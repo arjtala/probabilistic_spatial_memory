@@ -4,4 +4,6 @@
 */*.txt
 */build/
 build/
+.cache/
+compile_commands.json
 phrases/
