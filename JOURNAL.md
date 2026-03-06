@@ -340,3 +340,66 @@ Set up `Makefile` for the spatial memory project:
 1. **Implement `tile.c`** — Spatial tile pairing a geographic region with a ring buffer of HLLs
 2. **Implement `spatial_memory.h`** — Top-level engine managing a collection of tiles
 3. **Add `compile_flags.txt`** or generate `compile_commands.json` via Bear for LSP support
+
+---
+
+### 2026-03-06 — Tile Implementation & H3 Integration
+
+#### Tile Implementation
+
+Implemented `tile.c` — a spatial tile that pairs a geographic region (H3 cell) with a ring buffer of HLL counters:
+
+| Function | Description |
+|----------|------------|
+| `Tile_new(lat, lng, resolution, capacity, precision)` | Converts lat/lng to H3 cell ID, allocates ring buffer |
+| `Tile_free(tile)` | Frees ring buffer and tile |
+| `Tile_add(tile, data, size)` | Records observation in current time window via `HLL_add` |
+| `Tile_advance(tile)` | Rotates to next time window via `RingBuffer_advance` |
+| `Tile_query(tile, n)` | Returns distinct count over last N windows, properly frees merged HLL |
+
+#### H3 Integration
+
+Replaced geohash strings with [Uber's H3](https://h3geo.org/) hexagonal spatial index:
+
+- Installed via `brew install h3`, linked with `-lh3`
+- `H3Index` is a `uint64_t` — no string allocation/freeing needed
+- `latLngToCell()` converts coordinates to cell IDs with error checking
+- Advantages over geohash: uniform cell area, no edge discontinuities, hierarchical via bit-shifting, integer comparisons
+
+Makefile updated with `H3_PREFIX = $(shell brew --prefix h3)` for portable Homebrew path resolution.
+
+#### Tile Tests
+
+Wrote `tests/test_tile.c` with 5 test cases:
+
+| Test | What it verifies |
+|------|-----------------|
+| `test_tile_new` | H3 cell ID matches known value, ring buffer initialized correctly |
+| `test_tile_add` | Observation increases HLL count |
+| `test_tile_advance` | New time window is empty after advance |
+| `test_tile_query` | Merged count across windows reflects distinct items |
+| `test_tile_same_cell` | Two nearby coordinates at same resolution produce same cell ID |
+
+#### Build System Updates
+
+- `make test` now runs both `test-ring-buffer` and `test-tile`
+- `make test-tile` / `make test-ring-buffer` for running individual suites
+- LSP support via `bear -- make test` to generate `compile_commands.json`
+
+#### Updated Project Status
+
+| Component | File(s) | Status |
+|-----------|---------|--------|
+| HLL (vendor) | `vendor/probabilistic_data_structures/hyperloglog/hll.{h,c}` | Complete (refactored) |
+| Bloom Filter (vendor) | `vendor/probabilistic_data_structures/bloom_filter/bloom.{h,c}` | Complete (refactored) |
+| Ring Buffer | `src/ring_buffer.c`, `include/ring_buffer.h` | Complete (tested) |
+| Ring Buffer Tests | `tests/test_ring_buffer.c` | Complete (5 tests passing) |
+| Tile | `src/tile.c`, `include/tile.h` | Complete (tested) |
+| Tile Tests | `tests/test_tile.c` | Complete (5 tests passing) |
+| Build System | `Makefile` | Complete (H3 integrated) |
+| Spatial Memory Engine | `include/spatial_memory.h` | Stubbed (empty) |
+
+#### Next Steps
+
+1. **Implement `spatial_memory`** — Top-level engine managing a collection of tiles (hash map of H3Index → Tile)
+2. **Visualization** — OpenGL memory glow map (Phase 1 stretch)

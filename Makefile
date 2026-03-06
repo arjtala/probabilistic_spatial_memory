@@ -1,6 +1,7 @@
 CC = clang
-CFLAGS = -Wall -Wextra -Werror -std=c99 -O3 -march=native -flto -ffast-math -mtune=native -Iinclude -I.
-LDFLAGS = -flto
+H3_PREFIX = $(shell brew --prefix h3)
+CFLAGS = -Wall -Wextra -Werror -std=c99 -O3 -march=native -flto -ffast-math -mtune=native -Iinclude -I. -I$(H3_PREFIX)/include
+LDFLAGS = -flto -L$(H3_PREFIX)/lib -lh3
 BUILD_DIR = build
 
 # Vendor paths
@@ -23,8 +24,9 @@ VENDOR_OBJ = $(patsubst $(VENDOR)/%.c,$(BUILD_DIR)/vendor/%.o,$(VENDOR_SRCS))
 # Library name
 LIB = libpsm.a
 
-# Test executable
-TEST_EXEC = $(BUILD_DIR)/test_ring_buffer
+# Test executables
+TEST_RING_BUFFER = $(BUILD_DIR)/test_ring_buffer
+TEST_TILE = $(BUILD_DIR)/test_tile
 
 # Default target
 all: $(LIB)
@@ -43,14 +45,23 @@ $(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(VENDOR_HEADERS)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
-# Test target - build and run tests
-test: $(TEST_EXEC)
-	./$(TEST_EXEC)
+# Test targets
+test: test-ring-buffer test-tile
 
-# Build test executable
-$(TEST_EXEC): tests/test_ring_buffer.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
+test-ring-buffer: $(TEST_RING_BUFFER)
+	./$(TEST_RING_BUFFER)
+
+test-tile: $(TEST_TILE)
+	./$(TEST_TILE)
+
+# Build test executables
+$(TEST_RING_BUFFER): tests/test_ring_buffer.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_ring_buffer.c $(OBJ) $(VENDOR_OBJ) -o $@ -lm
+
+$(TEST_TILE): tests/test_tile.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_tile.c $(OBJ) $(VENDOR_OBJ) -o $@ -lm
 
 # Clean target
 clean:
@@ -60,7 +71,7 @@ clean:
 rebuild: clean all
 
 # Phony targets
-.PHONY: all test clean rebuild show
+.PHONY: all test test-ring-buffer test-tile clean rebuild show
 
 # Show detected files
 show:
