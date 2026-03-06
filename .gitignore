@@ -1,0 +1,7 @@
+*/*.gch
+*/*.tmp
+*/*.out
+*/*.txt
+*/build/
+build/
+phrases/
