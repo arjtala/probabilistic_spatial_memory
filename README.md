@@ -21,19 +21,19 @@ Memory usage is bounded regardless of how many observations are processed.
 ```
 ┌─────────────────────────────────────────┐
 │             Spatial Memory              │
-│  ┌──────┐  ┌──────┐  ┌──────┐          │
+│  ┌──────┐  ┌──────┐  ┌──────┐           │
 │  │Tile A│  │Tile B│  │Tile C│  ...      │
-│  └──┬───┘  └──┬───┘  └──┬───┘          │
+│  └──┬───┘  └──┬───┘  └──┬───┘           │
 │     │         │         │               │
-│  ┌──▼───────────────────▼──────────┐    │
+│  ┌──▼───────────────────▼─────────┐    │
 │  │  Ring Buffer (per tile)         │    │
-│  │  [HLL][HLL][HLL]...[HLL]       │    │
-│  │   t-0  t-1  t-2      t-n       │    │
+│  │  [HLL][HLL][HLL]...[HLL]        │    │
+│  │   t-0  t-1  t-2      t-n        │    │
 │  └─────────────────────────────────┘    │
 └─────────────────────────────────────────┘
 ```
 
-- **Tile**: A geographic region (geohash) with its own ring buffer
+- **Tile**: A geographic region (H3 hex cell) with its own ring buffer
 - **Ring Buffer**: Fixed-size circular buffer of HLL counters, one per time window
 - **HLL**: HyperLogLog sketch estimating distinct item count
 
@@ -71,6 +71,7 @@ vendor/             # Git submodule
 ## Dependencies
 
 - [probabilistic_data_structures](https://github.com/arjtala/probabilistic_data_structures) — HyperLogLog, Bloom filter, hash functions (included as git submodule)
+- [H3](https://h3geo.org/) — Uber's hexagonal hierarchical spatial index (`brew install h3`)
 
 ## Status
 
