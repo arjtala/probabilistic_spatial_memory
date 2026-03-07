@@ -1,6 +1,6 @@
 #include "tile.h"
 
-Tile *Tile_new(const double lat, const double lng, const int resolution, size_t capacity, size_t precision) {
+Tile *Tile_new(const double lat, const double lng, const size_t resolution, const size_t capacity, const size_t precision) {
 
   Tile *tile = (Tile*)malloc(sizeof(Tile));
   if (NULL==tile) {
@@ -11,8 +11,8 @@ Tile *Tile_new(const double lat, const double lng, const int resolution, size_t 
   LatLng loc;
   loc.lat = degsToRads(lat);
   loc.lng = degsToRads(lng);
-  H3Index index;
-  H3Error err = latLngToCell(&loc, resolution, &index);
+  H3Index cellId;
+  H3Error err = latLngToCell(&loc, resolution, &cellId);
   if (err) {
     fprintf(stderr, "Failed to create H3Index : invalid lat/lng or resolution\n");
     exit(EXIT_FAILURE);
@@ -20,7 +20,7 @@ Tile *Tile_new(const double lat, const double lng, const int resolution, size_t 
 
   RingBuffer *rb = RingBuffer_new(capacity, precision);
 
-  tile->cellId = index;
+  tile->cellId = cellId;
   tile->rb = rb;
   return tile;
 }
@@ -45,7 +45,7 @@ void Tile_advance(Tile *tile) {
 
 //  Tile_query(tile, n) — "How many distinct things were seen here over the last N time windows?" Merges N slots
 //  from the ring buffer, gets the count, frees the merged HLL, and returns the estimate.
-double Tile_query(Tile *tile, size_t n) {
+double Tile_query(Tile *tile, const size_t n) {
   HLL *hll = RingBuffer_merge_window(tile->rb, n);
   double count = HLL_count(hll);
   freeHLL(hll);

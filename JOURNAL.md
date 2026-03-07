@@ -403,3 +403,63 @@ Wrote `tests/test_tile.c` with 5 test cases:
 
 1. **Implement `spatial_memory`** — Top-level engine managing a collection of tiles (hash map of H3Index → Tile)
 2. **Visualization** — OpenGL memory glow map (Phase 1 stretch)
+
+---
+
+### 2026-03-07 — Spatial Memory Engine
+
+#### Spatial Memory Implementation
+
+Implemented `spatial_memory.c` — the top-level engine that manages a collection of tiles via a hash table keyed by H3 hex strings:
+
+| Function | Description |
+|----------|------------|
+| `SpatialMemory_new(resolution, capacity, precision)` | Allocates engine with shared config, creates `HashTable` for tiles |
+| `SpatialMemory_observe(sm, lat, lng, data, size)` | Converts lat/lng → H3 hex string, auto-creates tile if not found, adds observation |
+| `SpatialMemory_advance_all(sm)` | Iterates all tiles via `HashTableIterator`, advances each to next time window |
+| `SpatialMemory_query(sm, lat, lng, n)` | Looks up tile by H3 cell, returns distinct count over last N windows (0.0 if no tile exists) |
+| `SpatialMemory_free(sm)` | Iterates and frees all tiles, frees hash table and struct |
+
+#### Hash Table Dependency
+
+Added `HashTable` to the vendor `probabilistic_data_structures` library (`lib/hash.{h,c}`):
+
+- Open addressing with linear probing
+- String keys (H3 hex strings), `void *` values (Tile pointers)
+- Auto-expansion at 50% load factor
+- Iterator support for `advance_all` and `free`
+- Keys stored via `strdup` for ownership safety
+
+Design decision: using string keys (H3 hex strings) rather than raw `uint64_t` keeps the hash table generic and forward-compatible with other spatial indexing systems (e.g. S2 Geometry which also has string cell identifiers).
+
+#### Code Formatting
+
+Added `.clang-format` (Google style, 2-space indent) with format-on-save via clangd in Emacs.
+
+#### Common C mistakes caught during implementation
+
+- `HashTableIterator` (type) vs `HashTable_iterator` (function)
+- Struct returned by value vs pointer: `HashTableIterator it = ...` not `HashTableIterator *it = ...`
+- Dot vs arrow: `it.value` (stack struct) vs `it->value` (pointer)
+- Freeing a tile that's still in the hash table (query shouldn't free)
+- `SpatialMemory_free(sm)` calling itself recursively instead of `free(sm)`
+- Storing raw data instead of the `Tile *` in `HashTable_set`
+
+#### Updated Project Status
+
+| Component | File(s) | Status |
+|-----------|---------|--------|
+| HLL (vendor) | `vendor/probabilistic_data_structures/hyperloglog/hll.{h,c}` | Complete |
+| Bloom Filter (vendor) | `vendor/probabilistic_data_structures/bloom_filter/bloom.{h,c}` | Complete |
+| Hash Table (vendor) | `vendor/probabilistic_data_structures/lib/hash.{h,c}` | Complete |
+| Ring Buffer | `src/ring_buffer.c`, `include/ring_buffer.h` | Complete (tested) |
+| Tile | `src/tile.c`, `include/tile.h` | Complete (tested) |
+| Spatial Memory | `src/spatial_memory.c`, `include/spatial_memory.h` | Complete (needs tests) |
+| Ring Buffer Tests | `tests/test_ring_buffer.c` | Complete (5 tests) |
+| Tile Tests | `tests/test_tile.c` | Complete (5 tests) |
+| Build System | `Makefile` | Complete (H3 + vendor) |
+
+#### Next Steps
+
+1. **Write tests for `spatial_memory`** — observe, query, advance_all, multi-tile scenarios
+2. **Visualization** — OpenGL memory glow map (Phase 2)

@@ -12,7 +12,7 @@ typedef struct {
   size_t precision;
   HLL* hlls[];
 } RingBuffer;
-RingBuffer *RingBuffer_new(size_t capacity, size_t precision);
+RingBuffer *RingBuffer_new(const size_t capacity, const size_t precision);
 void RingBuffer_free(RingBuffer *rb);
 void RingBuffer_advance(RingBuffer *rb);
 HLL *RingBuffer_current(RingBuffer *rb);

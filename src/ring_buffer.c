@@ -1,6 +1,6 @@
 #include "ring_buffer.h"
 
-RingBuffer *RingBuffer_new(size_t capacity, size_t precision) {
+RingBuffer *RingBuffer_new(const size_t capacity, const size_t precision) {
   RingBuffer *rb = (RingBuffer*)malloc(sizeof(RingBuffer) + capacity * sizeof(HLL*));
   if (NULL==rb) {
     fprintf(stderr, "Out of memory.\n");
@@ -32,7 +32,9 @@ HLL *RingBuffer_merge_window(RingBuffer *rb, size_t n) {
   // This is a hacky way of return a deep copy as it performs an element-wise
   // max of registers of the HLL with itself
   if (n == 0) return HLL_merge_copy(curr_hll, curr_hll);
-  if (n > rb->capacity) n = rb->capacity;
+  if (n > rb->capacity) {
+    n = rb->capacity;
+  }
   HLL *merged_hll;
   HLL *prev_hll;
   size_t idx = rb->head;
