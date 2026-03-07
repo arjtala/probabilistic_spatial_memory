@@ -1,6 +1,6 @@
 #include "tile.h"
 
-Tile *Tile_new(const double lat, const double lng, const size_t resolution, const size_t capacity, const size_t precision) {
+Tile *Tile_new(const double lat, const double lng, const int resolution, const size_t capacity, const size_t precision) {
 
   Tile *tile = (Tile*)malloc(sizeof(Tile));
   if (NULL==tile) {
