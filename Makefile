@@ -27,6 +27,7 @@ LIB = libpsm.a
 # Test executables
 TEST_RING_BUFFER = $(BUILD_DIR)/test_ring_buffer
 TEST_TILE = $(BUILD_DIR)/test_tile
+TEST_SPATIAL = $(BUILD_DIR)/test_spatial_memory
 
 # Default target
 all: $(LIB)
@@ -46,7 +47,7 @@ $(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(VENDOR_HEADERS)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
 # Test targets
-test: test-ring-buffer test-tile
+test: test-ring-buffer test-tile test-spatial
 
 test-ring-buffer: $(TEST_RING_BUFFER)
 	./$(TEST_RING_BUFFER)
@@ -63,6 +64,13 @@ $(TEST_TILE): tests/test_tile.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_tile.c $(OBJ) $(VENDOR_OBJ) -o $@ -lm
 
+test-spatial: $(TEST_SPATIAL)
+	./$(TEST_SPATIAL)
+
+$(TEST_SPATIAL): tests/test_spatial_memory.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_spatial_memory.c $(OBJ) $(VENDOR_OBJ) -o $@ -lm
+
 # Clean target
 clean:
 	rm -rf $(BUILD_DIR) $(LIB)
@@ -71,7 +79,7 @@ clean:
 rebuild: clean all
 
 # Phony targets
-.PHONY: all test test-ring-buffer test-tile clean rebuild show
+.PHONY: all test test-ring-buffer test-tile test-spatial clean rebuild show
 
 # Show detected files
 show:

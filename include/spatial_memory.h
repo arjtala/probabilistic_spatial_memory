@@ -9,10 +9,10 @@
 //  - SpatialMemory_new(resolution, capacity, precision) — create the engine
 //  with shared config
 //  - SpatialMemory_observe(sm, lat, lng, data, size) — auto-creates tile if
-//  needed, adds observation
-//  - SpatialMemory_advance_all(sm) — rotates all tiles to next time window
-//  - SpatialMemory_query(sm, lat, lng, n) — query distinct count at a location
-//  - SpatialMemory_free(sm) — cleanup
+/* //  needed, adds observation */
+/* //  - SpatialMemory_advance_all(sm) — rotates all tiles to next time window */
+/* //  - SpatialMemory_query(sm, lat, lng, n) — query distinct count at a location */
+/* //  - SpatialMemory_free(sm) — cleanup */
 
 #define INITIAL_TILE_CAPACITY 16
 #define H3_INDEX_HEX_STRING_LENGTH 17

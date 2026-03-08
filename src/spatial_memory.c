@@ -9,7 +9,7 @@ SpatialMemory *SpatialMemory_new(const int resolution, const size_t capacity,
     fprintf(stderr, "Unable to initialize SpatialMemory: out of memory.\n");
     exit(EXIT_FAILURE);
   }
-  sm->tiles = HashTable_create();
+  sm->tiles = HashTable_create((void (*)(void *))Tile_free);
   if (NULL == sm->tiles) {
     fprintf(stderr, "Unable to initialize tiles: out of memory.\n");
     exit(EXIT_FAILURE);
@@ -70,10 +70,6 @@ double SpatialMemory_query(SpatialMemory *sm, const double lat, const double lng
 }
 
 void SpatialMemory_free(SpatialMemory *sm) {
-  HashTableIterator it = HashTable_iterator(sm->tiles);
-  while (HashTable_next(&it)) {
-    Tile_free(it.value);
-  }
   HashTable_free(sm->tiles);
   free(sm);
 }

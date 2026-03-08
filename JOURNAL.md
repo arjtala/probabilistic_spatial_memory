@@ -463,3 +463,55 @@ Added `.clang-format` (Google style, 2-space indent) with format-on-save via cla
 
 1. **Write tests for `spatial_memory`** — observe, query, advance_all, multi-tile scenarios
 2. **Visualization** — OpenGL memory glow map (Phase 2)
+
+---
+
+### 2026-03-08 — Spatial Memory Tests & HashTable Refinements
+
+#### Spatial Memory Tests
+
+Wrote `tests/test_spatial_memory.c` with 5 test cases:
+
+| Test | What it verifies |
+|------|-----------------|
+| `test_sm_new` | Resolution, capacity, precision set correctly, hash table initialized |
+| `test_sm_observe` | Observation creates a tile in the hash table, tile is non-NULL |
+| `test_sm_query` | Query returns correct distinct count after observation |
+| `test_sm_advance_all` | After advancing, current time window is empty (count == 0) |
+| `test_sm_multi_tile` | Two distant locations (London, Tokyo) create independent tiles with separate counts |
+
+All 15 tests passing across ring buffer, tile, and spatial memory suites.
+
+#### HashTable Refinements
+
+- Added `free_value` callback to `HashTable_create` — hash table owns value cleanup
+- `SpatialMemory_free` delegates to `HashTable_free` instead of manually iterating (fixed double-free segfault)
+- `HashTable_set` value parameter changed from `const char *` to `void *` for generic storage
+
+#### Common C mistakes caught
+
+- Double-free: manually iterating to free tiles AND having `HashTable_free` free them via callback
+- `strlen(data)` on `const void *` — use the `size` parameter instead
+- Storing raw data pointer in hash table instead of the created `Tile *`
+- Using `tile` after NULL check without assigning the newly created tile
+
+#### Updated Project Status
+
+| Component | File(s) | Status |
+|-----------|---------|--------|
+| HLL (vendor) | `vendor/probabilistic_data_structures/hyperloglog/hll.{h,c}` | Complete |
+| Bloom Filter (vendor) | `vendor/probabilistic_data_structures/bloom_filter/bloom.{h,c}` | Complete |
+| Hash Table (vendor) | `vendor/probabilistic_data_structures/lib/hash.{h,c}` | Complete |
+| Ring Buffer | `src/ring_buffer.c`, `include/ring_buffer.h` | Complete (tested) |
+| Tile | `src/tile.c`, `include/tile.h` | Complete (tested) |
+| Spatial Memory | `src/spatial_memory.c`, `include/spatial_memory.h` | Complete (tested) |
+| Ring Buffer Tests | `tests/test_ring_buffer.c` | Complete (5 tests) |
+| Tile Tests | `tests/test_tile.c` | Complete (5 tests) |
+| Spatial Memory Tests | `tests/test_spatial_memory.c` | Complete (5 tests) |
+| Build System | `Makefile` | Complete (H3 + vendor + 3 test suites) |
+
+#### Next Steps
+
+1. **Input pipeline** — Ingest stream of `(timestamp, lat, lng, embedding)` tuples from file or stdin
+2. **Visualization** — OpenGL memory glow map rendering tiles colored by novelty/distinct count
+3. **Novelty detection** — Compare current window count to historical merged count to identify novel regions
