@@ -1,7 +1,7 @@
 #ifndef TILE_H
 #define TILE_H
 
-#include "ring_buffer.h"
+#include "core/ring_buffer.h"
 #include <h3/h3api.h>
 
 typedef struct {

@@ -10,15 +10,15 @@ VENDOR_INCLUDES = -I$(VENDOR)/lib -I$(VENDOR)/hyperloglog -I$(VENDOR)/bloom_filt
 
 # Headers
 VENDOR_HEADERS = $(wildcard $(VENDOR)/lib/*.h) $(wildcard $(VENDOR)/hyperloglog/*.h) $(wildcard $(VENDOR)/bloom_filter/*.h)
-LOCAL_HEADERS = $(wildcard include/*.h)
+LOCAL_HEADERS = $(wildcard include/core/*.h)
 HEADERS = $(LOCAL_HEADERS) $(VENDOR_HEADERS)
 
 # Source files
-SRCS = $(wildcard src/*.c)
+SRCS = $(wildcard src/core/*.c)
 VENDOR_SRCS = $(VENDOR)/lib/hash.c $(VENDOR)/lib/bitarray.c $(VENDOR)/lib/utilities.c $(VENDOR)/hyperloglog/hll.c $(VENDOR)/bloom_filter/bloom.c
 
 # Object files
-OBJ = $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(SRCS))
+OBJ = $(patsubst src/core/%.c,$(BUILD_DIR)/core/%.o,$(SRCS))
 VENDOR_OBJ = $(patsubst $(VENDOR)/%.c,$(BUILD_DIR)/vendor/%.o,$(VENDOR_SRCS))
 
 # Library name
@@ -37,8 +37,8 @@ $(LIB): $(OBJ) $(VENDOR_OBJ)
 	ar rcs $@ $^
 
 # Build project object files
-$(BUILD_DIR)/%.o: src/%.c $(HEADERS)
-	@mkdir -p $(BUILD_DIR)
+$(BUILD_DIR)/core/%.o: src/core/%.c $(HEADERS)
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
 # Build vendor object files

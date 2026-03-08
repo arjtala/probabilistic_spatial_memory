@@ -1,11 +1,10 @@
-#include "hash.h"
 #define _POSIX_C_SOURCE 200809L
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-#include "spatial_memory.h"
+#include "core/spatial_memory.h"
 #include "vendor/probabilistic_data_structures/lib/utilities.h"
 
 #define CAPACITY 3

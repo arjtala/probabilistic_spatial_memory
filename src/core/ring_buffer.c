@@ -1,4 +1,4 @@
-#include "ring_buffer.h"
+#include "core/ring_buffer.h"
 
 RingBuffer *RingBuffer_new(const size_t capacity, const size_t precision) {
   RingBuffer *rb = (RingBuffer*)malloc(sizeof(RingBuffer) + capacity * sizeof(HLL*));

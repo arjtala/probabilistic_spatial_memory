@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-#include "ring_buffer.h"
+#include "core/ring_buffer.h"
 #include "vendor/probabilistic_data_structures/lib/utilities.h"
 
 #define CAPACITY 3

@@ -1,7 +1,7 @@
 #ifndef SPATIAL_H
 #define SPATIAL_H
 
-#include "tile.h"
+#include "core/tile.h"
 #include "vendor/probabilistic_data_structures/lib/hash.h"
 
 //  spatial_memory — the top-level engine that manages a collection of tiles.

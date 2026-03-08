@@ -1,6 +1,5 @@
-#include "spatial_memory.h"
+#include "core/spatial_memory.h"
 #include "hash.h"
-#include "tile.h"
 
 SpatialMemory *SpatialMemory_new(const int resolution, const size_t capacity,
                                  const size_t precision) {
