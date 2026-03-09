@@ -47,20 +47,33 @@ make test     # build and run tests
 make clean    # remove build artifacts
 ```
 
-Requires `clang` and a Unix-like environment.
+Requires `clang` and a Unix-like environment. Dependencies installed via Homebrew:
+
+```bash
+brew install h3 hdf5
+```
 
 ## Project structure
 
 ```
-include/            # Headers
-  ring_buffer.h
-  tile.h
-  spatial_memory.h
-src/                # Implementations
-  ring_buffer.c
-  tile.c
+include/
+  core/             # Core engine headers
+    ring_buffer.h
+    tile.h
+    spatial_memory.h
+  ingest/           # Data ingestion headers
+    ingest.h
+src/
+  core/             # Core engine
+    ring_buffer.c
+    tile.c
+    spatial_memory.c
+  ingest/           # HDF5 ingestion pipeline
+    ingest.c
 tests/              # Test suites
   test_ring_buffer.c
+  test_tile.c
+  test_spatial_memory.c
 vendor/             # Git submodule
   probabilistic_data_structures/
     hyperloglog/    # HyperLogLog implementation
@@ -72,6 +85,7 @@ vendor/             # Git submodule
 
 - [probabilistic_data_structures](https://github.com/arjtala/probabilistic_data_structures) — HyperLogLog, Bloom filter, hash functions (included as git submodule)
 - [H3](https://h3geo.org/) — Uber's hexagonal hierarchical spatial index (`brew install h3`)
+- [HDF5](https://www.hdfgroup.org/solutions/hdf5/) — Reading embedding datasets produced by Python extraction pipeline (`brew install hdf5`)
 
 ## Status
 
