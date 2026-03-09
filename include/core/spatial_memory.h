@@ -16,6 +16,7 @@
 
 #define INITIAL_TILE_CAPACITY 16
 #define H3_INDEX_HEX_STRING_LENGTH 17
+#define DEFAULT_RESOLUTION 10
 
 typedef struct {
   HashTable *tiles;  // dynamic array of tile pointers
@@ -30,6 +31,7 @@ void SpatialMemory_observe(SpatialMemory *sm, const double lat, const double lng
                            size_t size);
 void SpatialMemory_advance_all(SpatialMemory *sm);
 double SpatialMemory_query(SpatialMemory *sm, const double lat, const double lng, const size_t n);
+size_t SpatialMemory_tile_count(SpatialMemory *sm);
 void SpatialMemory_free(SpatialMemory *sm);
 
 #endif

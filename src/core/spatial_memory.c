@@ -1,5 +1,6 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include "core/spatial_memory.h"
-#include "hash.h"
 
 SpatialMemory *SpatialMemory_new(const int resolution, const size_t capacity,
                                  const size_t precision) {
@@ -66,6 +67,10 @@ double SpatialMemory_query(SpatialMemory *sm, const double lat, const double lng
   }
   count = Tile_query(tile, n);
   return count;
+}
+
+size_t SpatialMemory_tile_count(SpatialMemory *sm) {
+  return HashTable_size(sm->tiles);
 }
 
 void SpatialMemory_free(SpatialMemory *sm) {

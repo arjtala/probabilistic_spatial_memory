@@ -1,7 +1,8 @@
 CC = clang
 H3_PREFIX = $(shell brew --prefix h3)
-CFLAGS = -Wall -Wextra -Werror -std=c99 -O3 -march=native -flto -ffast-math -mtune=native -Iinclude -I. -I$(H3_PREFIX)/include
-LDFLAGS = -flto -L$(H3_PREFIX)/lib -lh3
+HDF5_PREFIX = $(shell brew --prefix hdf5)
+CFLAGS = -Wall -Wextra -Werror -std=c99 -O3 -march=native -flto -ffast-math -mtune=native -Iinclude -I. -I$(H3_PREFIX)/include -I$(HDF5_PREFIX)/include
+LDFLAGS = -flto -L$(H3_PREFIX)/lib -lh3 -L$(HDF5_PREFIX)/lib -lhdf5
 BUILD_DIR = build
 
 # Vendor paths
@@ -10,19 +11,26 @@ VENDOR_INCLUDES = -I$(VENDOR)/lib -I$(VENDOR)/hyperloglog -I$(VENDOR)/bloom_filt
 
 # Headers
 VENDOR_HEADERS = $(wildcard $(VENDOR)/lib/*.h) $(wildcard $(VENDOR)/hyperloglog/*.h) $(wildcard $(VENDOR)/bloom_filter/*.h)
-LOCAL_HEADERS = $(wildcard include/core/*.h)
+LOCAL_HEADERS = $(wildcard include/core/*.h) $(wildcard include/ingest/*.h)
 HEADERS = $(LOCAL_HEADERS) $(VENDOR_HEADERS)
 
 # Source files
-SRCS = $(wildcard src/core/*.c)
+CORE_SRCS = $(wildcard src/core/*.c)
+INGEST_SRCS = $(wildcard src/ingest/*.c)
+SRCS = $(CORE_SRCS) $(INGEST_SRCS)
 VENDOR_SRCS = $(VENDOR)/lib/hash.c $(VENDOR)/lib/bitarray.c $(VENDOR)/lib/utilities.c $(VENDOR)/hyperloglog/hll.c $(VENDOR)/bloom_filter/bloom.c
 
 # Object files
-OBJ = $(patsubst src/core/%.c,$(BUILD_DIR)/core/%.o,$(SRCS))
+CORE_OBJ = $(patsubst src/core/%.c,$(BUILD_DIR)/core/%.o,$(CORE_SRCS))
+INGEST_OBJ = $(patsubst src/ingest/%.c,$(BUILD_DIR)/ingest/%.o,$(INGEST_SRCS))
+OBJ = $(CORE_OBJ) $(INGEST_OBJ)
 VENDOR_OBJ = $(patsubst $(VENDOR)/%.c,$(BUILD_DIR)/vendor/%.o,$(VENDOR_SRCS))
 
 # Library name
 LIB = libpsm.a
+
+# Main executable
+BIN = psm
 
 # Test executables
 TEST_RING_BUFFER = $(BUILD_DIR)/test_ring_buffer
@@ -30,14 +38,22 @@ TEST_TILE = $(BUILD_DIR)/test_tile
 TEST_SPATIAL = $(BUILD_DIR)/test_spatial_memory
 
 # Default target
-all: $(LIB)
+all: $(LIB) $(BIN)
 
 # Build the static library
 $(LIB): $(OBJ) $(VENDOR_OBJ)
 	ar rcs $@ $^
 
+# Build main executable
+$(BIN): src/main.c $(LIB)
+	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) src/main.c $(LIB) -o $@ -lm
+
 # Build project object files
 $(BUILD_DIR)/core/%.o: src/core/%.c $(HEADERS)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
+
+$(BUILD_DIR)/ingest/%.o: src/ingest/%.c $(HEADERS)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
@@ -73,13 +89,13 @@ $(TEST_SPATIAL): tests/test_spatial_memory.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
 
 # Clean target
 clean:
-	rm -rf $(BUILD_DIR) $(LIB)
+	rm -rf $(BUILD_DIR) $(LIB) $(BIN)
 
 # Rebuild everything
 rebuild: clean all
 
 # Phony targets
-.PHONY: all test test-ring-buffer test-tile test-spatial clean rebuild show
+.PHONY: all test test-ring-buffer test-tile test-spatial clean rebuild show run
 
 # Show detected files
 show:

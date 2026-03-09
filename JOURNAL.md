@@ -515,3 +515,147 @@ All 15 tests passing across ring buffer, tile, and spatial memory suites.
 1. **Input pipeline** — Ingest stream of `(timestamp, lat, lng, embedding)` tuples from file or stdin
 2. **Visualization** — OpenGL memory glow map rendering tiles colored by novelty/distinct count
 3. **Novelty detection** — Compare current window count to historical merged count to identify novel regions
+
+---
+
+### 2026-03-08 — Phase 2 Planning: Input Pipeline & Visualization
+
+#### End-to-End Architecture
+
+```
+┌──────────────┐    ┌──────────────┐    ┌──────────────────────────┐
+│ Python       │    │ C Engine     │    │ OpenGL Visualization     │
+│              │    │              │    │                          │
+│ Video frames │───>│ Hash embeds  │──>│ Video   │  Heatmap       │
+│ + GPS trace  │    │ Observe tiles│   │ playback│  of tiles      │
+│ + Embeddings │    │ Advance time │   │         │  fading with   │
+│ (DINOv3,     │    │ Query counts │   │         │  time decay    │
+│  viCLIP)     │    │              │   │         │                │
+└──────────────┘    └──────────────┘    └──────────────────────────┘
+```
+
+#### Pipeline Stages
+
+1. **Python extraction (offline)**: Video → frame extraction → model inference (DINOv3 attention maps, viCLIP embeddings) + GPS trace alignment → binary file of `(timestamp, lat, lng, embedding_float[D])`
+2. **C ingestion**: Read binary records, hash each embedding via murmur64, feed to `SpatialMemory_observe`, advance time windows on timestamp boundaries
+3. **C visualization**: OpenGL window with side-by-side video playback and spatial memory heatmap, synchronized by timestamp. H3 hex cells colored by distinct count, fading as memory decays.
+
+#### Design Decisions
+
+- **Binary file format**: `[double timestamp][double lat][double lng][float embedding[D]]` per record, with a header specifying embedding dimension D. Binary chosen over CSV since embeddings are large float arrays.
+- **Hashing on C side**: Python writes raw embeddings, C hashes them. Keeps the Python side simple and allows experimenting with different hash strategies without re-running inference.
+- **Time window advancement**: Based on timestamp deltas, not wall clock. When the timestamp crosses a configurable boundary (e.g. every 5 seconds), call `SpatialMemory_advance_all`.
+- **GPS-only for location**: IMU data (dead reckoning, motion detection) deferred to later — useful for smoother inter-GPS-sample positioning and motion-aware observation weighting, but not needed for the core pipeline.
+
+#### Implementation Plan
+
+1. Define binary file format and write C reader (`src/ingest.c`, `include/ingest.h`)
+2. Hash embeddings and feed to `SpatialMemory_observe` with time-based window advancement
+3. Write Python extraction script (offline, produces binary file)
+4. OpenGL heatmap renderer with video sync
+
+#### Updated Project Status
+
+| Component | File(s) | Status |
+|-----------|---------|--------|
+| Ring Buffer | `src/ring_buffer.c` | Complete (tested) |
+| Tile | `src/tile.c` | Complete (tested) |
+| Spatial Memory | `src/spatial_memory.c` | Complete (tested) |
+| All Tests | `tests/test_*.c` | Complete (15 tests passing) |
+| Build System | `Makefile` | Complete |
+| Ingestion | `src/ingest/ingest.c` | Not started |
+| Python Extraction | TBD | Not started |
+| OpenGL Visualization | TBD | Not started |
+
+---
+
+### 2026-03-09 — Ingest Pipeline & Main Executable
+
+#### Ingest Module
+
+Implemented `src/ingest/ingest.c` — reads `(timestamp, lat, lng, embedding)` records from an HDF5 file and feeds them into the spatial memory engine:
+
+| Function | Description |
+|----------|------------|
+| `IngestReader_open(file, group)` | Opens HDF5 datasets within a group (e.g. `"dino"`, `"jepa"`), queries `n_records` and `emb_dimension` from dataset shapes, allocates reusable embedding buffer |
+| `IngestReader_next(reader, record)` | Reads one record at cursor via HDF5 hyperslab selection (3 scalar reads + 1 row read), advances cursor |
+| `IngestReader_close(reader)` | Closes datasets, frees embedding buffer and reader |
+| `IngestReader_run(reader, sm, time_window_sec)` | Main loop: iterates records, feeds raw embedding bytes to `SpatialMemory_observe`, calls `SpatialMemory_advance_all` on timestamp boundaries |
+
+#### HDF5 File Format
+
+Expected structure (produced by Python extraction scripts):
+
+```
+/<group>          (e.g. "dino" or "jepa")
+  /timestamps     [N] float64
+  /lat            [N] float64
+  /lng            [N] float64
+  /embeddings     [N, D] float32
+```
+
+#### Key Design Decisions
+
+- **HDF5 over raw binary**: Supports named datasets, self-describing dimensions, and standard tooling (h5dump, h5py)
+- **Reusable embedding buffer**: `embedding_buf` allocated once in `_open`, reused per `_next` call. `IngestRecord.embedding` borrows from this buffer (valid only until next `_next` call)
+- **`hsize_t` locals for HDF5 calls**: `size_t` and `hsize_t` may differ in width; passing `&size_t` where `const hsize_t *` is expected is undefined behavior. Local `hsize_t` variables avoid pointer type mismatches
+- **Raw embeddings, not pre-hashed**: HLL does its own internal hashing via murmur64, so `_run` passes raw float bytes directly to `SpatialMemory_observe`
+- **Timestamp-driven time windows**: Tracks `last_advance` timestamp; advances all tiles when `record.timestamp - last_advance >= time_window_sec`
+
+#### Main Executable
+
+Added `src/main.c` — CLI entry point that wires up the full pipeline:
+
+```
+./psm <file.h5> <group> [time_window_sec]
+```
+
+Prints ingestion stats and per-tile breakdown (H3 cell ID, current window count, total count across all windows).
+
+#### First End-to-End Run
+
+```
+$ ./psm /tmp/201703061033/features.h5 dino
+Records: 300, Embedding dim: 1024
+Tiles created: 15
+  Cell 8a2834772747fff: current=0 total=20
+  Cell 8a2834772767fff: current=0 total=19
+  Cell 8a283477275ffff: current=6 total=19
+  ...
+```
+
+Tiles with `total=0` confirm time decay: early-visited cells had their ring buffer windows overwritten as the walk progressed beyond the 60-second retention (12 windows × 5 seconds).
+
+#### Bugs Fixed
+
+- `H5P_DATASET_ACCESS` passed as transfer property list in `H5Dread` — should be `H5P_DEFAULT` (dataset access property list class, not a valid instance)
+- `H5Sclose(mem1)` missing after scalar reads — dataspace handle leaked
+- `spatial_memory.h` missing `#include "core/tile.h"` — broke after `main.c` simplified its include chain
+- `spatial_memory.c` missing `<stdio.h>` and `<stdlib.h>`
+
+#### Build System
+
+- Added `psm` executable target linking `src/main.c` against `libpsm.a`
+- `make` now builds both library and executable
+- Added `SpatialMemory_tile_count()` wrapping `HashTable_size()`
+
+#### Updated Project Status
+
+| Component | File(s) | Status |
+|-----------|---------|--------|
+| HLL (vendor) | `vendor/probabilistic_data_structures/hyperloglog/hll.{h,c}` | Complete |
+| Bloom Filter (vendor) | `vendor/probabilistic_data_structures/bloom_filter/bloom.{h,c}` | Complete |
+| Hash Table (vendor) | `vendor/probabilistic_data_structures/lib/hash.{h,c}` | Complete |
+| Ring Buffer | `src/core/ring_buffer.c`, `include/core/ring_buffer.h` | Complete (tested) |
+| Tile | `src/core/tile.c`, `include/core/tile.h` | Complete (tested) |
+| Spatial Memory | `src/core/spatial_memory.c`, `include/core/spatial_memory.h` | Complete (tested) |
+| Ingestion | `src/ingest/ingest.c`, `include/ingest/ingest.h` | Complete |
+| Main Executable | `src/main.c` | Complete |
+| All Tests | `tests/test_*.c` | Complete (15 tests passing) |
+| Build System | `Makefile` | Complete (H3 + HDF5 + vendor) |
+
+#### Next Steps
+
+1. **OpenGL visualization** — Side-by-side video playback + H3 heatmap colored by distinct count / memory decay
+2. **Ingest tests** — Test with synthetic HDF5 fixtures (deferred — validated end-to-end instead)
+3. **Novelty detection** — Compare current window count to historical merged count
