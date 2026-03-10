@@ -1,15 +1,61 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include "ingest/ingest.h"
 
 IngestReader *IngestReader_open(hid_t file, const char *group) {
-  IngestReader *reader = (IngestReader *)malloc(sizeof(IngestReader));
+  if (file < 0) {
+    fprintf(stderr, "IngestReader_open: invalid file handle\n");
+    return NULL;
+  }
 
   hid_t grp = H5Gopen(file, group, H5P_DEFAULT);
+  if (grp < 0) {
+    fprintf(stderr, "IngestReader_open: group '%s' not found\n", group);
+    return NULL;
+  }
+
+  IngestReader *reader = (IngestReader *)malloc(sizeof(IngestReader));
+  if (!reader) {
+    H5Gclose(grp);
+    return NULL;
+  }
+
   reader->dataset_ts = H5Dopen(grp, TIMESTAMPS, H5P_DEFAULT);
   reader->dataset_lat = H5Dopen(grp, LAT, H5P_DEFAULT);
   reader->dataset_lng = H5Dopen(grp, LNG, H5P_DEFAULT);
   reader->dataset_emb = H5Dopen(grp, EMBEDDINGS, H5P_DEFAULT);
+
+  // Try opening attention_maps (optional — not all groups have it)
+  reader->dataset_attn = -1;
+  reader->attn_size = 0;
+  reader->attn_buf = NULL;
+
+  hid_t attn_ds = H5Dopen(grp, ATTENTION_MAPS, H5P_DEFAULT);
+  if (attn_ds >= 0) {
+    hid_t attn_space = H5Dget_space(attn_ds);
+    int rank = H5Sget_simple_extent_ndims(attn_space);
+    if (rank == 3) {
+      hsize_t attn_dims[3];
+      H5Sget_simple_extent_dims(attn_space, attn_dims, NULL);
+      reader->dataset_attn = attn_ds;
+      reader->attn_size = attn_dims[1]; // spatial dim (e.g. 14)
+      reader->attn_buf = malloc(attn_dims[1] * attn_dims[2] * sizeof(float));
+    } else {
+      H5Dclose(attn_ds);
+    }
+    H5Sclose(attn_space);
+  }
+
   H5Gclose(grp);
+
+  if (reader->dataset_ts < 0 || reader->dataset_lat < 0 ||
+      reader->dataset_lng < 0 || reader->dataset_emb < 0) {
+    fprintf(stderr, "IngestReader_open: missing datasets in group '%s'\n", group);
+    if (reader->dataset_attn >= 0) H5Dclose(reader->dataset_attn);
+    free(reader->attn_buf);
+    free(reader);
+    return NULL;
+  }
 
   hid_t space = H5Dget_space(reader->dataset_ts);
   hsize_t dims[1];
@@ -72,6 +118,27 @@ bool IngestReader_next(IngestReader *reader, IngestRecord *record) {
 
   record->embedding = reader->embedding_buf;
   record->embedding_dim = reader->emb_dimension;
+
+  // Read attention map if available
+  if (reader->dataset_attn >= 0) {
+    hsize_t attn_sz = reader->attn_size;
+    hsize_t offset3[3] = {cur, 0, 0};
+    hsize_t count3[3] = {1, attn_sz, attn_sz};
+    hsize_t mem_dims[2] = {attn_sz, attn_sz};
+    hid_t mem_attn = H5Screate_simple(2, mem_dims, NULL);
+    hid_t attn_space = H5Dget_space(reader->dataset_attn);
+    H5Sselect_hyperslab(attn_space, H5S_SELECT_SET, offset3, NULL, count3, NULL);
+    H5Dread(reader->dataset_attn, H5T_NATIVE_FLOAT, mem_attn, attn_space, H5P_DEFAULT,
+            reader->attn_buf);
+    H5Sclose(attn_space);
+    H5Sclose(mem_attn);
+    record->attention_map = reader->attn_buf;
+    record->attn_size = reader->attn_size;
+  } else {
+    record->attention_map = NULL;
+    record->attn_size = 0;
+  }
+
   reader->cursor++;
 
   return true;
@@ -82,7 +149,9 @@ void IngestReader_close(IngestReader *reader) {
   H5Dclose(reader->dataset_lat);
   H5Dclose(reader->dataset_lng);
   H5Dclose(reader->dataset_emb);
+  if (reader->dataset_attn >= 0) H5Dclose(reader->dataset_attn);
   free(reader->embedding_buf);
+  free(reader->attn_buf);
   free(reader);
 }
 

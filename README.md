@@ -42,7 +42,8 @@ Merging HLL slots gives "memory over the last N intervals" with natural time dec
 ## Building
 
 ```bash
-make          # build static library (libpsm.a)
+make          # build static library (libpsm.a) and CLI
+make viz      # build visualizer (psm-viz)
 make test     # build and run tests
 make clean    # remove build artifacts
 ```
@@ -50,8 +51,37 @@ make clean    # remove build artifacts
 Requires `clang` and a Unix-like environment. Dependencies installed via Homebrew:
 
 ```bash
-brew install h3 hdf5
+brew install h3 hdf5                  # core engine
+brew install glfw ffmpeg curl          # visualization (psm-viz)
 ```
+
+## Visualization
+
+`psm-viz` renders side-by-side video playback and a spatial memory heatmap with GPS trace overlay, synchronized by timestamp.
+
+```bash
+# Directory mode — finds *.mp4 and features.h5 automatically
+./psm-viz -d /path/to/session/
+./psm-viz -d /path/to/session/ -g jepa
+
+# Explicit flags
+./psm-viz -v video.mp4 -f features.h5 -g dino
+
+# Legacy positional args
+./psm-viz video.mp4 features.h5 dino 5.0 10
+```
+
+| Flag | Arg | Default | Description |
+|------|-----|---------|-------------|
+| `-d` | `<dir>` | — | Directory containing `*.mp4` and `features.h5` |
+| `-v` | `<path>` | — | Video file path |
+| `-f` | `<path>` | — | HDF5 features file path |
+| `-g` | `<name>` | `dino` | HDF5 group name |
+| `-t` | `<sec>` | `5.0` | Time window (seconds) |
+| `-r` | `<res>` | `10` | H3 resolution (0-15) |
+| `-h` | — | — | Print help |
+
+**Controls:** Space (pause), +/- (zoom), Left/Right (speed), Scroll (scrub video / zoom map), Q/Esc (quit).
 
 ## Project structure
 
@@ -63,6 +93,12 @@ include/
     spatial_memory.h
   ingest/           # Data ingestion headers
     ingest.h
+  viz/              # Visualization headers
+    shader.h
+    video_decoder.h
+    hex_renderer.h
+    tile_map.h
+    gps_trace.h
 src/
   core/             # Core engine
     ring_buffer.c
@@ -70,6 +106,14 @@ src/
     spatial_memory.c
   ingest/           # HDF5 ingestion pipeline
     ingest.c
+  viz/              # OpenGL visualizer
+    viz_main.c
+    shader.c
+    video_decoder.c
+    hex_renderer.c
+    tile_map.c
+    gps_trace.c
+shaders/            # GLSL shaders
 tests/              # Test suites
   test_ring_buffer.c
   test_tile.c

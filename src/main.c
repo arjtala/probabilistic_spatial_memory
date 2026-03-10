@@ -14,7 +14,18 @@ int main(int argc, char *argv[]) {
 
   SpatialMemory *sm = SpatialMemory_new(DEFAULT_RESOLUTION, DEFAULT_CAPACITY, DEFAULT_PRECISION);
   hid_t file = H5Fopen(filepath, H5F_ACC_RDONLY, H5P_DEFAULT);
+  if (file < 0) {
+    fprintf(stderr, "Failed to open HDF5 file: %s\n", filepath);
+    SpatialMemory_free(sm);
+    return 1;
+  }
   IngestReader *reader = IngestReader_open(file, group);
+  if (!reader) {
+    fprintf(stderr, "Failed to open group '%s' in %s\n", group, filepath);
+    H5Fclose(file);
+    SpatialMemory_free(sm);
+    return 1;
+  }
 
   printf("Records: %zu, Embedding dim: %zu\n", reader->n_records, reader->emb_dimension);
 

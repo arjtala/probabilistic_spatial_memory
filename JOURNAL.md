@@ -659,3 +659,56 @@ Tiles with `total=0` confirm time decay: early-visited cells had their ring buff
 1. **OpenGL visualization** — Side-by-side video playback + H3 heatmap colored by distinct count / memory decay
 2. **Ingest tests** — Test with synthetic HDF5 fixtures (deferred — validated end-to-end instead)
 3. **Novelty detection** — Compare current window count to historical merged count
+
+---
+
+### 2026-03-10 — CLI Flags for psm-viz
+
+#### CLI Overhaul
+
+Replaced positional-only argument parsing in `src/viz/viz_main.c` with POSIX `getopt` flags, adding a directory mode for convenience:
+
+| Flag | Arg | Default | Description |
+|------|-----|---------|-------------|
+| `-d` | `<dir>` | — | Directory containing `*.mp4` and `features.h5` |
+| `-v` | `<path>` | — | Video file path |
+| `-f` | `<path>` | — | HDF5 features file path |
+| `-g` | `<name>` | `dino` | HDF5 group name |
+| `-t` | `<sec>` | `5.0` | Time window (seconds) |
+| `-r` | `<res>` | `10` | H3 resolution (0-15) |
+| `-h` | — | — | Print help |
+
+**Resolution priority:**
+1. `-d` directory mode: scans for first `*.mp4` and `features.h5`
+2. `-v`/`-f` explicit flags
+3. Legacy positional args (backward compatible)
+4. `-g`/`-t`/`-r` override defaults in all modes
+
+#### Implementation Details
+
+- Added `find_file_in_dir(dir, extension, exact_name)` helper using `opendir`/`readdir` — returns malloc'd full path or NULL
+- `used_flags` boolean tracks whether any getopt flag was seen, enabling clean fallback to positional args
+- Allocated paths (`alloc_video`, `alloc_h5`) tracked separately for cleanup
+- `features.h5` is optional in directory mode (no error if missing)
+
+#### Data Investigation
+
+Inspected `/tmp/201704111335/features.h5` — all 1,011 records in the `dino` group have identical GPS coordinates (lat=37.4531508, lng=-122.182). The GPS trace appears stationary because the location data is constant, not a bug in the visualizer.
+
+#### Updated Project Status
+
+| Component | File(s) | Status |
+|-----------|---------|--------|
+| Ring Buffer | `src/core/ring_buffer.c` | Complete (tested) |
+| Tile | `src/core/tile.c` | Complete (tested) |
+| Spatial Memory | `src/core/spatial_memory.c` | Complete (tested) |
+| Ingestion | `src/ingest/ingest.c` | Complete |
+| Main Executable | `src/main.c` | Complete |
+| Visualization | `src/viz/viz_main.c` | Complete (CLI flags, video+heatmap+GPS trace) |
+| All Tests | `tests/test_*.c` | Complete (15 tests passing) |
+| Build System | `Makefile` | Complete |
+
+#### Next Steps
+
+1. **Novelty detection** — Compare current window count to historical merged count
+2. **Better GPS data** — Re-extract features with proper per-frame GPS interpolation
