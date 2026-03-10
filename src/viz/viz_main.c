@@ -298,7 +298,8 @@ static void AttentionOverlay_upload(AttentionOverlay *ao, float *raw_map, size_t
 
   size_t n = size * size;
 
-  // Min-max normalize to [0,1]
+  // Min-max normalize in-place to [0,1]
+  // (safe: buffer is overwritten on next IngestReader_next call)
   float min_val = raw_map[0], max_val = raw_map[0];
   for (size_t i = 1; i < n; i++) {
     if (raw_map[i] < min_val) min_val = raw_map[i];
@@ -306,19 +307,18 @@ static void AttentionOverlay_upload(AttentionOverlay *ao, float *raw_map, size_t
   }
 
   float range = max_val - min_val;
-  float norm[196]; // 14*14 max
   if (range > 1e-8f) {
     for (size_t i = 0; i < n; i++)
-      norm[i] = (raw_map[i] - min_val) / range;
+      raw_map[i] = (raw_map[i] - min_val) / range;
   } else {
     for (size_t i = 0; i < n; i++)
-      norm[i] = 0.0f;
+      raw_map[i] = 0.0f;
   }
 
   glBindTexture(GL_TEXTURE_2D, ao->texture);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, (GLsizei)size, (GLsizei)size, 0,
-               GL_RED, GL_FLOAT, norm);
+               GL_RED, GL_FLOAT, raw_map);
   glBindTexture(GL_TEXTURE_2D, 0);
 
   ao->has_data = true;

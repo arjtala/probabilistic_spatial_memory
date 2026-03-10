@@ -25,12 +25,14 @@ IngestReader *IngestReader_open(hid_t file, const char *group) {
   reader->dataset_lng = H5Dopen(grp, LNG, H5P_DEFAULT);
   reader->dataset_emb = H5Dopen(grp, EMBEDDINGS, H5P_DEFAULT);
 
-  // Try opening attention_maps (optional — not all groups have it)
+  // Try opening spatial maps: attention_maps (dino) or prediction_maps (jepa)
   reader->dataset_attn = -1;
   reader->attn_size = 0;
   reader->attn_buf = NULL;
 
   hid_t attn_ds = H5Dopen(grp, ATTENTION_MAPS, H5P_DEFAULT);
+  if (attn_ds < 0)
+    attn_ds = H5Dopen(grp, PREDICTION_MAPS, H5P_DEFAULT);
   if (attn_ds >= 0) {
     hid_t attn_space = H5Dget_space(attn_ds);
     int rank = H5Sget_simple_extent_ndims(attn_space);

@@ -12,6 +12,7 @@
 #define LNG "lng"
 #define EMBEDDINGS "embeddings"
 #define ATTENTION_MAPS "attention_maps"
+#define PREDICTION_MAPS "prediction_maps"
 
 typedef struct {
   hid_t dataset_ts;
