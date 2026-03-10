@@ -693,7 +693,7 @@ Replaced positional-only argument parsing in `src/viz/viz_main.c` with POSIX `ge
 
 #### Data Investigation
 
-Inspected `/tmp/201704111335/features.h5` — all 1,011 records in the `dino` group have identical GPS coordinates (lat=37.4531508, lng=-122.182). The GPS trace appears stationary because the location data is constant, not a bug in the visualizer.
+Initially thought `/tmp/201704111335/features.h5` had constant GPS — `h5dump` displayed all coordinates as `37.4532` / `-122.182` due to default 6-significant-figure formatting. The session actually spans ~500m with 25k unique positions (100 Hz GPS with normal burst patterns). The coordinates just differ at the 4th+ decimal place (~11m), invisible at default display precision. Session passes the extraction pipeline's `--stats` integrity check (GPS OK, not STUCK).
 
 #### Updated Project Status
 
@@ -711,4 +711,4 @@ Inspected `/tmp/201704111335/features.h5` — all 1,011 records in the `dino` gr
 #### Next Steps
 
 1. **Novelty detection** — Compare current window count to historical merged count
-2. **Better GPS data** — Re-extract features with proper per-frame GPS interpolation
+2. **Debug GPS trace rendering** — Session 201704111335 has valid GPS spanning ~500m but trace doesn't update visually; investigate whether the issue is in timestamp alignment or rendering
