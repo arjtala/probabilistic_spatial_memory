@@ -42,10 +42,10 @@ Merging HLL slots gives "memory over the last N intervals" with natural time dec
 ## Building
 
 ```bash
-make          # build static library (libpsm.a) and CLI
-make viz      # build visualizer (psm-viz)
+make          # build library and CLI → targets/psm
+make viz      # build visualizer → targets/psm-viz
 make test     # build and run tests
-make clean    # remove build artifacts
+make clean    # remove build artifacts and targets/
 ```
 
 Requires `clang` and a Unix-like environment. Dependencies installed via Homebrew:
@@ -61,14 +61,14 @@ brew install glfw ffmpeg curl          # visualization (psm-viz)
 
 ```bash
 # Directory mode — finds *.mp4 and features.h5 automatically
-./psm-viz -d /path/to/session/
-./psm-viz -d /path/to/session/ -g jepa
+targets/psm-viz -d /path/to/session/
+targets/psm-viz -d /path/to/session/ -g jepa
 
 # Explicit flags
-./psm-viz -v video.mp4 -f features.h5 -g dino
+targets/psm-viz -v video.mp4 -f features.h5 -g dino
 
 # Legacy positional args
-./psm-viz video.mp4 features.h5 dino 5.0 10
+targets/psm-viz video.mp4 features.h5 dino 5.0 10
 ```
 
 | Flag | Arg | Default | Description |
@@ -118,6 +118,8 @@ tests/              # Test suites
   test_ring_buffer.c
   test_tile.c
   test_spatial_memory.c
+targets/            # Build outputs (psm, psm-viz, libpsm.a)
+build/              # Intermediate object files
 vendor/             # Git submodule
   probabilistic_data_structures/
     hyperloglog/    # HyperLogLog implementation

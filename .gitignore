@@ -7,5 +7,4 @@ build/
 .cache/
 compile_commands.json
 phrases/
-*.a
-psm
+targets/

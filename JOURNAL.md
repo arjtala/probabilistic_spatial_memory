@@ -587,12 +587,22 @@ Implemented `src/ingest/ingest.c` — reads `(timestamp, lat, lng, embedding)` r
 Expected structure (produced by Python extraction scripts):
 
 ```
-/<group>          (e.g. "dino" or "jepa")
-  /timestamps     [N] float64
-  /lat            [N] float64
-  /lng            [N] float64
-  /embeddings     [N, D] float32
+/dino/
+  timestamps          float64 (N,)      — epoch seconds
+  lat                 float64 (N,)      — latitude
+  lng                 float64 (N,)      — longitude
+  embeddings          float32 (N, 1024) — DINOv3 CLS embeddings
+  attention_maps      float32 (N, H, W) — CLS→patch attention
+
+/jepa/
+  timestamps          float64 (M,)      — epoch seconds (center of 64-frame window)
+  lat                 float64 (M,)      — latitude
+  lng                 float64 (M,)      — longitude
+  embeddings          float32 (M, 1024) — mean-pooled encoder tokens
+  prediction_maps     float32 (M, 16, 16) — spatial prediction error ("surprise maps")
 ```
+
+N and M differ — DINOv3 produces one record per sampled frame, V-JEPA 2 produces one per sliding window (stride 32 frames). Ingest reads `attention_maps` or `prediction_maps` (whichever exists) and renders both as spatial overlays via the same pipeline.
 
 #### Key Design Decisions
 
@@ -607,7 +617,7 @@ Expected structure (produced by Python extraction scripts):
 Added `src/main.c` — CLI entry point that wires up the full pipeline:
 
 ```
-./psm <file.h5> <group> [time_window_sec]
+targets/psm <file.h5> <group> [time_window_sec]
 ```
 
 Prints ingestion stats and per-tile breakdown (H3 cell ID, current window count, total count across all windows).
@@ -615,7 +625,7 @@ Prints ingestion stats and per-tile breakdown (H3 cell ID, current window count,
 #### First End-to-End Run
 
 ```
-$ ./psm /tmp/201703061033/features.h5 dino
+$ targets/psm /tmp/201703061033/features.h5 dino
 Records: 300, Embedding dim: 1024
 Tiles created: 15
   Cell 8a2834772747fff: current=0 total=20

@@ -40,12 +40,15 @@ VIZ_SRCS = src/viz/shader.c src/viz/video_decoder.c src/viz/hex_renderer.c src/v
 VIZ_OBJ = $(patsubst src/viz/%.c,$(BUILD_DIR)/viz/%.o,$(VIZ_SRCS))
 STB_OBJ = $(BUILD_DIR)/vendor/stb/stb_image_impl.o
 
+# Output directory for binaries
+TARGET_DIR = targets
+
 # Library name
-LIB = libpsm.a
+LIB = $(TARGET_DIR)/libpsm.a
 
 # Main executable
-BIN = psm
-VIZ_BIN = psm-viz
+BIN = $(TARGET_DIR)/psm
+VIZ_BIN = $(TARGET_DIR)/psm-viz
 
 # Test executables
 TEST_RING_BUFFER = $(BUILD_DIR)/test_ring_buffer
@@ -57,10 +60,12 @@ all: $(LIB) $(BIN)
 
 # Build the static library
 $(LIB): $(OBJ) $(VENDOR_OBJ)
+	@mkdir -p $(TARGET_DIR)
 	ar rcs $@ $^
 
 # Build main executable
 $(BIN): src/main.c $(LIB)
+	@mkdir -p $(TARGET_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) src/main.c $(LIB) -o $@ -lm
 
 # Build project object files
@@ -84,6 +89,7 @@ $(STB_OBJ): vendor/stb/stb_image_impl.c vendor/stb/stb_image.h
 
 # Build viz executable
 viz: $(LIB) $(VIZ_OBJ) $(STB_OBJ)
+	@mkdir -p $(TARGET_DIR)
 	$(CC) $(CFLAGS) $(VIZ_CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) $(VIZ_LDFLAGS) src/viz/viz_main.c $(VIZ_OBJ) $(STB_OBJ) $(LIB) -o $(VIZ_BIN) -lm
 
 # Build vendor object files
@@ -118,7 +124,7 @@ $(TEST_SPATIAL): tests/test_spatial_memory.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
 
 # Clean target
 clean:
-	rm -rf $(BUILD_DIR) $(LIB) $(BIN) $(VIZ_BIN)
+	rm -rf $(BUILD_DIR) $(TARGET_DIR)
 
 # Rebuild everything
 rebuild: clean all
