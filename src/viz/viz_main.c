@@ -15,6 +15,7 @@
 #include "viz/tile_map.h"
 #include "viz/gps_trace.h"
 #include "viz/imu_processor.h"
+#include "viz/jepa_cache.h"
 #include "ingest/ingest.h"
 
 // ---- State ----
@@ -42,6 +43,7 @@ static GpsTrace *g_gps_trace = NULL;
 static ImuProcessor *g_imu_proc = NULL;
 static IngestReader *g_reader = NULL;
 static ImuGpsReader *g_imu_gps = NULL;
+static JepaCache *g_jepa_cache = NULL;
 static SpatialMemory *g_sm = NULL;
 static double *g_first_ts = NULL;
 static double *g_last_adv = NULL;
@@ -439,6 +441,7 @@ static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) 
           g_hex_renderer->pan_offset_lng = 0.0;
           g_hex_renderer->vertex_count = 0;  // clear stale hex tile geometry
         }
+        if (g_jepa_cache) JepaCache_reset(g_jepa_cache);
       }
     }
   } else {
@@ -748,17 +751,31 @@ int main(int argc, char *argv[]) {
   double last_adv = -1.0;
   double first_ts = -1.0;
 
+  JepaCache *jepa_cache = NULL;
   if (h5_path) {
     sm = SpatialMemory_new(g_h3_resolution, DEFAULT_CAPACITY, DEFAULT_PRECISION);
     h5_file = H5Fopen(h5_path, H5F_ACC_RDONLY, H5P_DEFAULT);
     if (h5_file < 0) {
       fprintf(stderr, "Failed to open HDF5: %s\n", h5_path);
     } else {
-      reader = IngestReader_open(h5_file, group);
-      printf("HDF5: %zu records, %zu-d embeddings, group='%s'\n", reader->n_records,
-             reader->emb_dimension, group);
+      // Always use DINO embeddings for spatial memory
+      reader = IngestReader_open(h5_file, DINO);
+      if (reader) {
+        printf("HDF5: %zu records, %zu-d embeddings, group='%s'\n", reader->n_records,
+               reader->emb_dimension, DINO);
+      }
+
+      // When -g jepa, load JEPA prediction maps for overlay interpolation
+      if (strcmp(group, JEPA) == 0) {
+        jepa_cache = JepaCache_load(h5_file);
+        if (!jepa_cache) {
+          fprintf(stderr, "Warning: -g jepa but no JEPA prediction maps found; "
+                          "falling back to DINO attention overlay\n");
+        }
+      }
     }
   }
+  g_jepa_cache = jepa_cache;
 
   // Open high-rate IMU/GPS reader (independent of embedding reader)
   ImuGpsReader *imu_gps = NULL;
@@ -900,8 +917,16 @@ int main(int argc, char *argv[]) {
             }
           }
 
-          if (has_attention_overlay && record.attention_map) {
-            AttentionOverlay_upload(&ao, record.attention_map, record.attn_size);
+          if (has_attention_overlay) {
+            if (jepa_cache) {
+              // -g jepa: lookup prediction map at this DINO timestamp
+              float *interp_map = NULL;
+              if (JepaCache_lookup(jepa_cache, record.timestamp, &interp_map))
+                AttentionOverlay_upload(&ao, interp_map, JEPA_MAP_DIM);
+            } else if (record.attention_map) {
+              // -g dino: use DINO attention maps directly
+              AttentionOverlay_upload(&ao, record.attention_map, record.attn_size);
+            }
           }
 
           data_changed = true;
@@ -1021,6 +1046,7 @@ int main(int argc, char *argv[]) {
   glDeleteProgram(hex_prog);
   glDeleteProgram(tile_prog);
 
+  if (jepa_cache) JepaCache_free(jepa_cache);
   if (imu_proc) ImuProcessor_free(imu_proc);
   if (imu_gps) ImuGpsReader_close(imu_gps);
   if (reader) IngestReader_close(reader);
