@@ -24,7 +24,7 @@ static size_t write_cb(void *ptr, size_t size, size_t nmemb, void *userdata) {
 // ---- OSM tile coordinate math ----
 static int osm_zoom_from_degrees(double zoom_degrees) {
   if (zoom_degrees <= 0.0) zoom_degrees = 0.001;
-  double z = floor(log2(360.0 / (2.0 * zoom_degrees)));
+  double z = ceil(log2(360.0 / (2.0 * zoom_degrees)));
   if (z < 0) z = 0;
   if (z > 19) z = 19;
   return (int)z;
@@ -248,8 +248,12 @@ void TileMap_draw(TileMap *tm, double center_lat, double center_lng,
   glUseProgram(tm->program);
   glUniformMatrix4fv(tm->u_projection, 1, GL_FALSE, proj);
 
-  // Render tile grid cx+-2, cy+-2
-  int radius = 2;
+  // Dynamic grid radius: enough tiles to cover the viewport
+  double tile_degrees = 360.0 / pow(2.0, z);
+  int tiles_needed = (int)ceil(2.0 * zoom_degrees / tile_degrees) + 1;
+  int radius = (tiles_needed / 2) + 1;
+  if (radius < 2) radius = 2;
+  if (radius > 5) radius = 5;
   for (int dy = -radius; dy <= radius; dy++) {
     for (int dx = -radius; dx <= radius; dx++) {
       int tx = cx + dx;

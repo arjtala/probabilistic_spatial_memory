@@ -5,9 +5,10 @@ out vec4 frag_color;
 
 uniform sampler2D u_attention;
 uniform float u_opacity;
+uniform int u_colormap;  // 0 = inferno (DINO attention), 1 = viridis (JEPA prediction error)
 
-// Inferno colormap: black → dark red → orange → yellow → white
-// Polynomial approximation (Matt Zucker / matplotlib)
+// Inferno: black → dark red → orange → yellow → white
+// Warm tones — reads as "intensity of attention"
 vec3 inferno(float t) {
     const vec3 c0 = vec3(0.0002, 0.0017, -0.0195);
     const vec3 c1 = vec3(0.1065, 0.5640, 3.9327);
@@ -21,9 +22,26 @@ vec3 inferno(float t) {
     return clamp(c0+t*(c1+t*(c2+t*(c3+t*(c4+t*(c5+t*c6))))), 0.0, 1.0);
 }
 
+// Viridis: dark purple → teal → green → yellow
+// Cool tones — reads as "prediction error / surprise"
+vec3 viridis(float t) {
+    const vec3 c0 = vec3(0.2777, 0.0054, 0.3340);
+    const vec3 c1 = vec3(0.1050, 1.4046, 1.3845);
+    const vec3 c2 = vec3(-0.3308, -0.2149, -19.4525);
+    const vec3 c3 = vec3(-4.6342, -5.7991, 56.6905);
+    const vec3 c4 = vec3(6.2282, 14.1800, -66.1499);
+    const vec3 c5 = vec3(4.7763, -13.7451, 35.1636);
+    const vec3 c6 = vec3(-5.4354, 4.6459, -6.9272);
+
+    t = clamp(t, 0.0, 1.0);
+    return clamp(c0+t*(c1+t*(c2+t*(c3+t*(c4+t*(c5+t*c6))))), 0.0, 1.0);
+}
+
 void main() {
     float val = texture(u_attention, v_texcoord).r;
-    vec3 color = inferno(val);
-    float alpha = u_opacity * smoothstep(0.05, 0.3, val);
+    // JEPA: flip so low prediction accuracy (surprise) maps to bright yellow
+    float mapped = (u_colormap == 1) ? 1.0 - val : val;
+    vec3 color = (u_colormap == 1) ? viridis(mapped) : inferno(mapped);
+    float alpha = u_opacity * smoothstep(0.05, 0.3, mapped);
     frag_color = vec4(color, alpha);
 }

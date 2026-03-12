@@ -14,11 +14,16 @@
 #include "viz/hex_renderer.h"
 #include "viz/tile_map.h"
 #include "viz/gps_trace.h"
+#include "viz/imu_processor.h"
 #include "ingest/ingest.h"
 
 // ---- State ----
 static bool paused = false;
 static double playback_speed = 1.0;
+
+// ---- Mouse drag panning ----
+static bool g_dragging = false;
+static double g_drag_last_x = 0.0, g_drag_last_y = 0.0;
 
 // ---- Video quad geometry ----
 typedef struct {
@@ -34,7 +39,9 @@ static VideoQuad *g_vq_ptr = NULL;
 static HexRenderer *g_hex_renderer = NULL;
 static TileMap *g_tile_map = NULL;
 static GpsTrace *g_gps_trace = NULL;
+static ImuProcessor *g_imu_proc = NULL;
 static IngestReader *g_reader = NULL;
+static ImuGpsReader *g_imu_gps = NULL;
 static SpatialMemory *g_sm = NULL;
 static double *g_first_ts = NULL;
 static double *g_last_adv = NULL;
@@ -212,6 +219,46 @@ static void ProgressBar_draw(ProgressBar *pb, double progress) {
   glBindVertexArray(0);
 }
 
+static void ProgressBar_draw_pause_icon(ProgressBar *pb) {
+  // Two vertical bars centered in the viewport (standard pause symbol)
+  float bar_w = 0.04f, bar_h = 0.12f, gap = 0.035f;
+  float cx = 0.0f, cy = 0.0f;
+  float r = 1.0f, g = 1.0f, b = 1.0f, a = 0.7f;
+
+  float verts[12 * 6] = {
+      // Left bar
+      cx - gap - bar_w, cy - bar_h, r, g, b, a,
+      cx - gap,         cy - bar_h, r, g, b, a,
+      cx - gap - bar_w, cy + bar_h, r, g, b, a,
+      cx - gap - bar_w, cy + bar_h, r, g, b, a,
+      cx - gap,         cy - bar_h, r, g, b, a,
+      cx - gap,         cy + bar_h, r, g, b, a,
+      // Right bar
+      cx + gap,         cy - bar_h, r, g, b, a,
+      cx + gap + bar_w, cy - bar_h, r, g, b, a,
+      cx + gap,         cy + bar_h, r, g, b, a,
+      cx + gap,         cy + bar_h, r, g, b, a,
+      cx + gap + bar_w, cy - bar_h, r, g, b, a,
+      cx + gap + bar_w, cy + bar_h, r, g, b, a,
+  };
+
+  float identity[16] = {0};
+  identity[0] = 1.0f;
+  identity[5] = 1.0f;
+  identity[10] = 1.0f;
+  identity[15] = 1.0f;
+
+  glUseProgram(pb->program);
+  glUniformMatrix4fv(pb->u_projection, 1, GL_FALSE, identity);
+
+  glBindBuffer(GL_ARRAY_BUFFER, pb->vbo);
+  glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(verts), verts);
+
+  glBindVertexArray(pb->vao);
+  glDrawArrays(GL_TRIANGLES, 0, 12);
+  glBindVertexArray(0);
+}
+
 static void ProgressBar_free(ProgressBar *pb) {
   glDeleteBuffers(1, &pb->vbo);
   glDeleteVertexArrays(1, &pb->vao);
@@ -224,6 +271,7 @@ typedef struct {
   GLuint texture;
   GLuint program;
   GLint u_opacity;
+  GLint u_colormap;
   bool has_data;
   size_t attn_size;
 } AttentionOverlay;
@@ -232,6 +280,7 @@ static AttentionOverlay AttentionOverlay_create(GLuint program) {
   AttentionOverlay ao;
   ao.program = program;
   ao.u_opacity = glGetUniformLocation(program, "u_opacity");
+  ao.u_colormap = glGetUniformLocation(program, "u_colormap");
   ao.has_data = false;
   ao.attn_size = 0;
 
@@ -325,11 +374,12 @@ static void AttentionOverlay_upload(AttentionOverlay *ao, float *raw_map, size_t
   ao->attn_size = size;
 }
 
-static void AttentionOverlay_draw(AttentionOverlay *ao) {
+static void AttentionOverlay_draw(AttentionOverlay *ao, int colormap) {
   if (!ao->has_data) return;
 
   glUseProgram(ao->program);
   glUniform1f(ao->u_opacity, 0.5f);
+  glUniform1i(ao->u_colormap, colormap);
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, ao->texture);
   glBindVertexArray(ao->vao);
@@ -375,9 +425,20 @@ static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) 
         g_reader->cursor = 0;
         SpatialMemory_free(g_sm);
         g_sm = SpatialMemory_new(g_h3_resolution, DEFAULT_CAPACITY, DEFAULT_PRECISION);
-        if (g_first_ts) *g_first_ts = -1.0;
+        // first_ts is a fixed epoch→PTS mapping; don't reset it.
+        // last_adv tracks time-window advancement; reset so it re-initializes from the drain.
         if (g_last_adv) *g_last_adv = -1.0;
         if (g_gps_trace) GpsTrace_clear(g_gps_trace);
+        if (g_imu_proc) ImuProcessor_reset(g_imu_proc);
+        if (g_imu_gps) {
+          g_imu_gps->imu_cursor = 0;
+          g_imu_gps->gps_cursor = 0;
+        }
+        if (g_hex_renderer) {
+          g_hex_renderer->pan_offset_lat = 0.0;
+          g_hex_renderer->pan_offset_lng = 0.0;
+          g_hex_renderer->vertex_count = 0;  // clear stale hex tile geometry
+        }
       }
     }
   } else {
@@ -388,6 +449,8 @@ static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) 
     } else if (yoffset < 0) {
       g_hex_renderer->zoom *= 1.1;  // scroll down = zoom out
     }
+    if (g_hex_renderer->zoom < 0.0001) g_hex_renderer->zoom = 0.0001;
+    if (g_hex_renderer->zoom > 1.0) g_hex_renderer->zoom = 1.0;
   }
 }
 
@@ -407,10 +470,22 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
     paused = !paused;
     break;
   case GLFW_KEY_EQUAL:  // + key
-    if (g_hex_renderer) g_hex_renderer->zoom *= 0.8;
+    if (g_hex_renderer) {
+      g_hex_renderer->zoom *= 0.8;
+      if (g_hex_renderer->zoom < 0.0001) g_hex_renderer->zoom = 0.0001;
+    }
     break;
   case GLFW_KEY_MINUS:
-    if (g_hex_renderer) g_hex_renderer->zoom *= 1.25;
+    if (g_hex_renderer) {
+      g_hex_renderer->zoom *= 1.25;
+      if (g_hex_renderer->zoom > 1.0) g_hex_renderer->zoom = 1.0;
+    }
+    break;
+  case GLFW_KEY_C:
+    if (g_hex_renderer) {
+      g_hex_renderer->pan_offset_lat = 0.0;
+      g_hex_renderer->pan_offset_lng = 0.0;
+    }
     break;
   case GLFW_KEY_RIGHT:
     playback_speed *= 2.0;
@@ -425,6 +500,48 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
   default:
     break;
   }
+}
+
+// ---- Mouse button callback (drag to pan map) ----
+static void mouse_button_callback(GLFWwindow *window, int button, int action, int mods) {
+  (void)mods;
+  if (button != GLFW_MOUSE_BUTTON_LEFT) return;
+
+  if (action == GLFW_PRESS) {
+    int win_w, win_h;
+    glfwGetWindowSize(window, &win_w, &win_h);
+    double cx, cy;
+    glfwGetCursorPos(window, &cx, &cy);
+    if (cx > (double)win_w / 2.0) {
+      g_dragging = true;
+      g_drag_last_x = cx;
+      g_drag_last_y = cy;
+    }
+  } else if (action == GLFW_RELEASE) {
+    g_dragging = false;
+  }
+}
+
+// ---- Cursor position callback (drag to pan map) ----
+static void cursor_pos_callback(GLFWwindow *window, double xpos, double ypos) {
+  if (!g_dragging || !g_hex_renderer) return;
+
+  int win_w, win_h;
+  glfwGetWindowSize(window, &win_w, &win_h);
+  int viewport_w = win_w - win_w / 2;
+  int viewport_h = win_h;
+
+  double dx = xpos - g_drag_last_x;
+  double dy = ypos - g_drag_last_y;
+  g_drag_last_x = xpos;
+  g_drag_last_y = ypos;
+
+  double aspect = (double)viewport_h / (double)viewport_w;
+  double dlng = -dx * (2.0 * g_hex_renderer->zoom / (double)viewport_w);
+  double dlat = dy * (2.0 * g_hex_renderer->zoom * aspect / (double)viewport_h);
+
+  g_hex_renderer->pan_offset_lat += dlat;
+  g_hex_renderer->pan_offset_lng += dlng;
 }
 
 // ---- Directory scanning helper ----
@@ -485,6 +602,8 @@ static void print_usage(const char *prog) {
   fprintf(stderr, "  Left/Right  Slow down/speed up\n");
   fprintf(stderr, "  Scroll H    Scrub video (on video pane)\n");
   fprintf(stderr, "  Scroll V    Zoom map (on map pane)\n");
+  fprintf(stderr, "  Drag        Pan map (on map pane)\n");
+  fprintf(stderr, "  C           Re-center map\n");
   fprintf(stderr, "  Q/Esc       Quit\n");
 }
 
@@ -584,6 +703,8 @@ int main(int argc, char *argv[]) {
   glfwSwapInterval(1);  // vsync
   glfwSetKeyCallback(window, key_callback);
   glfwSetScrollCallback(window, scroll_callback);
+  glfwSetMouseButtonCallback(window, mouse_button_callback);
+  glfwSetCursorPosCallback(window, cursor_pos_callback);
 
   printf("OpenGL %s\n", glGetString(GL_VERSION));
 
@@ -637,6 +758,46 @@ int main(int argc, char *argv[]) {
       printf("HDF5: %zu records, %zu-d embeddings, group='%s'\n", reader->n_records,
              reader->emb_dimension, group);
     }
+  }
+
+  // Open high-rate IMU/GPS reader (independent of embedding reader)
+  ImuGpsReader *imu_gps = NULL;
+  if (h5_file >= 0) {
+    imu_gps = ImuGpsReader_open(h5_file);
+    if (imu_gps) {
+      printf("ImuGps: imu=%s (%zu samples), gps=%s (%zu samples)\n",
+             imu_gps->has_imu ? "yes" : "no", imu_gps->imu_n_records,
+             imu_gps->has_gps ? "yes" : "no", imu_gps->gps_n_records);
+    }
+  }
+  g_imu_gps = imu_gps;
+
+  // Create IMU processor — prefer high-rate IMU, fall back to per-embedding
+  ImuProcessor *imu_proc = NULL;
+  if (imu_gps && imu_gps->has_imu) {
+    imu_proc = ImuProcessor_new(0.3f);
+    printf("IMU: high-rate (100Hz) motion coloring enabled\n");
+  } else if (reader && reader->has_imu) {
+    imu_proc = ImuProcessor_new(0.3f);
+    printf("IMU: per-embedding (3Hz) motion coloring enabled\n");
+  }
+  g_imu_proc = imu_proc;
+
+  // Pre-compute first_ts from the embedding stream — embeddings are extracted
+  // from video frames, so emb_first_ts corresponds to video PTS 0.
+  // IMU samples before the video start will have negative video_time and
+  // drain harmlessly on the first frame.
+  if (reader) {
+    IngestRecord peek_rec;
+    size_t saved = reader->cursor;
+    if (IngestReader_next(reader, &peek_rec)) {
+      first_ts = peek_rec.timestamp;
+      reader->cursor = saved;
+    }
+  }
+  if (first_ts < 0.0 && imu_gps && imu_gps->has_imu && imu_gps->imu_n_records > 0) {
+    // No embedding reader — fall back to IMU first timestamp
+    first_ts = imu_gps->imu_first_ts;
   }
 
   // Set up global pointers for scroll callback
@@ -699,7 +860,8 @@ int main(int argc, char *argv[]) {
         VideoQuad_upload(&vq, dec->rgb_buffer, dec->width, dec->height);
       }
 
-      // ---- Drain ingest records up to video PTS ----
+      // ---- Drain ingest records up to displayed frame ----
+      double drain_pts = dec->current_pts;
       if (reader && sm) {
         IngestRecord record;
         bool data_changed = false;
@@ -707,10 +869,8 @@ int main(int argc, char *argv[]) {
           size_t saved_cursor = reader->cursor;
           if (!IngestReader_next(reader, &record)) break;
 
-          if (first_ts < 0.0) first_ts = record.timestamp;
-
           double record_video_time = record.timestamp - first_ts;
-          if (record_video_time > dec->current_pts) {
+          if (record_video_time > drain_pts) {
             reader->cursor = saved_cursor;
             break;
           }
@@ -725,7 +885,20 @@ int main(int argc, char *argv[]) {
 
           SpatialMemory_observe(sm, record.lat, record.lng, record.embedding,
                                 record.embedding_dim * sizeof(float));
-          GpsTrace_push(gt, record.lat, record.lng);
+
+          // GPS trace + IMU: skip when high-rate reader handles it
+          if (!(imu_gps && (imu_gps->has_imu || imu_gps->has_gps))) {
+            if (imu_proc && record.has_imu) {
+              ImuPointMeta meta = ImuProcessor_update(imu_proc, record.accel,
+                                                      record.gyro, record.timestamp,
+                                                      record.lat, record.lng);
+              double blended_lat, blended_lng;
+              ImuProcessor_get_blended_position(imu_proc, &blended_lat, &blended_lng);
+              GpsTrace_push(gt, blended_lat, blended_lng, &meta);
+            } else {
+              GpsTrace_push(gt, record.lat, record.lng, NULL);
+            }
+          }
 
           if (has_attention_overlay && record.attention_map) {
             AttentionOverlay_upload(&ao, record.attention_map, record.attn_size);
@@ -736,6 +909,46 @@ int main(int argc, char *argv[]) {
 
         if (data_changed) {
           HexRenderer_update(hr, sm);
+        }
+      }
+
+      // ---- Drain high-rate IMU up to displayed PTS ----
+      if (imu_gps && imu_gps->has_imu && imu_proc) {
+        ImuRecord imu_rec;
+        while (imu_gps->imu_cursor < imu_gps->imu_n_records) {
+          size_t saved = imu_gps->imu_cursor;
+          if (!ImuGpsReader_next_imu(imu_gps, &imu_rec)) break;
+
+          double imu_video_time = imu_rec.timestamp - first_ts;
+          if (imu_video_time > drain_pts) {
+            imu_gps->imu_cursor = saved;
+            break;
+          }
+
+          // Interpolate GPS at IMU timestamp
+          double gps_lat = 0.0, gps_lng = 0.0;
+          if (imu_gps->has_gps) {
+            ImuGpsReader_interpolate_gps(imu_gps, imu_rec.timestamp, &gps_lat, &gps_lng);
+          }
+
+          ImuPointMeta meta = ImuProcessor_update(imu_proc, imu_rec.accel,
+                                                  imu_rec.gyro, imu_rec.timestamp,
+                                                  gps_lat, gps_lng);
+          double blended_lat, blended_lng;
+          ImuProcessor_get_blended_position(imu_proc, &blended_lat, &blended_lng);
+          GpsTrace_push(gt, blended_lat, blended_lng, &meta);
+        }
+      }
+
+      // ---- Drain standalone GPS (no IMU) up to displayed PTS ----
+      if (imu_gps && imu_gps->has_gps && !imu_gps->has_imu) {
+        while (imu_gps->gps_cursor < imu_gps->gps_n_records) {
+          double gps_video_time = imu_gps->gps_ts[imu_gps->gps_cursor] - first_ts;
+          if (gps_video_time > drain_pts) break;
+          double lat = imu_gps->gps_lat[imu_gps->gps_cursor];
+          double lng = imu_gps->gps_lng[imu_gps->gps_cursor];
+          imu_gps->gps_cursor++;
+          GpsTrace_push(gt, lat, lng, NULL);
         }
       }
     } else if (paused) {
@@ -757,12 +970,17 @@ int main(int argc, char *argv[]) {
     glEnable(GL_BLEND);
     if (has_attention_overlay) {
       AttentionOverlay_update_aspect(&ao, dec->width, dec->height, half_w, win_h);
-      AttentionOverlay_draw(&ao);
+      AttentionOverlay_draw(&ao, (strcmp(group, JEPA) == 0) ? 1 : 0);
     }
 
     // Progress bar overlay on video
     double progress = (dec->duration > 0.0) ? dec->current_pts / dec->duration : 0.0;
     ProgressBar_draw(&pb, progress);
+
+    // Pause icon overlay
+    if (paused) {
+      ProgressBar_draw_pause_icon(&pb);
+    }
 
     // Right half: OSM tiles (background) + hex heatmap + GPS trace (overlay)
     glViewport(half_w, 0, win_w - half_w, win_h);
@@ -774,13 +992,15 @@ int main(int argc, char *argv[]) {
       map_center_lat = gt->center_lat;
       map_center_lng = gt->center_lng;
     }
+    map_center_lat += hr->pan_offset_lat;
+    map_center_lng += hr->pan_offset_lng;
 
     glDisable(GL_BLEND);
     TileMap_draw(tm, map_center_lat, map_center_lng, hr->zoom,
                  win_w - half_w, win_h);
     glEnable(GL_BLEND);
     GpsTrace_upload(gt, map_center_lat, map_center_lng);
-    HexRenderer_draw(hr, win_w - half_w, win_h);
+    HexRenderer_draw(hr, win_w - half_w, win_h, map_center_lat, map_center_lng);
     GpsTrace_draw(gt, win_w - half_w, win_h, hr->zoom);
 
     glfwSwapBuffers(window);
@@ -801,6 +1021,8 @@ int main(int argc, char *argv[]) {
   glDeleteProgram(hex_prog);
   glDeleteProgram(tile_prog);
 
+  if (imu_proc) ImuProcessor_free(imu_proc);
+  if (imu_gps) ImuGpsReader_close(imu_gps);
   if (reader) IngestReader_close(reader);
   if (h5_file >= 0) H5Fclose(h5_file);
   if (sm) SpatialMemory_free(sm);

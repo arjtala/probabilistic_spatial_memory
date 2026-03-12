@@ -14,11 +14,14 @@ typedef struct {
   double center_lat;
   double center_lng;
   double zoom;  // degrees of longitude visible in half-width
+  double pan_offset_lat;
+  double pan_offset_lng;
 } HexRenderer;
 
 HexRenderer *HexRenderer_new(GLuint program);
 void HexRenderer_update(HexRenderer *hr, SpatialMemory *sm);
-void HexRenderer_draw(HexRenderer *hr, int viewport_w, int viewport_h);
+void HexRenderer_draw(HexRenderer *hr, int viewport_w, int viewport_h,
+                      double map_center_lat, double map_center_lng);
 void HexRenderer_free(HexRenderer *hr);
 
 #endif

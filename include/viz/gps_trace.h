@@ -4,6 +4,7 @@
 #include <OpenGL/gl3.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "viz/imu_processor.h"
 
 typedef struct {
   GLuint vao;
@@ -26,10 +27,14 @@ typedef struct {
   // Reusable vertex buffer to avoid malloc/free per frame
   float *verts;
   size_t verts_capacity;  // in number of vertices
+  // IMU metadata parallel array
+  ImuPointMeta *imu_meta;
+  size_t imu_meta_capacity;
+  bool has_any_imu;
 } GpsTrace;
 
 GpsTrace *GpsTrace_new(GLuint program);
-void GpsTrace_push(GpsTrace *gt, double lat, double lng);
+void GpsTrace_push(GpsTrace *gt, double lat, double lng, const ImuPointMeta *imu);
 void GpsTrace_clear(GpsTrace *gt);
 void GpsTrace_upload(GpsTrace *gt, double proj_center_lat, double proj_center_lng);
 void GpsTrace_draw(GpsTrace *gt, int viewport_w, int viewport_h, double zoom);

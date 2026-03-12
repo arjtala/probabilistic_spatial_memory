@@ -182,7 +182,8 @@ void HexRenderer_update(HexRenderer *hr, SpatialMemory *sm) {
   free(verts);
 }
 
-void HexRenderer_draw(HexRenderer *hr, int viewport_w, int viewport_h) {
+void HexRenderer_draw(HexRenderer *hr, int viewport_w, int viewport_h,
+                      double map_center_lat, double map_center_lng) {
   if (hr->vertex_count == 0) return;
 
   glUseProgram(hr->program);
@@ -193,11 +194,18 @@ void HexRenderer_draw(HexRenderer *hr, int viewport_w, int viewport_h) {
   double half_w = hr->zoom;
   double half_h = hr->zoom * aspect;
 
-  // Column-major orthographic matrix
+  // Hex vertices are baked relative to hr->center; translate to map_center
+  double cos_center = cos(hr->center_lat * M_PI / 180.0);
+  double offset_x = (map_center_lng - hr->center_lng) * cos_center;
+  double offset_y = map_center_lat - hr->center_lat;
+
+  // Column-major orthographic matrix with translation
   float proj[16] = {0};
   proj[0] = (float)(1.0 / half_w);
   proj[5] = (float)(1.0 / half_h);
   proj[10] = -1.0f;
+  proj[12] = (float)(-offset_x / half_w);
+  proj[13] = (float)(-offset_y / half_h);
   proj[15] = 1.0f;
 
   glUniformMatrix4fv(hr->u_projection, 1, GL_FALSE, proj);
