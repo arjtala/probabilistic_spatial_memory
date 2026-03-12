@@ -722,3 +722,98 @@ Initially thought `/tmp/201704111335/features.h5` had constant GPS — `h5dump` 
 
 1. **Novelty detection** — Compare current window count to historical merged count
 2. **Debug GPS trace rendering** — Session 201704111335 has valid GPS spanning ~500m but trace doesn't update visually; investigate whether the issue is in timestamp alignment or rendering
+
+---
+
+### 2026-03-11 — Fix IMU Timing, Add Frustum Perspective, Improve Map Tiles + Panning
+
+Three user-reported issues fixed in a single pass across 8 files.
+
+#### 1. IMU-Video Timing Alignment
+
+**Problem:** The camera frustum rotated ~1 frame (33ms, ~3 IMU samples) ahead of the corresponding video frame. Two root causes:
+
+- **Decode overshoot:** The video decode loop runs `while (dec->current_pts < target_pts)`, so after exiting `dec->current_pts >= target_pts`. Both drain loops used `dec->current_pts` as their cutoff, draining ahead of the displayed frame.
+- **Shared `first_ts`:** `first_ts` was lazily initialized by whichever stream was read first. If IMU started before embeddings, early IMU samples would bulk-drain on frame 1.
+
+**Fix:**
+- Save `target_pts` as `drain_pts` before the decode loop; use it (not `dec->current_pts`) as the cutoff in both drain loops
+- Added `double imu_first_ts` to `ImuGpsReader`, populated by reading `timestamps[0]` during `ImuGpsReader_open()`
+- Pre-compute `first_ts = fmin(emb_first_ts, imu_first_ts)` before the render loop using a peek + cursor rewind on the embedding reader
+- Removed lazy `if (first_ts < 0.0) first_ts = ...` from both drain loops
+
+| File | Change |
+|------|--------|
+| `include/ingest/ingest.h` | Added `double imu_first_ts` to `ImuGpsReader` |
+| `src/ingest/ingest.c` | Read `timestamps[0]` via hyperslab in `ImuGpsReader_open()` |
+| `src/viz/viz_main.c` | Pre-compute `first_ts`, use `drain_pts` in both drain loops |
+
+#### 2. Frustum Perspective from Pitch
+
+**Problem:** The camera frustum was a fixed-shape trapezoid regardless of phone tilt. Looking down at the ground should show a short, wide frustum; looking forward should show a long, narrow one.
+
+**Fix:**
+- Added `float pitch_rad` to `ImuPointMeta` struct
+- Computed from the smoothed gravity vector: `pitch = asin(-uz)` where `uz` is the normalized gravity Z-component (camera optical axis is along sensor -Z)
+- Frustum depth and far half-width modulated by `cos(pitch)`:
+  - `depth = hw * (3 + cos(pitch) * 10)` — range 3-13 (was fixed 8)
+  - `far_hw = hw * (2 + (1 - cos(pitch)) * 6)` — range 2-8 (was fixed 5)
+  - `near_hw` unchanged at 1.5 (camera aperture)
+
+| File | Change |
+|------|--------|
+| `include/viz/imu_processor.h` | Added `float pitch_rad` to `ImuPointMeta` |
+| `src/viz/imu_processor.c` | Compute pitch from gravity vector after heading integration |
+| `src/viz/gps_trace.c` | Replace fixed `FRUSTUM_DEPTH`/`FRUSTUM_FAR_HW` with pitch-dependent values |
+
+#### 3. Sharper Map Tiles + Dynamic Grid
+
+**Problem:** OSM tiles looked blurry — `floor()` in zoom level computation always picked the lower-resolution zoom. At high zoom levels, only a 5x5 grid of tiles was rendered, sometimes not covering the viewport.
+
+**Fix:**
+- Changed `floor()` to `ceil()` in `osm_zoom_from_degrees` — consistently picks the sharper zoom level
+- Dynamic grid radius: `tiles_needed = ceil(2 * zoom_degrees / tile_degrees) + 1`, radius clamped to [2, 5]
+
+| File | Change |
+|------|--------|
+| `src/viz/tile_map.c` | `ceil()` for zoom, dynamic grid radius |
+
+#### 4. Map Panning (Mouse Drag)
+
+**Problem:** No way to pan/drag the map view.
+
+**Fix:**
+- Added `pan_offset_lat` / `pan_offset_lng` to `HexRenderer` struct
+- Mouse button callback: left-click on map half starts drag
+- Cursor position callback: converts pixel delta to degree delta using `zoom` and viewport dimensions
+- Pan offset applied to `map_center_lat`/`map_center_lng` before all draw calls
+- `C` key re-centers (resets pan offsets to 0)
+- Backward seek resets pan offsets
+- Zoom clamped to `[0.0001, 1.0]` in scroll, +/-, and key callbacks
+
+| File | Change |
+|------|--------|
+| `include/viz/hex_renderer.h` | Added `pan_offset_lat`, `pan_offset_lng` fields |
+| `src/viz/viz_main.c` | Mouse callbacks, pan application, C key, zoom clamping |
+
+#### Verification
+
+- `make clean && make viz` — zero warnings
+- `make test` — all 15 tests pass
+- No changes to core engine or test files
+
+#### Post-implementation fixes (same session)
+
+**Bug: Hex tiles didn't follow map panning.** `HexRenderer_draw` used its own `center_lat/lng` from `HexRenderer_update`, ignoring the pan-adjusted `map_center`. Tiles and GPS trace shifted when panning but hex cells stayed put. Fix: added `map_center_lat/lng` parameters to `HexRenderer_draw`, which now computes a translation offset in the projection matrix to align baked hex vertices with the actual map center.
+
+**Bug: Heading sign inverted.** `compute_yaw_rate` projected gyro onto the accelerometer-derived gravity estimate, which points UP (specific force opposing gravity). Right-hand rule: CW rotation from above gives negative angular velocity around the up axis. So `heading += yaw_rate * dt` decreased heading when turning right — the frustum rotated the wrong way. Fix: negate the yaw rate projection so CW-from-above is positive, matching the bearing convention (0=N, +90=E).
+
+**Bug: `first_ts = fmin()` broke embedding-to-video alignment.** Embedding timestamps correspond to video frames (`emb_first_ts` maps to PTS 0). When IMU starts earlier and `first_ts = fmin(emb_first, imu_first)`, the embedding drain offset shifts forward by the IMU-video start gap. All data streams lag behind the video. Fix: `first_ts = emb_first_ts` always; IMU samples before video start have negative video_time and drain harmlessly.
+
+**Bug: `drain_pts = target_pts` undershoots displayed frame.** After the decode loop, `dec->current_pts >= target_pts` (one frame overshoot). The displayed frame is at `dec->current_pts`, so the drain should match it. Using `target_pts` left IMU lagging by up to one frame. Fix: `drain_pts = dec->current_pts`.
+
+**Bug: Backward seek killed all data streams.** The seek handler reset `first_ts = -1.0`, but the pre-computation only runs once before the render loop. With `first_ts = -1.0`, `record_video_time = epoch + 1.0 ≈ 1.5e9`, which never passes the drain check. GPS/IMU traces were cleared and never rebuilt; hex tiles showed stale geometry. Fix: don't reset `first_ts` (it's a fixed epoch-to-PTS mapping); clear `hr->vertex_count = 0` so stale hex geometry doesn't render.
+
+**Feature: Pause icon.** Added a white semi-transparent pause icon (two vertical bars) drawn over the video pane when paused. Reuses the ProgressBar's shader and VBO.
+
+**README overhaul.** Added sections on Project Aria data, DINOv2 attention maps, V-JEPA 2 prediction error maps, IMU visualization (motion coloring, heading, pitch frustum), and colormap descriptions.

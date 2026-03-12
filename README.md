@@ -1,6 +1,6 @@
 # Probabilistic Spatial Memory
 
-A bounded-memory, time-decayed spatial memory system built on probabilistic data structures. Models *what has been seen*, *where it was seen*, and *how memory fades over time*.
+A bounded-memory, time-decayed spatial memory system built on probabilistic data structures. Models *what has been seen*, *where it was seen*, and *how memory fades over time* — from egocentric video captured on [Project Aria](https://www.projectaria.com/) glasses.
 
 ## What it does
 
@@ -15,6 +15,33 @@ This enables queries like:
 - "Is this region becoming more or less novel over time?"
 
 Memory usage is bounded regardless of how many observations are processed.
+
+## Data: Project Aria
+
+Input sessions are recorded on [Meta's Project Aria](https://www.projectaria.com/) glasses, which capture synchronized:
+
+- **Egocentric video** — first-person perspective from the wearer's point of view
+- **IMU** — 100 Hz accelerometer + gyroscope (6-axis inertial measurement)
+- **GPS** — 1 Hz location fixes
+
+A Python extraction pipeline (offline) runs each session through two vision foundation models and writes the results to an HDF5 file alongside the raw sensor streams:
+
+| Model | Group | What it produces | Colormap |
+|-------|-------|-----------------|----------|
+| [DINOv2](https://arxiv.org/abs/2304.07193) | `dino` | 1024-d CLS embeddings + **CLS→patch attention maps** (14x14). Attention highlights *where the model is looking* — salient objects, textures, scene structure. | Inferno (black → red → yellow) |
+| [V-JEPA 2](https://arxiv.org/abs/2412.08974) | `jepa` | 1024-d mean-pooled encoder tokens + **spatial prediction error maps** (16x16). Prediction error highlights *surprise* — regions the model fails to predict from context, indicating novelty or unusual content. | Viridis (purple → teal → yellow) |
+
+The CLS embeddings are hashed into the spatial memory engine (HyperLogLog counters per H3 hex cell). The spatial maps are rendered as semi-transparent heatmap overlays on the video.
+
+## IMU visualization
+
+The high-rate IMU stream drives three visual features on the map:
+
+- **GPS trace ribbon** — color-coded by motion state: blue (stationary), green (walking), orange (running). Motion is classified from accelerometer magnitude deviation from gravity.
+- **Heading** — integrated from gyroscope yaw rate (projected onto the gravity vector). Displayed as a camera frustum at the current position.
+- **Pitch-dependent frustum** — the frustum shape changes based on phone tilt. Looking forward: long, narrow (far field of view). Looking down: short, wide (near ground). Derived from the smoothed gravity vector.
+
+Dead reckoning (heading + estimated speed) is blended with GPS via a complementary filter to produce smooth inter-GPS-sample positioning.
 
 ## Architecture
 
@@ -76,12 +103,25 @@ targets/psm-viz video.mp4 features.h5 dino 5.0 10
 | `-d` | `<dir>` | — | Directory containing `*.mp4` and `features.h5` |
 | `-v` | `<path>` | — | Video file path |
 | `-f` | `<path>` | — | HDF5 features file path |
-| `-g` | `<name>` | `dino` | HDF5 group name |
+| `-g` | `<name>` | `dino` | HDF5 group name (`dino` or `jepa`) |
 | `-t` | `<sec>` | `5.0` | Time window (seconds) |
 | `-r` | `<res>` | `10` | H3 resolution (0-15) |
 | `-h` | — | — | Print help |
 
-**Controls:** Space (pause), +/- (zoom), Left/Right (speed), Scroll (scrub video / zoom map), Q/Esc (quit).
+**Controls:**
+
+| Key / Gesture | Action |
+|---------------|--------|
+| Space | Pause / resume (shows pause icon) |
+| +/- | Zoom in / out (map) |
+| Left / Right | Slow down / speed up playback |
+| Scroll H (video) | Scrub video timeline |
+| Scroll V (map) | Zoom map |
+| Drag (map) | Pan map |
+| C | Re-center map |
+| Q / Esc | Quit |
+
+**Layout:** Left half shows video with optional attention/prediction heatmap overlay. Right half shows OSM map tiles with H3 hex heatmap (viridis), GPS trace ribbon, and camera frustum.
 
 ## Project structure
 
@@ -99,6 +139,7 @@ include/
     hex_renderer.h
     tile_map.h
     gps_trace.h
+    imu_processor.h
 src/
   core/             # Core engine
     ring_buffer.c
@@ -113,6 +154,7 @@ src/
     hex_renderer.c
     tile_map.c
     gps_trace.c
+    imu_processor.c
 shaders/            # GLSL shaders
 tests/              # Test suites
   test_ring_buffer.c
