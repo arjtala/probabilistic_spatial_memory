@@ -1,5 +1,5 @@
-#ifndef SPATIAL_H
-#define SPATIAL_H
+#ifndef SPATIAL_MEMORY_H
+#define SPATIAL_MEMORY_H
 
 #include "core/tile.h"
 #include "vendor/probabilistic_data_structures/lib/hash.h"
