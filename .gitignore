@@ -8,3 +8,4 @@ build/
 compile_commands.json
 phrases/
 targets/
+.aider*

@@ -1,3 +1,0 @@
-~/src/probabilistic_spatial_memory/include/core/ring_buffer.h
-  20: Consider creating a utility function to abstract memory allocation and initialization logic.
-  34: Similarly, consider refactoring the freeing logic into a separate function to avoid repetition.

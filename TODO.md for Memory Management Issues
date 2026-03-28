@@ -1,3 +1,0 @@
-~/src/probabilistic_spatial_memory/include/core/ring_buffer.h
-  12: Ensure proper error handling in realloc calls to avoid potential memory allocation failures.
-  13: Add bounds checking before accessing elements in the arrays to prevent out-of-bounds errors.
