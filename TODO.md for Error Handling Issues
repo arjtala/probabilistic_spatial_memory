@@ -1,0 +1,3 @@
+~/src/probabilistic_spatial_memory/include/core/ring_buffer.h
+  12: Add error handling for realloc calls to ensure successful memory allocation before proceeding.
+  30: Implement proper error checking in functions that perform critical operations like H5Dopen.

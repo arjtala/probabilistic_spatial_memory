@@ -1,0 +1,3 @@
+~/src/probabilistic_spatial_memory/include/core/ring_buffer.h
+  21: Ensure consistent naming conventions for variables and functions across the codebase.
+  34: Apply the same pattern consistently in other parts of the repository where necessary.
