@@ -87,6 +87,10 @@ brew install glfw ffmpeg curl          # visualization (psm-viz)
 `psm-viz` renders side-by-side video playback and a spatial memory heatmap with GPS trace overlay, synchronized by timestamp.
 
 ```bash
+# Config file (defaults < config < CLI)
+targets/psm-viz -c psm-viz.toml.example
+targets/psm-viz -c /path/to/psm-viz.toml -g jepa
+
 # Directory mode — finds *.mp4 and features.h5 automatically
 targets/psm-viz -d /path/to/session/
 targets/psm-viz -d /path/to/session/ -g jepa
@@ -100,6 +104,7 @@ targets/psm-viz video.mp4 features.h5 dino 5.0 10
 
 | Flag | Arg | Default | Description |
 |------|-----|---------|-------------|
+| `-c` | `<path>` | — | TOML-style config file |
 | `-d` | `<dir>` | — | Directory containing `*.mp4` and `features.h5` |
 | `-v` | `<path>` | — | Video file path |
 | `-f` | `<path>` | — | HDF5 features file path |
@@ -108,20 +113,51 @@ targets/psm-viz video.mp4 features.h5 dino 5.0 10
 | `-r` | `<res>` | `10` | H3 resolution (0-15) |
 | `-h` | — | — | Print help |
 
+`psm-viz.toml` supports:
+
+```toml
+session_dir = "./session"
+# video_path = "./session/video.mp4"
+# features_path = "./session/features.h5"
+
+group = "dino"
+time_window_sec = 5.0
+h3_resolution = 10
+tile_style = "CartoDB.Positron"
+
+# Required for Stadia.* presets and any custom template using {api_key}
+# tile_api_key = "..."
+
+# Optional override; supports {z}, {x}, {y}, {s}, and {api_key}
+# tile_url_template = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+```
+
+Relative paths in the config resolve relative to the config file itself. CLI flags override config values.
+
+Available `tile_style` presets:
+- `CartoDB.Positron`
+- `CartoDB.PositronNoLabels`
+- `CartoDB.Voyager`
+- `CartoDB.DarkMatter`
+- `Stadia.AlidadeSmooth` (`tile_api_key` required)
+- `Stadia.AlidadeSmoothDark` (`tile_api_key` required)
+
+Preview the providers here: <https://leaflet-extras.github.io/leaflet-providers/preview/>
+
 **Controls:**
 
 | Key / Gesture | Action |
 |---------------|--------|
 | Space | Pause / resume (shows pause icon) |
-| +/- | Zoom in / out (map) |
+| +/- | Zoom in / out around the map center |
 | Left / Right | Slow down / speed up playback |
 | Scroll H (video) | Scrub video timeline |
-| Scroll V (map) | Zoom map |
-| Drag (map) | Pan map |
-| C | Re-center map |
+| Scroll V (map) | Zoom map toward the cursor |
+| Drag (map) | Pan map manually |
+| C | Re-center map and resume smooth follow |
 | Q / Esc | Quit |
 
-**Layout:** Left half shows video with optional attention/prediction heatmap overlay. Right half shows OSM map tiles with H3 hex heatmap (viridis), GPS trace ribbon, and camera frustum.
+**Layout:** Left half shows video with optional attention/prediction heatmap overlay. Right half shows configurable raster tiles (default: `CartoDB.Positron`) with H3 hex heatmap (viridis), GPS trace ribbon, and camera frustum. The map view follows the latest GPS/IMU-driven position smoothly by default; manual drag temporarily overrides that view until you re-center with `C`.
 
 ## Project structure
 
@@ -140,6 +176,7 @@ include/
     tile_map.h
     gps_trace.h
     imu_processor.h
+    viz_config.h
 src/
   core/             # Core engine
     ring_buffer.c
@@ -155,11 +192,17 @@ src/
     tile_map.c
     gps_trace.c
     imu_processor.c
+    viz_config.c
+psm-viz.toml.example  # Sample visualizer config
 shaders/            # GLSL shaders
 tests/              # Test suites
   test_ring_buffer.c
   test_tile.c
   test_spatial_memory.c
+  test_ingest.c
+  test_jepa_cache.c
+  test_viz_math.c
+  test_viz_config.c
 targets/            # Build outputs (psm, psm-viz, libpsm.a)
 build/              # Intermediate object files
 vendor/             # Git submodule

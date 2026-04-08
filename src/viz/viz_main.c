@@ -18,6 +18,7 @@
 #include "viz/gps_trace.h"
 #include "viz/imu_processor.h"
 #include "viz/jepa_cache.h"
+#include "viz/viz_config.h"
 #include "viz/viz_math.h"
 #include "ingest/ingest.h"
 
@@ -172,45 +173,6 @@ static void zoom_map_about_screen_point(GLFWwindow *window, double zoom_factor,
 
   g_hex_renderer->zoom = new_zoom;
   set_manual_map_center(new_center_lat, new_center_lng);
-}
-
-static bool parse_positive_double(const char *text, const char *name,
-                                  double *out_value) {
-  char *end = NULL;
-  errno = 0;
-  double value = strtod(text, &end);
-  if (errno != 0 || end == text || *end != '\0') {
-    fprintf(stderr, "Invalid %s: '%s'\n", name, text);
-    return false;
-  }
-  if (value <= 0.0) {
-    fprintf(stderr, "%s must be greater than 0, got '%s'\n", name, text);
-    return false;
-  }
-  *out_value = value;
-  return true;
-}
-
-static bool parse_int_in_range(const char *text, const char *name, int min_value,
-                               int max_value, int *out_value) {
-  char *end = NULL;
-  errno = 0;
-  long value = strtol(text, &end, 10);
-  if (errno != 0 || end == text || *end != '\0') {
-    fprintf(stderr, "Invalid %s: '%s'\n", name, text);
-    return false;
-  }
-  if (value < min_value || value > max_value) {
-    fprintf(stderr, "%s must be in [%d, %d], got '%s'\n",
-            name, min_value, max_value, text);
-    return false;
-  }
-  if (value < INT_MIN || value > INT_MAX) {
-    fprintf(stderr, "Invalid %s: '%s'\n", name, text);
-    return false;
-  }
-  *out_value = (int)value;
-  return true;
 }
 
 static VideoQuad VideoQuad_create(GLuint program) {
@@ -731,10 +693,12 @@ static char *find_file_in_dir(const char *dir, const char *extension,
 // ---- Usage ----
 static void print_usage(const char *prog) {
   fprintf(stderr, "Usage:\n");
+  fprintf(stderr, "  %s -c <config.toml> [-d <dir>] [-v <video>] [-f <features.h5>] [-g group] [-t sec] [-r res]\n", prog);
   fprintf(stderr, "  %s -d <dir> [-g group] [-t sec] [-r res]\n", prog);
   fprintf(stderr, "  %s -v <video> [-f <features.h5>] [-g group] [-t sec] [-r res]\n", prog);
   fprintf(stderr, "  %s <video.mp4> [data.h5 group] [time_window_sec] [h3_resolution]\n", prog);
   fprintf(stderr, "\nFlags:\n");
+  fprintf(stderr, "  -c <path>   TOML-style config file (defaults < config < CLI)\n");
   fprintf(stderr, "  -d <dir>    Directory containing *.mp4 and features.h5\n");
   fprintf(stderr, "  -v <path>   Video file path\n");
   fprintf(stderr, "  -f <path>   HDF5 features file path\n");
@@ -742,44 +706,110 @@ static void print_usage(const char *prog) {
   fprintf(stderr, "  -t <sec>    Time window in seconds (default: 5.0)\n");
   fprintf(stderr, "  -r <res>    H3 resolution 0-15 (default: 10)\n");
   fprintf(stderr, "  -h          Print this help\n");
+  fprintf(stderr, "\nConfig keys:\n");
+  fprintf(stderr, "  session_dir, video_path, features_path, group,\n");
+  fprintf(stderr, "  time_window_sec, h3_resolution, tile_style,\n");
+  fprintf(stderr, "  tile_api_key, tile_url_template\n");
+  fprintf(stderr, "\nTile styles:\n");
+  VizConfig_print_tile_styles(stderr);
   fprintf(stderr, "\nControls:\n");
   fprintf(stderr, "  Space       Pause/resume\n");
   fprintf(stderr, "  +/-         Zoom in/out (heatmap)\n");
   fprintf(stderr, "  Left/Right  Slow down/speed up\n");
   fprintf(stderr, "  Scroll H    Scrub video (on video pane)\n");
-  fprintf(stderr, "  Scroll V    Zoom map (on map pane)\n");
+  fprintf(stderr, "  Scroll V    Zoom map toward cursor (on map pane)\n");
   fprintf(stderr, "  Drag        Pan map (on map pane)\n");
-  fprintf(stderr, "  C           Re-center map\n");
+  fprintf(stderr, "  C           Re-center map and resume follow\n");
   fprintf(stderr, "  Q/Esc       Quit\n");
 }
 
 // ---- Main ----
 int main(int argc, char *argv[]) {
-  const char *dir_path = NULL;
-  const char *video_path = NULL;
-  const char *h5_path = NULL;
-  const char *group = DINO;
-  double time_window_sec = 5.0;
-  int h3_resolution = DEFAULT_RESOLUTION;
+  const char *config_path = NULL;
+  const char *dir_path;
+  const char *video_path;
+  const char *h5_path;
+  const char *group;
+  double time_window_sec;
+  int h3_resolution;
   char *alloc_video = NULL;  // track malloc'd paths for cleanup
   char *alloc_h5 = NULL;
+  VizConfig config;
+  VizTileSource tile_source;
 
   int opt;
-  bool used_flags = false;
-  while ((opt = getopt(argc, argv, "d:v:f:g:t:r:h")) != -1) {
-    used_flags = true;
+  bool help_requested = false;
+  bool used_runtime_flags = false;
+
+  VizConfig_init(&config);
+
+  opterr = 0;
+  optind = 1;
+  while ((opt = getopt(argc, argv, ":c:h")) != -1) {
+    if (opt == 'c') config_path = optarg;
+    if (opt == 'h') help_requested = true;
+  }
+  opterr = 1;
+  optind = 1;
+
+  if (help_requested) {
+    print_usage(argv[0]);
+    return 0;
+  }
+
+  if (config_path && !VizConfig_load_file(&config, config_path)) {
+    return 1;
+  }
+
+  while ((opt = getopt(argc, argv, "c:d:v:f:g:t:r:h")) != -1) {
     switch (opt) {
-    case 'd': dir_path = optarg; break;
-    case 'v': video_path = optarg; break;
-    case 'f': h5_path = optarg; break;
-    case 'g': group = optarg; break;
+    case 'c':
+      break;
+    case 'd':
+      used_runtime_flags = true;
+      if (!VizConfig_set_optional_text(config.session_dir,
+                                       sizeof(config.session_dir),
+                                       &config.has_session_dir,
+                                       optarg, "session_dir")) {
+        return 1;
+      }
+      break;
+    case 'v':
+      used_runtime_flags = true;
+      if (!VizConfig_set_optional_text(config.video_path,
+                                       sizeof(config.video_path),
+                                       &config.has_video_path,
+                                       optarg, "video_path")) {
+        return 1;
+      }
+      break;
+    case 'f':
+      used_runtime_flags = true;
+      if (!VizConfig_set_optional_text(config.features_path,
+                                       sizeof(config.features_path),
+                                       &config.has_features_path,
+                                       optarg, "features_path")) {
+        return 1;
+      }
+      break;
+    case 'g':
+      used_runtime_flags = true;
+      if (!VizConfig_set_text(config.group, sizeof(config.group),
+                              optarg, "group")) {
+        return 1;
+      }
+      break;
     case 't':
-      if (!parse_positive_double(optarg, "time window", &time_window_sec)) {
+      used_runtime_flags = true;
+      if (!VizConfig_parse_positive_double(optarg, "time window",
+                                           &config.time_window_sec)) {
         return 1;
       }
       break;
     case 'r':
-      if (!parse_int_in_range(optarg, "H3 resolution", 0, 15, &h3_resolution)) {
+      used_runtime_flags = true;
+      if (!VizConfig_parse_int_in_range(optarg, "H3 resolution", 0, 15,
+                                        &config.h3_resolution)) {
         return 1;
       }
       break;
@@ -791,6 +821,44 @@ int main(int argc, char *argv[]) {
       return 1;
     }
   }
+
+  // Legacy positional fallback: allow -c <config> plus positional args.
+  if (!used_runtime_flags && optind < argc) {
+    if (!VizConfig_set_optional_text(config.video_path, sizeof(config.video_path),
+                                     &config.has_video_path,
+                                     argv[optind], "video_path")) {
+      return 1;
+    }
+    if (optind + 1 < argc &&
+        !VizConfig_set_optional_text(config.features_path,
+                                     sizeof(config.features_path),
+                                     &config.has_features_path,
+                                     argv[optind + 1], "features_path")) {
+      return 1;
+    }
+    if (optind + 2 < argc &&
+        !VizConfig_set_text(config.group, sizeof(config.group),
+                            argv[optind + 2], "group")) {
+      return 1;
+    }
+    if (optind + 3 < argc &&
+        !VizConfig_parse_positive_double(argv[optind + 3], "time window",
+                                         &config.time_window_sec)) {
+      return 1;
+    }
+    if (optind + 4 < argc &&
+        !VizConfig_parse_int_in_range(argv[optind + 4], "H3 resolution",
+                                      0, 15, &config.h3_resolution)) {
+      return 1;
+    }
+  }
+
+  dir_path = config.has_session_dir ? config.session_dir : NULL;
+  video_path = config.has_video_path ? config.video_path : NULL;
+  h5_path = config.has_features_path ? config.features_path : NULL;
+  group = config.group;
+  time_window_sec = config.time_window_sec;
+  h3_resolution = config.h3_resolution;
 
   // Directory mode: scan for video and features.h5
   if (dir_path) {
@@ -809,26 +877,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  // Legacy positional fallback: no flags were used and positional args remain
-  if (!used_flags && optind < argc) {
-    video_path = argv[optind];
-    if (optind + 1 < argc) h5_path = argv[optind + 1];
-    if (optind + 2 < argc) group = argv[optind + 2];
-    if (optind + 3 < argc &&
-        !parse_positive_double(argv[optind + 3], "time window", &time_window_sec)) {
-      free(alloc_video);
-      free(alloc_h5);
-      return 1;
-    }
-    if (optind + 4 < argc &&
-        !parse_int_in_range(argv[optind + 4], "H3 resolution", 0, 15,
-                            &h3_resolution)) {
-      free(alloc_video);
-      free(alloc_h5);
-      return 1;
-    }
-  }
-
   // Validate required args
   if (!video_path) {
     print_usage(argv[0]);
@@ -839,6 +887,11 @@ int main(int argc, char *argv[]) {
 
   if (time_window_sec <= 0.0) {
     fprintf(stderr, "Time window must be greater than 0\n");
+    free(alloc_video);
+    free(alloc_h5);
+    return 1;
+  }
+  if (!VizConfig_resolve_tile_source(&config, &tile_source)) {
     free(alloc_video);
     free(alloc_h5);
     return 1;
@@ -992,8 +1045,34 @@ int main(int argc, char *argv[]) {
   HexRenderer *hr = HexRenderer_new(hex_prog);
   g_hex_renderer = hr;
 
-  TileMap *tm = TileMap_new(tile_prog);
+  TileMap *tm = TileMap_new(tile_prog, tile_source.style_name,
+                            tile_source.url_template,
+                            tile_source.api_key[0] ? tile_source.api_key : NULL);
   g_tile_map = tm;
+
+  if (!tm) {
+    fprintf(stderr, "Failed to initialize tile map for style '%s'\n",
+            tile_source.style_name);
+    HexRenderer_free(hr);
+    if (jepa_cache) JepaCache_free(jepa_cache);
+    if (imu_proc) ImuProcessor_free(imu_proc);
+    if (imu_gps) ImuGpsReader_close(imu_gps);
+    if (reader) IngestReader_close(reader);
+    if (h5_file >= 0) H5Fclose(h5_file);
+    if (sm) SpatialMemory_free(sm);
+    VideoQuad_free(&vq);
+    VideoDecoder_close(dec);
+    glDeleteProgram(video_prog);
+    glDeleteProgram(hex_prog);
+    glDeleteProgram(tile_prog);
+    if (has_attention_overlay) glDeleteProgram(attn_prog);
+    glfwDestroyWindow(window);
+    glfwTerminate();
+    free(alloc_video);
+    free(alloc_h5);
+    return 1;
+  }
+  printf("Tiles: %s\n", tile_source.style_name);
 
   GpsTrace *gt = GpsTrace_new(hex_prog);
   g_gps_trace = gt;
@@ -1175,7 +1254,7 @@ int main(int argc, char *argv[]) {
       ProgressBar_draw_pause_icon(&pb);
     }
 
-    // Right half: OSM tiles (background) + hex heatmap + GPS trace (overlay)
+    // Right half: raster tiles (background) + hex heatmap + GPS trace (overlay)
     glViewport(half_w, 0, win_w - half_w, win_h);
 
     double map_center_lat = 0.0;

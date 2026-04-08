@@ -817,3 +817,38 @@ Three user-reported issues fixed in a single pass across 8 files.
 **Feature: Pause icon.** Added a white semi-transparent pause icon (two vertical bars) drawn over the video pane when paused. Reuses the ProgressBar's shader and VBO.
 
 **README overhaul.** Added sections on Project Aria data, DINOv2 attention maps, V-JEPA 2 prediction error maps, IMU visualization (motion coloring, heading, pitch frustum), and colormap descriptions.
+
+### 2026-04-08 — Hardening, Map Navigation, Build Hygiene
+
+#### Core + Ingest cleanup
+
+- Core constructors and observe/query paths now fail non-fatally instead of calling `exit()`
+- `IngestReader` / `ImuGpsReader` share one IMU-shape validation path
+- H3 cell creation is centralized through `Tile_coords_to_cell()`
+- Added test coverage for ingest fixtures, same-cell HLL de-duplication, and shared tile cell conversion
+
+#### Viz behavior
+
+- Map zoom on the right pane now anchors under the cursor instead of always zooming around the viewport center
+- The map camera now follows the latest GPS/IMU position smoothly rather than snapping as new samples arrive
+- Manual drag still overrides the follow camera immediately
+- `C` now re-centers the map and resumes smooth follow behavior
+
+#### Build / runtime
+
+- Added runtime `rpath` entries for `psm-viz`, fixing local launch failures from unresolved `libcurl`
+- Added toolchain/SDK tracking in `Makefile` so stale LLVM bitcode objects get rebuilt after compiler or SDK changes, which avoids the misleading linker warnings seen on incremental builds
+
+#### Verification
+
+- `make test`
+- `make viz`
+- Synthetic `psm-viz` smoke run with a generated MP4 + HDF5 fixture
+
+#### Configurable viz runtime
+
+- Added a TOML-style `psm-viz` config path via `-c <file>` with explicit precedence: built-in defaults, then config file, then CLI flags
+- Config now covers `session_dir`, `video_path`, `features_path`, `group`, `time_window_sec`, `h3_resolution`, tile style selection, optional `tile_api_key`, and an optional custom `tile_url_template`
+- Added built-in tile presets for the requested CartoDB and Stadia styles, with `CartoDB.Positron` as the default
+- Relative paths inside the config resolve relative to the config file location, which makes per-session configs portable
+- Stadia tiles are supported but require credentials; the config and docs now make that explicit instead of failing silently at runtime

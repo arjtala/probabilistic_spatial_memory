@@ -19,6 +19,7 @@ VIZ_LDFLAGS = -L$(GLFW_PREFIX)/lib -lglfw \
               $(CURL_LDFLAGS) \
               -framework OpenGL -framework Cocoa -framework IOKit -framework CoreVideo
 BUILD_DIR = build
+TOOLCHAIN_INFO = $(BUILD_DIR)/.toolchain-info
 
 # Vendor paths
 VENDOR = vendor/probabilistic_data_structures
@@ -42,7 +43,7 @@ OBJ = $(CORE_OBJ) $(INGEST_OBJ)
 VENDOR_OBJ = $(patsubst $(VENDOR)/%.c,$(BUILD_DIR)/vendor/%.o,$(VENDOR_SRCS))
 
 # Viz source/object files
-VIZ_SRCS = src/viz/shader.c src/viz/video_decoder.c src/viz/hex_renderer.c src/viz/tile_map.c src/viz/gps_trace.c src/viz/imu_processor.c src/viz/jepa_cache.c src/viz/viz_math.c
+VIZ_SRCS = src/viz/shader.c src/viz/video_decoder.c src/viz/hex_renderer.c src/viz/tile_map.c src/viz/gps_trace.c src/viz/imu_processor.c src/viz/jepa_cache.c src/viz/viz_math.c src/viz/viz_config.c
 VIZ_OBJ = $(patsubst src/viz/%.c,$(BUILD_DIR)/viz/%.o,$(VIZ_SRCS))
 STB_OBJ = $(BUILD_DIR)/vendor/stb/stb_image_impl.o
 
@@ -63,6 +64,7 @@ TEST_SPATIAL = $(BUILD_DIR)/test_spatial_memory
 TEST_INGEST = $(BUILD_DIR)/test_ingest
 TEST_JEPA_CACHE = $(BUILD_DIR)/test_jepa_cache
 TEST_VIZ_MATH = $(BUILD_DIR)/test_viz_math
+TEST_VIZ_CONFIG = $(BUILD_DIR)/test_viz_config
 
 # Default target
 all: $(LIB) $(BIN)
@@ -77,22 +79,40 @@ $(BIN): src/main.c $(LIB)
 	@mkdir -p $(TARGET_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) src/main.c $(LIB) -o $@ -lm
 
+# Track toolchain/compiler changes so stale LLVM bitcode objects rebuild
+# after SDK or compiler upgrades instead of surfacing linker warnings.
+$(TOOLCHAIN_INFO): FORCE
+	@mkdir -p $(BUILD_DIR)
+	@current="$$( \
+		printf 'CC=%s\n' '$(CC)'; \
+		$(CC) --version 2>/dev/null | head -n 1; \
+		printf 'SDK=%s\n' "$$(if command -v xcrun >/dev/null 2>&1; then xcrun --show-sdk-version 2>/dev/null; else printf unknown; fi)"; \
+		printf 'ARCH=%s\n' "$$(uname -m 2>/dev/null || printf unknown)"; \
+		printf 'CFLAGS=%s\n' '$(CFLAGS)'; \
+		printf 'VIZ_CFLAGS=%s\n' '$(VIZ_CFLAGS)'; \
+		printf 'LDFLAGS=%s\n' '$(LDFLAGS)'; \
+		printf 'VIZ_LDFLAGS=%s\n' '$(VIZ_LDFLAGS)'; \
+	)"; \
+	if [ ! -f $@ ] || [ "$$(cat $@)" != "$$current" ]; then \
+		printf '%s\n' "$$current" > $@; \
+	fi
+
 # Build project object files
-$(BUILD_DIR)/core/%.o: src/core/%.c $(HEADERS)
+$(BUILD_DIR)/core/%.o: src/core/%.c $(HEADERS) $(TOOLCHAIN_INFO)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
-$(BUILD_DIR)/ingest/%.o: src/ingest/%.c $(HEADERS)
+$(BUILD_DIR)/ingest/%.o: src/ingest/%.c $(HEADERS) $(TOOLCHAIN_INFO)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
 # Build viz object files
-$(BUILD_DIR)/viz/%.o: src/viz/%.c $(HEADERS)
+$(BUILD_DIR)/viz/%.o: src/viz/%.c $(HEADERS) $(TOOLCHAIN_INFO)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(VIZ_CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
 # Build stb_image object (suppress warnings from vendored header)
-$(STB_OBJ): vendor/stb/stb_image_impl.c vendor/stb/stb_image.h
+$(STB_OBJ): vendor/stb/stb_image_impl.c vendor/stb/stb_image.h $(TOOLCHAIN_INFO)
 	@mkdir -p $(dir $@)
 	$(CC) -std=c99 -O3 -Ivendor -w -c $< -o $@
 
@@ -102,12 +122,12 @@ viz: $(LIB) $(VIZ_OBJ) $(STB_OBJ)
 	$(CC) $(CFLAGS) $(VIZ_CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) $(VIZ_RPATHS) $(VIZ_LDFLAGS) src/viz/viz_main.c $(VIZ_OBJ) $(STB_OBJ) $(LIB) -o $(VIZ_BIN) -lm
 
 # Build vendor object files
-$(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(VENDOR_HEADERS)
+$(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(VENDOR_HEADERS) $(TOOLCHAIN_INFO)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
 # Test targets
-test: test-ring-buffer test-tile test-spatial test-ingest test-jepa-cache test-viz-math
+test: test-ring-buffer test-tile test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config
 
 test-ring-buffer: $(TEST_RING_BUFFER)
 	./$(TEST_RING_BUFFER)
@@ -152,6 +172,13 @@ $(TEST_VIZ_MATH): tests/test_viz_math.c src/viz/viz_math.c include/viz/viz_math.
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) tests/test_viz_math.c src/viz/viz_math.c build/vendor/lib/utilities.o -o $@ -lm
 
+test-viz-config: $(TEST_VIZ_CONFIG)
+	./$(TEST_VIZ_CONFIG)
+
+$(TEST_VIZ_CONFIG): tests/test_viz_config.c src/viz/viz_config.c include/viz/viz_config.h build/vendor/lib/utilities.o
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) tests/test_viz_config.c src/viz/viz_config.c build/vendor/lib/utilities.o -o $@
+
 # Clean target
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET_DIR)
@@ -160,7 +187,7 @@ clean:
 rebuild: clean all
 
 # Phony targets
-.PHONY: all viz test test-ring-buffer test-tile test-spatial test-ingest test-jepa-cache test-viz-math clean rebuild show run
+.PHONY: all viz test test-ring-buffer test-tile test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config clean rebuild show run FORCE
 
 # Show detected files
 show:

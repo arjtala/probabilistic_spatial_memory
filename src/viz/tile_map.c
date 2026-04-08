@@ -82,14 +82,66 @@ static PendingDownload *find_free_slot(TileMap *tm) {
   return NULL;
 }
 
+static bool append_text(char *dst, size_t dst_size, size_t *dst_len,
+                        const char *text) {
+  size_t text_len = strlen(text);
+  if (*dst_len + text_len + 1 > dst_size) return false;
+  memcpy(dst + *dst_len, text, text_len);
+  *dst_len += text_len;
+  dst[*dst_len] = '\0';
+  return true;
+}
+
+static bool append_int(char *dst, size_t dst_size, size_t *dst_len, int value) {
+  char buf[32];
+  snprintf(buf, sizeof(buf), "%d", value);
+  return append_text(dst, dst_size, dst_len, buf);
+}
+
+static bool format_tile_url(const TileMap *tm, int x, int y, int z,
+                            char *out, size_t out_size) {
+  size_t out_len = 0;
+  const char *cursor;
+  const char *subdomains = "abcd";
+  char subdomain[2] = {subdomains[(x + y + z) & 3], '\0'};
+
+  if (!tm || !out || out_size == 0 || tm->url_template[0] == '\0') return false;
+  cursor = tm->url_template;
+  out[0] = '\0';
+
+  while (*cursor) {
+    if (strncmp(cursor, "{x}", 3) == 0) {
+      if (!append_int(out, out_size, &out_len, x)) return false;
+      cursor += 3;
+    } else if (strncmp(cursor, "{y}", 3) == 0) {
+      if (!append_int(out, out_size, &out_len, y)) return false;
+      cursor += 3;
+    } else if (strncmp(cursor, "{z}", 3) == 0) {
+      if (!append_int(out, out_size, &out_len, z)) return false;
+      cursor += 3;
+    } else if (strncmp(cursor, "{s}", 3) == 0) {
+      if (!append_text(out, out_size, &out_len, subdomain)) return false;
+      cursor += 3;
+    } else if (strncmp(cursor, "{api_key}", 9) == 0) {
+      if (!append_text(out, out_size, &out_len, tm->api_key)) return false;
+      cursor += 9;
+    } else {
+      char ch[2] = {*cursor, '\0'};
+      if (!append_text(out, out_size, &out_len, ch)) return false;
+      cursor++;
+    }
+  }
+
+  return true;
+}
+
 static void start_download(TileMap *tm, int x, int y, int z) {
   if (is_pending(tm, x, y, z)) return;
   PendingDownload *pd = find_free_slot(tm);
   if (!pd) return;  // all slots busy
 
-  char url[256];
-  snprintf(url, sizeof(url),
-           "https://tile.openstreetmap.org/%d/%d/%d.png", z, x, y);
+  char url[TILE_MAP_URL_CAP];
+  if (!format_tile_url(tm, x, y, z, url, sizeof(url))) return;
 
   pd->easy = curl_easy_init();
   if (!pd->easy) return;
@@ -173,7 +225,8 @@ static void poll_downloads(TileMap *tm) {
 }
 
 // ---- Public API ----
-TileMap *TileMap_new(GLuint program) {
+TileMap *TileMap_new(GLuint program, const char *style_name,
+                     const char *url_template, const char *api_key) {
   TileMap *tm = calloc(1, sizeof(TileMap));
   if (!tm) return NULL;
 
@@ -182,6 +235,18 @@ TileMap *TileMap_new(GLuint program) {
   tm->u_texture = glGetUniformLocation(program, "u_texture");
   tm->frame_counter = 0;
   tm->running_transfers = 0;
+
+  if (!style_name || !url_template ||
+      snprintf(tm->style_name, sizeof(tm->style_name), "%s", style_name) >=
+          (int)sizeof(tm->style_name) ||
+      snprintf(tm->url_template, sizeof(tm->url_template), "%s", url_template) >=
+          (int)sizeof(tm->url_template) ||
+      (api_key &&
+       snprintf(tm->api_key, sizeof(tm->api_key), "%s", api_key) >=
+           (int)sizeof(tm->api_key))) {
+    free(tm);
+    return NULL;
+  }
 
   glGenVertexArrays(1, &tm->vao);
   glGenBuffers(1, &tm->vbo);
@@ -200,6 +265,13 @@ TileMap *TileMap_new(GLuint program) {
 
   curl_global_init(CURL_GLOBAL_DEFAULT);
   tm->multi = curl_multi_init();
+  if (!tm->multi) {
+    glDeleteBuffers(1, &tm->vbo);
+    glDeleteVertexArrays(1, &tm->vao);
+    curl_global_cleanup();
+    free(tm);
+    return NULL;
+  }
 
   return tm;
 }
