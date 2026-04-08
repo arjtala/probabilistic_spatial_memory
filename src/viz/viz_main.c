@@ -46,7 +46,7 @@ static ImuGpsReader *g_imu_gps = NULL;
 static JepaCache *g_jepa_cache = NULL;
 static SpatialMemory *g_sm = NULL;
 static double *g_first_ts = NULL;
-static double *g_last_adv = NULL;
+static double *g_window_anchor = NULL;
 static double g_time_window_sec = 5.0;
 static int g_h3_resolution = DEFAULT_RESOLUTION;
 
@@ -428,8 +428,9 @@ static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) 
         SpatialMemory_free(g_sm);
         g_sm = SpatialMemory_new(g_h3_resolution, DEFAULT_CAPACITY, DEFAULT_PRECISION);
         // first_ts is a fixed epoch→PTS mapping; don't reset it.
-        // last_adv tracks time-window advancement; reset so it re-initializes from the drain.
-        if (g_last_adv) *g_last_adv = -1.0;
+        // The window anchor defines the fixed-width decay buckets, so reset it
+        // when replaying from an earlier point in the stream.
+        if (g_window_anchor) *g_window_anchor = -1.0;
         if (g_gps_trace) GpsTrace_clear(g_gps_trace);
         if (g_imu_proc) ImuProcessor_reset(g_imu_proc);
         if (g_imu_gps) {
@@ -748,7 +749,7 @@ int main(int argc, char *argv[]) {
   SpatialMemory *sm = NULL;
   IngestReader *reader = NULL;
   hid_t h5_file = -1;
-  double last_adv = -1.0;
+  double window_anchor = -1.0;
   double first_ts = -1.0;
 
   JepaCache *jepa_cache = NULL;
@@ -821,7 +822,7 @@ int main(int argc, char *argv[]) {
   g_sm = sm;
   g_reader = reader;
   g_first_ts = &first_ts;
-  g_last_adv = &last_adv;
+  g_window_anchor = &window_anchor;
 
   // ---- Create hex renderer, tile map, and GPS trace ----
   HexRenderer *hr = HexRenderer_new(hex_prog);
@@ -892,13 +893,8 @@ int main(int argc, char *argv[]) {
             break;
           }
 
-          if (last_adv < 0.0) {
-            last_adv = record.timestamp;
-          }
-          if (record.timestamp - last_adv >= time_window_sec) {
-            SpatialMemory_advance_all(sm);
-            last_adv = record.timestamp;
-          }
+          SpatialMemory_advance_to_timestamp(sm, record.timestamp, &window_anchor,
+                                             time_window_sec);
 
           SpatialMemory_observe(sm, record.lat, record.lng, record.embedding,
                                 record.embedding_dim * sizeof(float));

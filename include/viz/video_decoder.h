@@ -22,6 +22,7 @@ typedef struct {
   double time_base;     // seconds per PTS tick
   double duration;      // total duration in seconds
   double current_pts;   // PTS of last decoded frame in seconds
+  bool draining;
 } VideoDecoder;
 
 VideoDecoder *VideoDecoder_open(const char *path);

@@ -2,6 +2,154 @@
 #include <stdlib.h>
 #include "ingest/ingest.h"
 
+static void close_dataset(hid_t *dataset) {
+  if (dataset && *dataset >= 0) {
+    H5Dclose(*dataset);
+    *dataset = -1;
+  }
+}
+
+static bool link_exists(hid_t loc, const char *name) {
+  htri_t exists = H5Lexists(loc, name, H5P_DEFAULT);
+  return exists > 0;
+}
+
+static bool get_dataset_dims(hid_t dataset, int expected_rank, hsize_t *dims,
+                             const char *name) {
+  hid_t space = H5Dget_space(dataset);
+  if (space < 0) {
+    fprintf(stderr, "Failed to get dataspace for '%s'\n", name);
+    return false;
+  }
+
+  int rank = H5Sget_simple_extent_ndims(space);
+  if (rank != expected_rank) {
+    fprintf(stderr, "Dataset '%s' has rank %d, expected %d\n",
+            name, rank, expected_rank);
+    H5Sclose(space);
+    return false;
+  }
+
+  if (H5Sget_simple_extent_dims(space, dims, NULL) < 0) {
+    fprintf(stderr, "Failed to read dimensions for '%s'\n", name);
+    H5Sclose(space);
+    return false;
+  }
+
+  H5Sclose(space);
+  return true;
+}
+
+static bool read_double_row(hid_t dataset, size_t row, double *out,
+                            const char *name) {
+  hsize_t offset = row;
+  hsize_t count = 1;
+  hid_t mem = H5Screate_simple(1, &count, NULL);
+  hid_t space = H5Dget_space(dataset);
+  bool ok = false;
+
+  if (mem < 0 || space < 0) {
+    fprintf(stderr, "Failed to prepare HDF5 read for '%s'\n", name);
+    goto cleanup;
+  }
+  if (H5Sselect_hyperslab(space, H5S_SELECT_SET, &offset, NULL, &count, NULL) < 0) {
+    fprintf(stderr, "Failed to select row %zu in '%s'\n", row, name);
+    goto cleanup;
+  }
+  if (H5Dread(dataset, H5T_NATIVE_DOUBLE, mem, space, H5P_DEFAULT, out) < 0) {
+    fprintf(stderr, "Failed to read row %zu from '%s'\n", row, name);
+    goto cleanup;
+  }
+
+  ok = true;
+
+cleanup:
+  if (space >= 0) {
+    H5Sclose(space);
+  }
+  if (mem >= 0) {
+    H5Sclose(mem);
+  }
+  return ok;
+}
+
+static bool read_float_row(hid_t dataset, size_t row, size_t width, float *out,
+                           const char *name) {
+  hsize_t offset[2] = {row, 0};
+  hsize_t count[2] = {1, width};
+  hsize_t mem_dims = width;
+  hid_t mem = H5Screate_simple(1, &mem_dims, NULL);
+  hid_t space = H5Dget_space(dataset);
+  bool ok = false;
+
+  if (mem < 0 || space < 0) {
+    fprintf(stderr, "Failed to prepare HDF5 row read for '%s'\n", name);
+    goto cleanup;
+  }
+  if (H5Sselect_hyperslab(space, H5S_SELECT_SET, offset, NULL, count, NULL) < 0) {
+    fprintf(stderr, "Failed to select row %zu in '%s'\n", row, name);
+    goto cleanup;
+  }
+  if (H5Dread(dataset, H5T_NATIVE_FLOAT, mem, space, H5P_DEFAULT, out) < 0) {
+    fprintf(stderr, "Failed to read row %zu from '%s'\n", row, name);
+    goto cleanup;
+  }
+
+  ok = true;
+
+cleanup:
+  if (space >= 0) {
+    H5Sclose(space);
+  }
+  if (mem >= 0) {
+    H5Sclose(mem);
+  }
+  return ok;
+}
+
+static bool read_float_square_map(hid_t dataset, size_t row, size_t dim,
+                                  float *out, const char *name) {
+  hsize_t offset[3] = {row, 0, 0};
+  hsize_t count[3] = {1, dim, dim};
+  hsize_t mem_dims[2] = {dim, dim};
+  hid_t mem = H5Screate_simple(2, mem_dims, NULL);
+  hid_t space = H5Dget_space(dataset);
+  bool ok = false;
+
+  if (mem < 0 || space < 0) {
+    fprintf(stderr, "Failed to prepare HDF5 map read for '%s'\n", name);
+    goto cleanup;
+  }
+  if (H5Sselect_hyperslab(space, H5S_SELECT_SET, offset, NULL, count, NULL) < 0) {
+    fprintf(stderr, "Failed to select map %zu in '%s'\n", row, name);
+    goto cleanup;
+  }
+  if (H5Dread(dataset, H5T_NATIVE_FLOAT, mem, space, H5P_DEFAULT, out) < 0) {
+    fprintf(stderr, "Failed to read map %zu from '%s'\n", row, name);
+    goto cleanup;
+  }
+
+  ok = true;
+
+cleanup:
+  if (space >= 0) {
+    H5Sclose(space);
+  }
+  if (mem >= 0) {
+    H5Sclose(mem);
+  }
+  return ok;
+}
+
+static bool read_full_double_dataset(hid_t dataset, double *out,
+                                     const char *name) {
+  if (H5Dread(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, out) < 0) {
+    fprintf(stderr, "Failed to read dataset '%s'\n", name);
+    return false;
+  }
+  return true;
+}
+
 IngestReader *IngestReader_open(hid_t file, const char *group) {
   if (file < 0) {
     fprintf(stderr, "IngestReader_open: invalid file handle\n");
@@ -14,165 +162,156 @@ IngestReader *IngestReader_open(hid_t file, const char *group) {
     return NULL;
   }
 
-  IngestReader *reader = (IngestReader *)malloc(sizeof(IngestReader));
+  IngestReader *reader = (IngestReader *)calloc(1, sizeof(IngestReader));
   if (!reader) {
     H5Gclose(grp);
     return NULL;
   }
+  reader->dataset_ts = -1;
+  reader->dataset_lat = -1;
+  reader->dataset_lng = -1;
+  reader->dataset_emb = -1;
+  reader->dataset_attn = -1;
+  reader->dataset_accel = -1;
+  reader->dataset_gyro = -1;
+  reader->attn_buf = NULL;
+  reader->embedding_buf = NULL;
+  reader->has_imu = false;
 
   reader->dataset_ts = H5Dopen(grp, TIMESTAMPS, H5P_DEFAULT);
   reader->dataset_lat = H5Dopen(grp, LAT, H5P_DEFAULT);
   reader->dataset_lng = H5Dopen(grp, LNG, H5P_DEFAULT);
   reader->dataset_emb = H5Dopen(grp, EMBEDDINGS, H5P_DEFAULT);
-
-  // Try opening spatial maps: attention_maps (dino) or prediction_maps (jepa)
-  reader->dataset_attn = -1;
-  reader->attn_size = 0;
-  reader->attn_buf = NULL;
-
-  hid_t attn_ds = H5Dopen(grp, ATTENTION_MAPS, H5P_DEFAULT);
-  if (attn_ds < 0)
-    attn_ds = H5Dopen(grp, PREDICTION_MAPS, H5P_DEFAULT);
-  if (attn_ds >= 0) {
-    hid_t attn_space = H5Dget_space(attn_ds);
-    int rank = H5Sget_simple_extent_ndims(attn_space);
-    if (rank == 3) {
-      hsize_t attn_dims[3];
-      H5Sget_simple_extent_dims(attn_space, attn_dims, NULL);
-      reader->dataset_attn = attn_ds;
-      reader->attn_size = attn_dims[1]; // spatial dim (e.g. 14)
-      reader->attn_buf = malloc(attn_dims[1] * attn_dims[2] * sizeof(float));
-    } else {
-      H5Dclose(attn_ds);
-    }
-    H5Sclose(attn_space);
-  }
-
-  // Try opening IMU datasets (optional, both must be present)
-  reader->dataset_accel = -1;
-  reader->dataset_gyro = -1;
-  reader->has_imu = false;
-
-  hid_t accel_ds = H5Dopen(grp, ACCEL, H5P_DEFAULT);
-  hid_t gyro_ds = H5Dopen(grp, GYRO, H5P_DEFAULT);
-  if (accel_ds >= 0 && gyro_ds >= 0) {
-    // Validate both are rank-2 with second dim == 3
-    hid_t accel_space = H5Dget_space(accel_ds);
-    hid_t gyro_space = H5Dget_space(gyro_ds);
-    int accel_rank = H5Sget_simple_extent_ndims(accel_space);
-    int gyro_rank = H5Sget_simple_extent_ndims(gyro_space);
-    bool valid = false;
-    if (accel_rank == 2 && gyro_rank == 2) {
-      hsize_t accel_dims[2], gyro_dims[2];
-      H5Sget_simple_extent_dims(accel_space, accel_dims, NULL);
-      H5Sget_simple_extent_dims(gyro_space, gyro_dims, NULL);
-      if (accel_dims[1] == 3 && gyro_dims[1] == 3) {
-        valid = true;
-      }
-    }
-    H5Sclose(accel_space);
-    H5Sclose(gyro_space);
-    if (valid) {
-      reader->dataset_accel = accel_ds;
-      reader->dataset_gyro = gyro_ds;
-      reader->has_imu = true;
-    } else {
-      H5Dclose(accel_ds);
-      H5Dclose(gyro_ds);
-    }
-  } else {
-    if (accel_ds >= 0) H5Dclose(accel_ds);
-    if (gyro_ds >= 0) H5Dclose(gyro_ds);
-  }
-
-  H5Gclose(grp);
-
   if (reader->dataset_ts < 0 || reader->dataset_lat < 0 ||
       reader->dataset_lng < 0 || reader->dataset_emb < 0) {
     fprintf(stderr, "IngestReader_open: missing datasets in group '%s'\n", group);
-    if (reader->dataset_attn >= 0) H5Dclose(reader->dataset_attn);
-    if (reader->dataset_accel >= 0) H5Dclose(reader->dataset_accel);
-    if (reader->dataset_gyro >= 0) H5Dclose(reader->dataset_gyro);
-    free(reader->attn_buf);
-    free(reader);
+    H5Gclose(grp);
+    IngestReader_close(reader);
     return NULL;
   }
 
-  hid_t space = H5Dget_space(reader->dataset_ts);
-  hsize_t dims[1];
-  H5Sget_simple_extent_dims(space, dims, NULL);
-  reader->n_records = dims[0];
-  H5Sclose(space);
-
-  hid_t emb_space = H5Dget_space(reader->dataset_emb);
+  hsize_t ts_dims[1];
+  hsize_t lat_dims[1];
+  hsize_t lng_dims[1];
   hsize_t emb_dims[2];
-  H5Sget_simple_extent_dims(emb_space, emb_dims, NULL);
+
+  if (!get_dataset_dims(reader->dataset_ts, 1, ts_dims, TIMESTAMPS) ||
+      !get_dataset_dims(reader->dataset_lat, 1, lat_dims, LAT) ||
+      !get_dataset_dims(reader->dataset_lng, 1, lng_dims, LNG) ||
+      !get_dataset_dims(reader->dataset_emb, 2, emb_dims, EMBEDDINGS)) {
+    H5Gclose(grp);
+    IngestReader_close(reader);
+    return NULL;
+  }
+
+  if (lat_dims[0] != ts_dims[0] || lng_dims[0] != ts_dims[0] ||
+      emb_dims[0] != ts_dims[0]) {
+    fprintf(stderr, "IngestReader_open: dataset length mismatch in group '%s'\n", group);
+    H5Gclose(grp);
+    IngestReader_close(reader);
+    return NULL;
+  }
+
+  reader->n_records = ts_dims[0];
   reader->emb_dimension = emb_dims[1];
-  H5Sclose(emb_space);
-
   reader->cursor = 0;
-  reader->embedding_buf = malloc(reader->emb_dimension * sizeof(float));
+  reader->attn_size = 0;
 
+  reader->embedding_buf = malloc(reader->emb_dimension * sizeof(float));
+  if (!reader->embedding_buf && reader->emb_dimension > 0) {
+    H5Gclose(grp);
+    IngestReader_close(reader);
+    return NULL;
+  }
+
+  if (link_exists(grp, ATTENTION_MAPS) || link_exists(grp, PREDICTION_MAPS)) {
+    const char *attn_name = link_exists(grp, ATTENTION_MAPS)
+        ? ATTENTION_MAPS
+        : PREDICTION_MAPS;
+    hsize_t attn_dims[3];
+
+    reader->dataset_attn = H5Dopen(grp, attn_name, H5P_DEFAULT);
+    if (reader->dataset_attn < 0 ||
+        !get_dataset_dims(reader->dataset_attn, 3, attn_dims, attn_name)) {
+      H5Gclose(grp);
+      IngestReader_close(reader);
+      return NULL;
+    }
+    if (attn_dims[0] != ts_dims[0] || attn_dims[1] == 0 ||
+        attn_dims[1] != attn_dims[2]) {
+      fprintf(stderr, "IngestReader_open: invalid spatial map shape in group '%s'\n",
+              group);
+      H5Gclose(grp);
+      IngestReader_close(reader);
+      return NULL;
+    }
+
+    reader->attn_size = attn_dims[1];
+    reader->attn_buf = malloc(reader->attn_size * reader->attn_size * sizeof(float));
+    if (!reader->attn_buf) {
+      H5Gclose(grp);
+      IngestReader_close(reader);
+      return NULL;
+    }
+  }
+
+  bool has_accel = link_exists(grp, ACCEL);
+  bool has_gyro = link_exists(grp, GYRO);
+  if (has_accel != has_gyro) {
+    fprintf(stderr, "IngestReader_open: incomplete IMU datasets in group '%s'\n", group);
+    H5Gclose(grp);
+    IngestReader_close(reader);
+    return NULL;
+  }
+  if (has_accel) {
+    hsize_t accel_dims[2];
+    hsize_t gyro_dims[2];
+
+    reader->dataset_accel = H5Dopen(grp, ACCEL, H5P_DEFAULT);
+    reader->dataset_gyro = H5Dopen(grp, GYRO, H5P_DEFAULT);
+    if (reader->dataset_accel < 0 || reader->dataset_gyro < 0 ||
+        !get_dataset_dims(reader->dataset_accel, 2, accel_dims, ACCEL) ||
+        !get_dataset_dims(reader->dataset_gyro, 2, gyro_dims, GYRO)) {
+      H5Gclose(grp);
+      IngestReader_close(reader);
+      return NULL;
+    }
+    if (accel_dims[0] != ts_dims[0] || gyro_dims[0] != ts_dims[0] ||
+        accel_dims[1] != 3 || gyro_dims[1] != 3) {
+      fprintf(stderr, "IngestReader_open: invalid IMU shape in group '%s'\n", group);
+      H5Gclose(grp);
+      IngestReader_close(reader);
+      return NULL;
+    }
+    reader->has_imu = true;
+  }
+
+  H5Gclose(grp);
   return reader;
 }
 
 bool IngestReader_next(IngestReader *reader, IngestRecord *record) {
   if (reader->cursor >= reader->n_records)
     return false;
+  size_t cur = reader->cursor;
 
-  hsize_t offset1 = reader->cursor;
-  hsize_t count1 = 1;
-  hid_t mem1 = H5Screate_simple(1, &count1, NULL);
-
-  // timestamp
-  hid_t ts_space = H5Dget_space(reader->dataset_ts);
-  H5Sselect_hyperslab(ts_space, H5S_SELECT_SET, &offset1, NULL, &count1, NULL);
-  H5Dread(reader->dataset_ts, H5T_NATIVE_DOUBLE, mem1, ts_space, H5P_DEFAULT, &record->timestamp);
-  H5Sclose(ts_space);
-
-  // latitude
-  hid_t lat_space = H5Dget_space(reader->dataset_lat);
-  H5Sselect_hyperslab(lat_space, H5S_SELECT_SET, &offset1, NULL, &count1, NULL);
-  H5Dread(reader->dataset_lat, H5T_NATIVE_DOUBLE, mem1, lat_space, H5P_DEFAULT, &record->lat);
-  H5Sclose(lat_space);
-
-  // longitude
-  hid_t lng_space = H5Dget_space(reader->dataset_lng);
-  H5Sselect_hyperslab(lng_space, H5S_SELECT_SET, &offset1, NULL, &count1, NULL);
-  H5Dread(reader->dataset_lng, H5T_NATIVE_DOUBLE, mem1, lng_space, H5P_DEFAULT, &record->lng);
-  H5Sclose(lng_space);
-
-  // embedding (2D: select one row)
-  hsize_t cur = reader->cursor;
-  hsize_t emb_dim = reader->emb_dimension;
-  hsize_t offset2[2] = {cur, 0};
-  hsize_t count2[2] = {1, emb_dim};
-  hid_t mem2 = H5Screate_simple(1, &emb_dim, NULL);
-  hid_t emb_space = H5Dget_space(reader->dataset_emb);
-  H5Sselect_hyperslab(emb_space, H5S_SELECT_SET, offset2, NULL, count2, NULL);
-  H5Dread(reader->dataset_emb, H5T_NATIVE_FLOAT, mem2, emb_space, H5P_DEFAULT,
-          reader->embedding_buf);
-
-  H5Sclose(emb_space);
-  H5Sclose(mem1);
-  H5Sclose(mem2);
+  if (!read_double_row(reader->dataset_ts, cur, &record->timestamp, TIMESTAMPS) ||
+      !read_double_row(reader->dataset_lat, cur, &record->lat, LAT) ||
+      !read_double_row(reader->dataset_lng, cur, &record->lng, LNG) ||
+      !read_float_row(reader->dataset_emb, cur, reader->emb_dimension,
+                      reader->embedding_buf, EMBEDDINGS)) {
+    return false;
+  }
 
   record->embedding = reader->embedding_buf;
   record->embedding_dim = reader->emb_dimension;
 
   // Read attention map if available
   if (reader->dataset_attn >= 0) {
-    hsize_t attn_sz = reader->attn_size;
-    hsize_t offset3[3] = {cur, 0, 0};
-    hsize_t count3[3] = {1, attn_sz, attn_sz};
-    hsize_t mem_dims[2] = {attn_sz, attn_sz};
-    hid_t mem_attn = H5Screate_simple(2, mem_dims, NULL);
-    hid_t attn_space = H5Dget_space(reader->dataset_attn);
-    H5Sselect_hyperslab(attn_space, H5S_SELECT_SET, offset3, NULL, count3, NULL);
-    H5Dread(reader->dataset_attn, H5T_NATIVE_FLOAT, mem_attn, attn_space, H5P_DEFAULT,
-            reader->attn_buf);
-    H5Sclose(attn_space);
-    H5Sclose(mem_attn);
+    if (!read_float_square_map(reader->dataset_attn, cur, reader->attn_size,
+                               reader->attn_buf, "spatial_map")) {
+      return false;
+    }
     record->attention_map = reader->attn_buf;
     record->attn_size = reader->attn_size;
   } else {
@@ -182,24 +321,10 @@ bool IngestReader_next(IngestReader *reader, IngestRecord *record) {
 
   // Read IMU data if available
   if (reader->has_imu) {
-    hsize_t imu_offset[2] = {cur, 0};
-    hsize_t imu_count[2] = {1, 3};
-    hsize_t imu_mem_dim = 3;
-    hid_t imu_mem = H5Screate_simple(1, &imu_mem_dim, NULL);
-
-    hid_t accel_space = H5Dget_space(reader->dataset_accel);
-    H5Sselect_hyperslab(accel_space, H5S_SELECT_SET, imu_offset, NULL, imu_count, NULL);
-    H5Dread(reader->dataset_accel, H5T_NATIVE_FLOAT, imu_mem, accel_space, H5P_DEFAULT,
-            reader->accel_buf);
-    H5Sclose(accel_space);
-
-    hid_t gyro_space = H5Dget_space(reader->dataset_gyro);
-    H5Sselect_hyperslab(gyro_space, H5S_SELECT_SET, imu_offset, NULL, imu_count, NULL);
-    H5Dread(reader->dataset_gyro, H5T_NATIVE_FLOAT, imu_mem, gyro_space, H5P_DEFAULT,
-            reader->gyro_buf);
-    H5Sclose(gyro_space);
-
-    H5Sclose(imu_mem);
+    if (!read_float_row(reader->dataset_accel, cur, 3, reader->accel_buf, ACCEL) ||
+        !read_float_row(reader->dataset_gyro, cur, 3, reader->gyro_buf, GYRO)) {
+      return false;
+    }
 
     record->accel[0] = reader->accel_buf[0];
     record->accel[1] = reader->accel_buf[1];
@@ -220,13 +345,14 @@ bool IngestReader_next(IngestReader *reader, IngestRecord *record) {
 }
 
 void IngestReader_close(IngestReader *reader) {
-  H5Dclose(reader->dataset_ts);
-  H5Dclose(reader->dataset_lat);
-  H5Dclose(reader->dataset_lng);
-  H5Dclose(reader->dataset_emb);
-  if (reader->dataset_attn >= 0) H5Dclose(reader->dataset_attn);
-  if (reader->dataset_accel >= 0) H5Dclose(reader->dataset_accel);
-  if (reader->dataset_gyro >= 0) H5Dclose(reader->dataset_gyro);
+  if (!reader) return;
+  close_dataset(&reader->dataset_ts);
+  close_dataset(&reader->dataset_lat);
+  close_dataset(&reader->dataset_lng);
+  close_dataset(&reader->dataset_emb);
+  close_dataset(&reader->dataset_attn);
+  close_dataset(&reader->dataset_accel);
+  close_dataset(&reader->dataset_gyro);
   free(reader->embedding_buf);
   free(reader->attn_buf);
   free(reader);
@@ -234,15 +360,10 @@ void IngestReader_close(IngestReader *reader) {
 
 void IngestReader_run(IngestReader *reader, SpatialMemory *sm, const double time_window_sec) {
   IngestRecord record;
-  double last_adv = -1.0;
+  double window_anchor = -1.0;
   while (IngestReader_next(reader, &record)) {
-    if (last_adv < 0.0) {
-      last_adv = record.timestamp;
-    }
-    if (record.timestamp - last_adv >= time_window_sec) {
-      SpatialMemory_advance_all(sm);
-      last_adv = record.timestamp;
-    }
+    SpatialMemory_advance_to_timestamp(sm, record.timestamp, &window_anchor,
+                                       time_window_sec);
     SpatialMemory_observe(sm, record.lat, record.lng, record.embedding,
                           record.embedding_dim * sizeof(float));
   }
@@ -263,84 +384,164 @@ ImuGpsReader *ImuGpsReader_open(hid_t file) {
   size_t gps_n = 0;
 
   // Try opening "imu" group
-  hid_t imu_grp = H5Gopen(file, "imu", H5P_DEFAULT);
-  if (imu_grp >= 0) {
-    imu_ds_ts = H5Dopen(imu_grp, TIMESTAMPS, H5P_DEFAULT);
-    imu_ds_accel = H5Dopen(imu_grp, ACCEL, H5P_DEFAULT);
-    imu_ds_gyro = H5Dopen(imu_grp, GYRO, H5P_DEFAULT);
-
-    if (imu_ds_ts >= 0 && imu_ds_accel >= 0 && imu_ds_gyro >= 0) {
-      // Validate accel/gyro are rank-2 with dim[1]==3
-      hid_t accel_space = H5Dget_space(imu_ds_accel);
-      hid_t gyro_space = H5Dget_space(imu_ds_gyro);
-      int accel_rank = H5Sget_simple_extent_ndims(accel_space);
-      int gyro_rank = H5Sget_simple_extent_ndims(gyro_space);
-      bool valid = false;
-      if (accel_rank == 2 && gyro_rank == 2) {
-        hsize_t accel_dims[2], gyro_dims[2];
-        H5Sget_simple_extent_dims(accel_space, accel_dims, NULL);
-        H5Sget_simple_extent_dims(gyro_space, gyro_dims, NULL);
-        if (accel_dims[1] == 3 && gyro_dims[1] == 3) {
-          valid = true;
-        }
-      }
-      H5Sclose(accel_space);
-      H5Sclose(gyro_space);
-
-      if (valid) {
-        hid_t ts_space = H5Dget_space(imu_ds_ts);
-        hsize_t ts_dims[1];
-        H5Sget_simple_extent_dims(ts_space, ts_dims, NULL);
-        H5Sclose(ts_space);
-        imu_n = ts_dims[0];
-        found_imu = true;
-      }
+  if (link_exists(file, "imu")) {
+    hid_t imu_grp = H5Gopen(file, "imu", H5P_DEFAULT);
+    if (imu_grp < 0) {
+      return NULL;
     }
 
-    if (!found_imu) {
-      if (imu_ds_ts >= 0) H5Dclose(imu_ds_ts);
-      if (imu_ds_accel >= 0) H5Dclose(imu_ds_accel);
-      if (imu_ds_gyro >= 0) H5Dclose(imu_ds_gyro);
-      imu_ds_ts = imu_ds_accel = imu_ds_gyro = -1;
+    bool has_ts = link_exists(imu_grp, TIMESTAMPS);
+    bool has_accel = link_exists(imu_grp, ACCEL);
+    bool has_gyro = link_exists(imu_grp, GYRO);
+
+    if (has_ts || has_accel || has_gyro) {
+      hsize_t ts_dims[1];
+      hsize_t accel_dims[2];
+      hsize_t gyro_dims[2];
+
+      if (!(has_ts && has_accel && has_gyro)) {
+        fprintf(stderr, "ImuGpsReader_open: incomplete IMU datasets\n");
+        H5Gclose(imu_grp);
+        return NULL;
+      }
+
+      imu_ds_ts = H5Dopen(imu_grp, TIMESTAMPS, H5P_DEFAULT);
+      imu_ds_accel = H5Dopen(imu_grp, ACCEL, H5P_DEFAULT);
+      imu_ds_gyro = H5Dopen(imu_grp, GYRO, H5P_DEFAULT);
+      if (imu_ds_ts < 0 || imu_ds_accel < 0 || imu_ds_gyro < 0 ||
+          !get_dataset_dims(imu_ds_ts, 1, ts_dims, "imu/timestamps") ||
+          !get_dataset_dims(imu_ds_accel, 2, accel_dims, "imu/accel") ||
+          !get_dataset_dims(imu_ds_gyro, 2, gyro_dims, "imu/gyro")) {
+        H5Gclose(imu_grp);
+        close_dataset(&imu_ds_ts);
+        close_dataset(&imu_ds_accel);
+        close_dataset(&imu_ds_gyro);
+        return NULL;
+      }
+      if (accel_dims[0] != ts_dims[0] || gyro_dims[0] != ts_dims[0] ||
+          accel_dims[1] != 3 || gyro_dims[1] != 3) {
+        fprintf(stderr, "ImuGpsReader_open: invalid IMU dataset shapes\n");
+        H5Gclose(imu_grp);
+        close_dataset(&imu_ds_ts);
+        close_dataset(&imu_ds_accel);
+        close_dataset(&imu_ds_gyro);
+        return NULL;
+      }
+
+      imu_n = ts_dims[0];
+      found_imu = true;
     }
+
     H5Gclose(imu_grp);
   }
 
   // Try opening "gps" group — load fully into memory
-  hid_t gps_grp = H5Gopen(file, "gps", H5P_DEFAULT);
-  if (gps_grp >= 0) {
-    hid_t gps_ds_ts = H5Dopen(gps_grp, TIMESTAMPS, H5P_DEFAULT);
-    hid_t gps_ds_lat = H5Dopen(gps_grp, LAT, H5P_DEFAULT);
-    hid_t gps_ds_lng = H5Dopen(gps_grp, LNG, H5P_DEFAULT);
+  if (link_exists(file, "gps")) {
+    hid_t gps_grp = H5Gopen(file, "gps", H5P_DEFAULT);
+    if (gps_grp < 0) {
+      close_dataset(&imu_ds_ts);
+      close_dataset(&imu_ds_accel);
+      close_dataset(&imu_ds_gyro);
+      return NULL;
+    }
 
-    if (gps_ds_ts >= 0 && gps_ds_lat >= 0 && gps_ds_lng >= 0) {
-      hid_t ts_space = H5Dget_space(gps_ds_ts);
+    bool has_ts = link_exists(gps_grp, TIMESTAMPS);
+    bool has_lat = link_exists(gps_grp, LAT);
+    bool has_lng = link_exists(gps_grp, LNG);
+
+    if (has_ts || has_lat || has_lng) {
+      hid_t gps_ds_ts = -1;
+      hid_t gps_ds_lat = -1;
+      hid_t gps_ds_lng = -1;
       hsize_t ts_dims[1];
-      H5Sget_simple_extent_dims(ts_space, ts_dims, NULL);
-      H5Sclose(ts_space);
-      gps_n = ts_dims[0];
+      hsize_t lat_dims[1];
+      hsize_t lng_dims[1];
 
+      if (!(has_ts && has_lat && has_lng)) {
+        fprintf(stderr, "ImuGpsReader_open: incomplete GPS datasets\n");
+        H5Gclose(gps_grp);
+        close_dataset(&imu_ds_ts);
+        close_dataset(&imu_ds_accel);
+        close_dataset(&imu_ds_gyro);
+        return NULL;
+      }
+
+      gps_ds_ts = H5Dopen(gps_grp, TIMESTAMPS, H5P_DEFAULT);
+      gps_ds_lat = H5Dopen(gps_grp, LAT, H5P_DEFAULT);
+      gps_ds_lng = H5Dopen(gps_grp, LNG, H5P_DEFAULT);
+      if (gps_ds_ts < 0 || gps_ds_lat < 0 || gps_ds_lng < 0 ||
+          !get_dataset_dims(gps_ds_ts, 1, ts_dims, "gps/timestamps") ||
+          !get_dataset_dims(gps_ds_lat, 1, lat_dims, "gps/lat") ||
+          !get_dataset_dims(gps_ds_lng, 1, lng_dims, "gps/lng")) {
+        H5Gclose(gps_grp);
+        close_dataset(&gps_ds_ts);
+        close_dataset(&gps_ds_lat);
+        close_dataset(&gps_ds_lng);
+        close_dataset(&imu_ds_ts);
+        close_dataset(&imu_ds_accel);
+        close_dataset(&imu_ds_gyro);
+        return NULL;
+      }
+      if (lat_dims[0] != ts_dims[0] || lng_dims[0] != ts_dims[0]) {
+        fprintf(stderr, "ImuGpsReader_open: GPS dataset length mismatch\n");
+        H5Gclose(gps_grp);
+        close_dataset(&gps_ds_ts);
+        close_dataset(&gps_ds_lat);
+        close_dataset(&gps_ds_lng);
+        close_dataset(&imu_ds_ts);
+        close_dataset(&imu_ds_accel);
+        close_dataset(&imu_ds_gyro);
+        return NULL;
+      }
+
+      gps_n = ts_dims[0];
       if (gps_n > 0) {
         gps_ts = malloc(gps_n * sizeof(double));
         gps_lat = malloc(gps_n * sizeof(double));
         gps_lng = malloc(gps_n * sizeof(double));
 
-        H5Dread(gps_ds_ts, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, gps_ts);
-        H5Dread(gps_ds_lat, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, gps_lat);
-        H5Dread(gps_ds_lng, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, gps_lng);
+        if (!gps_ts || !gps_lat || !gps_lng ||
+            !read_full_double_dataset(gps_ds_ts, gps_ts, "gps/timestamps") ||
+            !read_full_double_dataset(gps_ds_lat, gps_lat, "gps/lat") ||
+            !read_full_double_dataset(gps_ds_lng, gps_lng, "gps/lng")) {
+          free(gps_ts);
+          free(gps_lat);
+          free(gps_lng);
+          H5Gclose(gps_grp);
+          close_dataset(&gps_ds_ts);
+          close_dataset(&gps_ds_lat);
+          close_dataset(&gps_ds_lng);
+          close_dataset(&imu_ds_ts);
+          close_dataset(&imu_ds_accel);
+          close_dataset(&imu_ds_gyro);
+          return NULL;
+        }
         found_gps = true;
       }
+
+      close_dataset(&gps_ds_ts);
+      close_dataset(&gps_ds_lat);
+      close_dataset(&gps_ds_lng);
     }
 
-    if (gps_ds_ts >= 0) H5Dclose(gps_ds_ts);
-    if (gps_ds_lat >= 0) H5Dclose(gps_ds_lat);
-    if (gps_ds_lng >= 0) H5Dclose(gps_ds_lng);
     H5Gclose(gps_grp);
   }
 
   if (!found_imu && !found_gps) return NULL;
 
   ImuGpsReader *r = calloc(1, sizeof(ImuGpsReader));
+  if (!r) {
+    close_dataset(&imu_ds_ts);
+    close_dataset(&imu_ds_accel);
+    close_dataset(&imu_ds_gyro);
+    free(gps_ts);
+    free(gps_lat);
+    free(gps_lng);
+    return NULL;
+  }
+  r->imu_dataset_ts = -1;
+  r->imu_dataset_accel = -1;
+  r->imu_dataset_gyro = -1;
 
   r->imu_dataset_ts = imu_ds_ts;
   r->imu_dataset_accel = imu_ds_accel;
@@ -359,14 +560,10 @@ ImuGpsReader *ImuGpsReader_open(hid_t file) {
   // Read first IMU timestamp for timing alignment
   r->imu_first_ts = 0.0;
   if (found_imu && imu_n > 0) {
-    hsize_t off = 0, cnt = 1;
-    hid_t mem1 = H5Screate_simple(1, &cnt, NULL);
-    hid_t ts_sp = H5Dget_space(r->imu_dataset_ts);
-    H5Sselect_hyperslab(ts_sp, H5S_SELECT_SET, &off, NULL, &cnt, NULL);
-    H5Dread(r->imu_dataset_ts, H5T_NATIVE_DOUBLE, mem1, ts_sp, H5P_DEFAULT,
-            &r->imu_first_ts);
-    H5Sclose(ts_sp);
-    H5Sclose(mem1);
+    if (!read_double_row(r->imu_dataset_ts, 0, &r->imu_first_ts, "imu/timestamps")) {
+      ImuGpsReader_close(r);
+      return NULL;
+    }
   }
 
   return r;
@@ -375,35 +572,12 @@ ImuGpsReader *ImuGpsReader_open(hid_t file) {
 bool ImuGpsReader_next_imu(ImuGpsReader *r, ImuRecord *rec) {
   if (!r || !r->has_imu || r->imu_cursor >= r->imu_n_records)
     return false;
-
-  hsize_t offset1 = r->imu_cursor;
-  hsize_t count1 = 1;
-  hid_t mem1 = H5Screate_simple(1, &count1, NULL);
-
-  // Read timestamp (1D slab)
-  hid_t ts_space = H5Dget_space(r->imu_dataset_ts);
-  H5Sselect_hyperslab(ts_space, H5S_SELECT_SET, &offset1, NULL, &count1, NULL);
-  H5Dread(r->imu_dataset_ts, H5T_NATIVE_DOUBLE, mem1, ts_space, H5P_DEFAULT, &rec->timestamp);
-  H5Sclose(ts_space);
-  H5Sclose(mem1);
-
-  // Read accel + gyro (2D slab, one row)
-  hsize_t offset2[2] = {r->imu_cursor, 0};
-  hsize_t count2[2] = {1, 3};
-  hsize_t mem_dim = 3;
-  hid_t mem2 = H5Screate_simple(1, &mem_dim, NULL);
-
-  hid_t accel_space = H5Dget_space(r->imu_dataset_accel);
-  H5Sselect_hyperslab(accel_space, H5S_SELECT_SET, offset2, NULL, count2, NULL);
-  H5Dread(r->imu_dataset_accel, H5T_NATIVE_FLOAT, mem2, accel_space, H5P_DEFAULT, rec->accel);
-  H5Sclose(accel_space);
-
-  hid_t gyro_space = H5Dget_space(r->imu_dataset_gyro);
-  H5Sselect_hyperslab(gyro_space, H5S_SELECT_SET, offset2, NULL, count2, NULL);
-  H5Dread(r->imu_dataset_gyro, H5T_NATIVE_FLOAT, mem2, gyro_space, H5P_DEFAULT, rec->gyro);
-  H5Sclose(gyro_space);
-
-  H5Sclose(mem2);
+  size_t row = r->imu_cursor;
+  if (!read_double_row(r->imu_dataset_ts, row, &rec->timestamp, "imu/timestamps") ||
+      !read_float_row(r->imu_dataset_accel, row, 3, rec->accel, "imu/accel") ||
+      !read_float_row(r->imu_dataset_gyro, row, 3, rec->gyro, "imu/gyro")) {
+    return false;
+  }
 
   r->imu_cursor++;
   return true;
@@ -451,9 +625,9 @@ void ImuGpsReader_interpolate_gps(ImuGpsReader *r, double timestamp, double *lat
 
 void ImuGpsReader_close(ImuGpsReader *r) {
   if (!r) return;
-  if (r->imu_dataset_ts >= 0) H5Dclose(r->imu_dataset_ts);
-  if (r->imu_dataset_accel >= 0) H5Dclose(r->imu_dataset_accel);
-  if (r->imu_dataset_gyro >= 0) H5Dclose(r->imu_dataset_gyro);
+  close_dataset(&r->imu_dataset_ts);
+  close_dataset(&r->imu_dataset_accel);
+  close_dataset(&r->imu_dataset_gyro);
   free(r->gps_ts);
   free(r->gps_lat);
   free(r->gps_lng);

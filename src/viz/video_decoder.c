@@ -2,6 +2,27 @@
 #include <stdlib.h>
 #include "viz/video_decoder.h"
 
+static void update_current_pts(VideoDecoder *dec) {
+  int64_t best_effort_pts = dec->frame->best_effort_timestamp;
+  if (best_effort_pts != AV_NOPTS_VALUE) {
+    dec->current_pts = (double)best_effort_pts * dec->time_base;
+  } else if (dec->frame->pts != AV_NOPTS_VALUE) {
+    dec->current_pts = (double)dec->frame->pts * dec->time_base;
+  }
+}
+
+static void cleanup_decoder(VideoDecoder *dec) {
+  if (!dec) return;
+  av_free(dec->rgb_buffer);
+  av_frame_free(&dec->frame);
+  av_frame_free(&dec->frame_rgb);
+  av_packet_free(&dec->pkt);
+  sws_freeContext(dec->sws_ctx);
+  avcodec_free_context(&dec->codec_ctx);
+  avformat_close_input(&dec->fmt_ctx);
+  free(dec);
+}
+
 VideoDecoder *VideoDecoder_open(const char *path) {
   VideoDecoder *dec = calloc(1, sizeof(VideoDecoder));
   if (!dec) return NULL;
@@ -44,12 +65,15 @@ VideoDecoder *VideoDecoder_open(const char *path) {
   }
 
   dec->codec_ctx = avcodec_alloc_context3(codec);
+  if (!dec->codec_ctx) {
+    avformat_close_input(&dec->fmt_ctx);
+    free(dec);
+    return NULL;
+  }
   avcodec_parameters_to_context(dec->codec_ctx, stream->codecpar);
   if (avcodec_open2(dec->codec_ctx, codec, NULL) < 0) {
     fprintf(stderr, "Failed to open codec\n");
-    avcodec_free_context(&dec->codec_ctx);
-    avformat_close_input(&dec->fmt_ctx);
-    free(dec);
+    cleanup_decoder(dec);
     return NULL;
   }
 
@@ -66,60 +90,91 @@ VideoDecoder *VideoDecoder_open(const char *path) {
   dec->sws_ctx = sws_getContext(dec->width, dec->height, dec->codec_ctx->pix_fmt,
                                 dec->width, dec->height, AV_PIX_FMT_RGB24,
                                 SWS_BILINEAR, NULL, NULL, NULL);
+  if (!dec->sws_ctx) {
+    cleanup_decoder(dec);
+    return NULL;
+  }
 
   dec->frame = av_frame_alloc();
   dec->frame_rgb = av_frame_alloc();
   dec->pkt = av_packet_alloc();
+  if (!dec->frame || !dec->frame_rgb || !dec->pkt) {
+    cleanup_decoder(dec);
+    return NULL;
+  }
 
   // Allocate RGB buffer
   int rgb_size = dec->width * dec->height * 3;
   dec->rgb_buffer = (uint8_t *)av_malloc((size_t)rgb_size);
+  if (!dec->rgb_buffer) {
+    cleanup_decoder(dec);
+    return NULL;
+  }
   dec->frame_rgb->data[0] = dec->rgb_buffer;
   dec->frame_rgb->linesize[0] = dec->width * 3;
 
   dec->current_pts = 0.0;
+  dec->draining = false;
   return dec;
 }
 
 bool VideoDecoder_next_frame(VideoDecoder *dec) {
-  while (av_read_frame(dec->fmt_ctx, dec->pkt) >= 0) {
-    if (dec->pkt->stream_index != dec->video_stream_idx) {
-      av_packet_unref(dec->pkt);
+  while (true) {
+    int ret = avcodec_receive_frame(dec->codec_ctx, dec->frame);
+    if (ret == 0) {
+      sws_scale(dec->sws_ctx, (const uint8_t *const *)dec->frame->data,
+                dec->frame->linesize, 0, dec->height,
+                dec->frame_rgb->data, dec->frame_rgb->linesize);
+      update_current_pts(dec);
+      return true;
+    }
+    if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+      return false;
+    }
+    if (ret == AVERROR_EOF) {
+      return false;
+    }
+
+    if (dec->draining) {
+      int drain_ret = avcodec_send_packet(dec->codec_ctx, NULL);
+      if (drain_ret < 0 && drain_ret != AVERROR_EOF) {
+        return false;
+      }
+      dec->draining = false;
       continue;
     }
 
-    int ret = avcodec_send_packet(dec->codec_ctx, dec->pkt);
-    av_packet_unref(dec->pkt);
-    if (ret < 0) continue;
+    bool sent_packet = false;
+    while (true) {
+      int read_ret = av_read_frame(dec->fmt_ctx, dec->pkt);
+      if (read_ret < 0) {
+        dec->draining = true;
+        break;
+      }
+      if (dec->pkt->stream_index != dec->video_stream_idx) {
+        av_packet_unref(dec->pkt);
+        continue;
+      }
 
-    ret = avcodec_receive_frame(dec->codec_ctx, dec->frame);
-    if (ret < 0) continue;
-
-    // Convert to RGB24
-    sws_scale(dec->sws_ctx, (const uint8_t *const *)dec->frame->data,
-              dec->frame->linesize, 0, dec->height,
-              dec->frame_rgb->data, dec->frame_rgb->linesize);
-
-    // Update PTS
-    if (dec->frame->pts != AV_NOPTS_VALUE) {
-      dec->current_pts = (double)dec->frame->pts * dec->time_base;
+      ret = avcodec_send_packet(dec->codec_ctx, dec->pkt);
+      av_packet_unref(dec->pkt);
+      if (ret == AVERROR(EAGAIN)) {
+        break;
+      }
+      if (ret < 0) {
+        return false;
+      }
+      sent_packet = true;
+      break;
     }
-    return true;
-  }
 
-  // Flush decoder
-  avcodec_send_packet(dec->codec_ctx, NULL);
-  int ret = avcodec_receive_frame(dec->codec_ctx, dec->frame);
-  if (ret >= 0) {
-    sws_scale(dec->sws_ctx, (const uint8_t *const *)dec->frame->data,
-              dec->frame->linesize, 0, dec->height,
-              dec->frame_rgb->data, dec->frame_rgb->linesize);
-    if (dec->frame->pts != AV_NOPTS_VALUE) {
-      dec->current_pts = (double)dec->frame->pts * dec->time_base;
+    if (ret == AVERROR(EAGAIN)) {
+      continue;
     }
-    return true;
+    if (dec->draining || sent_packet) {
+      continue;
+    }
   }
-  return false;
 }
 
 bool VideoDecoder_seek(VideoDecoder *dec, double target_seconds) {
@@ -133,6 +188,7 @@ bool VideoDecoder_seek(VideoDecoder *dec, double target_seconds) {
     return false;
   }
   avcodec_flush_buffers(dec->codec_ctx);
+  dec->draining = false;
 
   // Decode forward until we reach or pass target_seconds
   while (VideoDecoder_next_frame(dec)) {
@@ -145,13 +201,5 @@ bool VideoDecoder_seek(VideoDecoder *dec, double target_seconds) {
 }
 
 void VideoDecoder_close(VideoDecoder *dec) {
-  if (!dec) return;
-  av_free(dec->rgb_buffer);
-  av_frame_free(&dec->frame);
-  av_frame_free(&dec->frame_rgb);
-  av_packet_free(&dec->pkt);
-  sws_freeContext(dec->sws_ctx);
-  avcodec_free_context(&dec->codec_ctx);
-  avformat_close_input(&dec->fmt_ctx);
-  free(dec);
+  cleanup_decoder(dec);
 }

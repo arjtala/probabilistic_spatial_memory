@@ -72,10 +72,21 @@ void GpsTrace_push(GpsTrace *gt, double lat, double lng, const ImuPointMeta *imu
 
   if (gt->count >= gt->capacity) {
     size_t new_cap = gt->capacity * 2;
-    double *new_lats = realloc(gt->lats, new_cap * sizeof(double));
-    double *new_lngs = realloc(gt->lngs, new_cap * sizeof(double));
-    ImuPointMeta *new_imu = realloc(gt->imu_meta, new_cap * sizeof(ImuPointMeta));
-    if (!new_lats || !new_lngs || !new_imu) return;
+    double *new_lats = malloc(new_cap * sizeof(double));
+    double *new_lngs = malloc(new_cap * sizeof(double));
+    ImuPointMeta *new_imu = malloc(new_cap * sizeof(ImuPointMeta));
+    if (!new_lats || !new_lngs || !new_imu) {
+      free(new_lats);
+      free(new_lngs);
+      free(new_imu);
+      return;
+    }
+    memcpy(new_lats, gt->lats, gt->capacity * sizeof(double));
+    memcpy(new_lngs, gt->lngs, gt->capacity * sizeof(double));
+    memcpy(new_imu, gt->imu_meta, gt->capacity * sizeof(ImuPointMeta));
+    free(gt->lats);
+    free(gt->lngs);
+    free(gt->imu_meta);
     gt->lats = new_lats;
     gt->lngs = new_lngs;
     gt->imu_meta = new_imu;

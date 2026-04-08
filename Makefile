@@ -54,6 +54,8 @@ VIZ_BIN = $(TARGET_DIR)/psm-viz
 TEST_RING_BUFFER = $(BUILD_DIR)/test_ring_buffer
 TEST_TILE = $(BUILD_DIR)/test_tile
 TEST_SPATIAL = $(BUILD_DIR)/test_spatial_memory
+TEST_INGEST = $(BUILD_DIR)/test_ingest
+TEST_JEPA_CACHE = $(BUILD_DIR)/test_jepa_cache
 
 # Default target
 all: $(LIB) $(BIN)
@@ -98,7 +100,7 @@ $(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(VENDOR_HEADERS)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
 # Test targets
-test: test-ring-buffer test-tile test-spatial
+test: test-ring-buffer test-tile test-spatial test-ingest test-jepa-cache
 
 test-ring-buffer: $(TEST_RING_BUFFER)
 	./$(TEST_RING_BUFFER)
@@ -122,6 +124,20 @@ $(TEST_SPATIAL): tests/test_spatial_memory.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_spatial_memory.c $(OBJ) $(VENDOR_OBJ) -o $@ -lm
 
+test-ingest: $(TEST_INGEST)
+	./$(TEST_INGEST)
+
+$(TEST_INGEST): tests/test_ingest.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_ingest.c $(OBJ) $(VENDOR_OBJ) -o $@ -lm
+
+test-jepa-cache: $(TEST_JEPA_CACHE)
+	./$(TEST_JEPA_CACHE)
+
+$(TEST_JEPA_CACHE): tests/test_jepa_cache.c src/viz/jepa_cache.c include/viz/jepa_cache.h include/ingest/ingest.h build/vendor/lib/utilities.o
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_jepa_cache.c src/viz/jepa_cache.c build/vendor/lib/utilities.o -o $@ -lm
+
 # Clean target
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET_DIR)
@@ -130,7 +146,7 @@ clean:
 rebuild: clean all
 
 # Phony targets
-.PHONY: all viz test test-ring-buffer test-tile test-spatial clean rebuild show run
+.PHONY: all viz test test-ring-buffer test-tile test-spatial test-ingest test-jepa-cache clean rebuild show run
 
 # Show detected files
 show:

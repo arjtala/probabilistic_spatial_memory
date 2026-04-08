@@ -41,6 +41,27 @@ void SpatialMemory_observe(SpatialMemory *sm, const double lat, const double lng
   Tile_add(tile, data, size);
 }
 
+size_t SpatialMemory_advance_to_timestamp(SpatialMemory *sm, double timestamp,
+                                          double *window_anchor,
+                                          double time_window_sec) {
+  size_t advances = 0;
+
+  if (!sm || !window_anchor || time_window_sec <= 0.0) {
+    return 0;
+  }
+  if (*window_anchor < 0.0) {
+    *window_anchor = timestamp;
+    return 0;
+  }
+
+  while (timestamp - *window_anchor >= time_window_sec) {
+    SpatialMemory_advance_all(sm);
+    *window_anchor += time_window_sec;
+    advances++;
+  }
+  return advances;
+}
+
 void SpatialMemory_advance_all(SpatialMemory *sm) {
   HashTableIterator it = HashTable_iterator(sm->tiles);
   while (HashTable_next(&it)) {
