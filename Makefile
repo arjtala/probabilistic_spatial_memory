@@ -42,7 +42,7 @@ OBJ = $(CORE_OBJ) $(INGEST_OBJ)
 VENDOR_OBJ = $(patsubst $(VENDOR)/%.c,$(BUILD_DIR)/vendor/%.o,$(VENDOR_SRCS))
 
 # Viz source/object files
-VIZ_SRCS = src/viz/shader.c src/viz/video_decoder.c src/viz/hex_renderer.c src/viz/tile_map.c src/viz/gps_trace.c src/viz/imu_processor.c src/viz/jepa_cache.c
+VIZ_SRCS = src/viz/shader.c src/viz/video_decoder.c src/viz/hex_renderer.c src/viz/tile_map.c src/viz/gps_trace.c src/viz/imu_processor.c src/viz/jepa_cache.c src/viz/viz_math.c
 VIZ_OBJ = $(patsubst src/viz/%.c,$(BUILD_DIR)/viz/%.o,$(VIZ_SRCS))
 STB_OBJ = $(BUILD_DIR)/vendor/stb/stb_image_impl.o
 
@@ -62,6 +62,7 @@ TEST_TILE = $(BUILD_DIR)/test_tile
 TEST_SPATIAL = $(BUILD_DIR)/test_spatial_memory
 TEST_INGEST = $(BUILD_DIR)/test_ingest
 TEST_JEPA_CACHE = $(BUILD_DIR)/test_jepa_cache
+TEST_VIZ_MATH = $(BUILD_DIR)/test_viz_math
 
 # Default target
 all: $(LIB) $(BIN)
@@ -106,7 +107,7 @@ $(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(VENDOR_HEADERS)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
 # Test targets
-test: test-ring-buffer test-tile test-spatial test-ingest test-jepa-cache
+test: test-ring-buffer test-tile test-spatial test-ingest test-jepa-cache test-viz-math
 
 test-ring-buffer: $(TEST_RING_BUFFER)
 	./$(TEST_RING_BUFFER)
@@ -144,6 +145,13 @@ $(TEST_JEPA_CACHE): tests/test_jepa_cache.c src/viz/jepa_cache.c include/viz/jep
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_jepa_cache.c src/viz/jepa_cache.c build/vendor/lib/utilities.o -o $@ -lm
 
+test-viz-math: $(TEST_VIZ_MATH)
+	./$(TEST_VIZ_MATH)
+
+$(TEST_VIZ_MATH): tests/test_viz_math.c src/viz/viz_math.c include/viz/viz_math.h include/viz/imu_processor.h build/vendor/lib/utilities.o
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) tests/test_viz_math.c src/viz/viz_math.c build/vendor/lib/utilities.o -o $@ -lm
+
 # Clean target
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET_DIR)
@@ -152,7 +160,7 @@ clean:
 rebuild: clean all
 
 # Phony targets
-.PHONY: all viz test test-ring-buffer test-tile test-spatial test-ingest test-jepa-cache clean rebuild show run
+.PHONY: all viz test test-ring-buffer test-tile test-spatial test-ingest test-jepa-cache test-viz-math clean rebuild show run
 
 # Show detected files
 show:

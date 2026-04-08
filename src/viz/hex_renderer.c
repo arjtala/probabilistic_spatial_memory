@@ -4,45 +4,7 @@
 #include <string.h>
 #include <h3/h3api.h>
 #include "viz/hex_renderer.h"
-
-// Viridis colormap: dark purple (0) -> teal (0.5) -> yellow (1.0)
-// Polynomial approximation (Matt Zucker / matplotlib)
-static void count_to_color(double t, float *r, float *g, float *b, float *a) {
-  if (t < 0.0) t = 0.0;
-  if (t > 1.0) t = 1.0;
-
-  // Horner form: c0 + t*(c1 + t*(c2 + t*(c3 + t*(c4 + t*(c5 + t*c6)))))
-  double cr = -5.4355 + t * 4.7764;
-  cr = 6.2283 + t * cr;
-  cr = -4.6342 + t * cr;
-  cr = -0.3309 + t * cr;
-  cr = 0.1051 + t * cr;
-  cr = 0.2777 + t * cr;
-
-  double cg = 4.6459 + t * (-13.7451);
-  cg = 14.1799 + t * cg;
-  cg = -5.7991 + t * cg;
-  cg = 0.2148 + t * cg;
-  cg = 1.4046 + t * cg;
-  cg = 0.0054 + t * cg;
-
-  double cb = 26.3124 + t * (-65.3530);
-  cb = 56.6906 + t * cb;
-  cb = -19.3324 + t * cb;
-  cb = 0.0951 + t * cb;
-  cb = 1.3846 + t * cb;
-  cb = 0.3341 + t * cb;
-
-  // Clamp to [0,1]
-  if (cr < 0.0) cr = 0.0; if (cr > 1.0) cr = 1.0;
-  if (cg < 0.0) cg = 0.0; if (cg > 1.0) cg = 1.0;
-  if (cb < 0.0) cb = 0.0; if (cb > 1.0) cb = 1.0;
-
-  *r = (float)cr;
-  *g = (float)cg;
-  *b = (float)cb;
-  *a = 0.7f + 0.3f * (float)t;
-}
+#include "viz/viz_math.h"
 
 HexRenderer *HexRenderer_new(GLuint program) {
   HexRenderer *hr = calloc(1, sizeof(HexRenderer));

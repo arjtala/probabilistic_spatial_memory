@@ -5,6 +5,7 @@
 #include <OpenGL/gl3.h>
 #include "stb/stb_image.h"
 #include "viz/tile_map.h"
+#include "viz/viz_math.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -19,22 +20,6 @@ static size_t write_cb(void *ptr, size_t size, size_t nmemb, void *userdata) {
   memcpy(buf->data + buf->size, ptr, total);
   buf->size += total;
   return total;
-}
-
-// ---- OSM tile coordinate math ----
-static int osm_zoom_from_degrees(double zoom_degrees) {
-  if (zoom_degrees <= 0.0) zoom_degrees = 0.001;
-  double z = ceil(log2(360.0 / (2.0 * zoom_degrees)));
-  if (z < 0) z = 0;
-  if (z > 19) z = 19;
-  return (int)z;
-}
-
-static void latlon_to_tile(double lat, double lng, int z, int *tx, int *ty) {
-  double n = pow(2.0, z);
-  *tx = (int)floor((lng + 180.0) / 360.0 * n);
-  double lat_rad = lat * M_PI / 180.0;
-  *ty = (int)floor((1.0 - log(tan(lat_rad) + 1.0 / cos(lat_rad)) / M_PI) / 2.0 * n);
 }
 
 // Returns the geographic bounds of an OSM tile: (west, south, east, north) in degrees

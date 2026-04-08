@@ -55,5 +55,5 @@
 ## Testing
 
 - [x] No tests for ingest module (`IngestReader`, `ImuGpsReader`)
-- [ ] No tests for pure-logic viz functions (`count_to_color`, `classify_motion`, `osm_zoom_from_degrees`, `latlon_to_tile`, `normalize_angle`, `estimate_speed`)
+- [x] No tests for pure-logic viz functions (`count_to_color`, `classify_motion`, `osm_zoom_from_degrees`, `latlon_to_tile`, `normalize_angle`, `estimate_speed`)
 - [x] No test for `SpatialMemory_observe` adding to the same cell twice (verifying HLL de-duplication)

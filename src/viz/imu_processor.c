@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "viz/imu_processor.h"
+#include "viz/viz_math.h"
 
 #define GRAVITY 9.81f
 #define R_EARTH 6371000.0   // meters
@@ -18,40 +19,6 @@ ImuProcessor *ImuProcessor_new(float alpha) {
   proc->gravity_valid = false;
   proc->gravity[0] = proc->gravity[1] = proc->gravity[2] = 0.0f;
   return proc;
-}
-
-static MotionState classify_motion(const float accel[3]) {
-  float mag = sqrtf(accel[0] * accel[0] + accel[1] * accel[1] + accel[2] * accel[2]);
-  float deviation = fabsf(mag - GRAVITY);
-  if (deviation < 0.5f) return MOTION_STATIONARY;
-  if (deviation < 3.0f) return MOTION_WALKING;
-  return MOTION_RUNNING;
-}
-
-static float normalize_angle(float angle) {
-  while (angle > (float)M_PI) angle -= 2.0f * (float)M_PI;
-  while (angle < -(float)M_PI) angle += 2.0f * (float)M_PI;
-  return angle;
-}
-
-static float estimate_speed(MotionState motion, float deviation) {
-  switch (motion) {
-  case MOTION_STATIONARY:
-    return 0.0f;
-  case MOTION_WALKING: {
-    float t = (deviation - 0.5f) / 2.5f;
-    if (t < 0.0f) t = 0.0f;
-    if (t > 1.0f) t = 1.0f;
-    return 1.2f + t * 1.3f;
-  }
-  case MOTION_RUNNING: {
-    float t = (deviation - 3.0f) / 7.0f;
-    if (t < 0.0f) t = 0.0f;
-    if (t > 1.0f) t = 1.0f;
-    return 2.5f + t * 3.5f;
-  }
-  }
-  return 0.0f;
 }
 
 // Update gravity estimate with exponential moving average of accel readings.
