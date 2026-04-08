@@ -5,15 +5,9 @@
 #include "core/tile.h"
 #include "vendor/probabilistic_data_structures/lib/hash.h"
 
-//  spatial_memory — the top-level engine that manages a collection of tiles.
-//  It'll essentially be a hash map from H3Index → Tile*, with an API like:
-//  - SpatialMemory_new(resolution, capacity, precision) — create the engine
-//  with shared config
-//  - SpatialMemory_observe(sm, lat, lng, data, size) — auto-creates tile if
-/* //  needed, adds observation */
-/* //  - SpatialMemory_advance_all(sm) — rotates all tiles to next time window */
-/* //  - SpatialMemory_query(sm, lat, lng, n) — query distinct count at a location */
-/* //  - SpatialMemory_free(sm) — cleanup */
+// SpatialMemory maps H3 cells to per-tile ring buffers of HLL counters.
+// Observations are bucketed by location and queried approximately over recent
+// time windows without unbounded memory growth.
 
 #define INITIAL_TILE_CAPACITY 16
 #define H3_INDEX_HEX_STRING_LENGTH 17

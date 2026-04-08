@@ -9,5 +9,10 @@ float normalize_angle(float angle);
 float estimate_speed(MotionState motion, float deviation);
 int osm_zoom_from_degrees(double zoom_degrees);
 void latlon_to_tile(double lat, double lng, int z, int *tx, int *ty);
+bool compute_aspect_quad(float quad[16], int video_w, int video_h,
+                         int viewport_w, int viewport_h);
+void build_identity_matrix(float matrix[16]);
+void build_ortho_projection(float matrix[16], double half_w, double half_h,
+                            double offset_x, double offset_y);
 
 #endif

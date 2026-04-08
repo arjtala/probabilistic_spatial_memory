@@ -97,6 +97,41 @@ static void test_latlon_to_tile(void) {
   ASSERT(ty == 396, 396, ty);
 }
 
+static void test_compute_aspect_quad(void) {
+  float quad[16];
+
+  ASSERT(!compute_aspect_quad(NULL, 320, 240, 800, 600), 1, 1);
+  ASSERT(compute_aspect_quad(quad, 200, 100, 100, 100), 1, 1);
+  assert_close(-1.0, quad[0], 1e-6);
+  assert_close(-0.5, quad[1], 1e-6);
+  assert_close(1.0, quad[12], 1e-6);
+  assert_close(0.5, quad[13], 1e-6);
+}
+
+static void test_build_identity_matrix(void) {
+  float matrix[16];
+  build_identity_matrix(matrix);
+
+  assert_close(1.0, matrix[0], 1e-6);
+  assert_close(1.0, matrix[5], 1e-6);
+  assert_close(1.0, matrix[10], 1e-6);
+  assert_close(1.0, matrix[15], 1e-6);
+  assert_close(0.0, matrix[1], 1e-6);
+  assert_close(0.0, matrix[12], 1e-6);
+}
+
+static void test_build_ortho_projection(void) {
+  float matrix[16];
+  build_ortho_projection(matrix, 2.0, 1.0, 1.0, -0.5);
+
+  assert_close(0.5, matrix[0], 1e-6);
+  assert_close(1.0, matrix[5], 1e-6);
+  assert_close(-1.0, matrix[10], 1e-6);
+  assert_close(-0.5, matrix[12], 1e-6);
+  assert_close(0.5, matrix[13], 1e-6);
+  assert_close(1.0, matrix[15], 1e-6);
+}
+
 int main(void) {
   RUN_TEST(test_count_to_color);
   RUN_TEST(test_classify_motion);
@@ -104,5 +139,8 @@ int main(void) {
   RUN_TEST(test_estimate_speed);
   RUN_TEST(test_osm_zoom_from_degrees);
   RUN_TEST(test_latlon_to_tile);
+  RUN_TEST(test_compute_aspect_quad);
+  RUN_TEST(test_build_identity_matrix);
+  RUN_TEST(test_build_ortho_projection);
   return 0;
 }

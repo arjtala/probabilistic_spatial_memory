@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "viz/gps_trace.h"
+#include "viz/viz_math.h"
 
 #define GPS_TRACE_INITIAL_CAPACITY 1024
 // Half-width of the trace ribbon in projected (equirectangular degree) coordinates.
@@ -347,11 +348,8 @@ void GpsTrace_draw(GpsTrace *gt, int viewport_w, int viewport_h, double zoom) {
   double half_w = zoom;
   double half_h = zoom * aspect;
 
-  float proj[16] = {0};
-  proj[0] = (float)(1.0 / half_w);
-  proj[5] = (float)(1.0 / half_h);
-  proj[10] = -1.0f;
-  proj[15] = 1.0f;
+  float proj[16];
+  build_ortho_projection(proj, half_w, half_h, 0.0, 0.0);
 
   glUniformMatrix4fv(gt->u_projection, 1, GL_FALSE, proj);
 

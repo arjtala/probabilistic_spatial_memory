@@ -223,12 +223,8 @@ void TileMap_draw(TileMap *tm, double center_lat, double center_lng,
   double half_w = zoom_degrees;
   double half_h = zoom_degrees * aspect;
 
-  // Build same ortho projection as hex_renderer
-  float proj[16] = {0};
-  proj[0] = (float)(1.0 / half_w);
-  proj[5] = (float)(1.0 / half_h);
-  proj[10] = -1.0f;
-  proj[15] = 1.0f;
+  float proj[16];
+  build_ortho_projection(proj, half_w, half_h, 0.0, 0.0);
 
   glUseProgram(tm->program);
   glUniformMatrix4fv(tm->u_projection, 1, GL_FALSE, proj);

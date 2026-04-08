@@ -18,6 +18,7 @@
 #include "viz/gps_trace.h"
 #include "viz/imu_processor.h"
 #include "viz/jepa_cache.h"
+#include "viz/viz_math.h"
 #include "ingest/ingest.h"
 
 // ---- State ----
@@ -133,32 +134,18 @@ static VideoQuad VideoQuad_create(GLuint program) {
   return vq;
 }
 
-static void VideoQuad_update_aspect(VideoQuad *vq, int video_w, int video_h,
-                                    int viewport_w, int viewport_h) {
-  if (video_w <= 0 || video_h <= 0 || viewport_w <= 0 || viewport_h <= 0) return;
-
-  double video_aspect = (double)video_w / (double)video_h;
-  double viewport_aspect = (double)viewport_w / (double)viewport_h;
-
-  float sx = 1.0f, sy = 1.0f;
-  if (video_aspect > viewport_aspect) {
-    // Fit width, shrink height (letterbox)
-    sy = (float)(viewport_aspect / video_aspect);
-  } else {
-    // Fit height, shrink width (pillarbox)
-    sx = (float)(video_aspect / viewport_aspect);
-  }
-
-  float quad[] = {
-      -sx, -sy, 0.0f, 1.0f,
-       sx, -sy, 1.0f, 1.0f,
-      -sx,  sy, 0.0f, 0.0f,
-       sx,  sy, 1.0f, 0.0f,
-  };
-
-  glBindBuffer(GL_ARRAY_BUFFER, vq->vbo);
+static void update_textured_quad_aspect(GLuint vbo, int video_w, int video_h,
+                                        int viewport_w, int viewport_h) {
+  float quad[16];
+  if (!compute_aspect_quad(quad, video_w, video_h, viewport_w, viewport_h)) return;
+  glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(quad), quad);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+static void VideoQuad_update_aspect(VideoQuad *vq, int video_w, int video_h,
+                                    int viewport_w, int viewport_h) {
+  update_textured_quad_aspect(vq->vbo, video_w, video_h, viewport_w, viewport_h);
 }
 
 static void VideoQuad_upload(VideoQuad *vq, uint8_t *rgb, int w, int h) {
@@ -244,12 +231,8 @@ static void ProgressBar_draw(ProgressBar *pb, double progress) {
       fill_x, y1, fl_r, fl_g, fl_b, fl_a,
   };
 
-  // Identity projection
-  float identity[16] = {0};
-  identity[0] = 1.0f;
-  identity[5] = 1.0f;
-  identity[10] = 1.0f;
-  identity[15] = 1.0f;
+  float identity[16];
+  build_identity_matrix(identity);
 
   glUseProgram(pb->program);
   glUniformMatrix4fv(pb->u_projection, 1, GL_FALSE, identity);
@@ -285,11 +268,8 @@ static void ProgressBar_draw_pause_icon(ProgressBar *pb) {
       cx + gap + bar_w, cy + bar_h, r, g, b, a,
   };
 
-  float identity[16] = {0};
-  identity[0] = 1.0f;
-  identity[5] = 1.0f;
-  identity[10] = 1.0f;
-  identity[15] = 1.0f;
+  float identity[16];
+  build_identity_matrix(identity);
 
   glUseProgram(pb->program);
   glUniformMatrix4fv(pb->u_projection, 1, GL_FALSE, identity);
@@ -359,30 +339,10 @@ static AttentionOverlay AttentionOverlay_create(GLuint program) {
   return ao;
 }
 
-static void AttentionOverlay_update_aspect(AttentionOverlay *ao, int video_w, int video_h,
-                                           int viewport_w, int viewport_h) {
-  if (video_w <= 0 || video_h <= 0 || viewport_w <= 0 || viewport_h <= 0) return;
-
-  double video_aspect = (double)video_w / (double)video_h;
-  double viewport_aspect = (double)viewport_w / (double)viewport_h;
-
-  float sx = 1.0f, sy = 1.0f;
-  if (video_aspect > viewport_aspect) {
-    sy = (float)(viewport_aspect / video_aspect);
-  } else {
-    sx = (float)(video_aspect / viewport_aspect);
-  }
-
-  float quad[] = {
-      -sx, -sy, 0.0f, 1.0f,
-       sx, -sy, 1.0f, 1.0f,
-      -sx,  sy, 0.0f, 0.0f,
-       sx,  sy, 1.0f, 0.0f,
-  };
-
-  glBindBuffer(GL_ARRAY_BUFFER, ao->vbo);
-  glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(quad), quad);
-  glBindBuffer(GL_ARRAY_BUFFER, 0);
+static void AttentionOverlay_update_aspect(AttentionOverlay *ao, int video_w,
+                                           int video_h, int viewport_w,
+                                           int viewport_h) {
+  update_textured_quad_aspect(ao->vbo, video_w, video_h, viewport_w, viewport_h);
 }
 
 static void AttentionOverlay_upload(AttentionOverlay *ao, float *raw_map, size_t size) {

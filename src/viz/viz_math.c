@@ -1,4 +1,5 @@
 #include <math.h>
+#include <string.h>
 #include "viz/viz_math.h"
 
 #ifndef M_PI
@@ -95,4 +96,50 @@ void latlon_to_tile(double lat, double lng, int z, int *tx, int *ty) {
   double lat_rad = lat * M_PI / 180.0;
   *ty = (int)floor((1.0 - log(tan(lat_rad) + 1.0 / cos(lat_rad)) / M_PI) /
                    2.0 * n);
+}
+
+bool compute_aspect_quad(float quad[16], int video_w, int video_h,
+                         int viewport_w, int viewport_h) {
+  if (!quad || video_w <= 0 || video_h <= 0 ||
+      viewport_w <= 0 || viewport_h <= 0) {
+    return false;
+  }
+
+  double video_aspect = (double)video_w / (double)video_h;
+  double viewport_aspect = (double)viewport_w / (double)viewport_h;
+
+  float sx = 1.0f, sy = 1.0f;
+  if (video_aspect > viewport_aspect) {
+    sy = (float)(viewport_aspect / video_aspect);
+  } else {
+    sx = (float)(video_aspect / viewport_aspect);
+  }
+
+  const float textured_quad[16] = {
+      -sx, -sy, 0.0f, 1.0f,
+       sx, -sy, 1.0f, 1.0f,
+      -sx,  sy, 0.0f, 0.0f,
+       sx,  sy, 1.0f, 0.0f,
+  };
+  memcpy(quad, textured_quad, sizeof(textured_quad));
+  return true;
+}
+
+void build_identity_matrix(float matrix[16]) {
+  if (!matrix) return;
+  for (int i = 0; i < 16; i++) matrix[i] = 0.0f;
+  matrix[0] = 1.0f;
+  matrix[5] = 1.0f;
+  matrix[10] = 1.0f;
+  matrix[15] = 1.0f;
+}
+
+void build_ortho_projection(float matrix[16], double half_w, double half_h,
+                            double offset_x, double offset_y) {
+  build_identity_matrix(matrix);
+  matrix[0] = (float)(1.0 / half_w);
+  matrix[5] = (float)(1.0 / half_h);
+  matrix[10] = -1.0f;
+  matrix[12] = (float)(-offset_x / half_w);
+  matrix[13] = (float)(-offset_y / half_h);
 }

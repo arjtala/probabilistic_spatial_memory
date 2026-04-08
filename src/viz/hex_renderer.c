@@ -161,14 +161,8 @@ void HexRenderer_draw(HexRenderer *hr, int viewport_w, int viewport_h,
   double offset_x = (map_center_lng - hr->center_lng) * cos_center;
   double offset_y = map_center_lat - hr->center_lat;
 
-  // Column-major orthographic matrix with translation
-  float proj[16] = {0};
-  proj[0] = (float)(1.0 / half_w);
-  proj[5] = (float)(1.0 / half_h);
-  proj[10] = -1.0f;
-  proj[12] = (float)(-offset_x / half_w);
-  proj[13] = (float)(-offset_y / half_h);
-  proj[15] = 1.0f;
+  float proj[16];
+  build_ortho_projection(proj, half_w, half_h, offset_x, offset_y);
 
   glUniformMatrix4fv(hr->u_projection, 1, GL_FALSE, proj);
 
