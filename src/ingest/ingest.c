@@ -40,6 +40,23 @@ static bool get_dataset_dims(hid_t dataset, int expected_rank, hsize_t *dims,
   return true;
 }
 
+static bool validate_imu_dataset_shapes(hsize_t ts_len,
+                                        const hsize_t accel_dims[2],
+                                        const hsize_t gyro_dims[2],
+                                        const char *context,
+                                        const char *group) {
+  if (accel_dims[0] != ts_len || gyro_dims[0] != ts_len ||
+      accel_dims[1] != 3 || gyro_dims[1] != 3) {
+    if (group) {
+      fprintf(stderr, "%s: invalid IMU shape in group '%s'\n", context, group);
+    } else {
+      fprintf(stderr, "%s: invalid IMU dataset shapes\n", context);
+    }
+    return false;
+  }
+  return true;
+}
+
 static bool read_double_row(hid_t dataset, size_t row, double *out,
                             const char *name) {
   hsize_t offset = row;
@@ -276,9 +293,8 @@ IngestReader *IngestReader_open(hid_t file, const char *group) {
       IngestReader_close(reader);
       return NULL;
     }
-    if (accel_dims[0] != ts_dims[0] || gyro_dims[0] != ts_dims[0] ||
-        accel_dims[1] != 3 || gyro_dims[1] != 3) {
-      fprintf(stderr, "IngestReader_open: invalid IMU shape in group '%s'\n", group);
+    if (!validate_imu_dataset_shapes(ts_dims[0], accel_dims, gyro_dims,
+                                     "IngestReader_open", group)) {
       H5Gclose(grp);
       IngestReader_close(reader);
       return NULL;
@@ -421,9 +437,8 @@ ImuGpsReader *ImuGpsReader_open(hid_t file) {
         close_dataset(&imu_ds_gyro);
         return NULL;
       }
-      if (accel_dims[0] != ts_dims[0] || gyro_dims[0] != ts_dims[0] ||
-          accel_dims[1] != 3 || gyro_dims[1] != 3) {
-        fprintf(stderr, "ImuGpsReader_open: invalid IMU dataset shapes\n");
+      if (!validate_imu_dataset_shapes(ts_dims[0], accel_dims, gyro_dims,
+                                       "ImuGpsReader_open", NULL)) {
         H5Gclose(imu_grp);
         close_dataset(&imu_ds_ts);
         close_dataset(&imu_ds_accel);

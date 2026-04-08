@@ -8,19 +8,9 @@ static bool spatial_memory_coords_to_key(const SpatialMemory *sm, double lat,
                                          double lng, char hex_string[],
                                          H3Index *out_cell_id) {
   if (!sm || !hex_string) return false;
-  if (!isfinite(lat) || !isfinite(lng) || lat < -90.0 || lat > 90.0 ||
-      lng < -180.0 || lng > 180.0) {
-    fprintf(stderr, "SpatialMemory: invalid lat/lng\n");
-    return false;
-  }
-
-  LatLng loc;
-  loc.lat = degsToRads(lat);
-  loc.lng = degsToRads(lng);
   H3Index cellId;
-  H3Error err = latLngToCell(&loc, sm->resolution, &cellId);
-  if (err) {
-    fprintf(stderr, "SpatialMemory: invalid lat/lng or resolution\n");
+  if (!Tile_coords_to_cell(lat, lng, sm->resolution, &cellId,
+                           "SpatialMemory")) {
     return false;
   }
   h3ToString(cellId, hex_string, H3_INDEX_HEX_STRING_LENGTH);

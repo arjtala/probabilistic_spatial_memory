@@ -10,6 +10,8 @@ typedef struct {
   RingBuffer *rb;   // time-sliced HLL ring buffer
 } Tile;
 
+bool Tile_coords_to_cell(double lat, double lng, int resolution,
+                         H3Index *out_cell_id, const char *context);
 Tile *Tile_new(const double lat, const double lng, const int resolution, const size_t capacity, const size_t precision);
 void Tile_free(Tile *tile);
 void Tile_add(Tile *tile, const void *data, size_t size);

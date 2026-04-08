@@ -31,6 +31,15 @@ void test_tile_new_invalid_input(void) {
   ASSERT(NULL == bad_lat, 1, NULL == bad_lat);
 }
 
+void test_tile_coords_to_cell(void) {
+  H3Index cell_id = 0;
+  bool ok = Tile_coords_to_cell(LAT, LNG, RESOLUTION, &cell_id, "test");
+  ASSERT(ok, 1, ok);
+  ASSERT(cell_id == CELLID_RS10, 1, cell_id == CELLID_RS10);
+  ok = Tile_coords_to_cell(100.0, LNG, RESOLUTION, &cell_id, "test");
+  ASSERT(!ok, 0, ok);
+}
+
 void test_tile_add(void) {
   const char *pb = "peanut butter";
   Tile *tile = Tile_new(0.0, 0.0, RESOLUTION, CAPACITY, PRECISION);
@@ -75,6 +84,7 @@ void test_tile_same_cell(void) {
 int main(void) {
   RUN_TEST(test_tile_new);
   RUN_TEST(test_tile_new_invalid_input);
+  RUN_TEST(test_tile_coords_to_cell);
   RUN_TEST(test_tile_add);
   RUN_TEST(test_tile_advance);
   RUN_TEST(test_tile_query);

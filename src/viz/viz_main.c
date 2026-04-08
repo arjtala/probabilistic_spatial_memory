@@ -21,9 +21,16 @@
 #include "viz/viz_math.h"
 #include "ingest/ingest.h"
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 // ---- State ----
 static bool paused = false;
 static double playback_speed = 1.0;
+static bool g_map_view_initialized = false;
+static double g_map_view_center_lat = 0.0;
+static double g_map_view_center_lng = 0.0;
 
 // ---- Mouse drag panning ----
 static bool g_dragging = false;
@@ -57,6 +64,115 @@ static int g_h3_resolution = DEFAULT_RESOLUTION;
 static double *g_video_start_time = NULL;
 static double *g_video_pts_offset = NULL;
 static bool *g_video_done = NULL;
+
+static double clamp_map_zoom(double zoom) {
+  if (zoom < 0.0001) return 0.0001;
+  if (zoom > 1.0) return 1.0;
+  return zoom;
+}
+
+static bool current_auto_map_center(double *out_lat, double *out_lng) {
+  if (!out_lat || !out_lng) return false;
+  if (g_gps_trace && g_gps_trace->count > 0) {
+    size_t last = g_gps_trace->count - 1;
+    *out_lat = g_gps_trace->lats[last];
+    *out_lng = g_gps_trace->lngs[last];
+    return true;
+  }
+  if (g_hex_renderer && g_hex_renderer->vertex_count > 0) {
+    *out_lat = g_hex_renderer->center_lat;
+    *out_lng = g_hex_renderer->center_lng;
+    return true;
+  }
+  return false;
+}
+
+static bool current_map_target_center(double *out_lat, double *out_lng) {
+  if (!current_auto_map_center(out_lat, out_lng)) return false;
+  if (g_hex_renderer) {
+    *out_lat += g_hex_renderer->pan_offset_lat;
+    *out_lng += g_hex_renderer->pan_offset_lng;
+  }
+  return true;
+}
+
+static void snap_map_view_to(double center_lat, double center_lng) {
+  g_map_view_center_lat = center_lat;
+  g_map_view_center_lng = center_lng;
+  g_map_view_initialized = true;
+}
+
+static void set_manual_map_center(double center_lat, double center_lng) {
+  if (g_hex_renderer) {
+    double auto_lat, auto_lng;
+    if (current_auto_map_center(&auto_lat, &auto_lng)) {
+      g_hex_renderer->pan_offset_lat = center_lat - auto_lat;
+      g_hex_renderer->pan_offset_lng = center_lng - auto_lng;
+    }
+  }
+  snap_map_view_to(center_lat, center_lng);
+}
+
+static bool current_render_map_center(double *out_lat, double *out_lng) {
+  if (!out_lat || !out_lng) return false;
+  if (g_map_view_initialized) {
+    *out_lat = g_map_view_center_lat;
+    *out_lng = g_map_view_center_lng;
+    return true;
+  }
+  return current_map_target_center(out_lat, out_lng);
+}
+
+static void zoom_map_about_screen_point(GLFWwindow *window, double zoom_factor,
+                                        double cursor_x, double cursor_y) {
+  if (!g_hex_renderer) return;
+
+  int win_w, win_h;
+  glfwGetWindowSize(window, &win_w, &win_h);
+  int half_w = win_w / 2;
+  int viewport_w = win_w - half_w;
+  int viewport_h = win_h;
+  double map_x = cursor_x - (double)half_w;
+  double map_y = cursor_y;
+
+  if (viewport_w <= 0 || viewport_h <= 0 ||
+      map_x < 0.0 || map_x > (double)viewport_w ||
+      map_y < 0.0 || map_y > (double)viewport_h) {
+    return;
+  }
+
+  double center_lat, center_lng;
+  if (!current_render_map_center(&center_lat, &center_lng)) {
+    g_hex_renderer->zoom = clamp_map_zoom(g_hex_renderer->zoom * zoom_factor);
+    return;
+  }
+
+  double old_zoom = g_hex_renderer->zoom;
+  double new_zoom = clamp_map_zoom(old_zoom * zoom_factor);
+  if (fabs(new_zoom - old_zoom) < 1e-12) return;
+
+  double aspect = (double)viewport_h / (double)viewport_w;
+  double nx = (map_x / (double)viewport_w) * 2.0 - 1.0;
+  double ny = 1.0 - (map_y / (double)viewport_h) * 2.0;
+  double old_half_h = old_zoom * aspect;
+  double cos_center = cos(center_lat * M_PI / 180.0);
+  if (fabs(cos_center) < 1e-6) {
+    cos_center = (cos_center < 0.0) ? -1e-6 : 1e-6;
+  }
+
+  double focus_lat = center_lat + ny * old_half_h;
+  double focus_lng = center_lng + (nx * old_zoom) / cos_center;
+  double new_half_h = new_zoom * aspect;
+  double new_center_lat = focus_lat - ny * new_half_h;
+  double cos_new_center = cos(new_center_lat * M_PI / 180.0);
+  if (fabs(cos_new_center) < 1e-6) {
+    cos_new_center = (cos_new_center < 0.0) ? -1e-6 : 1e-6;
+  }
+  double new_center_lng = focus_lng - (nx * new_zoom) / cos_new_center;
+
+  g_hex_renderer->zoom = new_zoom;
+  set_manual_map_center(new_center_lat, new_center_lng);
+}
 
 static bool parse_positive_double(const char *text, const char *name,
                                   double *out_value) {
@@ -448,6 +564,7 @@ static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) 
           g_hex_renderer->pan_offset_lng = 0.0;
           g_hex_renderer->vertex_count = 0;  // clear stale hex tile geometry
         }
+        g_map_view_initialized = false;
         if (g_jepa_cache) JepaCache_reset(g_jepa_cache);
       }
     }
@@ -455,12 +572,10 @@ static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) 
     // Cursor over map: vertical scroll to zoom
     if (!g_hex_renderer) return;
     if (yoffset > 0) {
-      g_hex_renderer->zoom *= 0.9;  // scroll up = zoom in
+      zoom_map_about_screen_point(window, 0.9, cursor_x, cursor_y);
     } else if (yoffset < 0) {
-      g_hex_renderer->zoom *= 1.1;  // scroll down = zoom out
+      zoom_map_about_screen_point(window, 1.1, cursor_x, cursor_y);
     }
-    if (g_hex_renderer->zoom < 0.0001) g_hex_renderer->zoom = 0.0001;
-    if (g_hex_renderer->zoom > 1.0) g_hex_renderer->zoom = 1.0;
   }
 }
 
@@ -481,20 +596,32 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
     break;
   case GLFW_KEY_EQUAL:  // + key
     if (g_hex_renderer) {
-      g_hex_renderer->zoom *= 0.8;
-      if (g_hex_renderer->zoom < 0.0001) g_hex_renderer->zoom = 0.0001;
+      int win_w, win_h;
+      glfwGetWindowSize(window, &win_w, &win_h);
+      zoom_map_about_screen_point(window, 0.8,
+                                  (double)(win_w + win_w / 2) / 2.0,
+                                  (double)win_h / 2.0);
     }
     break;
   case GLFW_KEY_MINUS:
     if (g_hex_renderer) {
-      g_hex_renderer->zoom *= 1.25;
-      if (g_hex_renderer->zoom > 1.0) g_hex_renderer->zoom = 1.0;
+      int win_w, win_h;
+      glfwGetWindowSize(window, &win_w, &win_h);
+      zoom_map_about_screen_point(window, 1.25,
+                                  (double)(win_w + win_w / 2) / 2.0,
+                                  (double)win_h / 2.0);
     }
     break;
   case GLFW_KEY_C:
     if (g_hex_renderer) {
       g_hex_renderer->pan_offset_lat = 0.0;
       g_hex_renderer->pan_offset_lng = 0.0;
+      double center_lat, center_lng;
+      if (current_map_target_center(&center_lat, &center_lng)) {
+        snap_map_view_to(center_lat, center_lng);
+      } else {
+        g_map_view_initialized = false;
+      }
     }
     break;
   case GLFW_KEY_RIGHT:
@@ -547,11 +674,20 @@ static void cursor_pos_callback(GLFWwindow *window, double xpos, double ypos) {
   g_drag_last_y = ypos;
 
   double aspect = (double)viewport_h / (double)viewport_w;
-  double dlng = -dx * (2.0 * g_hex_renderer->zoom / (double)viewport_w);
   double dlat = dy * (2.0 * g_hex_renderer->zoom * aspect / (double)viewport_h);
-
-  g_hex_renderer->pan_offset_lat += dlat;
-  g_hex_renderer->pan_offset_lng += dlng;
+  double center_lat, center_lng;
+  if (current_render_map_center(&center_lat, &center_lng)) {
+    double cos_center = cos(center_lat * M_PI / 180.0);
+    if (fabs(cos_center) < 1e-6) {
+      cos_center = (cos_center < 0.0) ? -1e-6 : 1e-6;
+    }
+    double dlng = -dx * (2.0 * g_hex_renderer->zoom / (double)viewport_w) / cos_center;
+    set_manual_map_center(center_lat + dlat, center_lng + dlng);
+  } else {
+    double dlng = -dx * (2.0 * g_hex_renderer->zoom / (double)viewport_w);
+    g_hex_renderer->pan_offset_lat += dlat;
+    g_hex_renderer->pan_offset_lng += dlng;
+  }
 }
 
 // ---- Directory scanning helper ----
@@ -878,6 +1014,7 @@ int main(int argc, char *argv[]) {
   double video_start_time = glfwGetTime();
   double video_pts_offset = dec->current_pts;
   bool video_done = false;
+  double last_frame_time = glfwGetTime();
 
   g_video_start_time = &video_start_time;
   g_video_pts_offset = &video_pts_offset;
@@ -885,6 +1022,11 @@ int main(int argc, char *argv[]) {
 
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
+    double frame_time = glfwGetTime();
+    double frame_dt = frame_time - last_frame_time;
+    if (frame_dt < 0.0) frame_dt = 0.0;
+    if (frame_dt > 0.25) frame_dt = 0.25;
+    last_frame_time = frame_time;
 
     int win_w, win_h;
     glfwGetFramebufferSize(window, &win_w, &win_h);
@@ -1036,15 +1178,23 @@ int main(int argc, char *argv[]) {
     // Right half: OSM tiles (background) + hex heatmap + GPS trace (overlay)
     glViewport(half_w, 0, win_w - half_w, win_h);
 
-    // Use GPS trace center when hex renderer has no data yet
-    double map_center_lat = hr->center_lat;
-    double map_center_lng = hr->center_lng;
-    if (hr->vertex_count == 0 && gt->count > 0) {
-      map_center_lat = gt->center_lat;
-      map_center_lng = gt->center_lng;
+    double map_center_lat = 0.0;
+    double map_center_lng = 0.0;
+    double map_target_lat, map_target_lng;
+    if (current_map_target_center(&map_target_lat, &map_target_lng)) {
+      if (!g_map_view_initialized) {
+        snap_map_view_to(map_target_lat, map_target_lng);
+      } else if (!g_dragging) {
+        double follow_alpha = 1.0 - exp(-8.0 * frame_dt);
+        g_map_view_center_lat += (map_target_lat - g_map_view_center_lat) * follow_alpha;
+        g_map_view_center_lng += (map_target_lng - g_map_view_center_lng) * follow_alpha;
+      }
+      map_center_lat = g_map_view_center_lat;
+      map_center_lng = g_map_view_center_lng;
+    } else if (g_map_view_initialized) {
+      map_center_lat = g_map_view_center_lat;
+      map_center_lng = g_map_view_center_lng;
     }
-    map_center_lat += hr->pan_offset_lat;
-    map_center_lng += hr->pan_offset_lng;
 
     glDisable(GL_BLEND);
     TileMap_draw(tm, map_center_lat, map_center_lng, hr->zoom,

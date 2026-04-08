@@ -3,24 +3,33 @@
 #include <stdlib.h>
 #include "core/tile.h"
 
-Tile *Tile_new(const double lat, const double lng, const int resolution, const size_t capacity, const size_t precision) {
+bool Tile_coords_to_cell(double lat, double lng, int resolution,
+                         H3Index *out_cell_id, const char *context) {
+  if (!out_cell_id) return false;
   if (resolution < 0 || resolution > 15) {
-    fprintf(stderr, "Tile_new: H3 resolution must be in [0, 15], got %d\n",
-            resolution);
-    return NULL;
+    fprintf(stderr, "%s: H3 resolution must be in [0, 15], got %d\n",
+            context, resolution);
+    return false;
   }
   if (!isfinite(lat) || !isfinite(lng) || lat < -90.0 || lat > 90.0 ||
       lng < -180.0 || lng > 180.0) {
-    fprintf(stderr, "Tile_new: invalid lat/lng\n");
-    return NULL;
+    fprintf(stderr, "%s: invalid lat/lng\n", context);
+    return false;
   }
+
   LatLng loc;
   loc.lat = degsToRads(lat);
   loc.lng = degsToRads(lng);
+  if (latLngToCell(&loc, resolution, out_cell_id)) {
+    fprintf(stderr, "%s: invalid lat/lng or resolution\n", context);
+    return false;
+  }
+  return true;
+}
+
+Tile *Tile_new(const double lat, const double lng, const int resolution, const size_t capacity, const size_t precision) {
   H3Index cellId;
-  H3Error err = latLngToCell(&loc, resolution, &cellId);
-  if (err) {
-    fprintf(stderr, "Tile_new: invalid lat/lng or resolution\n");
+  if (!Tile_coords_to_cell(lat, lng, resolution, &cellId, "Tile_new")) {
     return NULL;
   }
 

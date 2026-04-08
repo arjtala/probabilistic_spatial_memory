@@ -21,12 +21,12 @@
 ## Code Duplication Issues
 
 - [x] `spatial_memory.c` — `SpatialMemory_observe` and `SpatialMemory_query` both duplicate the `latLngToCell` + `h3ToString` pattern; extract a helper
-- [ ] `ingest.c` — IMU rank-2 validation (accel/gyro shape check with `H5Sget_simple_extent_ndims`) is duplicated between `IngestReader_open` and `ImuGpsReader_open`
+- [x] `ingest.c` — IMU rank-2 validation (accel/gyro shape check with `H5Sget_simple_extent_ndims`) is duplicated between `IngestReader_open` and `ImuGpsReader_open`
 - [x] `ingest.c` — HDF5 row-read pattern (create memspace → get dataspace → select hyperslab → read → close) repeated ~10 times; extract a helper
 - [x] `viz_main.c` — `VideoQuad_update_aspect` and `AttentionOverlay_update_aspect` are identical; extract shared function
 - [x] `viz_main.c` — Identity matrix construction duplicated in `ProgressBar_draw` and `ProgressBar_draw_pause_icon`
 - [x] Ortho projection matrix built identically in `HexRenderer_draw`, `GpsTrace_draw`, and `TileMap_draw`
-- [ ] Consolidate H3 index creation code between `Tile_new` and `SpatialMemory_observe`/`SpatialMemory_query`
+- [x] Consolidate H3 index creation code between `Tile_new` and `SpatialMemory_observe`/`SpatialMemory_query`
 
 ## Consistency Issues
 
