@@ -1,6 +1,7 @@
 #ifndef SPATIAL_MEMORY_H
 #define SPATIAL_MEMORY_H
 
+#include <stdbool.h>
 #include "core/tile.h"
 #include "vendor/probabilistic_data_structures/lib/hash.h"
 
@@ -27,13 +28,14 @@ typedef struct {
 
 SpatialMemory *SpatialMemory_new(const int resolution, const size_t capacity,
                                  const size_t precision);
-void SpatialMemory_observe(SpatialMemory *sm, const double lat, const double lng, const void *data,
-                           size_t size);
+bool SpatialMemory_observe(SpatialMemory *sm, const double lat, const double lng,
+                           const void *data, size_t size);
 size_t SpatialMemory_advance_to_timestamp(SpatialMemory *sm, double timestamp,
                                           double *window_anchor,
                                           double time_window_sec);
 void SpatialMemory_advance_all(SpatialMemory *sm);
-double SpatialMemory_query(SpatialMemory *sm, const double lat, const double lng, const size_t n);
+bool SpatialMemory_query(SpatialMemory *sm, const double lat, const double lng,
+                         const size_t n, double *out_count);
 size_t SpatialMemory_tile_count(SpatialMemory *sm);
 void SpatialMemory_free(SpatialMemory *sm);
 

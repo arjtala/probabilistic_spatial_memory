@@ -1,6 +1,7 @@
 #ifndef TILE_H
 #define TILE_H
 
+#include <stddef.h>
 #include "core/ring_buffer.h"
 #include <h3/h3api.h>
 

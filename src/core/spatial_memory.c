@@ -1,18 +1,62 @@
+#include <math.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include "core/spatial_memory.h"
 
+static bool spatial_memory_coords_to_key(const SpatialMemory *sm, double lat,
+                                         double lng, char hex_string[],
+                                         H3Index *out_cell_id) {
+  if (!sm || !hex_string) return false;
+  if (!isfinite(lat) || !isfinite(lng) || lat < -90.0 || lat > 90.0 ||
+      lng < -180.0 || lng > 180.0) {
+    fprintf(stderr, "SpatialMemory: invalid lat/lng\n");
+    return false;
+  }
+
+  LatLng loc;
+  loc.lat = degsToRads(lat);
+  loc.lng = degsToRads(lng);
+  H3Index cellId;
+  H3Error err = latLngToCell(&loc, sm->resolution, &cellId);
+  if (err) {
+    fprintf(stderr, "SpatialMemory: invalid lat/lng or resolution\n");
+    return false;
+  }
+  h3ToString(cellId, hex_string, H3_INDEX_HEX_STRING_LENGTH);
+  if (out_cell_id) {
+    *out_cell_id = cellId;
+  }
+  return true;
+}
+
 SpatialMemory *SpatialMemory_new(const int resolution, const size_t capacity,
                                  const size_t precision) {
+  if (resolution < 0 || resolution > 15) {
+    fprintf(stderr, "SpatialMemory_new: H3 resolution must be in [0, 15], got %d\n",
+            resolution);
+    return NULL;
+  }
+  if (capacity == 0) {
+    fprintf(stderr, "SpatialMemory_new: capacity must be greater than 0\n");
+    return NULL;
+  }
+  if (precision < 4 || precision > 8 * sizeof(uint64_t)) {
+    fprintf(stderr, "SpatialMemory_new: precision %zu is out of range\n",
+            precision);
+    return NULL;
+  }
+
   SpatialMemory *sm = (SpatialMemory *)malloc(sizeof(SpatialMemory));
   if (NULL == sm) {
     fprintf(stderr, "Unable to initialize SpatialMemory: out of memory.\n");
-    exit(EXIT_FAILURE);
+    return NULL;
   }
   sm->tiles = HashTable_create((void (*)(void *))Tile_free);
   if (NULL == sm->tiles) {
     fprintf(stderr, "Unable to initialize tiles: out of memory.\n");
-    exit(EXIT_FAILURE);
+    free(sm);
+    return NULL;
   }
   sm->resolution = resolution;
   sm->capacity = capacity;
@@ -20,25 +64,28 @@ SpatialMemory *SpatialMemory_new(const int resolution, const size_t capacity,
   return sm;
 }
 
-void SpatialMemory_observe(SpatialMemory *sm, const double lat, const double lng, const void *data,
-                           size_t size) {
-  LatLng loc;
-  loc.lat = degsToRads(lat);
-  loc.lng = degsToRads(lng);
-  H3Index cellId;
-  H3Error err = latLngToCell(&loc, sm->resolution, &cellId);
-  if (err) {
-    fprintf(stderr, "Failed to create H3Index : invalid lat/lng or resolution\n");
-    exit(EXIT_FAILURE);
+bool SpatialMemory_observe(SpatialMemory *sm, const double lat, const double lng,
+                           const void *data, size_t size) {
+  if (!sm || !data || size == 0) {
+    return false;
   }
   char hexString[H3_INDEX_HEX_STRING_LENGTH];
-  h3ToString(cellId, hexString, sizeof(hexString));
+  if (!spatial_memory_coords_to_key(sm, lat, lng, hexString, NULL)) {
+    return false;
+  }
   Tile *tile = HashTable_get(sm->tiles, hexString);
   if (NULL == tile) {
     tile = Tile_new(lat, lng, sm->resolution, sm->capacity, sm->precision);
-    HashTable_set(sm->tiles, hexString, tile);
+    if (!tile) {
+      return false;
+    }
+    if (!HashTable_set(sm->tiles, hexString, tile)) {
+      Tile_free(tile);
+      return false;
+    }
   }
   Tile_add(tile, data, size);
+  return true;
 }
 
 size_t SpatialMemory_advance_to_timestamp(SpatialMemory *sm, double timestamp,
@@ -63,38 +110,40 @@ size_t SpatialMemory_advance_to_timestamp(SpatialMemory *sm, double timestamp,
 }
 
 void SpatialMemory_advance_all(SpatialMemory *sm) {
+  if (!sm) return;
   HashTableIterator it = HashTable_iterator(sm->tiles);
   while (HashTable_next(&it)) {
     Tile_advance(it.value);
   }
 }
 
-double SpatialMemory_query(SpatialMemory *sm, const double lat, const double lng, const size_t n) {
-  double count = 0.0;
-  LatLng loc;
-  loc.lat = degsToRads(lat);
-  loc.lng = degsToRads(lng);
-  H3Index cellId;
-  H3Error err = latLngToCell(&loc, sm->resolution, &cellId);
-  if (err) {
-    fprintf(stderr, "Failed to create H3Index : invalid lat/lng or resolution\n");
-    exit(EXIT_FAILURE);
+bool SpatialMemory_query(SpatialMemory *sm, const double lat, const double lng,
+                         const size_t n, double *out_count) {
+  if (!out_count) {
+    return false;
   }
+  *out_count = 0.0;
+  if (!sm) return false;
+
   char hexString[H3_INDEX_HEX_STRING_LENGTH];
-  h3ToString(cellId, hexString, sizeof(hexString));
+  if (!spatial_memory_coords_to_key(sm, lat, lng, hexString, NULL)) {
+    return false;
+  }
   Tile *tile = HashTable_get(sm->tiles, hexString);
   if (NULL == tile) {
-    return count;
+    return true;
   }
-  count = Tile_query(tile, n);
-  return count;
+  *out_count = Tile_query(tile, n);
+  return true;
 }
 
 size_t SpatialMemory_tile_count(SpatialMemory *sm) {
+  if (!sm) return 0;
   return HashTable_size(sm->tiles);
 }
 
 void SpatialMemory_free(SpatialMemory *sm) {
+  if (!sm) return;
   HashTable_free(sm->tiles);
   free(sm);
 }

@@ -1,6 +1,25 @@
+#include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "ingest/ingest.h"
+
+static bool parse_positive_double(const char *text, const char *name,
+                                  double *out_value) {
+  char *end = NULL;
+  errno = 0;
+  double value = strtod(text, &end);
+  if (errno != 0 || end == text || *end != '\0') {
+    fprintf(stderr, "Invalid %s: '%s'\n", name, text);
+    return false;
+  }
+  if (value <= 0.0) {
+    fprintf(stderr, "%s must be greater than 0, got '%s'\n", name, text);
+    return false;
+  }
+  *out_value = value;
+  return true;
+}
 
 int main(int argc, char *argv[]) {
   if (argc < 3) {
@@ -10,9 +29,16 @@ int main(int argc, char *argv[]) {
 
   const char *filepath = argv[1];
   const char *group = argv[2];
-  double time_window_sec = argc > 3 ? atof(argv[3]) : 5.0;
+  double time_window_sec = 5.0;
+  if (argc > 3 && !parse_positive_double(argv[3], "time window", &time_window_sec)) {
+    return 1;
+  }
 
   SpatialMemory *sm = SpatialMemory_new(DEFAULT_RESOLUTION, DEFAULT_CAPACITY, DEFAULT_PRECISION);
+  if (!sm) {
+    fprintf(stderr, "Failed to initialize spatial memory\n");
+    return 1;
+  }
   hid_t file = H5Fopen(filepath, H5F_ACC_RDONLY, H5P_DEFAULT);
   if (file < 0) {
     fprintf(stderr, "Failed to open HDF5 file: %s\n", filepath);

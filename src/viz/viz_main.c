@@ -1,7 +1,9 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <math.h>
+#include <limits.h>
 #include <getopt.h>
 #include <dirent.h>
 #include <string.h>
@@ -54,6 +56,45 @@ static int g_h3_resolution = DEFAULT_RESOLUTION;
 static double *g_video_start_time = NULL;
 static double *g_video_pts_offset = NULL;
 static bool *g_video_done = NULL;
+
+static bool parse_positive_double(const char *text, const char *name,
+                                  double *out_value) {
+  char *end = NULL;
+  errno = 0;
+  double value = strtod(text, &end);
+  if (errno != 0 || end == text || *end != '\0') {
+    fprintf(stderr, "Invalid %s: '%s'\n", name, text);
+    return false;
+  }
+  if (value <= 0.0) {
+    fprintf(stderr, "%s must be greater than 0, got '%s'\n", name, text);
+    return false;
+  }
+  *out_value = value;
+  return true;
+}
+
+static bool parse_int_in_range(const char *text, const char *name, int min_value,
+                               int max_value, int *out_value) {
+  char *end = NULL;
+  errno = 0;
+  long value = strtol(text, &end, 10);
+  if (errno != 0 || end == text || *end != '\0') {
+    fprintf(stderr, "Invalid %s: '%s'\n", name, text);
+    return false;
+  }
+  if (value < min_value || value > max_value) {
+    fprintf(stderr, "%s must be in [%d, %d], got '%s'\n",
+            name, min_value, max_value, text);
+    return false;
+  }
+  if (value < INT_MIN || value > INT_MAX) {
+    fprintf(stderr, "Invalid %s: '%s'\n", name, text);
+    return false;
+  }
+  *out_value = (int)value;
+  return true;
+}
 
 static VideoQuad VideoQuad_create(GLuint program) {
   VideoQuad vq;
@@ -423,10 +464,15 @@ static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) 
       if (g_video_done) *g_video_done = false;
 
       // On backward seek: reset ingest reader and spatial memory
-      if (seek_delta < 0.0 && g_reader && g_sm) {
+      if (seek_delta < 0.0 && g_reader) {
+        SpatialMemory *new_sm = SpatialMemory_new(g_h3_resolution, DEFAULT_CAPACITY,
+                                                  DEFAULT_PRECISION);
         g_reader->cursor = 0;
         SpatialMemory_free(g_sm);
-        g_sm = SpatialMemory_new(g_h3_resolution, DEFAULT_CAPACITY, DEFAULT_PRECISION);
+        g_sm = new_sm;
+        if (!g_sm) {
+          fprintf(stderr, "Failed to reset spatial memory after seek\n");
+        }
         // first_ts is a fixed epoch→PTS mapping; don't reset it.
         // The window anchor defines the fixed-width decay buckets, so reset it
         // when replaying from an earlier point in the stream.
@@ -631,8 +677,16 @@ int main(int argc, char *argv[]) {
     case 'v': video_path = optarg; break;
     case 'f': h5_path = optarg; break;
     case 'g': group = optarg; break;
-    case 't': time_window_sec = atof(optarg); break;
-    case 'r': h3_resolution = atoi(optarg); break;
+    case 't':
+      if (!parse_positive_double(optarg, "time window", &time_window_sec)) {
+        return 1;
+      }
+      break;
+    case 'r':
+      if (!parse_int_in_range(optarg, "H3 resolution", 0, 15, &h3_resolution)) {
+        return 1;
+      }
+      break;
     case 'h':
       print_usage(argv[0]);
       return 0;
@@ -664,8 +718,19 @@ int main(int argc, char *argv[]) {
     video_path = argv[optind];
     if (optind + 1 < argc) h5_path = argv[optind + 1];
     if (optind + 2 < argc) group = argv[optind + 2];
-    if (optind + 3 < argc) time_window_sec = atof(argv[optind + 3]);
-    if (optind + 4 < argc) h3_resolution = atoi(argv[optind + 4]);
+    if (optind + 3 < argc &&
+        !parse_positive_double(argv[optind + 3], "time window", &time_window_sec)) {
+      free(alloc_video);
+      free(alloc_h5);
+      return 1;
+    }
+    if (optind + 4 < argc &&
+        !parse_int_in_range(argv[optind + 4], "H3 resolution", 0, 15,
+                            &h3_resolution)) {
+      free(alloc_video);
+      free(alloc_h5);
+      return 1;
+    }
   }
 
   // Validate required args
@@ -676,8 +741,8 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  if (h3_resolution < 0 || h3_resolution > 15) {
-    fprintf(stderr, "H3 resolution must be 0-15, got %d\n", h3_resolution);
+  if (time_window_sec <= 0.0) {
+    fprintf(stderr, "Time window must be greater than 0\n");
     free(alloc_video);
     free(alloc_h5);
     return 1;
@@ -755,6 +820,9 @@ int main(int argc, char *argv[]) {
   JepaCache *jepa_cache = NULL;
   if (h5_path) {
     sm = SpatialMemory_new(g_h3_resolution, DEFAULT_CAPACITY, DEFAULT_PRECISION);
+    if (!sm) {
+      fprintf(stderr, "Failed to initialize spatial memory\n");
+    }
     h5_file = H5Fopen(h5_path, H5F_ACC_RDONLY, H5P_DEFAULT);
     if (h5_file < 0) {
       fprintf(stderr, "Failed to open HDF5: %s\n", h5_path);
@@ -896,8 +964,10 @@ int main(int argc, char *argv[]) {
           SpatialMemory_advance_to_timestamp(sm, record.timestamp, &window_anchor,
                                              time_window_sec);
 
-          SpatialMemory_observe(sm, record.lat, record.lng, record.embedding,
-                                record.embedding_dim * sizeof(float));
+          if (!SpatialMemory_observe(sm, record.lat, record.lng, record.embedding,
+                                     record.embedding_dim * sizeof(float))) {
+            continue;
+          }
 
           // GPS trace + IMU: skip when high-rate reader handles it
           if (!(imu_gps && (imu_gps->has_imu || imu_gps->has_gps))) {

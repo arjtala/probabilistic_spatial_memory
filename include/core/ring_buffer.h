@@ -1,6 +1,7 @@
 #ifndef RING_BUFFER_H
 #define RING_BUFFER_H
 
+#include <stddef.h>
 #include "vendor/probabilistic_data_structures/hyperloglog/hll.h"
 
 #define DEFAULT_CAPACITY 12

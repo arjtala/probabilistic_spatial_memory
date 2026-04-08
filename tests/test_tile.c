@@ -16,11 +16,19 @@
 
 void test_tile_new(void) {
   Tile *tile = Tile_new(LAT, LNG, RESOLUTION, CAPACITY, PRECISION);
+  ASSERT(NULL != tile, 1, NULL != tile);
   ASSERT(CELLID_RS10 == tile->cellId, 1, CELLID_RS10 == tile->cellId);
   ASSERT(CAPACITY == tile->rb->capacity, CAPACITY, (int)tile->rb->capacity);
   ASSERT(PRECISION == tile->rb->precision, PRECISION, (int)tile->rb->precision);
   ASSERT(0 == tile->rb->head, 0, (int)tile->rb->head);
   Tile_free(tile);
+}
+
+void test_tile_new_invalid_input(void) {
+  Tile *bad_resolution = Tile_new(LAT, LNG, 16, CAPACITY, PRECISION);
+  Tile *bad_lat = Tile_new(100.0, LNG, RESOLUTION, CAPACITY, PRECISION);
+  ASSERT(NULL == bad_resolution, 1, NULL == bad_resolution);
+  ASSERT(NULL == bad_lat, 1, NULL == bad_lat);
 }
 
 void test_tile_add(void) {
@@ -66,6 +74,7 @@ void test_tile_same_cell(void) {
 
 int main(void) {
   RUN_TEST(test_tile_new);
+  RUN_TEST(test_tile_new_invalid_input);
   RUN_TEST(test_tile_add);
   RUN_TEST(test_tile_advance);
   RUN_TEST(test_tile_query);
