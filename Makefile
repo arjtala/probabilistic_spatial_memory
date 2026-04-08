@@ -3,11 +3,17 @@ H3_PREFIX = $(shell brew --prefix h3)
 HDF5_PREFIX = $(shell brew --prefix hdf5)
 GLFW_PREFIX = $(shell brew --prefix glfw)
 FFMPEG_PREFIX = $(shell brew --prefix ffmpeg)
+CURL_PREFIX = $(shell curl-config --prefix)
 CURL_CFLAGS = $(shell curl-config --cflags)
 CURL_LDFLAGS = $(shell curl-config --libs)
 CFLAGS = -Wall -Wextra -Werror -std=c99 -O3 -march=native -flto -ffast-math -mtune=native -Iinclude -I. -I$(H3_PREFIX)/include -I$(HDF5_PREFIX)/include
 LDFLAGS = -flto -L$(H3_PREFIX)/lib -lh3 -L$(HDF5_PREFIX)/lib -lhdf5
 VIZ_CFLAGS = -I$(GLFW_PREFIX)/include -I$(FFMPEG_PREFIX)/include $(CURL_CFLAGS) -Ivendor -DGL_SILENCE_DEPRECATION
+VIZ_RPATHS = -Wl,-rpath,$(H3_PREFIX)/lib \
+             -Wl,-rpath,$(HDF5_PREFIX)/lib \
+             -Wl,-rpath,$(GLFW_PREFIX)/lib \
+             -Wl,-rpath,$(FFMPEG_PREFIX)/lib \
+             -Wl,-rpath,$(CURL_PREFIX)/lib
 VIZ_LDFLAGS = -L$(GLFW_PREFIX)/lib -lglfw \
               -L$(FFMPEG_PREFIX)/lib -lavcodec -lavformat -lswscale -lavutil \
               $(CURL_LDFLAGS) \
@@ -92,7 +98,7 @@ $(STB_OBJ): vendor/stb/stb_image_impl.c vendor/stb/stb_image.h
 # Build viz executable
 viz: $(LIB) $(VIZ_OBJ) $(STB_OBJ)
 	@mkdir -p $(TARGET_DIR)
-	$(CC) $(CFLAGS) $(VIZ_CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) $(VIZ_LDFLAGS) src/viz/viz_main.c $(VIZ_OBJ) $(STB_OBJ) $(LIB) -o $(VIZ_BIN) -lm
+	$(CC) $(CFLAGS) $(VIZ_CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) $(VIZ_RPATHS) $(VIZ_LDFLAGS) src/viz/viz_main.c $(VIZ_OBJ) $(STB_OBJ) $(LIB) -o $(VIZ_BIN) -lm
 
 # Build vendor object files
 $(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(VENDOR_HEADERS)
