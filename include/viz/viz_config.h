@@ -21,11 +21,13 @@
 #define VIZ_CONFIG_DEFAULT_INGEST_RECORD_BUDGET 128
 #define VIZ_CONFIG_DEFAULT_IMU_SAMPLE_BUDGET 512
 #define VIZ_CONFIG_DEFAULT_GPS_POINT_BUDGET 64
+#define VIZ_CONFIG_DEFAULT_TILE_DISK_CACHE_MAX_MB 512
 
 #define VIZ_CONFIG_MAX_VIDEO_DECODE_BUDGET 64
 #define VIZ_CONFIG_MAX_INGEST_RECORD_BUDGET 4096
 #define VIZ_CONFIG_MAX_IMU_SAMPLE_BUDGET 16384
 #define VIZ_CONFIG_MAX_GPS_POINT_BUDGET 4096
+#define VIZ_CONFIG_MAX_TILE_DISK_CACHE_MAX_MB 16384
 
 typedef struct {
   bool has_session_dir;
@@ -40,6 +42,8 @@ typedef struct {
   char group[VIZ_CONFIG_GROUP_CAP];
   double time_window_sec;
   int h3_resolution;
+  bool start_paused;
+  bool debug_hud_enabled;
   double scrub_sensitivity_sec;
   double map_follow_smoothing;
   int video_decode_budget;
@@ -47,6 +51,8 @@ typedef struct {
   int imu_sample_budget;
   int gps_point_budget;
   int tile_uploads_per_frame;
+  bool tile_disk_cache_enabled;
+  int tile_disk_cache_max_mb;
 
   char tile_style[VIZ_CONFIG_STYLE_CAP];
 
@@ -74,6 +80,7 @@ bool VizConfig_set_optional_text(char *dst, size_t dst_size, bool *has_value,
 
 bool VizConfig_parse_positive_double(const char *text, const char *name,
                                      double *out_value);
+bool VizConfig_parse_bool(const char *text, const char *name, bool *out_value);
 bool VizConfig_parse_int_in_range(const char *text, const char *name,
                                   int min_value, int max_value,
                                   int *out_value);

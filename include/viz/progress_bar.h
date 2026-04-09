@@ -13,6 +13,7 @@ typedef struct {
 ProgressBar ProgressBar_create(GLuint program);
 void ProgressBar_draw(ProgressBar *pb, double progress);
 void ProgressBar_draw_pause_icon(ProgressBar *pb);
+void ProgressBar_draw_start_overlay(ProgressBar *pb);
 void ProgressBar_free(ProgressBar *pb);
 
 #endif

@@ -75,6 +75,8 @@ static void test_defaults_resolve_to_positron(void) {
          config.time_window_sec == 5.0 ? 1 : 0);
   ASSERT(config.h3_resolution == DEFAULT_RESOLUTION, DEFAULT_RESOLUTION,
          config.h3_resolution);
+  ASSERT(config.start_paused, 1, config.start_paused ? 1 : 0);
+  ASSERT(config.debug_hud_enabled, 1, config.debug_hud_enabled ? 1 : 0);
   ASSERT(config.scrub_sensitivity_sec == 2.0, 1,
          config.scrub_sensitivity_sec == 2.0 ? 1 : 0);
   ASSERT(config.map_follow_smoothing == 8.0, 1,
@@ -90,6 +92,12 @@ static void test_defaults_resolve_to_positron(void) {
   ASSERT(config.gps_point_budget == VIZ_CONFIG_DEFAULT_GPS_POINT_BUDGET,
          VIZ_CONFIG_DEFAULT_GPS_POINT_BUDGET, config.gps_point_budget);
   ASSERT(config.tile_uploads_per_frame == 1, 1, config.tile_uploads_per_frame);
+  ASSERT(config.tile_disk_cache_enabled, 1,
+         config.tile_disk_cache_enabled ? 1 : 0);
+  ASSERT(config.tile_disk_cache_max_mb ==
+             VIZ_CONFIG_DEFAULT_TILE_DISK_CACHE_MAX_MB,
+         VIZ_CONFIG_DEFAULT_TILE_DISK_CACHE_MAX_MB,
+         config.tile_disk_cache_max_mb);
   assert_str_eq("CartoDB.Positron", config.tile_style);
 
   ok = VizConfig_resolve_tile_source(&config, &tile_source);
@@ -122,6 +130,8 @@ static void test_load_file_resolves_relative_paths(void) {
       "group = \"jepa\"\n"
       "time_window_sec = 2.5\n"
       "h3_resolution = 8\n"
+      "start_paused = false\n"
+      "debug_hud_enabled = false\n"
       "scrub_sensitivity_sec = 1.25\n"
       "map_follow_smoothing = 12.0\n"
       "video_decode_budget = 8\n"
@@ -129,6 +139,8 @@ static void test_load_file_resolves_relative_paths(void) {
       "imu_sample_budget = 1024\n"
       "gps_point_budget = 96\n"
       "tile_uploads_per_frame = 3\n"
+      "tile_disk_cache_enabled = false\n"
+      "tile_disk_cache_max_mb = 64\n"
       "tile_style = \"CartoDB.DarkMatter\"\n");
 
   VizConfig_init(&config);
@@ -146,6 +158,8 @@ static void test_load_file_resolves_relative_paths(void) {
   ASSERT(config.time_window_sec == 2.5, 1,
          config.time_window_sec == 2.5 ? 1 : 0);
   ASSERT(config.h3_resolution == 8, 8, config.h3_resolution);
+  ASSERT(!config.start_paused, 0, config.start_paused ? 1 : 0);
+  ASSERT(!config.debug_hud_enabled, 0, config.debug_hud_enabled ? 1 : 0);
   ASSERT(config.scrub_sensitivity_sec == 1.25, 1,
          config.scrub_sensitivity_sec == 1.25 ? 1 : 0);
   ASSERT(config.map_follow_smoothing == 12.0, 1,
@@ -156,6 +170,10 @@ static void test_load_file_resolves_relative_paths(void) {
   ASSERT(config.imu_sample_budget == 1024, 1024, config.imu_sample_budget);
   ASSERT(config.gps_point_budget == 96, 96, config.gps_point_budget);
   ASSERT(config.tile_uploads_per_frame == 3, 3, config.tile_uploads_per_frame);
+  ASSERT(!config.tile_disk_cache_enabled, 0,
+         config.tile_disk_cache_enabled ? 1 : 0);
+  ASSERT(config.tile_disk_cache_max_mb == 64, 64,
+         config.tile_disk_cache_max_mb);
   assert_str_eq("CartoDB.DarkMatter", config.tile_style);
 
   ok = VizConfig_resolve_tile_source(&config, &tile_source);

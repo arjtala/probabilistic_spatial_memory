@@ -29,9 +29,29 @@
 #endif
 
 #define VIDEO_DECODE_BUDGET_SCALE_CAP 4
+#define ADAPTIVE_VIDEO_BUDGET_SCALE_CAP 8
+#define ADAPTIVE_INGEST_BUDGET_SCALE_CAP 8
+#define ADAPTIVE_IMU_BUDGET_SCALE_CAP 4
+#define ADAPTIVE_GPS_BUDGET_SCALE_CAP 8
+#define ADAPTIVE_TILE_UPLOAD_BUDGET_CAP 4
+#define DEBUG_TITLE_UPDATE_INTERVAL_SEC 0.15
+
+typedef struct {
+  int decode_steps;
+  int decode_base_budget;
+  int decode_budget;
+  bool video_backlog;
+  int drained_records;
+  bool ingest_backlog;
+  int drained_imu;
+  bool imu_backlog;
+  int drained_gps;
+  bool gps_backlog;
+} VizFrameStats;
 
 typedef struct {
   bool paused;
+  bool awaiting_initial_play;
   double playback_speed;
 
   bool map_view_initialized;
@@ -71,13 +91,35 @@ typedef struct {
   int ingest_record_budget;
   int imu_sample_budget;
   int gps_point_budget;
+  int effective_video_decode_budget;
+  int effective_ingest_record_budget;
+  int effective_imu_sample_budget;
+  int effective_gps_point_budget;
+  int effective_tile_upload_budget;
+  bool debug_hud_enabled;
+  double next_debug_title_update;
+  VizFrameStats frame_stats;
 } VizApp;
 
 static VizApp *app_from_window(GLFWwindow *window) {
   return (VizApp *)glfwGetWindowUserPointer(window);
 }
 
-static int video_decode_budget(const VizApp *app) {
+static int clamp_int(int value, int min_value, int max_value) {
+  if (value < min_value) return min_value;
+  if (value > max_value) return max_value;
+  return value;
+}
+
+static unsigned long long bytes_to_mib_ceil(size_t bytes) {
+  const unsigned long long mib = 1024ull * 1024ull;
+  unsigned long long value = (unsigned long long)bytes;
+
+  if (value == 0) return 0;
+  return (value + mib - 1ull) / mib;
+}
+
+static int scaled_video_decode_base_budget(const VizApp *app) {
   int base = VIZ_CONFIG_DEFAULT_VIDEO_DECODE_BUDGET;
   double scale = 1.0;
   int max_budget;
@@ -95,6 +137,212 @@ static int video_decode_budget(const VizApp *app) {
   if (budget < base) return base;
   if (budget > max_budget) return max_budget;
   return budget;
+}
+
+static int adaptive_budget_cap(int base, int scale_cap, int hard_max) {
+  long scaled_cap;
+
+  if (base < 1) base = 1;
+  if (scale_cap < 1) scale_cap = 1;
+  scaled_cap = (long)base * (long)scale_cap;
+  if (scaled_cap < base) scaled_cap = base;
+  if (scaled_cap > hard_max) scaled_cap = hard_max;
+  return (int)scaled_cap;
+}
+
+static int ramp_adaptive_budget_up(int current, int base, int cap) {
+  int step;
+
+  current = clamp_int(current, base, cap);
+  step = current / 2;
+  if (step < base) step = base;
+  return clamp_int(current + step, base, cap);
+}
+
+static int ramp_adaptive_budget_down(int current, int base) {
+  int over = current - base;
+  int step;
+
+  if (over <= 0) return base;
+  step = over / 4;
+  if (step < 1) step = 1;
+  return clamp_int(current - step, base, current);
+}
+
+static int next_adaptive_budget(int current, int base, int cap, bool pressured,
+                                int demand_hint) {
+  int next;
+  int hinted;
+
+  current = clamp_int(current, base, cap);
+  if (!pressured) return ramp_adaptive_budget_down(current, base);
+
+  next = ramp_adaptive_budget_up(current, base, cap);
+  if (demand_hint <= 0) return next;
+
+  hinted = clamp_int(base + demand_hint, base, cap);
+  if (hinted > next) return hinted;
+  return next;
+}
+
+static void format_budget_label(char *dst, size_t dst_size, int effective,
+                                int base) {
+  if (!dst || dst_size == 0) return;
+  if (effective > base) {
+    snprintf(dst, dst_size, "%d(%d)", effective, base);
+  } else {
+    snprintf(dst, dst_size, "%d", effective);
+  }
+}
+
+static void update_effective_runtime_budgets(VizApp *app,
+                                             const VizFrameStats *prev_stats,
+                                             const TileMapStats *prev_tiles) {
+  int video_base;
+  int video_cap;
+  int ingest_cap;
+  int imu_cap;
+  int gps_cap;
+  int tile_cap;
+  int tile_base;
+  bool tile_pressured = false;
+  int tile_demand_hint = 0;
+
+  if (!app) return;
+
+  video_base = scaled_video_decode_base_budget(app);
+  video_cap = adaptive_budget_cap(video_base, ADAPTIVE_VIDEO_BUDGET_SCALE_CAP,
+                                  VIZ_CONFIG_MAX_VIDEO_DECODE_BUDGET);
+  ingest_cap = adaptive_budget_cap(app->ingest_record_budget,
+                                   ADAPTIVE_INGEST_BUDGET_SCALE_CAP,
+                                   VIZ_CONFIG_MAX_INGEST_RECORD_BUDGET);
+  imu_cap = adaptive_budget_cap(app->imu_sample_budget,
+                                ADAPTIVE_IMU_BUDGET_SCALE_CAP,
+                                VIZ_CONFIG_MAX_IMU_SAMPLE_BUDGET);
+  gps_cap = adaptive_budget_cap(app->gps_point_budget,
+                                ADAPTIVE_GPS_BUDGET_SCALE_CAP,
+                                VIZ_CONFIG_MAX_GPS_POINT_BUDGET);
+  tile_base = clamp_int(app->tile_uploads_per_frame, 1, MAX_PENDING_DOWNLOADS);
+  tile_cap = clamp_int(ADAPTIVE_TILE_UPLOAD_BUDGET_CAP, tile_base,
+                       MAX_PENDING_DOWNLOADS);
+
+  app->effective_video_decode_budget = next_adaptive_budget(
+      app->effective_video_decode_budget, video_base, video_cap,
+      prev_stats && prev_stats->video_backlog,
+      prev_stats ? prev_stats->decode_steps : 0);
+  app->effective_ingest_record_budget = next_adaptive_budget(
+      app->effective_ingest_record_budget, app->ingest_record_budget,
+      ingest_cap, prev_stats && prev_stats->ingest_backlog,
+      prev_stats ? prev_stats->drained_records : 0);
+  app->effective_imu_sample_budget = next_adaptive_budget(
+      app->effective_imu_sample_budget, app->imu_sample_budget, imu_cap,
+      prev_stats && prev_stats->imu_backlog,
+      prev_stats ? prev_stats->drained_imu : 0);
+  app->effective_gps_point_budget = next_adaptive_budget(
+      app->effective_gps_point_budget, app->gps_point_budget, gps_cap,
+      prev_stats && prev_stats->gps_backlog,
+      prev_stats ? prev_stats->drained_gps : 0);
+
+  if (prev_tiles) {
+    tile_pressured = prev_tiles->decoded_downloads >
+                         app->effective_tile_upload_budget ||
+                     prev_tiles->decoded_downloads >= tile_base + 1;
+    tile_demand_hint = prev_tiles->decoded_downloads;
+  }
+  app->effective_tile_upload_budget = next_adaptive_budget(
+      app->effective_tile_upload_budget, tile_base, tile_cap,
+      tile_pressured, tile_demand_hint);
+
+  app->frame_stats.decode_base_budget = video_base;
+  app->frame_stats.decode_budget = app->effective_video_decode_budget;
+}
+
+static void clear_frame_stats(VizFrameStats *stats) {
+  if (!stats) return;
+  memset(stats, 0, sizeof(*stats));
+}
+
+static void reset_window_title(GLFWwindow *window) {
+  if (!window) return;
+  glfwSetWindowTitle(window, "psm-viz");
+}
+
+static void update_debug_window_title(GLFWwindow *window, VizApp *app,
+                                      double now) {
+  char title[512];
+  char video_budget[32];
+  char ingest_budget[32];
+  char imu_budget[32];
+  char gps_budget[32];
+  char tile_budget[32];
+  char disk_stats[96];
+  TileMapStats tile_stats = {0};
+  const char *state;
+  const char *video_backlog = "";
+  const char *ingest_backlog = "";
+  const char *imu_backlog = "";
+  const char *gps_backlog = "";
+  double current_pts = 0.0;
+  double duration = 0.0;
+
+  if (!window || !app || !app->debug_hud_enabled) return;
+  if (now < app->next_debug_title_update) return;
+
+  if (app->tile_map) {
+    TileMap_get_stats(app->tile_map, &tile_stats);
+  }
+  if (app->dec) {
+    current_pts = app->dec->current_pts;
+    duration = app->dec->duration;
+  }
+
+  state = app->paused ? "paused" : (app->video_done ? "done" : "play");
+  if (app->frame_stats.video_backlog) video_backlog = "*";
+  if (app->frame_stats.ingest_backlog) ingest_backlog = "*";
+  if (app->frame_stats.imu_backlog) imu_backlog = "*";
+  if (app->frame_stats.gps_backlog) gps_backlog = "*";
+
+  format_budget_label(video_budget, sizeof(video_budget),
+                      app->frame_stats.decode_budget,
+                      app->frame_stats.decode_base_budget);
+  format_budget_label(ingest_budget, sizeof(ingest_budget),
+                      app->effective_ingest_record_budget,
+                      app->ingest_record_budget);
+  format_budget_label(imu_budget, sizeof(imu_budget),
+                      app->effective_imu_sample_budget,
+                      app->imu_sample_budget);
+  format_budget_label(gps_budget, sizeof(gps_budget),
+                      app->effective_gps_point_budget,
+                      app->gps_point_budget);
+  format_budget_label(tile_budget, sizeof(tile_budget),
+                      app->effective_tile_upload_budget,
+                      app->tile_uploads_per_frame);
+  if (tile_stats.disk_cache_enabled) {
+    snprintf(disk_stats, sizeof(disk_stats),
+             "disk h%d w%d p%d m%llu/%llu",
+             tile_stats.disk_cache_hits, tile_stats.disk_cache_writes,
+             tile_stats.disk_cache_prunes,
+             bytes_to_mib_ceil(tile_stats.disk_cache_bytes),
+             bytes_to_mib_ceil(tile_stats.disk_cache_max_bytes));
+  } else {
+    snprintf(disk_stats, sizeof(disk_stats), "disk off");
+  }
+
+  snprintf(title, sizeof(title),
+           "psm-viz | %s %.2fx | pts %.2f/%.2f | v %d/%s%s | in %d/%s%s | "
+           "imu %d/%s%s | gps %d/%s%s | tiles act%d rdy%d dec%d pix%d up%d/%s c%d | %s",
+           state, app->playback_speed, current_pts, duration,
+           app->frame_stats.decode_steps, video_budget,
+           video_backlog, app->frame_stats.drained_records,
+           ingest_budget, ingest_backlog,
+           app->frame_stats.drained_imu, imu_budget, imu_backlog,
+           app->frame_stats.drained_gps, gps_budget, gps_backlog,
+           tile_stats.active_downloads, tile_stats.ready_downloads,
+           tile_stats.decoding_downloads, tile_stats.decoded_downloads,
+           tile_stats.uploads_last_frame, tile_budget, tile_stats.cache_tiles,
+           disk_stats);
+  glfwSetWindowTitle(window, title);
+  app->next_debug_title_update = now + DEBUG_TITLE_UPDATE_INTERVAL_SEC;
 }
 
 static double clamp_map_zoom(double zoom) {
@@ -345,6 +593,9 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
     break;
   case GLFW_KEY_SPACE:
     app->paused = !app->paused;
+    if (!app->paused) {
+      app->awaiting_initial_play = false;
+    }
     break;
   case GLFW_KEY_EQUAL:  // + key
     if (app->hex_renderer) {
@@ -375,6 +626,14 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
         app->map_view_initialized = false;
       }
     }
+    break;
+  case GLFW_KEY_H:
+    app->debug_hud_enabled = !app->debug_hud_enabled;
+    app->next_debug_title_update = 0.0;
+    if (!app->debug_hud_enabled) {
+      reset_window_title(window);
+    }
+    printf("Debug HUD: %s\n", app->debug_hud_enabled ? "on" : "off");
     break;
   case GLFW_KEY_RIGHT:
     app->playback_speed *= 2.0;
@@ -503,11 +762,13 @@ static void print_usage(const char *prog) {
   fprintf(stderr, "\nConfig keys:\n");
   fprintf(stderr, "  session_dir, video_path, features_path, group,\n");
   fprintf(stderr, "  time_window_sec, h3_resolution,\n");
+  fprintf(stderr, "  start_paused, debug_hud_enabled,\n");
   fprintf(stderr, "  scrub_sensitivity_sec, map_follow_smoothing,\n");
   fprintf(stderr, "  video_decode_budget, ingest_record_budget,\n");
   fprintf(stderr, "  imu_sample_budget, gps_point_budget,\n");
-  fprintf(stderr, "  tile_uploads_per_frame, tile_style,\n");
-  fprintf(stderr, "  tile_api_key, tile_url_template\n");
+  fprintf(stderr, "  tile_uploads_per_frame,\n");
+  fprintf(stderr, "  tile_disk_cache_enabled, tile_disk_cache_max_mb,\n");
+  fprintf(stderr, "  tile_style, tile_api_key, tile_url_template\n");
   fprintf(stderr, "\nTile styles:\n");
   VizConfig_print_tile_styles(stderr);
   fprintf(stderr, "\nControls:\n");
@@ -518,6 +779,7 @@ static void print_usage(const char *prog) {
   fprintf(stderr, "  Scroll V    Zoom map toward cursor (on map pane)\n");
   fprintf(stderr, "  Drag        Pan map (on map pane)\n");
   fprintf(stderr, "  C           Re-center map and resume follow\n");
+  fprintf(stderr, "  H           Toggle debug title HUD\n");
   fprintf(stderr, "  Q/Esc       Quit\n");
 }
 
@@ -695,6 +957,8 @@ int main(int argc, char *argv[]) {
     free(alloc_h5);
     return 1;
   }
+  app.paused = config.start_paused;
+  app.awaiting_initial_play = config.start_paused;
   app.playback_speed = 1.0;
   app.time_window_sec = time_window_sec;
   app.h3_resolution = h3_resolution;
@@ -705,6 +969,16 @@ int main(int argc, char *argv[]) {
   app.imu_sample_budget = config.imu_sample_budget;
   app.gps_point_budget = config.gps_point_budget;
   app.tile_uploads_per_frame = config.tile_uploads_per_frame;
+  app.effective_video_decode_budget = scaled_video_decode_base_budget(&app);
+  app.effective_ingest_record_budget = app.ingest_record_budget;
+  app.effective_imu_sample_budget = app.imu_sample_budget;
+  app.effective_gps_point_budget = app.gps_point_budget;
+  app.effective_tile_upload_budget = app.tile_uploads_per_frame;
+  app.debug_hud_enabled = config.debug_hud_enabled;
+  app.next_debug_title_update = 0.0;
+  clear_frame_stats(&app.frame_stats);
+  app.frame_stats.decode_base_budget = app.effective_video_decode_budget;
+  app.frame_stats.decode_budget = app.effective_video_decode_budget;
   app.window_anchor = -1.0;
   app.first_ts = -1.0;
 
@@ -867,13 +1141,22 @@ int main(int argc, char *argv[]) {
     free(alloc_h5);
     return 1;
   }
+  TileMap_configure_disk_cache(
+      tm, config.tile_disk_cache_enabled,
+      (size_t)config.tile_disk_cache_max_mb * 1024u * 1024u);
   printf("Tiles: %s\n", tile_source.style_name);
   printf("Scrub: %.2fs/step, Map follow: %.2f, Tile uploads/frame: %d\n",
          app.scrub_sensitivity_sec, app.map_follow_smoothing,
          app.tile_uploads_per_frame);
+  printf("Tile disk cache: %s, cap=%d MB\n",
+         config.tile_disk_cache_enabled ? "on" : "off",
+         config.tile_disk_cache_max_mb);
   printf("Budgets: video=%d base/frame, ingest=%d, imu=%d, gps=%d\n",
          app.video_decode_budget, app.ingest_record_budget,
          app.imu_sample_budget, app.gps_point_budget);
+  printf("Launch: %s, Debug HUD: %s\n",
+         app.paused ? "paused" : "playing",
+         app.debug_hud_enabled ? "on" : "off");
 
   GpsTrace *gt = GpsTrace_new(hex_prog);
   app.gps_trace = gt;
@@ -900,9 +1183,17 @@ int main(int argc, char *argv[]) {
     glfwPollEvents();
     double frame_time = glfwGetTime();
     double frame_dt = frame_time - last_frame_time;
+    VizFrameStats prev_frame_stats = app.frame_stats;
+    TileMapStats prev_tile_stats = {0};
     if (frame_dt < 0.0) frame_dt = 0.0;
     if (frame_dt > 0.25) frame_dt = 0.25;
     last_frame_time = frame_time;
+    if (tm) {
+      TileMap_get_stats(tm, &prev_tile_stats);
+    }
+    clear_frame_stats(&app.frame_stats);
+    update_effective_runtime_budgets(&app, &prev_frame_stats,
+                                     tm ? &prev_tile_stats : NULL);
 
     if (app.seek_pending) {
       apply_pending_seek(&app, frame_time);
@@ -919,7 +1210,7 @@ int main(int argc, char *argv[]) {
       bool video_frame_advanced = false;
       bool drain_backlog = false;
       int decode_steps = 0;
-      int decode_budget = video_decode_budget(&app);
+      int decode_budget = app.frame_stats.decode_budget;
 
       while (dec->current_pts < target_pts && decode_steps < decode_budget) {
         if (!VideoDecoder_next_frame(dec)) {
@@ -929,6 +1220,7 @@ int main(int argc, char *argv[]) {
         video_frame_advanced = true;
         decode_steps++;
       }
+      app.frame_stats.decode_steps = decode_steps;
 
       // Only the last decoded frame is visible, so upload once per tick.
       if (video_frame_advanced) {
@@ -938,6 +1230,7 @@ int main(int argc, char *argv[]) {
       // If we still have backlog after spending this frame's decode budget,
       // drop the remaining lag and continue from the most recently decoded frame.
       if (!app.video_done && dec->current_pts < target_pts) {
+        app.frame_stats.video_backlog = true;
         reset_playback_timing(&app, frame_time);
       }
 
@@ -948,8 +1241,9 @@ int main(int argc, char *argv[]) {
         bool data_changed = false;
         int drained_records = 0;
         while (app.reader->cursor < app.reader->n_records) {
-          if (drained_records >= app.ingest_record_budget) {
+          if (drained_records >= app.effective_ingest_record_budget) {
             drain_backlog = true;
+            app.frame_stats.ingest_backlog = true;
             break;
           }
           size_t saved_cursor = app.reader->cursor;
@@ -1007,6 +1301,7 @@ int main(int argc, char *argv[]) {
 
           data_changed = true;
         }
+        app.frame_stats.drained_records = drained_records;
 
         if (data_changed) {
           HexRenderer_update(hr, app.sm);
@@ -1018,8 +1313,9 @@ int main(int argc, char *argv[]) {
         ImuRecord imu_rec;
         int drained_imu = 0;
         while (app.imu_gps->imu_cursor < app.imu_gps->imu_n_records) {
-          if (drained_imu >= app.imu_sample_budget) {
+          if (drained_imu >= app.effective_imu_sample_budget) {
             drain_backlog = true;
+            app.frame_stats.imu_backlog = true;
             break;
           }
           size_t saved = app.imu_gps->imu_cursor;
@@ -1052,14 +1348,16 @@ int main(int argc, char *argv[]) {
                                             &blended_lng);
           GpsTrace_push(gt, blended_lat, blended_lng, &meta);
         }
+        app.frame_stats.drained_imu = drained_imu;
       }
 
       // ---- Drain standalone GPS (no IMU) up to displayed PTS ----
       if (app.imu_gps && app.imu_gps->has_gps && !app.imu_gps->has_imu) {
         int drained_gps = 0;
         while (app.imu_gps->gps_cursor < app.imu_gps->gps_n_records) {
-          if (drained_gps >= app.gps_point_budget) {
+          if (drained_gps >= app.effective_gps_point_budget) {
             drain_backlog = true;
+            app.frame_stats.gps_backlog = true;
             break;
           }
           double gps_video_time = app.imu_gps->gps_ts[app.imu_gps->gps_cursor] -
@@ -1071,6 +1369,7 @@ int main(int argc, char *argv[]) {
           drained_gps++;
           GpsTrace_push(gt, lat, lng, NULL);
         }
+        app.frame_stats.drained_gps = drained_gps;
       }
 
       if (drain_backlog) {
@@ -1105,6 +1404,9 @@ int main(int argc, char *argv[]) {
     // Pause icon overlay
     if (app.paused) {
       ProgressBar_draw_pause_icon(&pb);
+      if (app.awaiting_initial_play) {
+        ProgressBar_draw_start_overlay(&pb);
+      }
     }
 
     // Right half: raster tiles (background) + hex heatmap + GPS trace (overlay)
@@ -1133,11 +1435,12 @@ int main(int argc, char *argv[]) {
 
     glDisable(GL_BLEND);
     TileMap_draw(tm, map_center_lat, map_center_lng, hr->zoom,
-                 win_w - half_w, win_h, app.tile_uploads_per_frame);
+                 win_w - half_w, win_h, app.effective_tile_upload_budget);
     glEnable(GL_BLEND);
     GpsTrace_upload(gt, map_center_lat, map_center_lng);
     HexRenderer_draw(hr, win_w - half_w, win_h, map_center_lat, map_center_lng);
     GpsTrace_draw(gt, win_w - half_w, win_h, hr->zoom);
+    update_debug_window_title(window, &app, frame_time);
 
     glfwSwapBuffers(window);
   }

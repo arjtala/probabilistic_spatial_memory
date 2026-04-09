@@ -102,6 +102,66 @@ void ProgressBar_draw_pause_icon(ProgressBar *pb) {
   glBindVertexArray(0);
 }
 
+void ProgressBar_draw_start_overlay(ProgressBar *pb) {
+  float identity[16];
+  float verts[30 * 6];
+  float cy = 0.06f;
+  float panel_x0 = -0.34f, panel_x1 = 0.34f;
+  float panel_y0 = -0.24f, panel_y1 = 0.30f;
+  float glow_x0 = -0.30f, glow_x1 = 0.30f;
+  float glow_y0 = -0.18f, glow_y1 = 0.24f;
+  float tri_left = -0.08f, tri_right = 0.12f, tri_half_h = 0.12f;
+  float hint_bar_w = 0.032f, hint_bar_h = 0.07f, hint_gap = 0.024f;
+
+  if (!pb) return;
+
+  memcpy(verts, (float[30 * 6]){
+      panel_x0, panel_y0, 0.02f, 0.04f, 0.08f, 0.60f,
+      panel_x1, panel_y0, 0.02f, 0.04f, 0.08f, 0.60f,
+      panel_x0, panel_y1, 0.02f, 0.04f, 0.08f, 0.60f,
+      panel_x0, panel_y1, 0.02f, 0.04f, 0.08f, 0.60f,
+      panel_x1, panel_y0, 0.02f, 0.04f, 0.08f, 0.60f,
+      panel_x1, panel_y1, 0.02f, 0.04f, 0.08f, 0.60f,
+
+      glow_x0, glow_y0, 0.16f, 0.30f, 0.55f, 0.16f,
+      glow_x1, glow_y0, 0.16f, 0.30f, 0.55f, 0.16f,
+      glow_x0, glow_y1, 0.16f, 0.30f, 0.55f, 0.16f,
+      glow_x0, glow_y1, 0.16f, 0.30f, 0.55f, 0.16f,
+      glow_x1, glow_y0, 0.16f, 0.30f, 0.55f, 0.16f,
+      glow_x1, glow_y1, 0.16f, 0.30f, 0.55f, 0.16f,
+
+      tri_left, cy - tri_half_h, 1.00f, 1.00f, 1.00f, 0.92f,
+      tri_left, cy + tri_half_h, 1.00f, 1.00f, 1.00f, 0.92f,
+      tri_right, cy,             1.00f, 1.00f, 1.00f, 0.92f,
+
+      -hint_gap - hint_bar_w, -0.12f - hint_bar_h, 1.00f, 1.00f, 1.00f, 0.78f,
+      -hint_gap,               -0.12f - hint_bar_h, 1.00f, 1.00f, 1.00f, 0.78f,
+      -hint_gap - hint_bar_w, -0.12f + hint_bar_h, 1.00f, 1.00f, 1.00f, 0.78f,
+      -hint_gap - hint_bar_w, -0.12f + hint_bar_h, 1.00f, 1.00f, 1.00f, 0.78f,
+      -hint_gap,               -0.12f - hint_bar_h, 1.00f, 1.00f, 1.00f, 0.78f,
+      -hint_gap,               -0.12f + hint_bar_h, 1.00f, 1.00f, 1.00f, 0.78f,
+
+       hint_gap,               -0.12f - hint_bar_h, 1.00f, 1.00f, 1.00f, 0.78f,
+       hint_gap + hint_bar_w, -0.12f - hint_bar_h, 1.00f, 1.00f, 1.00f, 0.78f,
+       hint_gap,               -0.12f + hint_bar_h, 1.00f, 1.00f, 1.00f, 0.78f,
+       hint_gap,               -0.12f + hint_bar_h, 1.00f, 1.00f, 1.00f, 0.78f,
+       hint_gap + hint_bar_w, -0.12f - hint_bar_h, 1.00f, 1.00f, 1.00f, 0.78f,
+       hint_gap + hint_bar_w, -0.12f + hint_bar_h, 1.00f, 1.00f, 1.00f, 0.78f,
+  }, sizeof(verts));
+
+  build_identity_matrix(identity);
+
+  glUseProgram(pb->program);
+  glUniformMatrix4fv(pb->u_projection, 1, GL_FALSE, identity);
+
+  glBindBuffer(GL_ARRAY_BUFFER, pb->vbo);
+  glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(verts), verts);
+
+  glBindVertexArray(pb->vao);
+  glDrawArrays(GL_TRIANGLES, 0, 30);
+  glBindVertexArray(0);
+}
+
 void ProgressBar_free(ProgressBar *pb) {
   if (!pb) return;
   glDeleteBuffers(1, &pb->vbo);

@@ -213,6 +213,8 @@ void VizConfig_init(VizConfig *config) {
   snprintf(config->group, sizeof(config->group), "%s", DINO);
   config->time_window_sec = 5.0;
   config->h3_resolution = DEFAULT_RESOLUTION;
+  config->start_paused = true;
+  config->debug_hud_enabled = true;
   config->scrub_sensitivity_sec = 2.0;
   config->map_follow_smoothing = 8.0;
   config->video_decode_budget = VIZ_CONFIG_DEFAULT_VIDEO_DECODE_BUDGET;
@@ -220,6 +222,8 @@ void VizConfig_init(VizConfig *config) {
   config->imu_sample_budget = VIZ_CONFIG_DEFAULT_IMU_SAMPLE_BUDGET;
   config->gps_point_budget = VIZ_CONFIG_DEFAULT_GPS_POINT_BUDGET;
   config->tile_uploads_per_frame = 1;
+  config->tile_disk_cache_enabled = true;
+  config->tile_disk_cache_max_mb = VIZ_CONFIG_DEFAULT_TILE_DISK_CACHE_MAX_MB;
   snprintf(config->tile_style, sizeof(config->tile_style), "%s",
            "CartoDB.Positron");
 }
@@ -272,6 +276,27 @@ bool VizConfig_parse_positive_double(const char *text, const char *name,
   }
   *out_value = value;
   return true;
+}
+
+bool VizConfig_parse_bool(const char *text, const char *name, bool *out_value) {
+  if (!text || !name || !out_value) {
+    fprintf(stderr, "Invalid boolean parse request\n");
+    return false;
+  }
+
+  if (strcmp(text, "true") == 0 || strcmp(text, "yes") == 0 ||
+      strcmp(text, "on") == 0 || strcmp(text, "1") == 0) {
+    *out_value = true;
+    return true;
+  }
+  if (strcmp(text, "false") == 0 || strcmp(text, "no") == 0 ||
+      strcmp(text, "off") == 0 || strcmp(text, "0") == 0) {
+    *out_value = false;
+    return true;
+  }
+
+  fprintf(stderr, "Invalid %s: '%s' (expected true/false)\n", name, text);
+  return false;
 }
 
 bool VizConfig_parse_int_in_range(const char *text, const char *name,
@@ -385,6 +410,17 @@ bool VizConfig_load_file(VizConfig *config, const char *path) {
         fclose(file);
         return false;
       }
+    } else if (strcmp(key, "start_paused") == 0) {
+      if (!VizConfig_parse_bool(value_buf, key, &config->start_paused)) {
+        fclose(file);
+        return false;
+      }
+    } else if (strcmp(key, "debug_hud_enabled") == 0) {
+      if (!VizConfig_parse_bool(value_buf, key,
+                                &config->debug_hud_enabled)) {
+        fclose(file);
+        return false;
+      }
     } else if (strcmp(key, "scrub_sensitivity_sec") == 0) {
       if (!VizConfig_parse_positive_double(value_buf, key,
                                            &config->scrub_sensitivity_sec)) {
@@ -428,6 +464,19 @@ bool VizConfig_load_file(VizConfig *config, const char *path) {
     } else if (strcmp(key, "tile_uploads_per_frame") == 0) {
       if (!VizConfig_parse_int_in_range(value_buf, key, 1, 8,
                                         &config->tile_uploads_per_frame)) {
+        fclose(file);
+        return false;
+      }
+    } else if (strcmp(key, "tile_disk_cache_enabled") == 0) {
+      if (!VizConfig_parse_bool(value_buf, key,
+                                &config->tile_disk_cache_enabled)) {
+        fclose(file);
+        return false;
+      }
+    } else if (strcmp(key, "tile_disk_cache_max_mb") == 0) {
+      if (!VizConfig_parse_int_in_range(value_buf, key, 1,
+                                        VIZ_CONFIG_MAX_TILE_DISK_CACHE_MAX_MB,
+                                        &config->tile_disk_cache_max_mb)) {
         fclose(file);
         return false;
       }

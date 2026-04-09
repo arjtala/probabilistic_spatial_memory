@@ -133,6 +133,8 @@ session_dir = "./session"
 group = "dino"
 time_window_sec = 5.0
 h3_resolution = 10
+start_paused = true
+debug_hud_enabled = true
 scrub_sensitivity_sec = 2.0
 map_follow_smoothing = 8.0
 video_decode_budget = 6
@@ -140,6 +142,8 @@ ingest_record_budget = 128
 imu_sample_budget = 512
 gps_point_budget = 64
 tile_uploads_per_frame = 1
+tile_disk_cache_enabled = true
+tile_disk_cache_max_mb = 512
 tile_style = "CartoDB.Positron"
 
 # Required for Stadia.* presets and any custom template using {api_key}
@@ -156,13 +160,17 @@ Ready-made presets:
 - `configs/psm-viz-low-hitch.toml`: prioritizes smoother interaction with fewer tile uploads per frame and smaller per-frame catch-up budgets.
 
 Tuning keys:
+- `start_paused`: when `true`, `psm-viz` opens on the first decoded frame and waits for `Space` before playback starts.
+- `debug_hud_enabled`: enables the live window-title HUD by default. You can still toggle it at runtime with `H`.
 - `scrub_sensitivity_sec`: seconds moved per horizontal scroll step on the video pane.
 - `map_follow_smoothing`: exponential follow rate for GPS/IMU-driven recentering. Higher values snap faster.
-- `video_decode_budget`: baseline video decode steps per frame at 1x playback. Faster playback scales up from this value to help keep up.
-- `ingest_record_budget`: max feature/embedding records applied per frame before playback timing is re-anchored.
-- `imu_sample_budget`: max IMU samples drained per frame before playback timing is re-anchored.
-- `gps_point_budget`: max standalone GPS points drained per frame before playback timing is re-anchored.
-- `tile_uploads_per_frame`: max ready tile textures uploaded per frame. Lower values reduce GL-side hitches; higher values fill tiles faster.
+- `video_decode_budget`: baseline video decode steps per frame at 1x playback. Faster playback scales up from this value, and sustained decode backlog can temporarily raise it further before it decays back down.
+- `ingest_record_budget`: baseline max feature/embedding records applied per frame. Under sustained ingest backlog the runtime can temporarily raise this catch-up budget, then ease it back to the configured base.
+- `imu_sample_budget`: baseline max IMU samples drained per frame, with the same temporary backlog-driven catch-up behavior.
+- `gps_point_budget`: baseline max standalone GPS points drained per frame, with the same temporary backlog-driven catch-up behavior.
+- `tile_uploads_per_frame`: baseline max ready tile textures uploaded per frame. Lower values reduce GL-side hitches; higher values fill tiles faster, and the runtime can temporarily raise this when decoded tiles are piling up.
+- `tile_disk_cache_enabled`: enables or disables the on-disk raster tile cache.
+- `tile_disk_cache_max_mb`: maximum on-disk tile cache size per configured tile source before older cached tiles are pruned.
 
 Available `tile_style` presets:
 - `CartoDB.Positron`
@@ -174,18 +182,27 @@ Available `tile_style` presets:
 
 Preview the providers here: <https://leaflet-extras.github.io/leaflet-providers/preview/>
 
+Downloaded raster tiles are cached on disk and replay through the same threaded decode path as network tiles. The cache location is:
+- macOS: `~/Library/Caches/psm-viz/tiles/...`
+- other Unix-like systems: `$XDG_CACHE_HOME/psm-viz/tiles/...` or `~/.cache/psm-viz/tiles/...`
+
 **Controls:**
 
 | Key / Gesture | Action |
 |---------------|--------|
-| Space | Pause / resume (shows pause icon) |
+| Space | Start / pause / resume playback (shows pause icon) |
 | +/- | Zoom in / out around the map center |
 | Left / Right | Slow down / speed up playback |
 | Scroll H (video) | Scrub video timeline |
 | Scroll V (map) | Zoom map toward the cursor |
 | Drag (map) | Pan map manually |
 | C | Re-center map and resume smooth follow |
+| H | Toggle live debug title HUD |
 | Q / Esc | Quit |
+
+The visualizer opens paused by default on the first decoded frame, shows a centered startup play overlay, and does not begin playback until you press `Space`.
+
+The debug HUD lives in the window title and shows playback/decode budgets, ingest drain activity, tile pipeline queue counts, and tile disk-cache health in real time. For the `v`, `in`, `imu`, `gps`, and `up` fields, the HUD shows `work/current_budget`; when adaptive backpressure boosts a budget above its configured base, the base appears in parentheses, for example `256/384(128)`. A trailing `*` means that lane still had backlog after spending its frame budget. Tile fields are: `act` active network downloads, `rdy` compressed tiles ready for decode, `dec` tiles currently being decoded, `pix` decoded tiles waiting for GL upload, and `c` resident cached tile textures. Disk-cache fields are: `h` disk cache hits, `w` cache writes, `p` pruned files, and `m` cached MiB used versus cap.
 
 **Layout:** Left half shows video with optional attention/prediction heatmap overlay. Right half shows configurable raster tiles (default: `CartoDB.Positron`) with H3 hex heatmap (viridis), GPS trace ribbon, and camera frustum. The map view follows the latest GPS/IMU-driven position smoothly by default; manual drag temporarily overrides that view until you re-center with `C`.
 
@@ -202,6 +219,13 @@ The benchmark prints three scenarios:
 - `observe_same_cell`: hot-path repeated observations into one cell.
 - `observe_grid`: observations spread across a grid of cells.
 - `query_grid`: repeated queries after pre-populating the grid.
+
+For tile streaming regressions, use the standalone PNG decode stress benchmark that exercises the same `stbi_load_from_memory(...)` path as the threaded tile worker:
+
+```bash
+make bench-tile-decode
+./targets/benchmark_tile_decode [total_decodes] [thread_count]
+```
 
 ## Project structure
 

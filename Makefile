@@ -94,6 +94,7 @@ LIB = $(TARGET_DIR)/libpsm.a
 BIN = $(TARGET_DIR)/psm
 VIZ_BIN = $(TARGET_DIR)/psm-viz
 BENCH_SPATIAL = $(TARGET_DIR)/benchmark_spatial_memory
+BENCH_TILE_DECODE = $(TARGET_DIR)/benchmark_tile_decode
 
 # Test executables
 TEST_RING_BUFFER = $(BUILD_DIR)/test_ring_buffer
@@ -164,9 +165,16 @@ viz: $(LIB) $(VIZ_OBJ) $(STB_OBJ)
 bench-spatial-memory: $(BENCH_SPATIAL)
 	./$(BENCH_SPATIAL)
 
+bench-tile-decode: $(BENCH_TILE_DECODE)
+	./$(BENCH_TILE_DECODE)
+
 $(BENCH_SPATIAL): benchmarks/benchmark_spatial_memory.c $(LIB)
 	@mkdir -p $(TARGET_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) benchmarks/benchmark_spatial_memory.c $(LIB) -o $@ -lm
+
+$(BENCH_TILE_DECODE): benchmarks/benchmark_tile_decode.c $(STB_OBJ)
+	@mkdir -p $(TARGET_DIR)
+	$(CC) $(CFLAGS) $(PTHREAD_FLAGS) -Ivendor benchmarks/benchmark_tile_decode.c $(STB_OBJ) -o $@ -lz -lm
 
 # Build vendor object files
 $(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(VENDOR_HEADERS) $(TOOLCHAIN_INFO)
@@ -248,7 +256,7 @@ clean:
 rebuild: clean all
 
 # Phony targets
-.PHONY: all viz bench-spatial-memory test test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace clean rebuild show run FORCE
+.PHONY: all viz bench-spatial-memory bench-tile-decode test test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace clean rebuild show run FORCE
 
 # Show detected files
 show:
