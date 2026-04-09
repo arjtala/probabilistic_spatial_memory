@@ -44,8 +44,8 @@ void HexRenderer_update(HexRenderer *hr, SpatialMemory *sm) {
   double sum_lat = 0.0, sum_lng = 0.0;
   size_t n_tiles = 0;
 
-  HashTableIterator it = HashTable_iterator(sm->tiles);
-  while (HashTable_next(&it)) {
+  TileTableIterator it = TileTable_iterator(sm->tiles);
+  while (TileTable_next(&it)) {
     Tile *tile = (Tile *)it.value;
     double count = Tile_query(tile, sm->capacity - 1);
     if (count > max_count) max_count = count;
@@ -72,8 +72,8 @@ void HexRenderer_update(HexRenderer *hr, SpatialMemory *sm) {
 
   double cos_center = cos(hr->center_lat * M_PI / 180.0);
 
-  it = HashTable_iterator(sm->tiles);
-  while (HashTable_next(&it)) {
+  it = TileTable_iterator(sm->tiles);
+  while (TileTable_next(&it)) {
     Tile *tile = (Tile *)it.value;
     double count = Tile_query(tile, sm->capacity - 1);
     double t = count / max_count;

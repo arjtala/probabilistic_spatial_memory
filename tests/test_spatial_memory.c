@@ -50,11 +50,9 @@ void test_sm_observe(void) {
     fprintf(stderr, "Failed to create H3Index : invalid lat/lng or resolution\n");
     exit(EXIT_FAILURE);
   }
-  char hexString[H3_INDEX_HEX_STRING_LENGTH];
-  h3ToString(cellId, hexString, sizeof(hexString));
-  Tile *tile = HashTable_get(sm->tiles, hexString);
+  Tile *tile = TileTable_get(sm->tiles, cellId);
   ASSERT(NULL != tile, 1, NULL != tile);
-  ASSERT(1 == HashTable_size(sm->tiles), 1, 1 == HashTable_size(sm->tiles));
+  ASSERT(1 == TileTable_size(sm->tiles), 1, 1 == TileTable_size(sm->tiles));
   SpatialMemory_free(sm);
 }
 
@@ -83,13 +81,11 @@ void test_sm_advance_all(void) {
     fprintf(stderr, "Failed to create H3Index : invalid lat/lng or resolution\n");
     exit(EXIT_FAILURE);
   }
-  char hexString[H3_INDEX_HEX_STRING_LENGTH];
-  h3ToString(cellId, hexString, sizeof(hexString));
 
   bool ok = SpatialMemory_observe(sm, LAT, LNG, pb, strlen(pb));
   ASSERT(ok, 1, ok);
   SpatialMemory_advance_all(sm);
-  Tile *tile = HashTable_get(sm->tiles, hexString);
+  Tile *tile = TileTable_get(sm->tiles, cellId);
   int count = (int)Tile_query(tile, 0);
   ASSERT(0 == count, 0, count);
   SpatialMemory_free(sm);
@@ -111,10 +107,10 @@ void test_sm_multi_tile(void) {
   ASSERT(ok, 1, ok);
   ok = SpatialMemory_query(sm, tokyo_lat, tokyo_lng, 0, &count_tok);
   ASSERT(ok, 1, ok);
-  int num_hash_tables = (int)HashTable_size(sm->tiles);
+  int num_tiles = (int)TileTable_size(sm->tiles);
   ASSERT(count_tok >= 1, 1, (int)count_tok);
   ASSERT(count_lon >= 1, 1, (int)count_lon);
-  ASSERT(2 == num_hash_tables, 2, num_hash_tables);
+  ASSERT(2 == num_tiles, 2, num_tiles);
   SpatialMemory_free(sm);
 }
 

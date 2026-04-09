@@ -11,7 +11,7 @@ static void update_textured_quad_aspect(GLuint vbo, int video_w, int video_h,
 }
 
 VideoQuad VideoQuad_create(GLuint program) {
-  VideoQuad vq;
+  VideoQuad vq = {0};
   vq.program = program;
 
   float quad[] = {
@@ -55,7 +55,15 @@ void VideoQuad_upload(VideoQuad *vq, uint8_t *rgb, int w, int h) {
   if (!vq || !rgb) return;
   glBindTexture(GL_TEXTURE_2D, vq->texture);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, rgb);
+  if (vq->texture_w != w || vq->texture_h != h) {
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE,
+                 rgb);
+    vq->texture_w = w;
+    vq->texture_h = h;
+  } else {
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE,
+                    rgb);
+  }
   glBindTexture(GL_TEXTURE_2D, 0);
 }
 

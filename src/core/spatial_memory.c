@@ -3,20 +3,11 @@
 #include <stdlib.h>
 #include "core/spatial_memory.h"
 
-static bool spatial_memory_coords_to_key(const SpatialMemory *sm, double lat,
-                                         double lng, char hex_string[],
-                                         H3Index *out_cell_id) {
-  if (!sm || !hex_string) return false;
-  H3Index cellId;
-  if (!Tile_coords_to_cell(lat, lng, sm->resolution, &cellId,
-                           "SpatialMemory")) {
-    return false;
-  }
-  h3ToString(cellId, hex_string, H3_INDEX_HEX_STRING_LENGTH);
-  if (out_cell_id) {
-    *out_cell_id = cellId;
-  }
-  return true;
+static bool spatial_memory_coords_to_cell(const SpatialMemory *sm, double lat,
+                                          double lng, H3Index *out_cell_id) {
+  if (!sm || !out_cell_id) return false;
+  return Tile_coords_to_cell(lat, lng, sm->resolution, out_cell_id,
+                             "SpatialMemory");
 }
 
 SpatialMemory *SpatialMemory_new(const int resolution, const size_t capacity,
@@ -42,7 +33,7 @@ SpatialMemory *SpatialMemory_new(const int resolution, const size_t capacity,
     fprintf(stderr, "Unable to initialize SpatialMemory: out of memory.\n");
     return NULL;
   }
-  sm->tiles = HashTable_create((void (*)(void *))Tile_free);
+  sm->tiles = TileTable_create();
   if (NULL == sm->tiles) {
     fprintf(stderr, "Unable to initialize tiles: out of memory.\n");
     free(sm);
@@ -59,17 +50,17 @@ bool SpatialMemory_observe(SpatialMemory *sm, const double lat, const double lng
   if (!sm || !data || size == 0) {
     return false;
   }
-  char hexString[H3_INDEX_HEX_STRING_LENGTH];
-  if (!spatial_memory_coords_to_key(sm, lat, lng, hexString, NULL)) {
+  H3Index cell_id;
+  if (!spatial_memory_coords_to_cell(sm, lat, lng, &cell_id)) {
     return false;
   }
-  Tile *tile = HashTable_get(sm->tiles, hexString);
+  Tile *tile = TileTable_get(sm->tiles, cell_id);
   if (NULL == tile) {
     tile = Tile_new(lat, lng, sm->resolution, sm->capacity, sm->precision);
     if (!tile) {
       return false;
     }
-    if (!HashTable_set(sm->tiles, hexString, tile)) {
+    if (!TileTable_set(sm->tiles, cell_id, tile)) {
       Tile_free(tile);
       return false;
     }
@@ -101,8 +92,8 @@ size_t SpatialMemory_advance_to_timestamp(SpatialMemory *sm, double timestamp,
 
 void SpatialMemory_advance_all(SpatialMemory *sm) {
   if (!sm) return;
-  HashTableIterator it = HashTable_iterator(sm->tiles);
-  while (HashTable_next(&it)) {
+  TileTableIterator it = TileTable_iterator(sm->tiles);
+  while (TileTable_next(&it)) {
     Tile_advance(it.value);
   }
 }
@@ -115,11 +106,11 @@ bool SpatialMemory_query(SpatialMemory *sm, const double lat, const double lng,
   *out_count = 0.0;
   if (!sm) return false;
 
-  char hexString[H3_INDEX_HEX_STRING_LENGTH];
-  if (!spatial_memory_coords_to_key(sm, lat, lng, hexString, NULL)) {
+  H3Index cell_id;
+  if (!spatial_memory_coords_to_cell(sm, lat, lng, &cell_id)) {
     return false;
   }
-  Tile *tile = HashTable_get(sm->tiles, hexString);
+  Tile *tile = TileTable_get(sm->tiles, cell_id);
   if (NULL == tile) {
     return true;
   }
@@ -129,11 +120,11 @@ bool SpatialMemory_query(SpatialMemory *sm, const double lat, const double lng,
 
 size_t SpatialMemory_tile_count(SpatialMemory *sm) {
   if (!sm) return 0;
-  return HashTable_size(sm->tiles);
+  return TileTable_size(sm->tiles);
 }
 
 void SpatialMemory_free(SpatialMemory *sm) {
   if (!sm) return;
-  HashTable_free(sm->tiles);
+  TileTable_free(sm->tiles);
   free(sm);
 }

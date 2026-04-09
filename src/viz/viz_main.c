@@ -59,6 +59,9 @@ typedef struct {
   double video_start_time;
   double video_pts_offset;
   bool video_done;
+
+  bool seek_pending;
+  double pending_seek_target;
 } VizApp;
 
 static VizApp *app_from_window(GLFWwindow *window) {
@@ -181,6 +184,85 @@ static void zoom_map_about_screen_point(VizApp *app, GLFWwindow *window,
   set_manual_map_center(app, new_center_lat, new_center_lng);
 }
 
+static void reset_playback_timing(VizApp *app, double now) {
+  if (!app || !app->dec) return;
+  app->video_start_time = now;
+  app->video_pts_offset = app->dec->current_pts;
+  app->video_done = false;
+}
+
+static void reset_replay_state_after_backward_seek(VizApp *app,
+                                                   SpatialMemory *replacement_sm) {
+  if (!app) return;
+
+  if (app->reader) {
+    app->reader->cursor = 0;
+  }
+  if (app->sm && replacement_sm) {
+    SpatialMemory_free(app->sm);
+    app->sm = replacement_sm;
+  }
+  app->window_anchor = -1.0;
+  if (app->gps_trace) GpsTrace_clear(app->gps_trace);
+  if (app->imu_proc) ImuProcessor_reset(app->imu_proc);
+  if (app->imu_gps) {
+    app->imu_gps->imu_cursor = 0;
+    app->imu_gps->gps_cursor = 0;
+  }
+  if (app->hex_renderer) {
+    app->hex_renderer->pan_offset_lat = 0.0;
+    app->hex_renderer->pan_offset_lng = 0.0;
+    app->hex_renderer->vertex_count = 0;
+  }
+  app->map_view_initialized = false;
+  if (app->jepa_cache) JepaCache_reset(app->jepa_cache);
+}
+
+static bool apply_pending_seek(VizApp *app, double now) {
+  if (!app || !app->seek_pending || !app->dec || !app->video_quad) return false;
+
+  double target = app->pending_seek_target;
+  if (target < 0.0) target = 0.0;
+  if (app->dec->duration > 0.0 && target > app->dec->duration) {
+    target = app->dec->duration;
+  }
+  if (fabs(target - app->dec->current_pts) < 1e-6) {
+    app->pending_seek_target = app->dec->current_pts;
+    app->seek_pending = false;
+    return true;
+  }
+
+  bool seek_backward = target + 1e-9 < app->dec->current_pts;
+  SpatialMemory *replacement_sm = NULL;
+  if (seek_backward && app->sm) {
+    replacement_sm = SpatialMemory_new(app->h3_resolution, DEFAULT_CAPACITY,
+                                       DEFAULT_PRECISION);
+    if (!replacement_sm) {
+      fprintf(stderr, "Failed to reset spatial memory after seek\n");
+      app->seek_pending = false;
+      return false;
+    }
+  }
+
+  if (!VideoDecoder_seek(app->dec, target)) {
+    SpatialMemory_free(replacement_sm);
+    app->seek_pending = false;
+    return false;
+  }
+
+  VideoQuad_upload(app->video_quad, app->dec->rgb_buffer, app->dec->width,
+                   app->dec->height);
+  reset_playback_timing(app, now);
+
+  if (seek_backward) {
+    reset_replay_state_after_backward_seek(app, replacement_sm);
+  }
+
+  app->pending_seek_target = app->dec->current_pts;
+  app->seek_pending = false;
+  return true;
+}
+
 // ---- Scroll callback (scrub + zoom) ----
 static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
   VizApp *app = app_from_window(window);
@@ -198,49 +280,15 @@ static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) 
     // Cursor over video: horizontal scroll to scrub
     if (!app->dec || app->dec->duration <= 0.0) return;
 
+    if (fabs(xoffset) < 1e-9) return;
     double seek_delta = xoffset * 2.0;  // seconds per scroll unit
-    double target = app->dec->current_pts + seek_delta;
+    double base_pts = app->seek_pending ? app->pending_seek_target
+                                        : app->dec->current_pts;
+    double target = base_pts + seek_delta;
     if (target < 0.0) target = 0.0;
     if (target > app->dec->duration) target = app->dec->duration;
-
-    if (VideoDecoder_seek(app->dec, target)) {
-      VideoQuad_upload(app->video_quad, app->dec->rgb_buffer, app->dec->width,
-                       app->dec->height);
-
-      // Reset timing
-      app->video_start_time = glfwGetTime();
-      app->video_pts_offset = app->dec->current_pts;
-      app->video_done = false;
-
-      // On backward seek: reset ingest reader and spatial memory
-      if (seek_delta < 0.0 && app->reader) {
-        SpatialMemory *new_sm = SpatialMemory_new(app->h3_resolution, DEFAULT_CAPACITY,
-                                                  DEFAULT_PRECISION);
-        app->reader->cursor = 0;
-        SpatialMemory_free(app->sm);
-        app->sm = new_sm;
-        if (!app->sm) {
-          fprintf(stderr, "Failed to reset spatial memory after seek\n");
-        }
-        // first_ts is a fixed epoch→PTS mapping; don't reset it.
-        // The window anchor defines the fixed-width decay buckets, so reset it
-        // when replaying from an earlier point in the stream.
-        app->window_anchor = -1.0;
-        if (app->gps_trace) GpsTrace_clear(app->gps_trace);
-        if (app->imu_proc) ImuProcessor_reset(app->imu_proc);
-        if (app->imu_gps) {
-          app->imu_gps->imu_cursor = 0;
-          app->imu_gps->gps_cursor = 0;
-        }
-        if (app->hex_renderer) {
-          app->hex_renderer->pan_offset_lat = 0.0;
-          app->hex_renderer->pan_offset_lng = 0.0;
-          app->hex_renderer->vertex_count = 0;  // clear stale hex tile geometry
-        }
-        app->map_view_initialized = false;
-        if (app->jepa_cache) JepaCache_reset(app->jepa_cache);
-      }
-    }
+    app->pending_seek_target = target;
+    app->seek_pending = true;
   } else {
     // Cursor over map: vertical scroll to zoom
     if (!app->hex_renderer) return;
@@ -810,21 +858,30 @@ int main(int argc, char *argv[]) {
     if (frame_dt > 0.25) frame_dt = 0.25;
     last_frame_time = frame_time;
 
+    if (app.seek_pending) {
+      apply_pending_seek(&app, frame_time);
+    }
+
     int win_w, win_h;
     glfwGetFramebufferSize(window, &win_w, &win_h);
     int half_w = win_w / 2;
 
     // ---- Decode video frames ----
     if (!app.paused && !app.video_done) {
-      double wall_elapsed =
-          (glfwGetTime() - app.video_start_time) * app.playback_speed;
+      double wall_elapsed = (frame_time - app.video_start_time) * app.playback_speed;
       double target_pts = app.video_pts_offset + wall_elapsed;
+      bool video_frame_advanced = false;
 
       while (dec->current_pts < target_pts) {
         if (!VideoDecoder_next_frame(dec)) {
           app.video_done = true;
           break;
         }
+        video_frame_advanced = true;
+      }
+
+      // Only the last decoded frame is visible, so upload once per tick.
+      if (video_frame_advanced) {
         VideoQuad_upload(&vq, dec->rgb_buffer, dec->width, dec->height);
       }
 

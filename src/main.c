@@ -64,12 +64,14 @@ int main(int argc, char *argv[]) {
   }
 
   printf("Tiles created: %zu\n", SpatialMemory_tile_count(sm));
-  HashTableIterator it = HashTable_iterator(sm->tiles);
-  while (HashTable_next(&it)) {
+  TileTableIterator it = TileTable_iterator(sm->tiles);
+  while (TileTable_next(&it)) {
     Tile *tile = (Tile *)it.value;
     double current = Tile_query(tile, 0);                   // current window only
     double total = Tile_query(tile, DEFAULT_CAPACITY - 1);  // all windows
-    printf("  Cell %s: current=%.0f total=%.0f\n", it.key, current, total);
+    char cell_string[H3_INDEX_HEX_STRING_LENGTH];
+    h3ToString(it.key, cell_string, sizeof(cell_string));
+    printf("  Cell %s: current=%.0f total=%.0f\n", cell_string, current, total);
   }
 
   IngestReader_close(reader);

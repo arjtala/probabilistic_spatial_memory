@@ -90,6 +90,7 @@ VIZ_BIN = $(TARGET_DIR)/psm-viz
 # Test executables
 TEST_RING_BUFFER = $(BUILD_DIR)/test_ring_buffer
 TEST_TILE = $(BUILD_DIR)/test_tile
+TEST_TILE_TABLE = $(BUILD_DIR)/test_tile_table
 TEST_SPATIAL = $(BUILD_DIR)/test_spatial_memory
 TEST_INGEST = $(BUILD_DIR)/test_ingest
 TEST_JEPA_CACHE = $(BUILD_DIR)/test_jepa_cache
@@ -158,13 +159,16 @@ $(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(VENDOR_HEADERS) $(TOOLCHAIN_INFO)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
 # Test targets
-test: test-ring-buffer test-tile test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace
+test: test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace
 
 test-ring-buffer: $(TEST_RING_BUFFER)
 	./$(TEST_RING_BUFFER)
 
 test-tile: $(TEST_TILE)
 	./$(TEST_TILE)
+
+test-tile-table: $(TEST_TILE_TABLE)
+	./$(TEST_TILE_TABLE)
 
 # Build test executables
 $(TEST_RING_BUFFER): tests/test_ring_buffer.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
@@ -174,6 +178,10 @@ $(TEST_RING_BUFFER): tests/test_ring_buffer.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
 $(TEST_TILE): tests/test_tile.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_tile.c $(OBJ) $(VENDOR_OBJ) -o $@ -lm
+
+$(TEST_TILE_TABLE): tests/test_tile_table.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_tile_table.c $(OBJ) $(VENDOR_OBJ) -o $@ -lm
 
 test-spatial: $(TEST_SPATIAL)
 	./$(TEST_SPATIAL)
@@ -225,7 +233,7 @@ clean:
 rebuild: clean all
 
 # Phony targets
-.PHONY: all viz test test-ring-buffer test-tile test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace clean rebuild show run FORCE
+.PHONY: all viz test test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace clean rebuild show run FORCE
 
 # Show detected files
 show:

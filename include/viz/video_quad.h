@@ -9,6 +9,8 @@ typedef struct {
   GLuint vbo;
   GLuint texture;
   GLuint program;
+  int texture_w;
+  int texture_h;
 } VideoQuad;
 
 VideoQuad VideoQuad_create(GLuint program);
