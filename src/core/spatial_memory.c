@@ -123,6 +123,20 @@ size_t SpatialMemory_tile_count(SpatialMemory *sm) {
   return TileTable_size(sm->tiles);
 }
 
+bool SpatialMemory_for_each_tile(SpatialMemory *sm,
+                                 SpatialMemoryTileVisitor visitor,
+                                 void *user_data) {
+  if (!sm || !visitor) return false;
+
+  TileTableIterator it = TileTable_iterator(sm->tiles);
+  while (TileTable_next(&it)) {
+    if (!visitor(it.key, it.value, user_data)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void SpatialMemory_free(SpatialMemory *sm) {
   if (!sm) return;
   TileTable_free(sm->tiles);

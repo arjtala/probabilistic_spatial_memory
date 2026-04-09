@@ -62,6 +62,9 @@ typedef struct {
 
   bool seek_pending;
   double pending_seek_target;
+  double scrub_sensitivity_sec;
+  double map_follow_smoothing;
+  int tile_uploads_per_frame;
 } VizApp;
 
 static VizApp *app_from_window(GLFWwindow *window) {
@@ -281,7 +284,7 @@ static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) 
     if (!app->dec || app->dec->duration <= 0.0) return;
 
     if (fabs(xoffset) < 1e-9) return;
-    double seek_delta = xoffset * 2.0;  // seconds per scroll unit
+    double seek_delta = xoffset * app->scrub_sensitivity_sec;
     double base_pts = app->seek_pending ? app->pending_seek_target
                                         : app->dec->current_pts;
     double target = base_pts + seek_delta;
@@ -473,7 +476,9 @@ static void print_usage(const char *prog) {
   fprintf(stderr, "  -h          Print this help\n");
   fprintf(stderr, "\nConfig keys:\n");
   fprintf(stderr, "  session_dir, video_path, features_path, group,\n");
-  fprintf(stderr, "  time_window_sec, h3_resolution, tile_style,\n");
+  fprintf(stderr, "  time_window_sec, h3_resolution,\n");
+  fprintf(stderr, "  scrub_sensitivity_sec, map_follow_smoothing,\n");
+  fprintf(stderr, "  tile_uploads_per_frame, tile_style,\n");
   fprintf(stderr, "  tile_api_key, tile_url_template\n");
   fprintf(stderr, "\nTile styles:\n");
   VizConfig_print_tile_styles(stderr);
@@ -665,6 +670,9 @@ int main(int argc, char *argv[]) {
   app.playback_speed = 1.0;
   app.time_window_sec = time_window_sec;
   app.h3_resolution = h3_resolution;
+  app.scrub_sensitivity_sec = config.scrub_sensitivity_sec;
+  app.map_follow_smoothing = config.map_follow_smoothing;
+  app.tile_uploads_per_frame = config.tile_uploads_per_frame;
   app.window_anchor = -1.0;
   app.first_ts = -1.0;
 
@@ -828,6 +836,9 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   printf("Tiles: %s\n", tile_source.style_name);
+  printf("Scrub: %.2fs/step, Map follow: %.2f, Tile uploads/frame: %d\n",
+         app.scrub_sensitivity_sec, app.map_follow_smoothing,
+         app.tile_uploads_per_frame);
 
   GpsTrace *gt = GpsTrace_new(hex_prog);
   app.gps_trace = gt;
@@ -1039,7 +1050,8 @@ int main(int argc, char *argv[]) {
       if (!app.map_view_initialized) {
         snap_map_view_to(&app, map_target_lat, map_target_lng);
       } else if (!app.dragging) {
-        double follow_alpha = 1.0 - exp(-8.0 * frame_dt);
+        double follow_alpha =
+            1.0 - exp(-app.map_follow_smoothing * frame_dt);
         app.map_view_center_lat +=
             (map_target_lat - app.map_view_center_lat) * follow_alpha;
         app.map_view_center_lng +=
@@ -1054,7 +1066,7 @@ int main(int argc, char *argv[]) {
 
     glDisable(GL_BLEND);
     TileMap_draw(tm, map_center_lat, map_center_lng, hr->zoom,
-                 win_w - half_w, win_h);
+                 win_w - half_w, win_h, app.tile_uploads_per_frame);
     glEnable(GL_BLEND);
     GpsTrace_upload(gt, map_center_lat, map_center_lng);
     HexRenderer_draw(hr, win_w - half_w, win_h, map_center_lat, map_center_lng);

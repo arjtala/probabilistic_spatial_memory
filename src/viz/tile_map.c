@@ -59,9 +59,6 @@ static CachedTile *cache_evict(TileMap *tm) {
   }
 
   CachedTile *ct = &tm->cache[oldest_idx];
-  if (ct->valid && ct->texture) {
-    glDeleteTextures(1, &ct->texture);
-  }
   ct->valid = false;
   return ct;
 }
@@ -70,16 +67,32 @@ static CachedTile *cache_evict(TileMap *tm) {
 static bool is_pending(TileMap *tm, int x, int y, int z) {
   for (int i = 0; i < MAX_PENDING_DOWNLOADS; i++) {
     PendingDownload *pd = &tm->pending[i];
-    if (pd->active && pd->x == x && pd->y == y && pd->z == z) return true;
+    if ((pd->active || pd->ready) &&
+        pd->x == x && pd->y == y && pd->z == z) {
+      return true;
+    }
   }
   return false;
 }
 
 static PendingDownload *find_free_slot(TileMap *tm) {
   for (int i = 0; i < MAX_PENDING_DOWNLOADS; i++) {
-    if (!tm->pending[i].active) return &tm->pending[i];
+    if (!tm->pending[i].active && !tm->pending[i].ready) return &tm->pending[i];
   }
   return NULL;
+}
+
+static void clear_pending_download(PendingDownload *pd) {
+  if (!pd) return;
+  free(pd->buf.data);
+  pd->buf.data = NULL;
+  pd->buf.size = 0;
+  pd->easy = NULL;
+  pd->x = 0;
+  pd->y = 0;
+  pd->z = 0;
+  pd->active = false;
+  pd->ready = false;
 }
 
 static bool append_text(char *dst, size_t dst_size, size_t *dst_len,
@@ -152,6 +165,7 @@ static void start_download(TileMap *tm, int x, int y, int z) {
   pd->y = y;
   pd->z = z;
   pd->active = true;
+  pd->ready = false;
 
   curl_easy_setopt(pd->easy, CURLOPT_URL, url);
   curl_easy_setopt(pd->easy, CURLOPT_WRITEFUNCTION, write_cb);
@@ -177,50 +191,73 @@ static void poll_downloads(TileMap *tm) {
     curl_easy_getinfo(easy, CURLINFO_PRIVATE, &pd);
     if (!pd) continue;
 
-    // Process completed download
-    if (msg->data.result == CURLE_OK && pd->buf.size > 0) {
-      int w, h, channels;
-      uint8_t *img = stbi_load_from_memory(pd->buf.data, (int)pd->buf.size,
-                                            &w, &h, &channels, 4);
-      if (img) {
-        CachedTile *ct = cache_find(tm, pd->x, pd->y, pd->z);
-        if (!ct) {
-          ct = cache_evict(tm);
-        }
-        if (ct->valid && ct->texture) {
-          glDeleteTextures(1, &ct->texture);
-        }
-
-        GLuint tex;
-        glGenTextures(1, &tex);
-        glBindTexture(GL_TEXTURE_2D, tex);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA,
-                     GL_UNSIGNED_BYTE, img);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        stbi_image_free(img);
-
-        ct->x = pd->x;
-        ct->y = pd->y;
-        ct->z = pd->z;
-        ct->texture = tex;
-        ct->last_used_frame = tm->frame_counter;
-        ct->valid = true;
-      }
-    }
-
     // Cleanup
     curl_multi_remove_handle(tm->multi, easy);
     curl_easy_cleanup(easy);
-    free(pd->buf.data);
-    pd->buf.data = NULL;
-    pd->buf.size = 0;
     pd->easy = NULL;
     pd->active = false;
+    pd->ready = (msg->data.result == CURLE_OK && pd->buf.size > 0);
+    if (!pd->ready) {
+      clear_pending_download(pd);
+    }
+  }
+}
+
+static void upload_cached_tile_texture(CachedTile *ct, const uint8_t *img,
+                                       int w, int h) {
+  if (!ct || !img || w <= 0 || h <= 0) return;
+
+  if (!ct->texture) {
+    glGenTextures(1, &ct->texture);
+    glBindTexture(GL_TEXTURE_2D, ct->texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  } else {
+    glBindTexture(GL_TEXTURE_2D, ct->texture);
+  }
+
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  if (ct->texture_w != w || ct->texture_h != h) {
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA,
+                 GL_UNSIGNED_BYTE, img);
+    ct->texture_w = w;
+    ct->texture_h = h;
+  } else {
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE,
+                    img);
+  }
+  glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+static void process_ready_downloads(TileMap *tm, int budget) {
+  if (!tm || budget <= 0) return;
+
+  int processed = 0;
+  for (int i = 0; i < MAX_PENDING_DOWNLOADS && processed < budget; i++) {
+    PendingDownload *pd = &tm->pending[i];
+    if (!pd->ready || pd->buf.size == 0) continue;
+
+    int w, h, channels;
+    uint8_t *img = stbi_load_from_memory(pd->buf.data, (int)pd->buf.size,
+                                         &w, &h, &channels, 4);
+    if (img) {
+      CachedTile *ct = cache_find(tm, pd->x, pd->y, pd->z);
+      if (!ct) {
+        ct = cache_evict(tm);
+      }
+      upload_cached_tile_texture(ct, img, w, h);
+      ct->x = pd->x;
+      ct->y = pd->y;
+      ct->z = pd->z;
+      ct->last_used_frame = tm->frame_counter;
+      ct->valid = true;
+      stbi_image_free(img);
+    }
+
+    clear_pending_download(pd);
+    processed++;
   }
 }
 
@@ -277,7 +314,8 @@ TileMap *TileMap_new(GLuint program, const char *style_name,
 }
 
 void TileMap_draw(TileMap *tm, double center_lat, double center_lng,
-                  double zoom_degrees, int viewport_w, int viewport_h) {
+                  double zoom_degrees, int viewport_w, int viewport_h,
+                  int upload_budget) {
   if (center_lat == 0.0 && center_lng == 0.0) return;  // no data yet
 
   tm->frame_counter++;
@@ -351,6 +389,13 @@ void TileMap_draw(TileMap *tm, double center_lat, double center_lng,
       glBindVertexArray(0);
     }
   }
+
+  // Amortize PNG decode and texture upload work to keep map rendering responsive.
+  if (upload_budget < 1) upload_budget = 1;
+  if (upload_budget > MAX_PENDING_DOWNLOADS) {
+    upload_budget = MAX_PENDING_DOWNLOADS;
+  }
+  process_ready_downloads(tm, upload_budget);
 }
 
 void TileMap_free(TileMap *tm) {
@@ -361,13 +406,13 @@ void TileMap_free(TileMap *tm) {
     if (pd->active && pd->easy) {
       curl_multi_remove_handle(tm->multi, pd->easy);
       curl_easy_cleanup(pd->easy);
-      free(pd->buf.data);
     }
+    free(pd->buf.data);
   }
   if (tm->multi) curl_multi_cleanup(tm->multi);
 
   for (int i = 0; i < TILE_CACHE_SIZE; i++) {
-    if (tm->cache[i].valid && tm->cache[i].texture) {
+    if (tm->cache[i].texture) {
       glDeleteTextures(1, &tm->cache[i].texture);
     }
   }

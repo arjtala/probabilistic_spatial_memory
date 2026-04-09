@@ -6,6 +6,107 @@
 #include "viz/hex_renderer.h"
 #include "viz/viz_math.h"
 
+typedef struct {
+  HexRenderer *hr;
+  SpatialMemory *sm;
+  double max_count;
+  double sum_lat;
+  double sum_lng;
+  size_t n_tiles;
+} HexRendererStats;
+
+typedef struct {
+  HexRenderer *hr;
+  SpatialMemory *sm;
+  float *verts;
+  size_t vi;
+  double max_count;
+  double cos_center;
+} HexRendererBuild;
+
+static bool collect_hex_renderer_stats(H3Index cell_id, Tile *tile,
+                                       void *user_data) {
+  HexRendererStats *stats = (HexRendererStats *)user_data;
+  (void)cell_id;
+  if (!stats || !tile || !stats->sm) return false;
+
+  double count = Tile_query(tile, stats->sm->capacity - 1);
+  if (count > stats->max_count) stats->max_count = count;
+
+  LatLng center;
+  cellToLatLng(tile->cellId, &center);
+  stats->sum_lat += radsToDegs(center.lat);
+  stats->sum_lng += radsToDegs(center.lng);
+  stats->n_tiles++;
+  return true;
+}
+
+static bool append_hex_renderer_tile(H3Index cell_id, Tile *tile,
+                                     void *user_data) {
+  HexRendererBuild *build = (HexRendererBuild *)user_data;
+  (void)cell_id;
+  if (!build || !tile || !build->sm || !build->verts) return false;
+
+  double count = Tile_query(tile, build->sm->capacity - 1);
+  double t = count / build->max_count;
+
+  float r, g, b, a;
+  count_to_color(t, &r, &g, &b, &a);
+
+  double current = Tile_query(tile, 0);
+  if (current < 1.0 && count > 0.0) {
+    a *= 0.4f + 0.6f * (float)(current / count);
+  }
+
+  CellBoundary boundary;
+  cellToBoundary(tile->cellId, &boundary);
+
+  LatLng cell_center;
+  cellToLatLng(tile->cellId, &cell_center);
+  float cx = (float)((radsToDegs(cell_center.lng) - build->hr->center_lng) *
+                     build->cos_center);
+  float cy = (float)(radsToDegs(cell_center.lat) - build->hr->center_lat);
+
+  for (int i = 0; i < boundary.numVerts; i++) {
+    int next = (i + 1) % boundary.numVerts;
+
+    float bx0 = (float)((radsToDegs(boundary.verts[i].lng) -
+                         build->hr->center_lng) * build->cos_center);
+    float by0 = (float)(radsToDegs(boundary.verts[i].lat) -
+                        build->hr->center_lat);
+    float bx1 = (float)((radsToDegs(boundary.verts[next].lng) -
+                         build->hr->center_lng) * build->cos_center);
+    float by1 = (float)(radsToDegs(boundary.verts[next].lat) -
+                        build->hr->center_lat);
+
+    build->verts[build->vi * 6 + 0] = cx;
+    build->verts[build->vi * 6 + 1] = cy;
+    build->verts[build->vi * 6 + 2] = r;
+    build->verts[build->vi * 6 + 3] = g;
+    build->verts[build->vi * 6 + 4] = b;
+    build->verts[build->vi * 6 + 5] = a;
+    build->vi++;
+
+    build->verts[build->vi * 6 + 0] = bx0;
+    build->verts[build->vi * 6 + 1] = by0;
+    build->verts[build->vi * 6 + 2] = r;
+    build->verts[build->vi * 6 + 3] = g;
+    build->verts[build->vi * 6 + 4] = b;
+    build->verts[build->vi * 6 + 5] = a;
+    build->vi++;
+
+    build->verts[build->vi * 6 + 0] = bx1;
+    build->verts[build->vi * 6 + 1] = by1;
+    build->verts[build->vi * 6 + 2] = r;
+    build->verts[build->vi * 6 + 3] = g;
+    build->verts[build->vi * 6 + 4] = b;
+    build->verts[build->vi * 6 + 5] = a;
+    build->vi++;
+  }
+
+  return true;
+}
+
 HexRenderer *HexRenderer_new(GLuint program) {
   HexRenderer *hr = calloc(1, sizeof(HexRenderer));
   if (!hr) return NULL;
@@ -40,26 +141,15 @@ void HexRenderer_update(HexRenderer *hr, SpatialMemory *sm) {
   }
 
   // First pass: find max count and compute center for projection
-  double max_count = 1.0;
-  double sum_lat = 0.0, sum_lng = 0.0;
-  size_t n_tiles = 0;
-
-  TileTableIterator it = TileTable_iterator(sm->tiles);
-  while (TileTable_next(&it)) {
-    Tile *tile = (Tile *)it.value;
-    double count = Tile_query(tile, sm->capacity - 1);
-    if (count > max_count) max_count = count;
-
-    LatLng center;
-    cellToLatLng(tile->cellId, &center);
-    sum_lat += radsToDegs(center.lat);
-    sum_lng += radsToDegs(center.lng);
-    n_tiles++;
+  HexRendererStats stats = {.hr = hr, .sm = sm, .max_count = 1.0};
+  if (!SpatialMemory_for_each_tile(sm, collect_hex_renderer_stats, &stats)) {
+    hr->vertex_count = 0;
+    return;
   }
 
-  if (n_tiles > 0) {
-    hr->center_lat = sum_lat / (double)n_tiles;
-    hr->center_lng = sum_lng / (double)n_tiles;
+  if (stats.n_tiles > 0) {
+    hr->center_lat = stats.sum_lat / (double)stats.n_tiles;
+    hr->center_lng = stats.sum_lng / (double)stats.n_tiles;
   }
 
   // Each hex has at most MAX_CELL_BNDRY_VERTS boundary vertices
@@ -68,77 +158,25 @@ void HexRenderer_update(HexRenderer *hr, SpatialMemory *sm) {
   size_t max_verts = tile_count * 30;
   float *verts = malloc(max_verts * 6 * sizeof(float));
   if (!verts) return;
-  size_t vi = 0;
-
-  double cos_center = cos(hr->center_lat * M_PI / 180.0);
-
-  it = TileTable_iterator(sm->tiles);
-  while (TileTable_next(&it)) {
-    Tile *tile = (Tile *)it.value;
-    double count = Tile_query(tile, sm->capacity - 1);
-    double t = count / max_count;
-
-    float r, g, b, a;
-    count_to_color(t, &r, &g, &b, &a);
-
-    // Fade alpha based on recency: check current window vs total
-    double current = Tile_query(tile, 0);
-    if (current < 1.0 && count > 0.0) {
-      a *= 0.4f + 0.6f * (float)(current / count);
-    }
-
-    CellBoundary boundary;
-    cellToBoundary(tile->cellId, &boundary);
-
-    // Compute hex center in projected coordinates
-    LatLng cell_center;
-    cellToLatLng(tile->cellId, &cell_center);
-    float cx = (float)((radsToDegs(cell_center.lng) - hr->center_lng) * cos_center);
-    float cy = (float)(radsToDegs(cell_center.lat) - hr->center_lat);
-
-    // Emit triangle fan as individual triangles
-    for (int i = 0; i < boundary.numVerts; i++) {
-      int next = (i + 1) % boundary.numVerts;
-
-      float bx0 = (float)((radsToDegs(boundary.verts[i].lng) - hr->center_lng) * cos_center);
-      float by0 = (float)(radsToDegs(boundary.verts[i].lat) - hr->center_lat);
-      float bx1 = (float)((radsToDegs(boundary.verts[next].lng) - hr->center_lng) * cos_center);
-      float by1 = (float)(radsToDegs(boundary.verts[next].lat) - hr->center_lat);
-
-      // Triangle: center, v[i], v[i+1]
-      // Vertex 0: center
-      verts[vi * 6 + 0] = cx;
-      verts[vi * 6 + 1] = cy;
-      verts[vi * 6 + 2] = r;
-      verts[vi * 6 + 3] = g;
-      verts[vi * 6 + 4] = b;
-      verts[vi * 6 + 5] = a;
-      vi++;
-
-      // Vertex 1: boundary[i]
-      verts[vi * 6 + 0] = bx0;
-      verts[vi * 6 + 1] = by0;
-      verts[vi * 6 + 2] = r;
-      verts[vi * 6 + 3] = g;
-      verts[vi * 6 + 4] = b;
-      verts[vi * 6 + 5] = a;
-      vi++;
-
-      // Vertex 2: boundary[i+1]
-      verts[vi * 6 + 0] = bx1;
-      verts[vi * 6 + 1] = by1;
-      verts[vi * 6 + 2] = r;
-      verts[vi * 6 + 3] = g;
-      verts[vi * 6 + 4] = b;
-      verts[vi * 6 + 5] = a;
-      vi++;
-    }
+  HexRendererBuild build = {
+      .hr = hr,
+      .sm = sm,
+      .verts = verts,
+      .vi = 0,
+      .max_count = stats.max_count,
+      .cos_center = cos(hr->center_lat * M_PI / 180.0),
+  };
+  if (!SpatialMemory_for_each_tile(sm, append_hex_renderer_tile, &build)) {
+    free(verts);
+    hr->vertex_count = 0;
+    return;
   }
 
-  hr->vertex_count = vi;
+  hr->vertex_count = build.vi;
 
   glBindBuffer(GL_ARRAY_BUFFER, hr->vbo);
-  glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(vi * 6 * sizeof(float)), verts, GL_DYNAMIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(build.vi * 6 * sizeof(float)),
+               verts, GL_DYNAMIC_DRAW);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 
   free(verts);

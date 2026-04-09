@@ -130,6 +130,9 @@ session_dir = "./session"
 group = "dino"
 time_window_sec = 5.0
 h3_resolution = 10
+scrub_sensitivity_sec = 2.0
+map_follow_smoothing = 8.0
+tile_uploads_per_frame = 1
 tile_style = "CartoDB.Positron"
 
 # Required for Stadia.* presets and any custom template using {api_key}
@@ -140,6 +143,11 @@ tile_style = "CartoDB.Positron"
 ```
 
 Relative paths in the config resolve relative to the config file itself. CLI flags override config values.
+
+Tuning keys:
+- `scrub_sensitivity_sec`: seconds moved per horizontal scroll step on the video pane.
+- `map_follow_smoothing`: exponential follow rate for GPS/IMU-driven recentering. Higher values snap faster.
+- `tile_uploads_per_frame`: max downloaded map tiles decoded/uploaded per frame. Lower values reduce hitches; higher values fill tiles faster.
 
 Available `tile_style` presets:
 - `CartoDB.Positron`

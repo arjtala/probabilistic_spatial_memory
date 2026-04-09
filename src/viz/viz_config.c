@@ -213,6 +213,9 @@ void VizConfig_init(VizConfig *config) {
   snprintf(config->group, sizeof(config->group), "%s", DINO);
   config->time_window_sec = 5.0;
   config->h3_resolution = DEFAULT_RESOLUTION;
+  config->scrub_sensitivity_sec = 2.0;
+  config->map_follow_smoothing = 8.0;
+  config->tile_uploads_per_frame = 1;
   snprintf(config->tile_style, sizeof(config->tile_style), "%s",
            "CartoDB.Positron");
 }
@@ -375,6 +378,24 @@ bool VizConfig_load_file(VizConfig *config, const char *path) {
     } else if (strcmp(key, "h3_resolution") == 0) {
       if (!VizConfig_parse_int_in_range(value_buf, key, 0, 15,
                                         &config->h3_resolution)) {
+        fclose(file);
+        return false;
+      }
+    } else if (strcmp(key, "scrub_sensitivity_sec") == 0) {
+      if (!VizConfig_parse_positive_double(value_buf, key,
+                                           &config->scrub_sensitivity_sec)) {
+        fclose(file);
+        return false;
+      }
+    } else if (strcmp(key, "map_follow_smoothing") == 0) {
+      if (!VizConfig_parse_positive_double(value_buf, key,
+                                           &config->map_follow_smoothing)) {
+        fclose(file);
+        return false;
+      }
+    } else if (strcmp(key, "tile_uploads_per_frame") == 0) {
+      if (!VizConfig_parse_int_in_range(value_buf, key, 1, 8,
+                                        &config->tile_uploads_per_frame)) {
         fclose(file);
         return false;
       }

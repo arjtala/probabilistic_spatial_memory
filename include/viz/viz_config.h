@@ -30,6 +30,9 @@ typedef struct {
   char group[VIZ_CONFIG_GROUP_CAP];
   double time_window_sec;
   int h3_resolution;
+  double scrub_sensitivity_sec;
+  double map_follow_smoothing;
+  int tile_uploads_per_frame;
 
   char tile_style[VIZ_CONFIG_STYLE_CAP];
 

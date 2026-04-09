@@ -21,6 +21,21 @@ static bool parse_positive_double(const char *text, const char *name,
   return true;
 }
 
+static bool print_tile_summary(H3Index cell_id, Tile *tile, void *user_data) {
+  size_t *capacity = (size_t *)user_data;
+  char cell_string[H3_INDEX_HEX_STRING_LENGTH];
+  double current;
+  double total;
+
+  if (!capacity || !tile || *capacity == 0) return false;
+
+  current = Tile_query(tile, 0);
+  total = Tile_query(tile, *capacity - 1);
+  h3ToString(cell_id, cell_string, sizeof(cell_string));
+  printf("  Cell %s: current=%.0f total=%.0f\n", cell_string, current, total);
+  return true;
+}
+
 int main(int argc, char *argv[]) {
   if (argc < 3) {
     fprintf(stderr, "Usage: %s <file.h5> <group> [time_window_sec]\n", argv[0]);
@@ -64,14 +79,8 @@ int main(int argc, char *argv[]) {
   }
 
   printf("Tiles created: %zu\n", SpatialMemory_tile_count(sm));
-  TileTableIterator it = TileTable_iterator(sm->tiles);
-  while (TileTable_next(&it)) {
-    Tile *tile = (Tile *)it.value;
-    double current = Tile_query(tile, 0);                   // current window only
-    double total = Tile_query(tile, DEFAULT_CAPACITY - 1);  // all windows
-    char cell_string[H3_INDEX_HEX_STRING_LENGTH];
-    h3ToString(it.key, cell_string, sizeof(cell_string));
-    printf("  Cell %s: current=%.0f total=%.0f\n", cell_string, current, total);
+  if (!SpatialMemory_for_each_tile(sm, print_tile_summary, &sm->capacity)) {
+    fprintf(stderr, "Failed to enumerate spatial memory tiles\n");
   }
 
   IngestReader_close(reader);

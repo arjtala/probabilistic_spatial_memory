@@ -75,6 +75,11 @@ static void test_defaults_resolve_to_positron(void) {
          config.time_window_sec == 5.0 ? 1 : 0);
   ASSERT(config.h3_resolution == DEFAULT_RESOLUTION, DEFAULT_RESOLUTION,
          config.h3_resolution);
+  ASSERT(config.scrub_sensitivity_sec == 2.0, 1,
+         config.scrub_sensitivity_sec == 2.0 ? 1 : 0);
+  ASSERT(config.map_follow_smoothing == 8.0, 1,
+         config.map_follow_smoothing == 8.0 ? 1 : 0);
+  ASSERT(config.tile_uploads_per_frame == 1, 1, config.tile_uploads_per_frame);
   assert_str_eq("CartoDB.Positron", config.tile_style);
 
   ok = VizConfig_resolve_tile_source(&config, &tile_source);
@@ -107,6 +112,9 @@ static void test_load_file_resolves_relative_paths(void) {
       "group = \"jepa\"\n"
       "time_window_sec = 2.5\n"
       "h3_resolution = 8\n"
+      "scrub_sensitivity_sec = 1.25\n"
+      "map_follow_smoothing = 12.0\n"
+      "tile_uploads_per_frame = 3\n"
       "tile_style = \"CartoDB.DarkMatter\"\n");
 
   VizConfig_init(&config);
@@ -124,6 +132,11 @@ static void test_load_file_resolves_relative_paths(void) {
   ASSERT(config.time_window_sec == 2.5, 1,
          config.time_window_sec == 2.5 ? 1 : 0);
   ASSERT(config.h3_resolution == 8, 8, config.h3_resolution);
+  ASSERT(config.scrub_sensitivity_sec == 1.25, 1,
+         config.scrub_sensitivity_sec == 1.25 ? 1 : 0);
+  ASSERT(config.map_follow_smoothing == 12.0, 1,
+         config.map_follow_smoothing == 12.0 ? 1 : 0);
+  ASSERT(config.tile_uploads_per_frame == 3, 3, config.tile_uploads_per_frame);
   assert_str_eq("CartoDB.DarkMatter", config.tile_style);
 
   ok = VizConfig_resolve_tile_source(&config, &tile_source);

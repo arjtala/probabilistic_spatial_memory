@@ -8,6 +8,7 @@
 
 #define TILE_CACHE_SIZE 64
 #define MAX_PENDING_DOWNLOADS 8
+#define MAX_TILE_UPLOADS_PER_FRAME 1
 #define TILE_MAP_STYLE_CAP 64
 #define TILE_MAP_URL_CAP 1024
 #define TILE_MAP_API_KEY_CAP 256
@@ -15,6 +16,8 @@
 typedef struct {
   int x, y, z;
   GLuint texture;
+  int texture_w;
+  int texture_h;
   int last_used_frame;
   bool valid;
 } CachedTile;
@@ -30,6 +33,7 @@ typedef struct {
   MemBuffer buf;
   int x, y, z;
   bool active;
+  bool ready;
 } PendingDownload;
 
 typedef struct {
@@ -52,7 +56,8 @@ typedef struct {
 TileMap *TileMap_new(GLuint program, const char *style_name,
                      const char *url_template, const char *api_key);
 void TileMap_draw(TileMap *tm, double center_lat, double center_lng,
-                  double zoom_degrees, int viewport_w, int viewport_h);
+                  double zoom_degrees, int viewport_w, int viewport_h,
+                  int upload_budget);
 void TileMap_free(TileMap *tm);
 
 #endif
