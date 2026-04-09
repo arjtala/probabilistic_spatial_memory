@@ -3,6 +3,56 @@
 #include <stdlib.h>
 #include "core/ring_buffer.h"
 
+struct RingBufferHLL {
+  HLL *hll;
+  size_t refcount;
+};
+
+static RingBufferHLL *ring_buffer_hll_wrap(HLL *hll) {
+  RingBufferHLL *wrapped;
+
+  if (!hll) return NULL;
+  wrapped = malloc(sizeof(*wrapped));
+  if (!wrapped) {
+    freeHLL(hll);
+    return NULL;
+  }
+  wrapped->hll = hll;
+  wrapped->refcount = 1;
+  return wrapped;
+}
+
+static RingBufferHLL *ring_buffer_hll_new(size_t precision) {
+  return ring_buffer_hll_wrap(HLL_default(precision));
+}
+
+static RingBufferHLL *ring_buffer_hll_retain(RingBufferHLL *hll) {
+  if (hll) {
+    hll->refcount++;
+  }
+  return hll;
+}
+
+void RingBufferHLL_release(RingBufferHLL *hll) {
+  if (!hll) return;
+  if (hll->refcount == 0) return;
+  hll->refcount--;
+  if (hll->refcount == 0) {
+    freeHLL(hll->hll);
+    free(hll);
+  }
+}
+
+void RingBufferHLL_add(RingBufferHLL *hll, const void *data, size_t size) {
+  if (!hll || !hll->hll) return;
+  HLL_add(hll->hll, data, size);
+}
+
+double RingBufferHLL_count(const RingBufferHLL *hll) {
+  if (!hll || !hll->hll) return 0.0;
+  return HLL_count(hll->hll);
+}
+
 size_t RingBuffer_precision_min(void) {
   return 4;
 }
@@ -27,7 +77,8 @@ RingBuffer *RingBuffer_new(const size_t capacity, const size_t precision) {
     return NULL;
   }
 
-  RingBuffer *rb = (RingBuffer *)malloc(sizeof(RingBuffer) + capacity * sizeof(HLL *));
+  RingBuffer *rb =
+      (RingBuffer *)malloc(sizeof(RingBuffer) + capacity * sizeof(RingBufferHLL *));
   if (NULL == rb) {
     fprintf(stderr, "RingBuffer_new: out of memory\n");
     return NULL;
@@ -36,10 +87,10 @@ RingBuffer *RingBuffer_new(const size_t capacity, const size_t precision) {
   rb->capacity = capacity;
   rb->precision = precision;
   for (size_t i = 0; i < capacity; ++i) {
-    rb->hlls[i] = HLL_default(rb->precision);
+    rb->hlls[i] = ring_buffer_hll_new(rb->precision);
     if (!rb->hlls[i]) {
       for (size_t j = 0; j < i; ++j) {
-        freeHLL(rb->hlls[j]);
+        RingBufferHLL_release(rb->hlls[j]);
       }
       free(rb);
       return NULL;
@@ -52,43 +103,54 @@ void RingBuffer_free(RingBuffer *rb) {
   if (!rb) return;
   for (size_t i = 0; i < rb->capacity; ++i) {
     if (rb->hlls[i]) {
-      freeHLL(rb->hlls[i]);
+      RingBufferHLL_release(rb->hlls[i]);
     }
   }
   free(rb);
 }
 void RingBuffer_advance(RingBuffer *rb) {
+  RingBufferHLL *replacement;
+  RingBufferHLL *expired;
+
   if (!rb || rb->capacity == 0) return;
-  HLL *replacement = HLL_default(rb->precision);
+  replacement = ring_buffer_hll_new(rb->precision);
   if (!replacement) return;
   rb->head = (rb->head + 1) % rb->capacity;
-  freeHLL(rb->hlls[rb->head]);
+  expired = rb->hlls[rb->head];
   rb->hlls[rb->head] = replacement;
+  RingBufferHLL_release(expired);
 }
-HLL *RingBuffer_current(RingBuffer *rb) {
+RingBufferHLL *RingBuffer_current(RingBuffer *rb) {
   if (!rb || rb->capacity == 0) return NULL;
-  return rb->hlls[rb->head];
+  return ring_buffer_hll_retain(rb->hlls[rb->head]);
 }
-HLL *RingBuffer_merge_window(RingBuffer *rb, size_t n) {
+RingBufferHLL *RingBuffer_merge_window(RingBuffer *rb, size_t n) {
+  HLL *merged_hll;
+  HLL *next;
+  HLL *curr_hll;
+  RingBufferHLL *current;
+
   if (!rb || rb->capacity == 0) return NULL;
-  HLL *curr_hll = RingBuffer_current(rb);
+  current = rb->hlls[rb->head];
+  curr_hll = current ? current->hll : NULL;
   if (!curr_hll) return NULL;
   if (n > rb->capacity) {
     n = rb->capacity;
   }
 
-  HLL *merged_hll = HLL_merge_copy(curr_hll, curr_hll);
-  if (!merged_hll || n == 0) return merged_hll;
+  merged_hll = HLL_merge_copy(curr_hll, curr_hll);
+  if (!merged_hll) return NULL;
+  if (n == 0) return ring_buffer_hll_wrap(merged_hll);
 
   size_t idx = rb->head;
   for (size_t i = 0; i < n; ++i) {
     idx = (idx - 1 + rb->capacity) % rb->capacity;
-    HLL *next = HLL_merge_copy(merged_hll, rb->hlls[idx]);
+    next = HLL_merge_copy(merged_hll, rb->hlls[idx]->hll);
     freeHLL(merged_hll);
     if (!next) {
       return NULL;
     }
     merged_hll = next;
   }
-  return merged_hll;
+  return ring_buffer_hll_wrap(merged_hll);
 }

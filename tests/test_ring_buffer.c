@@ -41,50 +41,61 @@ void test_ring_buffer_precision_limits(void) {
 
 void test_ring_buffer_current(void) {
   RingBuffer *rb = RingBuffer_new(CAPACITY, PRECISION);
-  HLL *hll = RingBuffer_current(rb);
-  int curr_count = (int)HLL_count(hll);
+  RingBufferHLL *hll = RingBuffer_current(rb);
+  int curr_count = (int)RingBufferHLL_count(hll);
   ASSERT(0 == curr_count, 0, curr_count);
   const char *pb = "peanut butter";
-  HLL_add(hll, pb, strlen(pb));
-  curr_count = (int)HLL_count(hll);
+  RingBufferHLL_add(hll, pb, strlen(pb));
+  curr_count = (int)RingBufferHLL_count(hll);
   ASSERT(1 <= curr_count, 1, curr_count);
+  RingBufferHLL_release(hll);
   RingBuffer_free(rb);
 }
 
 void test_ring_buffer_advance(void) {
   RingBuffer *rb = RingBuffer_new(CAPACITY, PRECISION);
-  HLL *hll = RingBuffer_current(rb);
+  RingBufferHLL *hll = RingBuffer_current(rb);
   const char *pb = "peanut butter";
-  HLL_add(hll, pb, strlen(pb));
+  RingBufferHLL_add(hll, pb, strlen(pb));
 
-  int orig_data_size = (int)HLL_count(RingBuffer_current(rb));
+  RingBufferHLL *before_advance = RingBuffer_current(rb);
+  int orig_data_size = (int)RingBufferHLL_count(before_advance);
   ASSERT(0 == rb->head, 0, (int)rb->head);
   ASSERT(1 <= orig_data_size, 1, orig_data_size);
 
 
   RingBuffer_advance(rb);
-  int new_data_size = (int)HLL_count(RingBuffer_current(rb));
-  orig_data_size = (int)HLL_count(rb->hlls[0]);
+  RingBufferHLL *after_advance = RingBuffer_current(rb);
+  int new_data_size = (int)RingBufferHLL_count(after_advance);
+  RingBufferHLL *merged = RingBuffer_merge_window(rb, 1);
+  orig_data_size = (int)RingBufferHLL_count(merged);
   ASSERT(1 == rb->head, 1, (int)rb->head);
   ASSERT(1 <= orig_data_size, 1, orig_data_size);
   ASSERT(0 == new_data_size, 0, new_data_size);
 
+  RingBufferHLL_release(hll);
+  RingBufferHLL_release(before_advance);
+  RingBufferHLL_release(after_advance);
+  RingBufferHLL_release(merged);
   RingBuffer_free(rb);
 }
 
 void test_ring_buffer_wrap(void) {
   RingBuffer *rb = RingBuffer_new(CAPACITY, PRECISION);
-  HLL *hll = RingBuffer_current(rb);
+  RingBufferHLL *hll = RingBuffer_current(rb);
   const char *pb = "peanut butter";
-  HLL_add(hll, pb, strlen(pb));
-  int curr_size = (int)HLL_count(hll);
+  RingBufferHLL_add(hll, pb, strlen(pb));
+  int curr_size = (int)RingBufferHLL_count(hll);
   ASSERT(curr_size >= 1, curr_size, 1);
 
   for (size_t i = 0; i < CAPACITY; ++i) RingBuffer_advance(rb);
-  int wrap_size = (int)HLL_count(RingBuffer_current(rb));
+  RingBufferHLL *wrapped = RingBuffer_current(rb);
+  int wrap_size = (int)RingBufferHLL_count(wrapped);
   ASSERT(0 == rb->head, 0, (int)rb->head);
   ASSERT(0 == wrap_size, 0, wrap_size);
 
+  RingBufferHLL_release(hll);
+  RingBufferHLL_release(wrapped);
   RingBuffer_free(rb);
 }
 
@@ -92,24 +103,55 @@ void test_ring_buffer_merge_window(void) {
   RingBuffer *rb = RingBuffer_new(CAPACITY, PRECISION);
   const char *sammich[] = {"peanut butter", "jelly", "toast"};
   int sizes[] = {0,0,0};
-  HLL *hll;
+  RingBufferHLL *hll;
   for (size_t i = 0; i < CAPACITY-1; ++i) {
     hll = RingBuffer_current(rb);
-    HLL_add(hll, sammich[i], strlen(sammich[i]));
-    sizes[i] = (int)HLL_count(RingBuffer_current(rb));
+    RingBufferHLL_add(hll, sammich[i], strlen(sammich[i]));
+    sizes[i] = (int)RingBufferHLL_count(hll);
+    RingBufferHLL_release(hll);
     RingBuffer_advance(rb);
   }
-  HLL *two_merged = RingBuffer_merge_window(rb, 1);
-  int two_merged_count = (int)HLL_count(two_merged);
-  HLL *all_merged = RingBuffer_merge_window(rb, CAPACITY);
-  int all_merged_count = (int)HLL_count(all_merged);
+  RingBufferHLL *two_merged = RingBuffer_merge_window(rb, 1);
+  int two_merged_count = (int)RingBufferHLL_count(two_merged);
+  RingBufferHLL *all_merged = RingBuffer_merge_window(rb, CAPACITY);
+  int all_merged_count = (int)RingBufferHLL_count(all_merged);
 
   ASSERT(sizes[1] <= two_merged_count, sizes[1], two_merged_count);
   ASSERT(all_merged_count >= two_merged_count, all_merged_count, two_merged_count);
 
-  freeHLL(two_merged);
-  freeHLL(all_merged);
+  RingBufferHLL_release(two_merged);
+  RingBufferHLL_release(all_merged);
   RingBuffer_free(rb);
+}
+
+void test_ring_buffer_retained_handle_survives_advance(void) {
+  RingBuffer *rb = RingBuffer_new(CAPACITY, PRECISION);
+  RingBufferHLL *held = RingBuffer_current(rb);
+  const char *pb = "peanut butter";
+
+  RingBufferHLL_add(held, pb, strlen(pb));
+  RingBuffer_advance(rb);
+
+  ASSERT(1 <= (int)RingBufferHLL_count(held), 1, (int)RingBufferHLL_count(held));
+
+  RingBufferHLL *current = RingBuffer_current(rb);
+  ASSERT(0 == (int)RingBufferHLL_count(current), 0, (int)RingBufferHLL_count(current));
+
+  RingBufferHLL_release(current);
+  RingBufferHLL_release(held);
+  RingBuffer_free(rb);
+}
+
+void test_ring_buffer_retained_handle_survives_free(void) {
+  RingBuffer *rb = RingBuffer_new(CAPACITY, PRECISION);
+  RingBufferHLL *held = RingBuffer_current(rb);
+  const char *pb = "peanut butter";
+
+  RingBufferHLL_add(held, pb, strlen(pb));
+  RingBuffer_free(rb);
+
+  ASSERT(1 <= (int)RingBufferHLL_count(held), 1, (int)RingBufferHLL_count(held));
+  RingBufferHLL_release(held);
 }
 
 int main(void) {
@@ -120,6 +162,8 @@ int main(void) {
   RUN_TEST(test_ring_buffer_advance);
   RUN_TEST(test_ring_buffer_wrap);
   RUN_TEST(test_ring_buffer_merge_window);
+  RUN_TEST(test_ring_buffer_retained_handle_survives_advance);
+  RUN_TEST(test_ring_buffer_retained_handle_survives_free);
 
   return 0;
 }

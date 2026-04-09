@@ -59,9 +59,10 @@ void Tile_free(Tile *tile) {
 // Record an observation in this tile's current time window. Gets the current HLL
 //  from the ring buffer and adds the data to it. This is how you say "I saw this thing in this location."
 void Tile_add(Tile *tile, const void *data, size_t size) {
-  HLL *current = tile ? RingBuffer_current(tile->rb) : NULL;
+  RingBufferHLL *current = tile ? RingBuffer_current(tile->rb) : NULL;
   if (!current) return;
-  HLL_add(current, data, size);
+  RingBufferHLL_add(current, data, size);
+  RingBufferHLL_release(current);
 }
 
 // Rotate to the next time window. This is called on a timer (e.g. every 5 minutes). The
@@ -76,9 +77,9 @@ void Tile_advance(Tile *tile) {
 //  from the ring buffer, gets the count, frees the merged HLL, and returns the estimate.
 double Tile_query(Tile *tile, const size_t n) {
   if (!tile) return 0.0;
-  HLL *hll = RingBuffer_merge_window(tile->rb, n);
+  RingBufferHLL *hll = RingBuffer_merge_window(tile->rb, n);
   if (!hll) return 0.0;
-  double count = HLL_count(hll);
-  freeHLL(hll);
+  double count = RingBufferHLL_count(hll);
+  RingBufferHLL_release(hll);
   return count;
 }

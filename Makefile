@@ -73,7 +73,7 @@ OBJ = $(CORE_OBJ) $(INGEST_OBJ)
 VENDOR_OBJ = $(patsubst $(VENDOR)/%.c,$(BUILD_DIR)/vendor/%.o,$(VENDOR_SRCS))
 
 # Viz source/object files
-VIZ_SRCS = src/viz/shader.c src/viz/video_decoder.c src/viz/hex_renderer.c src/viz/tile_map.c src/viz/gps_trace.c src/viz/imu_processor.c src/viz/jepa_cache.c src/viz/viz_math.c src/viz/viz_config.c
+VIZ_SRCS = src/viz/shader.c src/viz/video_decoder.c src/viz/video_quad.c src/viz/progress_bar.c src/viz/attention_overlay.c src/viz/hex_renderer.c src/viz/tile_map.c src/viz/gps_trace.c src/viz/imu_processor.c src/viz/jepa_cache.c src/viz/viz_math.c src/viz/viz_config.c
 VIZ_OBJ = $(patsubst src/viz/%.c,$(BUILD_DIR)/viz/%.o,$(VIZ_SRCS))
 STB_OBJ = $(BUILD_DIR)/vendor/stb/stb_image_impl.o
 

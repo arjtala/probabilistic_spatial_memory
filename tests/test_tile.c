@@ -47,8 +47,10 @@ void test_tile_add(void) {
   const char *pb = "peanut butter";
   Tile *tile = Tile_new(0.0, 0.0, RESOLUTION, CAPACITY, PRECISION);
   Tile_add(tile, pb, strlen(pb));
-  int count = (int)HLL_count(RingBuffer_current(tile->rb));
+  RingBufferHLL *current = RingBuffer_current(tile->rb);
+  int count = (int)RingBufferHLL_count(current);
   ASSERT(count >= 1, count, 1);
+  RingBufferHLL_release(current);
   Tile_free(tile);
 }
 
@@ -57,8 +59,10 @@ void test_tile_advance(void) {
   Tile *tile = Tile_new(0.0, 0.0, RESOLUTION, CAPACITY, PRECISION);
   Tile_add(tile, pb, strlen(pb));
   Tile_advance(tile);
-  int count = (int)HLL_count(RingBuffer_current(tile->rb));
+  RingBufferHLL *current = RingBuffer_current(tile->rb);
+  int count = (int)RingBufferHLL_count(current);
   ASSERT(0 == count, 0, count);
+  RingBufferHLL_release(current);
   Tile_free(tile);
 }
 
