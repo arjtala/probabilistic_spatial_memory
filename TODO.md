@@ -49,8 +49,8 @@
 
 ## Portability
 
-- [ ] `#include <OpenGL/gl3.h>` in all viz headers is macOS-only; needs platform-conditional includes for Linux/Windows
-- [ ] Makefile uses `brew --prefix` exclusively — no fallback for non-Homebrew systems
+- [x] `#include <OpenGL/gl3.h>` in all viz headers is macOS-only; needs platform-conditional includes for Linux/Windows
+- [x] Makefile uses `brew --prefix` exclusively — no fallback for non-Homebrew systems
 
 ## Testing
 

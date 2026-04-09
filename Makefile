@@ -1,23 +1,53 @@
 CC = clang
-H3_PREFIX = $(shell brew --prefix h3)
-HDF5_PREFIX = $(shell brew --prefix hdf5)
-GLFW_PREFIX = $(shell brew --prefix glfw)
-FFMPEG_PREFIX = $(shell brew --prefix ffmpeg)
-CURL_PREFIX = $(shell curl-config --prefix)
-CURL_CFLAGS = $(shell curl-config --cflags)
-CURL_LDFLAGS = $(shell curl-config --libs)
-CFLAGS = -Wall -Wextra -Werror -std=c99 -O3 -march=native -flto -ffast-math -mtune=native -Iinclude -I. -I$(H3_PREFIX)/include -I$(HDF5_PREFIX)/include
-LDFLAGS = -flto -L$(H3_PREFIX)/lib -lh3 -L$(HDF5_PREFIX)/lib -lhdf5
-VIZ_CFLAGS = -I$(GLFW_PREFIX)/include -I$(FFMPEG_PREFIX)/include $(CURL_CFLAGS) -Ivendor -DGL_SILENCE_DEPRECATION
-VIZ_RPATHS = -Wl,-rpath,$(H3_PREFIX)/lib \
-             -Wl,-rpath,$(HDF5_PREFIX)/lib \
-             -Wl,-rpath,$(GLFW_PREFIX)/lib \
-             -Wl,-rpath,$(FFMPEG_PREFIX)/lib \
-             -Wl,-rpath,$(CURL_PREFIX)/lib
-VIZ_LDFLAGS = -L$(GLFW_PREFIX)/lib -lglfw \
-              -L$(FFMPEG_PREFIX)/lib -lavcodec -lavformat -lswscale -lavutil \
+UNAME_S := $(shell uname -s)
+BREW ?= brew
+PKG_CONFIG ?= pkg-config
+comma := ,
+
+pkg_prefix = $(strip $(shell $(PKG_CONFIG) --silence-errors --variable=prefix $(1) 2>/dev/null))
+brew_prefix = $(strip $(shell $(BREW) --prefix $(1) 2>/dev/null))
+rpath_flag = $(if $(1),-Wl$(comma)-rpath$(comma)$(1)/lib)
+
+H3_PREFIX ?= $(or $(call pkg_prefix,h3),$(call pkg_prefix,libh3),$(call brew_prefix,h3))
+HDF5_PREFIX ?= $(or $(call pkg_prefix,hdf5),$(call pkg_prefix,hdf5-serial),$(call brew_prefix,hdf5))
+GLFW_PREFIX ?= $(or $(call pkg_prefix,glfw3),$(call brew_prefix,glfw))
+FFMPEG_PREFIX ?= $(or $(call pkg_prefix,libavcodec),$(call brew_prefix,ffmpeg))
+CURL_PREFIX ?= $(shell curl-config --prefix 2>/dev/null)
+CURL_CFLAGS = $(shell curl-config --cflags 2>/dev/null)
+CURL_LDFLAGS = $(shell curl-config --libs 2>/dev/null)
+
+H3_CFLAGS = $(if $(H3_PREFIX),-I$(H3_PREFIX)/include)
+H3_LDFLAGS = $(if $(H3_PREFIX),-L$(H3_PREFIX)/lib) -lh3
+HDF5_CFLAGS = $(if $(HDF5_PREFIX),-I$(HDF5_PREFIX)/include)
+HDF5_LDFLAGS = $(if $(HDF5_PREFIX),-L$(HDF5_PREFIX)/lib) -lhdf5
+GLFW_CFLAGS = $(if $(GLFW_PREFIX),-I$(GLFW_PREFIX)/include)
+GLFW_LDFLAGS = $(if $(GLFW_PREFIX),-L$(GLFW_PREFIX)/lib) -lglfw
+FFMPEG_CFLAGS = $(if $(FFMPEG_PREFIX),-I$(FFMPEG_PREFIX)/include)
+FFMPEG_LDFLAGS = $(if $(FFMPEG_PREFIX),-L$(FFMPEG_PREFIX)/lib) -lavcodec -lavformat -lswscale -lavutil
+
+ifeq ($(UNAME_S),Darwin)
+OPENGL_LDFLAGS = -framework OpenGL -framework Cocoa -framework IOKit -framework CoreVideo
+TEST_OPENGL_LDFLAGS = -framework OpenGL
+else ifeq ($(OS),Windows_NT)
+OPENGL_LDFLAGS = -lopengl32 -lgdi32
+TEST_OPENGL_LDFLAGS = -lopengl32
+else
+OPENGL_LDFLAGS = -lGL
+TEST_OPENGL_LDFLAGS = -lGL
+endif
+
+CFLAGS = -Wall -Wextra -Werror -std=c99 -O3 -march=native -flto -ffast-math -mtune=native -Iinclude -I. $(H3_CFLAGS) $(HDF5_CFLAGS)
+LDFLAGS = -flto $(H3_LDFLAGS) $(HDF5_LDFLAGS)
+VIZ_CFLAGS = $(GLFW_CFLAGS) $(FFMPEG_CFLAGS) $(CURL_CFLAGS) -Ivendor -DGL_SILENCE_DEPRECATION
+VIZ_RPATHS = $(call rpath_flag,$(H3_PREFIX)) \
+             $(call rpath_flag,$(HDF5_PREFIX)) \
+             $(call rpath_flag,$(GLFW_PREFIX)) \
+             $(call rpath_flag,$(FFMPEG_PREFIX)) \
+             $(call rpath_flag,$(CURL_PREFIX))
+VIZ_LDFLAGS = $(GLFW_LDFLAGS) \
+              $(FFMPEG_LDFLAGS) \
               $(CURL_LDFLAGS) \
-              -framework OpenGL -framework Cocoa -framework IOKit -framework CoreVideo
+              $(OPENGL_LDFLAGS)
 BUILD_DIR = build
 TOOLCHAIN_INFO = $(BUILD_DIR)/.toolchain-info
 
@@ -185,7 +215,7 @@ test-gps-trace: $(TEST_GPS_TRACE)
 
 $(TEST_GPS_TRACE): tests/test_gps_trace.c src/viz/gps_trace.c src/viz/viz_math.c include/viz/gps_trace.h include/viz/viz_math.h include/viz/imu_processor.h build/vendor/lib/utilities.o $(TOOLCHAIN_INFO)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(VIZ_CFLAGS) $(VENDOR_INCLUDES) tests/test_gps_trace.c src/viz/gps_trace.c src/viz/viz_math.c build/vendor/lib/utilities.o -o $@ -framework OpenGL -lm
+	$(CC) $(CFLAGS) $(VIZ_CFLAGS) $(VENDOR_INCLUDES) tests/test_gps_trace.c src/viz/gps_trace.c src/viz/viz_math.c build/vendor/lib/utilities.o -o $@ $(TEST_OPENGL_LDFLAGS) -lm
 
 # Clean target
 clean:

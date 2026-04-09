@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <OpenGL/gl3.h>
 #include "stb/stb_image.h"
+#include "viz/gl_platform.h"
 #include "viz/tile_map.h"
 #include "viz/viz_math.h"
 

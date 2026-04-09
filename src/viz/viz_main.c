@@ -7,10 +7,9 @@
 #include <getopt.h>
 #include <dirent.h>
 #include <string.h>
-#include <OpenGL/gl3.h>
-#include <GLFW/glfw3.h>
 #include <hdf5.h>
 
+#include "viz/gl_platform.h"
 #include "viz/shader.h"
 #include "viz/video_decoder.h"
 #include "viz/hex_renderer.h"

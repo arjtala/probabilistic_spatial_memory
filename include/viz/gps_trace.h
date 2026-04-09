@@ -1,9 +1,9 @@
 #ifndef VIZ_GPS_TRACE_H
 #define VIZ_GPS_TRACE_H
 
-#include <OpenGL/gl3.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "viz/gl_platform.h"
 #include "viz/imu_processor.h"
 
 typedef struct {

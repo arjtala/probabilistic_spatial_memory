@@ -1,7 +1,7 @@
 #ifndef VIZ_HEX_RENDERER_H
 #define VIZ_HEX_RENDERER_H
 
-#include <OpenGL/gl3.h>
+#include "viz/gl_platform.h"
 #include "core/spatial_memory.h"
 
 typedef struct {

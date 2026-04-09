@@ -1,10 +1,10 @@
 #ifndef VIZ_TILE_MAP_H
 #define VIZ_TILE_MAP_H
 
-#include <OpenGL/gl3.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <curl/curl.h>
+#include "viz/gl_platform.h"
 
 #define TILE_CACHE_SIZE 64
 #define MAX_PENDING_DOWNLOADS 8

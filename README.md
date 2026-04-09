@@ -75,11 +75,18 @@ make test     # build and run tests
 make clean    # remove build artifacts and targets/
 ```
 
-Requires `clang` and a Unix-like environment. Dependencies installed via Homebrew:
+Requires `clang` and a Unix-like environment. Dependencies can come from Homebrew, your system package manager, or custom install prefixes. Homebrew example:
 
 ```bash
 brew install h3 hdf5                  # core engine
 brew install glfw ffmpeg curl          # visualization (psm-viz)
+```
+
+If your libraries live outside standard system paths, point `make` at them directly:
+
+```bash
+make H3_PREFIX=/opt/h3 HDF5_PREFIX=/opt/hdf5 \
+     GLFW_PREFIX=/opt/glfw FFMPEG_PREFIX=/opt/ffmpeg
 ```
 
 ## Visualization
