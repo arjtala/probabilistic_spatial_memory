@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <pthread.h>
 #include <curl/curl.h>
 #include "viz/gl_platform.h"
 
@@ -31,9 +32,14 @@ typedef struct {
 typedef struct {
   CURL *easy;
   MemBuffer buf;
+  uint8_t *decoded_pixels;
+  int decoded_w;
+  int decoded_h;
   int x, y, z;
   bool active;
   bool ready;
+  bool decoding;
+  bool decoded;
 } PendingDownload;
 
 typedef struct {
@@ -48,6 +54,10 @@ typedef struct {
   CURLM *multi;
   PendingDownload pending[MAX_PENDING_DOWNLOADS];
   int running_transfers;
+  pthread_mutex_t pending_mutex;
+  pthread_cond_t pending_cond;
+  pthread_t decode_thread;
+  bool shutdown_worker;
   char style_name[TILE_MAP_STYLE_CAP];
   char url_template[TILE_MAP_URL_CAP];
   char api_key[TILE_MAP_API_KEY_CAP];

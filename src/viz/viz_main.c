@@ -28,8 +28,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-#define MIN_VIDEO_DECODE_BUDGET 4
-#define MAX_VIDEO_DECODE_BUDGET 24
+#define VIDEO_DECODE_BUDGET_SCALE_CAP 4
 
 typedef struct {
   bool paused;
@@ -68,6 +67,10 @@ typedef struct {
   double scrub_sensitivity_sec;
   double map_follow_smoothing;
   int tile_uploads_per_frame;
+  int video_decode_budget;
+  int ingest_record_budget;
+  int imu_sample_budget;
+  int gps_point_budget;
 } VizApp;
 
 static VizApp *app_from_window(GLFWwindow *window) {
@@ -75,10 +78,22 @@ static VizApp *app_from_window(GLFWwindow *window) {
 }
 
 static int video_decode_budget(const VizApp *app) {
-  double scaled = app ? app->playback_speed * 6.0 : 6.0;
+  int base = VIZ_CONFIG_DEFAULT_VIDEO_DECODE_BUDGET;
+  double scale = 1.0;
+  int max_budget;
+
+  if (app && app->video_decode_budget > 0) {
+    base = app->video_decode_budget;
+  }
+  if (app && app->playback_speed > 1.0) {
+    scale = app->playback_speed;
+  }
+
+  double scaled = (double)base * scale;
   int budget = (int)ceil(scaled);
-  if (budget < MIN_VIDEO_DECODE_BUDGET) return MIN_VIDEO_DECODE_BUDGET;
-  if (budget > MAX_VIDEO_DECODE_BUDGET) return MAX_VIDEO_DECODE_BUDGET;
+  max_budget = base * VIDEO_DECODE_BUDGET_SCALE_CAP;
+  if (budget < base) return base;
+  if (budget > max_budget) return max_budget;
   return budget;
 }
 
@@ -489,6 +504,8 @@ static void print_usage(const char *prog) {
   fprintf(stderr, "  session_dir, video_path, features_path, group,\n");
   fprintf(stderr, "  time_window_sec, h3_resolution,\n");
   fprintf(stderr, "  scrub_sensitivity_sec, map_follow_smoothing,\n");
+  fprintf(stderr, "  video_decode_budget, ingest_record_budget,\n");
+  fprintf(stderr, "  imu_sample_budget, gps_point_budget,\n");
   fprintf(stderr, "  tile_uploads_per_frame, tile_style,\n");
   fprintf(stderr, "  tile_api_key, tile_url_template\n");
   fprintf(stderr, "\nTile styles:\n");
@@ -683,6 +700,10 @@ int main(int argc, char *argv[]) {
   app.h3_resolution = h3_resolution;
   app.scrub_sensitivity_sec = config.scrub_sensitivity_sec;
   app.map_follow_smoothing = config.map_follow_smoothing;
+  app.video_decode_budget = config.video_decode_budget;
+  app.ingest_record_budget = config.ingest_record_budget;
+  app.imu_sample_budget = config.imu_sample_budget;
+  app.gps_point_budget = config.gps_point_budget;
   app.tile_uploads_per_frame = config.tile_uploads_per_frame;
   app.window_anchor = -1.0;
   app.first_ts = -1.0;
@@ -850,6 +871,9 @@ int main(int argc, char *argv[]) {
   printf("Scrub: %.2fs/step, Map follow: %.2f, Tile uploads/frame: %d\n",
          app.scrub_sensitivity_sec, app.map_follow_smoothing,
          app.tile_uploads_per_frame);
+  printf("Budgets: video=%d base/frame, ingest=%d, imu=%d, gps=%d\n",
+         app.video_decode_budget, app.ingest_record_budget,
+         app.imu_sample_budget, app.gps_point_budget);
 
   GpsTrace *gt = GpsTrace_new(hex_prog);
   app.gps_trace = gt;
@@ -893,6 +917,7 @@ int main(int argc, char *argv[]) {
       double wall_elapsed = (frame_time - app.video_start_time) * app.playback_speed;
       double target_pts = app.video_pts_offset + wall_elapsed;
       bool video_frame_advanced = false;
+      bool drain_backlog = false;
       int decode_steps = 0;
       int decode_budget = video_decode_budget(&app);
 
@@ -921,7 +946,12 @@ int main(int argc, char *argv[]) {
       if (app.reader && app.sm) {
         IngestRecord record;
         bool data_changed = false;
+        int drained_records = 0;
         while (app.reader->cursor < app.reader->n_records) {
+          if (drained_records >= app.ingest_record_budget) {
+            drain_backlog = true;
+            break;
+          }
           size_t saved_cursor = app.reader->cursor;
           IngestReadStatus status = IngestReader_next(app.reader, &record);
           if (status == INGEST_READ_EOF) break;
@@ -936,6 +966,7 @@ int main(int argc, char *argv[]) {
             app.reader->cursor = saved_cursor;
             break;
           }
+          drained_records++;
 
           SpatialMemory_advance_to_timestamp(app.sm, record.timestamp,
                                              &app.window_anchor,
@@ -985,7 +1016,12 @@ int main(int argc, char *argv[]) {
       // ---- Drain high-rate IMU up to displayed PTS ----
       if (app.imu_gps && app.imu_gps->has_imu && app.imu_proc) {
         ImuRecord imu_rec;
+        int drained_imu = 0;
         while (app.imu_gps->imu_cursor < app.imu_gps->imu_n_records) {
+          if (drained_imu >= app.imu_sample_budget) {
+            drain_backlog = true;
+            break;
+          }
           size_t saved = app.imu_gps->imu_cursor;
           IngestReadStatus status = ImuGpsReader_next_imu(app.imu_gps, &imu_rec);
           if (status == INGEST_READ_EOF) break;
@@ -999,6 +1035,7 @@ int main(int argc, char *argv[]) {
             app.imu_gps->imu_cursor = saved;
             break;
           }
+          drained_imu++;
 
           // Interpolate GPS at IMU timestamp
           double gps_lat = 0.0, gps_lng = 0.0;
@@ -1019,15 +1056,25 @@ int main(int argc, char *argv[]) {
 
       // ---- Drain standalone GPS (no IMU) up to displayed PTS ----
       if (app.imu_gps && app.imu_gps->has_gps && !app.imu_gps->has_imu) {
+        int drained_gps = 0;
         while (app.imu_gps->gps_cursor < app.imu_gps->gps_n_records) {
+          if (drained_gps >= app.gps_point_budget) {
+            drain_backlog = true;
+            break;
+          }
           double gps_video_time = app.imu_gps->gps_ts[app.imu_gps->gps_cursor] -
                                   app.first_ts;
           if (gps_video_time > drain_pts) break;
           double lat = app.imu_gps->gps_lat[app.imu_gps->gps_cursor];
           double lng = app.imu_gps->gps_lng[app.imu_gps->gps_cursor];
           app.imu_gps->gps_cursor++;
+          drained_gps++;
           GpsTrace_push(gt, lat, lng, NULL);
         }
+      }
+
+      if (drain_backlog) {
+        reset_playback_timing(&app, frame_time);
       }
     } else if (app.paused) {
       app.video_start_time = glfwGetTime();

@@ -215,6 +215,10 @@ void VizConfig_init(VizConfig *config) {
   config->h3_resolution = DEFAULT_RESOLUTION;
   config->scrub_sensitivity_sec = 2.0;
   config->map_follow_smoothing = 8.0;
+  config->video_decode_budget = VIZ_CONFIG_DEFAULT_VIDEO_DECODE_BUDGET;
+  config->ingest_record_budget = VIZ_CONFIG_DEFAULT_INGEST_RECORD_BUDGET;
+  config->imu_sample_budget = VIZ_CONFIG_DEFAULT_IMU_SAMPLE_BUDGET;
+  config->gps_point_budget = VIZ_CONFIG_DEFAULT_GPS_POINT_BUDGET;
   config->tile_uploads_per_frame = 1;
   snprintf(config->tile_style, sizeof(config->tile_style), "%s",
            "CartoDB.Positron");
@@ -390,6 +394,34 @@ bool VizConfig_load_file(VizConfig *config, const char *path) {
     } else if (strcmp(key, "map_follow_smoothing") == 0) {
       if (!VizConfig_parse_positive_double(value_buf, key,
                                            &config->map_follow_smoothing)) {
+        fclose(file);
+        return false;
+      }
+    } else if (strcmp(key, "video_decode_budget") == 0) {
+      if (!VizConfig_parse_int_in_range(value_buf, key, 1,
+                                        VIZ_CONFIG_MAX_VIDEO_DECODE_BUDGET,
+                                        &config->video_decode_budget)) {
+        fclose(file);
+        return false;
+      }
+    } else if (strcmp(key, "ingest_record_budget") == 0) {
+      if (!VizConfig_parse_int_in_range(value_buf, key, 1,
+                                        VIZ_CONFIG_MAX_INGEST_RECORD_BUDGET,
+                                        &config->ingest_record_budget)) {
+        fclose(file);
+        return false;
+      }
+    } else if (strcmp(key, "imu_sample_budget") == 0) {
+      if (!VizConfig_parse_int_in_range(value_buf, key, 1,
+                                        VIZ_CONFIG_MAX_IMU_SAMPLE_BUDGET,
+                                        &config->imu_sample_budget)) {
+        fclose(file);
+        return false;
+      }
+    } else if (strcmp(key, "gps_point_budget") == 0) {
+      if (!VizConfig_parse_int_in_range(value_buf, key, 1,
+                                        VIZ_CONFIG_MAX_GPS_POINT_BUDGET,
+                                        &config->gps_point_budget)) {
         fclose(file);
         return false;
       }

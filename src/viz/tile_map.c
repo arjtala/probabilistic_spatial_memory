@@ -1,4 +1,5 @@
 #include <math.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -64,10 +65,14 @@ static CachedTile *cache_evict(TileMap *tm) {
 }
 
 // ---- Async download helpers ----
-static bool is_pending(TileMap *tm, int x, int y, int z) {
+static bool slot_is_busy(const PendingDownload *pd) {
+  return pd && (pd->active || pd->ready || pd->decoding || pd->decoded);
+}
+
+static bool is_pending_locked(const TileMap *tm, int x, int y, int z) {
   for (int i = 0; i < MAX_PENDING_DOWNLOADS; i++) {
-    PendingDownload *pd = &tm->pending[i];
-    if ((pd->active || pd->ready) &&
+    const PendingDownload *pd = &tm->pending[i];
+    if (slot_is_busy(pd) &&
         pd->x == x && pd->y == y && pd->z == z) {
       return true;
     }
@@ -75,9 +80,9 @@ static bool is_pending(TileMap *tm, int x, int y, int z) {
   return false;
 }
 
-static PendingDownload *find_free_slot(TileMap *tm) {
+static PendingDownload *find_free_slot_locked(TileMap *tm) {
   for (int i = 0; i < MAX_PENDING_DOWNLOADS; i++) {
-    if (!tm->pending[i].active && !tm->pending[i].ready) return &tm->pending[i];
+    if (!slot_is_busy(&tm->pending[i])) return &tm->pending[i];
   }
   return NULL;
 }
@@ -85,14 +90,95 @@ static PendingDownload *find_free_slot(TileMap *tm) {
 static void clear_pending_download(PendingDownload *pd) {
   if (!pd) return;
   free(pd->buf.data);
+  free(pd->decoded_pixels);
   pd->buf.data = NULL;
   pd->buf.size = 0;
+  pd->decoded_pixels = NULL;
+  pd->decoded_w = 0;
+  pd->decoded_h = 0;
   pd->easy = NULL;
   pd->x = 0;
   pd->y = 0;
   pd->z = 0;
   pd->active = false;
   pd->ready = false;
+  pd->decoding = false;
+  pd->decoded = false;
+}
+
+static bool has_decode_work(const TileMap *tm) {
+  if (!tm) return false;
+  for (int i = 0; i < MAX_PENDING_DOWNLOADS; i++) {
+    const PendingDownload *pd = &tm->pending[i];
+    if (pd->ready && !pd->decoding && !pd->decoded) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static void *tile_decode_worker(void *userdata) {
+  TileMap *tm = (TileMap *)userdata;
+
+  for (;;) {
+    PendingDownload *pd = NULL;
+    uint8_t *compressed = NULL;
+    size_t compressed_size = 0;
+    int slot = -1;
+
+    pthread_mutex_lock(&tm->pending_mutex);
+    while (!tm->shutdown_worker && !has_decode_work(tm)) {
+      pthread_cond_wait(&tm->pending_cond, &tm->pending_mutex);
+    }
+    if (tm->shutdown_worker) {
+      pthread_mutex_unlock(&tm->pending_mutex);
+      return NULL;
+    }
+
+    for (int i = 0; i < MAX_PENDING_DOWNLOADS; i++) {
+      PendingDownload *candidate = &tm->pending[i];
+      if (candidate->ready && !candidate->decoding && !candidate->decoded) {
+        pd = candidate;
+        slot = i;
+        pd->decoding = true;
+        pd->ready = false;
+        compressed = pd->buf.data;
+        compressed_size = pd->buf.size;
+        pd->buf.data = NULL;
+        pd->buf.size = 0;
+        break;
+      }
+    }
+    pthread_mutex_unlock(&tm->pending_mutex);
+
+    if (!pd || !compressed || compressed_size == 0) {
+      free(compressed);
+      pthread_mutex_lock(&tm->pending_mutex);
+      if (slot >= 0) {
+        clear_pending_download(&tm->pending[slot]);
+      }
+      pthread_mutex_unlock(&tm->pending_mutex);
+      continue;
+    }
+
+    int w = 0, h = 0, channels = 0;
+    uint8_t *decoded = stbi_load_from_memory(compressed, (int)compressed_size,
+                                             &w, &h, &channels, 4);
+    free(compressed);
+
+    pthread_mutex_lock(&tm->pending_mutex);
+    pd = &tm->pending[slot];
+    pd->decoding = false;
+    if (decoded) {
+      pd->decoded_pixels = decoded;
+      pd->decoded_w = w;
+      pd->decoded_h = h;
+      pd->decoded = true;
+    } else {
+      clear_pending_download(pd);
+    }
+    pthread_mutex_unlock(&tm->pending_mutex);
+  }
 }
 
 static bool append_text(char *dst, size_t dst_size, size_t *dst_len,
@@ -149,33 +235,53 @@ static bool format_tile_url(const TileMap *tm, int x, int y, int z,
 }
 
 static void start_download(TileMap *tm, int x, int y, int z) {
-  if (is_pending(tm, x, y, z)) return;
-  PendingDownload *pd = find_free_slot(tm);
-  if (!pd) return;  // all slots busy
-
   char url[TILE_MAP_URL_CAP];
+  CURL *easy = NULL;
+  PendingDownload *pd = NULL;
+
   if (!format_tile_url(tm, x, y, z, url, sizeof(url))) return;
 
-  pd->easy = curl_easy_init();
-  if (!pd->easy) return;
+  easy = curl_easy_init();
+  if (!easy) return;
 
-  pd->buf.data = NULL;
-  pd->buf.size = 0;
+  pthread_mutex_lock(&tm->pending_mutex);
+  if (is_pending_locked(tm, x, y, z)) {
+    pthread_mutex_unlock(&tm->pending_mutex);
+    curl_easy_cleanup(easy);
+    return;
+  }
+
+  pd = find_free_slot_locked(tm);
+  if (!pd) {
+    pthread_mutex_unlock(&tm->pending_mutex);
+    curl_easy_cleanup(easy);
+    return;
+  }
+
+  clear_pending_download(pd);
+  pd->easy = easy;
   pd->x = x;
   pd->y = y;
   pd->z = z;
   pd->active = true;
-  pd->ready = false;
+  pthread_mutex_unlock(&tm->pending_mutex);
 
-  curl_easy_setopt(pd->easy, CURLOPT_URL, url);
-  curl_easy_setopt(pd->easy, CURLOPT_WRITEFUNCTION, write_cb);
-  curl_easy_setopt(pd->easy, CURLOPT_WRITEDATA, &pd->buf);
-  curl_easy_setopt(pd->easy, CURLOPT_USERAGENT, "psm-viz/1.0");
-  curl_easy_setopt(pd->easy, CURLOPT_TIMEOUT, 10L);
-  curl_easy_setopt(pd->easy, CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(pd->easy, CURLOPT_PRIVATE, pd);
+  curl_easy_setopt(easy, CURLOPT_URL, url);
+  curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, write_cb);
+  curl_easy_setopt(easy, CURLOPT_WRITEDATA, &pd->buf);
+  curl_easy_setopt(easy, CURLOPT_USERAGENT, "psm-viz/1.0");
+  curl_easy_setopt(easy, CURLOPT_TIMEOUT, 10L);
+  curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(easy, CURLOPT_PRIVATE, pd);
 
-  curl_multi_add_handle(tm->multi, pd->easy);
+  if (curl_multi_add_handle(tm->multi, easy) != CURLM_OK) {
+    pthread_mutex_lock(&tm->pending_mutex);
+    if (pd->easy == easy) {
+      clear_pending_download(pd);
+    }
+    pthread_mutex_unlock(&tm->pending_mutex);
+    curl_easy_cleanup(easy);
+  }
 }
 
 static void poll_downloads(TileMap *tm) {
@@ -194,12 +300,16 @@ static void poll_downloads(TileMap *tm) {
     // Cleanup
     curl_multi_remove_handle(tm->multi, easy);
     curl_easy_cleanup(easy);
+    pthread_mutex_lock(&tm->pending_mutex);
     pd->easy = NULL;
     pd->active = false;
     pd->ready = (msg->data.result == CURLE_OK && pd->buf.size > 0);
-    if (!pd->ready) {
+    if (pd->ready) {
+      pthread_cond_signal(&tm->pending_cond);
+    } else {
       clear_pending_download(pd);
     }
+    pthread_mutex_unlock(&tm->pending_mutex);
   }
 }
 
@@ -236,27 +346,40 @@ static void process_ready_downloads(TileMap *tm, int budget) {
 
   int processed = 0;
   for (int i = 0; i < MAX_PENDING_DOWNLOADS && processed < budget; i++) {
+    uint8_t *decoded = NULL;
+    int w = 0;
+    int h = 0;
+    int x = 0;
+    int y = 0;
+    int z = 0;
+
+    pthread_mutex_lock(&tm->pending_mutex);
     PendingDownload *pd = &tm->pending[i];
-    if (!pd->ready || pd->buf.size == 0) continue;
-
-    int w, h, channels;
-    uint8_t *img = stbi_load_from_memory(pd->buf.data, (int)pd->buf.size,
-                                         &w, &h, &channels, 4);
-    if (img) {
-      CachedTile *ct = cache_find(tm, pd->x, pd->y, pd->z);
-      if (!ct) {
-        ct = cache_evict(tm);
-      }
-      upload_cached_tile_texture(ct, img, w, h);
-      ct->x = pd->x;
-      ct->y = pd->y;
-      ct->z = pd->z;
-      ct->last_used_frame = tm->frame_counter;
-      ct->valid = true;
-      stbi_image_free(img);
+    if (!pd->decoded || !pd->decoded_pixels) {
+      pthread_mutex_unlock(&tm->pending_mutex);
+      continue;
     }
-
+    decoded = pd->decoded_pixels;
+    pd->decoded_pixels = NULL;
+    w = pd->decoded_w;
+    h = pd->decoded_h;
+    x = pd->x;
+    y = pd->y;
+    z = pd->z;
     clear_pending_download(pd);
+    pthread_mutex_unlock(&tm->pending_mutex);
+
+    CachedTile *ct = cache_find(tm, x, y, z);
+    if (!ct) {
+      ct = cache_evict(tm);
+    }
+    upload_cached_tile_texture(ct, decoded, w, h);
+    ct->x = x;
+    ct->y = y;
+    ct->z = z;
+    ct->last_used_frame = tm->frame_counter;
+    ct->valid = true;
+    stbi_image_free(decoded);
     processed++;
   }
 }
@@ -267,12 +390,6 @@ TileMap *TileMap_new(GLuint program, const char *style_name,
   TileMap *tm = calloc(1, sizeof(TileMap));
   if (!tm) return NULL;
 
-  tm->program = program;
-  tm->u_projection = glGetUniformLocation(program, "u_projection");
-  tm->u_texture = glGetUniformLocation(program, "u_texture");
-  tm->frame_counter = 0;
-  tm->running_transfers = 0;
-
   if (!style_name || !url_template ||
       snprintf(tm->style_name, sizeof(tm->style_name), "%s", style_name) >=
           (int)sizeof(tm->style_name) ||
@@ -281,6 +398,21 @@ TileMap *TileMap_new(GLuint program, const char *style_name,
       (api_key &&
        snprintf(tm->api_key, sizeof(tm->api_key), "%s", api_key) >=
            (int)sizeof(tm->api_key))) {
+    free(tm);
+    return NULL;
+  }
+
+  tm->program = program;
+  tm->u_projection = glGetUniformLocation(program, "u_projection");
+  tm->u_texture = glGetUniformLocation(program, "u_texture");
+  tm->frame_counter = 0;
+  tm->running_transfers = 0;
+  if (pthread_mutex_init(&tm->pending_mutex, NULL) != 0) {
+    free(tm);
+    return NULL;
+  }
+  if (pthread_cond_init(&tm->pending_cond, NULL) != 0) {
+    pthread_mutex_destroy(&tm->pending_mutex);
     free(tm);
     return NULL;
   }
@@ -303,6 +435,19 @@ TileMap *TileMap_new(GLuint program, const char *style_name,
   curl_global_init(CURL_GLOBAL_DEFAULT);
   tm->multi = curl_multi_init();
   if (!tm->multi) {
+    pthread_mutex_destroy(&tm->pending_mutex);
+    pthread_cond_destroy(&tm->pending_cond);
+    glDeleteBuffers(1, &tm->vbo);
+    glDeleteVertexArrays(1, &tm->vao);
+    curl_global_cleanup();
+    free(tm);
+    return NULL;
+  }
+
+  if (pthread_create(&tm->decode_thread, NULL, tile_decode_worker, tm) != 0) {
+    curl_multi_cleanup(tm->multi);
+    pthread_mutex_destroy(&tm->pending_mutex);
+    pthread_cond_destroy(&tm->pending_cond);
     glDeleteBuffers(1, &tm->vbo);
     glDeleteVertexArrays(1, &tm->vao);
     curl_global_cleanup();
@@ -400,6 +545,12 @@ void TileMap_draw(TileMap *tm, double center_lat, double center_lng,
 
 void TileMap_free(TileMap *tm) {
   if (!tm) return;
+  pthread_mutex_lock(&tm->pending_mutex);
+  tm->shutdown_worker = true;
+  pthread_cond_signal(&tm->pending_cond);
+  pthread_mutex_unlock(&tm->pending_mutex);
+  pthread_join(tm->decode_thread, NULL);
+
   // Cleanup pending downloads
   for (int i = 0; i < MAX_PENDING_DOWNLOADS; i++) {
     PendingDownload *pd = &tm->pending[i];
@@ -407,9 +558,11 @@ void TileMap_free(TileMap *tm) {
       curl_multi_remove_handle(tm->multi, pd->easy);
       curl_easy_cleanup(pd->easy);
     }
-    free(pd->buf.data);
+    clear_pending_download(pd);
   }
   if (tm->multi) curl_multi_cleanup(tm->multi);
+  pthread_mutex_destroy(&tm->pending_mutex);
+  pthread_cond_destroy(&tm->pending_cond);
 
   for (int i = 0; i < TILE_CACHE_SIZE; i++) {
     if (tm->cache[i].texture) {

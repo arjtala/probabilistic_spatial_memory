@@ -135,6 +135,10 @@ time_window_sec = 5.0
 h3_resolution = 10
 scrub_sensitivity_sec = 2.0
 map_follow_smoothing = 8.0
+video_decode_budget = 6
+ingest_record_budget = 128
+imu_sample_budget = 512
+gps_point_budget = 64
 tile_uploads_per_frame = 1
 tile_style = "CartoDB.Positron"
 
@@ -149,12 +153,16 @@ Relative paths in the config resolve relative to the config file itself. CLI fla
 
 Ready-made presets:
 - `configs/psm-viz-balanced.toml`: a good default balance between responsiveness and tile fill speed.
-- `configs/psm-viz-low-hitch.toml`: prioritizes smoother interaction with fewer tile uploads per frame and gentler follow behavior.
+- `configs/psm-viz-low-hitch.toml`: prioritizes smoother interaction with fewer tile uploads per frame and smaller per-frame catch-up budgets.
 
 Tuning keys:
 - `scrub_sensitivity_sec`: seconds moved per horizontal scroll step on the video pane.
 - `map_follow_smoothing`: exponential follow rate for GPS/IMU-driven recentering. Higher values snap faster.
-- `tile_uploads_per_frame`: max downloaded map tiles decoded/uploaded per frame. Lower values reduce hitches; higher values fill tiles faster.
+- `video_decode_budget`: baseline video decode steps per frame at 1x playback. Faster playback scales up from this value to help keep up.
+- `ingest_record_budget`: max feature/embedding records applied per frame before playback timing is re-anchored.
+- `imu_sample_budget`: max IMU samples drained per frame before playback timing is re-anchored.
+- `gps_point_budget`: max standalone GPS points drained per frame before playback timing is re-anchored.
+- `tile_uploads_per_frame`: max ready tile textures uploaded per frame. Lower values reduce GL-side hitches; higher values fill tiles faster.
 
 Available `tile_style` presets:
 - `CartoDB.Positron`

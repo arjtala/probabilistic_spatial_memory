@@ -79,6 +79,16 @@ static void test_defaults_resolve_to_positron(void) {
          config.scrub_sensitivity_sec == 2.0 ? 1 : 0);
   ASSERT(config.map_follow_smoothing == 8.0, 1,
          config.map_follow_smoothing == 8.0 ? 1 : 0);
+  ASSERT(config.video_decode_budget == VIZ_CONFIG_DEFAULT_VIDEO_DECODE_BUDGET,
+         VIZ_CONFIG_DEFAULT_VIDEO_DECODE_BUDGET, config.video_decode_budget);
+  ASSERT(config.ingest_record_budget ==
+             VIZ_CONFIG_DEFAULT_INGEST_RECORD_BUDGET,
+         VIZ_CONFIG_DEFAULT_INGEST_RECORD_BUDGET,
+         config.ingest_record_budget);
+  ASSERT(config.imu_sample_budget == VIZ_CONFIG_DEFAULT_IMU_SAMPLE_BUDGET,
+         VIZ_CONFIG_DEFAULT_IMU_SAMPLE_BUDGET, config.imu_sample_budget);
+  ASSERT(config.gps_point_budget == VIZ_CONFIG_DEFAULT_GPS_POINT_BUDGET,
+         VIZ_CONFIG_DEFAULT_GPS_POINT_BUDGET, config.gps_point_budget);
   ASSERT(config.tile_uploads_per_frame == 1, 1, config.tile_uploads_per_frame);
   assert_str_eq("CartoDB.Positron", config.tile_style);
 
@@ -114,6 +124,10 @@ static void test_load_file_resolves_relative_paths(void) {
       "h3_resolution = 8\n"
       "scrub_sensitivity_sec = 1.25\n"
       "map_follow_smoothing = 12.0\n"
+      "video_decode_budget = 8\n"
+      "ingest_record_budget = 256\n"
+      "imu_sample_budget = 1024\n"
+      "gps_point_budget = 96\n"
       "tile_uploads_per_frame = 3\n"
       "tile_style = \"CartoDB.DarkMatter\"\n");
 
@@ -136,6 +150,11 @@ static void test_load_file_resolves_relative_paths(void) {
          config.scrub_sensitivity_sec == 1.25 ? 1 : 0);
   ASSERT(config.map_follow_smoothing == 12.0, 1,
          config.map_follow_smoothing == 12.0 ? 1 : 0);
+  ASSERT(config.video_decode_budget == 8, 8, config.video_decode_budget);
+  ASSERT(config.ingest_record_budget == 256, 256,
+         config.ingest_record_budget);
+  ASSERT(config.imu_sample_budget == 1024, 1024, config.imu_sample_budget);
+  ASSERT(config.gps_point_budget == 96, 96, config.gps_point_budget);
   ASSERT(config.tile_uploads_per_frame == 3, 3, config.tile_uploads_per_frame);
   assert_str_eq("CartoDB.DarkMatter", config.tile_style);
 

@@ -17,6 +17,16 @@
 #define VIZ_CONFIG_API_KEY_CAP 256
 #define VIZ_CONFIG_URL_CAP 1024
 
+#define VIZ_CONFIG_DEFAULT_VIDEO_DECODE_BUDGET 6
+#define VIZ_CONFIG_DEFAULT_INGEST_RECORD_BUDGET 128
+#define VIZ_CONFIG_DEFAULT_IMU_SAMPLE_BUDGET 512
+#define VIZ_CONFIG_DEFAULT_GPS_POINT_BUDGET 64
+
+#define VIZ_CONFIG_MAX_VIDEO_DECODE_BUDGET 64
+#define VIZ_CONFIG_MAX_INGEST_RECORD_BUDGET 4096
+#define VIZ_CONFIG_MAX_IMU_SAMPLE_BUDGET 16384
+#define VIZ_CONFIG_MAX_GPS_POINT_BUDGET 4096
+
 typedef struct {
   bool has_session_dir;
   char session_dir[PATH_MAX];
@@ -32,6 +42,10 @@ typedef struct {
   int h3_resolution;
   double scrub_sensitivity_sec;
   double map_follow_smoothing;
+  int video_decode_budget;
+  int ingest_record_budget;
+  int imu_sample_budget;
+  int gps_point_budget;
   int tile_uploads_per_frame;
 
   char tile_style[VIZ_CONFIG_STYLE_CAP];

@@ -36,15 +36,22 @@ OPENGL_LDFLAGS = -lGL
 TEST_OPENGL_LDFLAGS = -lGL
 endif
 
+ifeq ($(OS),Windows_NT)
+PTHREAD_FLAGS =
+else
+PTHREAD_FLAGS = -pthread
+endif
+
 CFLAGS = -Wall -Wextra -Werror -std=c99 -O3 -march=native -flto -ffast-math -mtune=native -Iinclude -I. $(H3_CFLAGS) $(HDF5_CFLAGS)
 LDFLAGS = -flto $(H3_LDFLAGS) $(HDF5_LDFLAGS)
-VIZ_CFLAGS = $(GLFW_CFLAGS) $(FFMPEG_CFLAGS) $(CURL_CFLAGS) -Ivendor -DGL_SILENCE_DEPRECATION
+VIZ_CFLAGS = $(GLFW_CFLAGS) $(FFMPEG_CFLAGS) $(CURL_CFLAGS) $(PTHREAD_FLAGS) -Ivendor -DGL_SILENCE_DEPRECATION
 VIZ_RPATHS = $(call rpath_flag,$(H3_PREFIX)) \
              $(call rpath_flag,$(HDF5_PREFIX)) \
              $(call rpath_flag,$(GLFW_PREFIX)) \
              $(call rpath_flag,$(FFMPEG_PREFIX)) \
              $(call rpath_flag,$(CURL_PREFIX))
-VIZ_LDFLAGS = $(GLFW_LDFLAGS) \
+VIZ_LDFLAGS = $(PTHREAD_FLAGS) \
+              $(GLFW_LDFLAGS) \
               $(FFMPEG_LDFLAGS) \
               $(CURL_LDFLAGS) \
               $(OPENGL_LDFLAGS)

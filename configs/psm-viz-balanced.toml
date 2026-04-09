@@ -9,6 +9,10 @@ h3_resolution = 10
 
 scrub_sensitivity_sec = 2.0
 map_follow_smoothing = 9.0
+video_decode_budget = 6
+ingest_record_budget = 128
+imu_sample_budget = 512
+gps_point_budget = 64
 tile_uploads_per_frame = 2
 
 tile_style = "CartoDB.Positron"
