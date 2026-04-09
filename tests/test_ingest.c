@@ -188,6 +188,56 @@ static void create_valid_imu_gps_file(const char *path) {
   H5Fclose(file);
 }
 
+static void create_imu_only_file(const char *path) {
+  hid_t file = H5Fcreate(path, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+  hid_t imu_group = H5Gcreate(file, "imu", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+  double imu_ts[] = {10.0, 11.0};
+  float accel[] = {
+      1.0f, 2.0f, 3.0f,
+      4.0f, 5.0f, 6.0f,
+  };
+  float gyro[] = {
+      6.0f, 5.0f, 4.0f,
+      3.0f, 2.0f, 1.0f,
+  };
+
+  write_doubles_1d(imu_group, TIMESTAMPS, imu_ts, 2);
+  write_floats_2d(imu_group, ACCEL, accel, 2, 3);
+  write_floats_2d(imu_group, GYRO, gyro, 2, 3);
+
+  H5Gclose(imu_group);
+  H5Fclose(file);
+}
+
+static void create_imu_with_empty_gps_file(const char *path) {
+  hid_t file = H5Fcreate(path, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+  hid_t imu_group = H5Gcreate(file, "imu", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  hid_t gps_group = H5Gcreate(file, "gps", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+  double imu_ts[] = {10.0, 11.0};
+  float accel[] = {
+      1.0f, 2.0f, 3.0f,
+      4.0f, 5.0f, 6.0f,
+  };
+  float gyro[] = {
+      6.0f, 5.0f, 4.0f,
+      3.0f, 2.0f, 1.0f,
+  };
+  double unused = 0.0;
+
+  write_doubles_1d(imu_group, TIMESTAMPS, imu_ts, 2);
+  write_floats_2d(imu_group, ACCEL, accel, 2, 3);
+  write_floats_2d(imu_group, GYRO, gyro, 2, 3);
+  write_doubles_1d(gps_group, TIMESTAMPS, &unused, 0);
+  write_doubles_1d(gps_group, LAT, &unused, 0);
+  write_doubles_1d(gps_group, LNG, &unused, 0);
+
+  H5Gclose(imu_group);
+  H5Gclose(gps_group);
+  H5Fclose(file);
+}
+
 static void create_mismatched_imu_gps_file(const char *path) {
   hid_t file = H5Fcreate(path, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
   hid_t gps_group = H5Gcreate(file, "gps", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
@@ -217,7 +267,8 @@ void test_ingest_open_and_next(void) {
   ASSERT(1 == reader->has_imu, 1, reader->has_imu);
 
   IngestRecord record;
-  bool ok = IngestReader_next(reader, &record);
+  IngestReadStatus status = IngestReader_next(reader, &record);
+  bool ok = (status == INGEST_READ_OK);
   ASSERT(ok, 1, ok);
   ASSERT(100 == (int)record.timestamp, 100, (int)record.timestamp);
   ASSERT(1 == (int)record.lat, 1, (int)record.lat);
@@ -227,6 +278,14 @@ void test_ingest_open_and_next(void) {
   ASSERT(1 == record.has_imu, 1, record.has_imu);
   ASSERT(2 == (int)record.accel[1], 2, (int)record.accel[1]);
   ASSERT(8 == (int)record.gyro[1], 8, (int)record.gyro[1]);
+  status = IngestReader_next(reader, &record);
+  ok = (status == INGEST_READ_OK);
+  ASSERT(ok, 1, ok);
+  status = IngestReader_next(reader, &record);
+  ok = (status == INGEST_READ_OK);
+  ASSERT(ok, 1, ok);
+  status = IngestReader_next(reader, &record);
+  ASSERT(INGEST_READ_EOF == status, INGEST_READ_EOF, status);
 
   IngestReader_close(reader);
   H5Fclose(file);
@@ -259,7 +318,7 @@ void test_ingest_run_preserves_empty_windows(void) {
   ASSERT(NULL != reader, 1, NULL != reader);
   ASSERT(NULL != sm, 1, NULL != sm);
 
-  IngestReader_run(reader, sm, 5.0);
+  ASSERT(IngestReader_run(reader, sm, 5.0), 1, 1);
 
   double current_only = 0.0;
   double current_plus_prev = 0.0;
@@ -297,7 +356,8 @@ void test_imu_gps_open_and_interpolate(void) {
   ASSERT(10 == (int)reader->imu_first_ts, 10, (int)reader->imu_first_ts);
 
   ImuRecord rec;
-  bool ok = ImuGpsReader_next_imu(reader, &rec);
+  IngestReadStatus status = ImuGpsReader_next_imu(reader, &rec);
+  bool ok = (status == INGEST_READ_OK);
   ASSERT(ok, 1, ok);
   ASSERT(10 == (int)rec.timestamp, 10, (int)rec.timestamp);
   ASSERT(2 == (int)rec.accel[1], 2, (int)rec.accel[1]);
@@ -305,17 +365,24 @@ void test_imu_gps_open_and_interpolate(void) {
 
   double lat = 0.0;
   double lng = 0.0;
-  ImuGpsReader_interpolate_gps(reader, 11.0, &lat, &lng);
+  ASSERT(ImuGpsReader_interpolate_gps(reader, 11.0, &lat, &lng), 1, 1);
   ASSERT(2 == (int)lat, 2, (int)lat);
   ASSERT(5 == (int)lng, 5, (int)lng);
 
-  ImuGpsReader_interpolate_gps(reader, 9.0, &lat, &lng);
+  ASSERT(ImuGpsReader_interpolate_gps(reader, 9.0, &lat, &lng), 1, 1);
   ASSERT(1 == (int)lat, 1, (int)lat);
   ASSERT(4 == (int)lng, 4, (int)lng);
 
-  ImuGpsReader_interpolate_gps(reader, 13.0, &lat, &lng);
+  ASSERT(ImuGpsReader_interpolate_gps(reader, 13.0, &lat, &lng), 1, 1);
   ASSERT(3 == (int)lat, 3, (int)lat);
   ASSERT(6 == (int)lng, 6, (int)lng);
+
+  status = ImuGpsReader_next_imu(reader, &rec);
+  ASSERT(INGEST_READ_OK == status, INGEST_READ_OK, status);
+  status = ImuGpsReader_next_imu(reader, &rec);
+  ASSERT(INGEST_READ_OK == status, INGEST_READ_OK, status);
+  status = ImuGpsReader_next_imu(reader, &rec);
+  ASSERT(INGEST_READ_EOF == status, INGEST_READ_EOF, status);
 
   ImuGpsReader_close(reader);
   H5Fclose(file);
@@ -336,14 +403,102 @@ void test_imu_gps_rejects_mismatched_lengths(void) {
   free(path);
 }
 
+void test_imu_gps_open_without_gps_data(void) {
+  char *path = create_temp_path();
+  create_imu_only_file(path);
+
+  hid_t file = H5Fopen(path, H5F_ACC_RDONLY, H5P_DEFAULT);
+  ImuGpsReader *reader = ImuGpsReader_open(file);
+  ASSERT(NULL != reader, 1, NULL != reader);
+  ASSERT(1 == reader->has_imu, 1, reader->has_imu);
+  ASSERT(0 == reader->has_gps, 0, reader->has_gps);
+  ASSERT(0 == (int)reader->gps_n_records, 0, (int)reader->gps_n_records);
+
+  ImuRecord rec;
+  IngestReadStatus status = ImuGpsReader_next_imu(reader, &rec);
+  ASSERT(INGEST_READ_OK == status, INGEST_READ_OK, status);
+  ASSERT(10 == (int)rec.timestamp, 10, (int)rec.timestamp);
+
+  double lat = 123.0;
+  double lng = 456.0;
+  bool ok = ImuGpsReader_interpolate_gps(reader, 10.5, &lat, &lng);
+  ASSERT(!ok, 0, ok);
+  ASSERT(0 == (int)lat, 0, (int)lat);
+  ASSERT(0 == (int)lng, 0, (int)lng);
+
+  ImuGpsReader_close(reader);
+  H5Fclose(file);
+  unlink(path);
+  free(path);
+}
+
+void test_imu_gps_open_with_empty_gps_data(void) {
+  char *path = create_temp_path();
+  create_imu_with_empty_gps_file(path);
+
+  hid_t file = H5Fopen(path, H5F_ACC_RDONLY, H5P_DEFAULT);
+  ImuGpsReader *reader = ImuGpsReader_open(file);
+  ASSERT(NULL != reader, 1, NULL != reader);
+  ASSERT(1 == reader->has_imu, 1, reader->has_imu);
+  ASSERT(0 == reader->has_gps, 0, reader->has_gps);
+  ASSERT(0 == (int)reader->gps_n_records, 0, (int)reader->gps_n_records);
+
+  double lat = -1.0;
+  double lng = -1.0;
+  bool ok = ImuGpsReader_interpolate_gps(reader, 10.5, &lat, &lng);
+  ASSERT(!ok, 0, ok);
+  ASSERT(0 == (int)lat, 0, (int)lat);
+  ASSERT(0 == (int)lng, 0, (int)lng);
+
+  ImuGpsReader_close(reader);
+  H5Fclose(file);
+  unlink(path);
+  free(path);
+}
+
+void test_ingest_reader_invalid_args(void) {
+  IngestRecord record;
+  IngestReadStatus status = INGEST_READ_OK;
+  bool ok = true;
+  IngestReader *reader = IngestReader_open(-1, DINO);
+  ASSERT(NULL == reader, 1, NULL == reader);
+  reader = IngestReader_open(-1, NULL);
+  ASSERT(NULL == reader, 1, NULL == reader);
+  status = IngestReader_next(NULL, &record);
+  ASSERT(INGEST_READ_ERROR == status, INGEST_READ_ERROR, status);
+  status = IngestReader_next((IngestReader *)1, NULL);
+  ASSERT(INGEST_READ_ERROR == status, INGEST_READ_ERROR, status);
+  ok = IngestReader_run(NULL, NULL, 1.0);
+  ASSERT(!ok, 0, ok);
+}
+
+void test_imu_gps_invalid_args(void) {
+  double lat = 123.0;
+  double lng = 456.0;
+  IngestReadStatus status = INGEST_READ_OK;
+  bool ok = true;
+  ImuGpsReader *reader = ImuGpsReader_open(-1);
+  ASSERT(NULL == reader, 1, NULL == reader);
+  status = ImuGpsReader_next_imu(NULL, NULL);
+  ASSERT(INGEST_READ_ERROR == status, INGEST_READ_ERROR, status);
+  ok = ImuGpsReader_interpolate_gps(NULL, 0.0, &lat, &lng);
+  ASSERT(!ok, 0, ok);
+  ASSERT(0 == (int)lat, 0, (int)lat);
+  ASSERT(0 == (int)lng, 0, (int)lng);
+}
+
 int main(void) {
   H5Eset_auto2(H5E_DEFAULT, NULL, NULL);
 
   RUN_TEST(test_ingest_open_and_next);
   RUN_TEST(test_ingest_rejects_mismatched_lengths);
   RUN_TEST(test_ingest_run_preserves_empty_windows);
+  RUN_TEST(test_ingest_reader_invalid_args);
   RUN_TEST(test_imu_gps_open_and_interpolate);
   RUN_TEST(test_imu_gps_rejects_mismatched_lengths);
+  RUN_TEST(test_imu_gps_open_without_gps_data);
+  RUN_TEST(test_imu_gps_open_with_empty_gps_data);
+  RUN_TEST(test_imu_gps_invalid_args);
 
   return 0;
 }

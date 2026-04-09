@@ -1,6 +1,5 @@
 #include <math.h>
 #include <stdio.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include "core/spatial_memory.h"
 
@@ -31,9 +30,10 @@ SpatialMemory *SpatialMemory_new(const int resolution, const size_t capacity,
     fprintf(stderr, "SpatialMemory_new: capacity must be greater than 0\n");
     return NULL;
   }
-  if (precision < 4 || precision > 8 * sizeof(uint64_t)) {
-    fprintf(stderr, "SpatialMemory_new: precision %zu is out of range\n",
-            precision);
+  if (!RingBuffer_precision_is_valid(precision)) {
+    fprintf(stderr,
+            "SpatialMemory_new: precision %zu is out of range [%zu, %zu]\n",
+            precision, RingBuffer_precision_min(), RingBuffer_precision_max());
     return NULL;
   }
 

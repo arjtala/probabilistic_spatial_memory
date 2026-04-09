@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include "viz/gps_trace.h"
@@ -12,6 +13,60 @@
 #define FRUSTUM_DEPTH 8.0f       // how far the frustum extends forward
 #define FRUSTUM_NEAR_HW 1.5f     // near half-width (at camera)
 #define FRUSTUM_FAR_HW 5.0f      // far half-width (field of view edge)
+
+static bool gps_trace_can_allocate(size_t count, size_t elem_size) {
+  return elem_size > 0 && count <= SIZE_MAX / elem_size;
+}
+
+static bool gps_trace_reserve(GpsTrace *gt, size_t min_capacity) {
+  size_t new_cap;
+  double *new_lats;
+  double *new_lngs;
+  ImuPointMeta *new_imu;
+
+  if (!gt) return false;
+  if (min_capacity <= gt->capacity) return true;
+
+  new_cap = gt->capacity ? gt->capacity : GPS_TRACE_INITIAL_CAPACITY;
+  while (new_cap < min_capacity) {
+    if (new_cap > SIZE_MAX / 2) {
+      new_cap = min_capacity;
+      break;
+    }
+    new_cap *= 2;
+  }
+
+  if (!gps_trace_can_allocate(new_cap, sizeof(double)) ||
+      !gps_trace_can_allocate(new_cap, sizeof(ImuPointMeta))) {
+    return false;
+  }
+
+  new_lats = malloc(new_cap * sizeof(double));
+  new_lngs = malloc(new_cap * sizeof(double));
+  new_imu = malloc(new_cap * sizeof(ImuPointMeta));
+  if (!new_lats || !new_lngs || !new_imu) {
+    free(new_lats);
+    free(new_lngs);
+    free(new_imu);
+    return false;
+  }
+
+  if (gt->count > 0) {
+    memcpy(new_lats, gt->lats, gt->count * sizeof(double));
+    memcpy(new_lngs, gt->lngs, gt->count * sizeof(double));
+    memcpy(new_imu, gt->imu_meta, gt->count * sizeof(ImuPointMeta));
+  }
+
+  free(gt->lats);
+  free(gt->lngs);
+  free(gt->imu_meta);
+  gt->lats = new_lats;
+  gt->lngs = new_lngs;
+  gt->imu_meta = new_imu;
+  gt->imu_meta_capacity = new_cap;
+  gt->capacity = new_cap;
+  return true;
+}
 
 GpsTrace *GpsTrace_new(GLuint program) {
   GpsTrace *gt = calloc(1, sizeof(GpsTrace));
@@ -69,31 +124,13 @@ GpsTrace *GpsTrace_new(GLuint program) {
 }
 
 void GpsTrace_push(GpsTrace *gt, double lat, double lng, const ImuPointMeta *imu) {
-  if (!gt) return;
+  size_t next_count;
 
-  if (gt->count >= gt->capacity) {
-    size_t new_cap = gt->capacity * 2;
-    double *new_lats = malloc(new_cap * sizeof(double));
-    double *new_lngs = malloc(new_cap * sizeof(double));
-    ImuPointMeta *new_imu = malloc(new_cap * sizeof(ImuPointMeta));
-    if (!new_lats || !new_lngs || !new_imu) {
-      free(new_lats);
-      free(new_lngs);
-      free(new_imu);
-      return;
-    }
-    memcpy(new_lats, gt->lats, gt->capacity * sizeof(double));
-    memcpy(new_lngs, gt->lngs, gt->capacity * sizeof(double));
-    memcpy(new_imu, gt->imu_meta, gt->capacity * sizeof(ImuPointMeta));
-    free(gt->lats);
-    free(gt->lngs);
-    free(gt->imu_meta);
-    gt->lats = new_lats;
-    gt->lngs = new_lngs;
-    gt->imu_meta = new_imu;
-    gt->imu_meta_capacity = new_cap;
-    gt->capacity = new_cap;
-  }
+  if (!gt) return;
+  if (gt->count == SIZE_MAX) return;
+
+  next_count = gt->count + 1;
+  if (!gps_trace_reserve(gt, next_count)) return;
 
   gt->lats[gt->count] = lat;
   gt->lngs[gt->count] = lng;

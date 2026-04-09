@@ -32,19 +32,19 @@
 
 - [x] `ring_buffer.c` / `tile.c` — use `fprintf`, `exit`, `malloc`, `free` without explicit `<stdio.h>` / `<stdlib.h>` includes (relying on transitive includes from vendor headers)
 - [x] Core modules (`ring_buffer`, `tile`, `spatial_memory`) call `exit()` on errors while ingest/viz modules return NULL — should pick one strategy
-- [ ] Standardize precision parameter handling across all HLL operations
-- [ ] Ensure consistent error return values in all HDF5 reader functions
+- [x] Standardize precision parameter handling across all HLL operations
+- [x] Ensure consistent error return values in all HDF5 reader functions
 
 ## Memory Management Issues
 
-- [ ] Fix potential memory leaks in `ImuGpsReader_interpolate_gps` when GPS data is absent
+- [x] Fix potential memory leaks in `ImuGpsReader_interpolate_gps` when GPS data is absent
 - [ ] Add proper reference counting for HLL objects in ring buffer operations
-- [ ] Implement proper buffer management in `GpsTrace_push` to prevent overflow
+- [x] Implement proper buffer management in `GpsTrace_push` to prevent overflow
 
 ## Architecture / Refactoring
 
 - [ ] `viz_main.c` is ~1060 lines with inline types (`VideoQuad`, `ProgressBar`, `AttentionOverlay`) — extract these into their own source files
-- [ ] `viz_main.c` uses ~20 global variables for GLFW callbacks — use `glfwSetWindowUserPointer` with a context struct instead
+- [x] `viz_main.c` uses ~20 global variables for GLFW callbacks — use `glfwSetWindowUserPointer` with a context struct instead
 - [ ] `SpatialMemory` forces `H3Index` → string conversion on every observe/query because `HashTable` requires string keys — consider a numeric hash map keyed by `H3Index` directly
 
 ## Portability

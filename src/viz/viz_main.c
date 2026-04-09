@@ -26,17 +26,6 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// ---- State ----
-static bool paused = false;
-static double playback_speed = 1.0;
-static bool g_map_view_initialized = false;
-static double g_map_view_center_lat = 0.0;
-static double g_map_view_center_lng = 0.0;
-
-// ---- Mouse drag panning ----
-static bool g_dragging = false;
-static double g_drag_last_x = 0.0, g_drag_last_y = 0.0;
-
 // ---- Video quad geometry ----
 typedef struct {
   GLuint vao;
@@ -45,26 +34,42 @@ typedef struct {
   GLuint program;
 } VideoQuad;
 
-// ---- Forward declarations for scroll callback globals ----
-static VideoDecoder *g_dec = NULL;
-static VideoQuad *g_vq_ptr = NULL;
-static HexRenderer *g_hex_renderer = NULL;
-static TileMap *g_tile_map = NULL;
-static GpsTrace *g_gps_trace = NULL;
-static ImuProcessor *g_imu_proc = NULL;
-static IngestReader *g_reader = NULL;
-static ImuGpsReader *g_imu_gps = NULL;
-static JepaCache *g_jepa_cache = NULL;
-static SpatialMemory *g_sm = NULL;
-static double *g_first_ts = NULL;
-static double *g_window_anchor = NULL;
-static double g_time_window_sec = 5.0;
-static int g_h3_resolution = DEFAULT_RESOLUTION;
+typedef struct {
+  bool paused;
+  double playback_speed;
 
-// Timing state that scroll callback needs to reset
-static double *g_video_start_time = NULL;
-static double *g_video_pts_offset = NULL;
-static bool *g_video_done = NULL;
+  bool map_view_initialized;
+  double map_view_center_lat;
+  double map_view_center_lng;
+
+  bool dragging;
+  double drag_last_x;
+  double drag_last_y;
+
+  VideoDecoder *dec;
+  VideoQuad *video_quad;
+  HexRenderer *hex_renderer;
+  TileMap *tile_map;
+  GpsTrace *gps_trace;
+  ImuProcessor *imu_proc;
+  IngestReader *reader;
+  ImuGpsReader *imu_gps;
+  JepaCache *jepa_cache;
+  SpatialMemory *sm;
+
+  double first_ts;
+  double window_anchor;
+  double time_window_sec;
+  int h3_resolution;
+
+  double video_start_time;
+  double video_pts_offset;
+  bool video_done;
+} VizApp;
+
+static VizApp *app_from_window(GLFWwindow *window) {
+  return (VizApp *)glfwGetWindowUserPointer(window);
+}
 
 static double clamp_map_zoom(double zoom) {
   if (zoom < 0.0001) return 0.0001;
@@ -72,61 +77,68 @@ static double clamp_map_zoom(double zoom) {
   return zoom;
 }
 
-static bool current_auto_map_center(double *out_lat, double *out_lng) {
-  if (!out_lat || !out_lng) return false;
-  if (g_gps_trace && g_gps_trace->count > 0) {
-    size_t last = g_gps_trace->count - 1;
-    *out_lat = g_gps_trace->lats[last];
-    *out_lng = g_gps_trace->lngs[last];
+static bool current_auto_map_center(const VizApp *app, double *out_lat,
+                                    double *out_lng) {
+  if (!app || !out_lat || !out_lng) return false;
+  if (app->gps_trace && app->gps_trace->count > 0) {
+    size_t last = app->gps_trace->count - 1;
+    *out_lat = app->gps_trace->lats[last];
+    *out_lng = app->gps_trace->lngs[last];
     return true;
   }
-  if (g_hex_renderer && g_hex_renderer->vertex_count > 0) {
-    *out_lat = g_hex_renderer->center_lat;
-    *out_lng = g_hex_renderer->center_lng;
+  if (app->hex_renderer && app->hex_renderer->vertex_count > 0) {
+    *out_lat = app->hex_renderer->center_lat;
+    *out_lng = app->hex_renderer->center_lng;
     return true;
   }
   return false;
 }
 
-static bool current_map_target_center(double *out_lat, double *out_lng) {
-  if (!current_auto_map_center(out_lat, out_lng)) return false;
-  if (g_hex_renderer) {
-    *out_lat += g_hex_renderer->pan_offset_lat;
-    *out_lng += g_hex_renderer->pan_offset_lng;
+static bool current_map_target_center(const VizApp *app, double *out_lat,
+                                      double *out_lng) {
+  if (!current_auto_map_center(app, out_lat, out_lng)) return false;
+  if (app->hex_renderer) {
+    *out_lat += app->hex_renderer->pan_offset_lat;
+    *out_lng += app->hex_renderer->pan_offset_lng;
   }
   return true;
 }
 
-static void snap_map_view_to(double center_lat, double center_lng) {
-  g_map_view_center_lat = center_lat;
-  g_map_view_center_lng = center_lng;
-  g_map_view_initialized = true;
+static void snap_map_view_to(VizApp *app, double center_lat, double center_lng) {
+  if (!app) return;
+  app->map_view_center_lat = center_lat;
+  app->map_view_center_lng = center_lng;
+  app->map_view_initialized = true;
 }
 
-static void set_manual_map_center(double center_lat, double center_lng) {
-  if (g_hex_renderer) {
+static void set_manual_map_center(VizApp *app, double center_lat,
+                                  double center_lng) {
+  if (!app) return;
+  if (app->hex_renderer) {
     double auto_lat, auto_lng;
-    if (current_auto_map_center(&auto_lat, &auto_lng)) {
-      g_hex_renderer->pan_offset_lat = center_lat - auto_lat;
-      g_hex_renderer->pan_offset_lng = center_lng - auto_lng;
+    if (current_auto_map_center(app, &auto_lat, &auto_lng)) {
+      app->hex_renderer->pan_offset_lat = center_lat - auto_lat;
+      app->hex_renderer->pan_offset_lng = center_lng - auto_lng;
     }
   }
-  snap_map_view_to(center_lat, center_lng);
+  snap_map_view_to(app, center_lat, center_lng);
 }
 
-static bool current_render_map_center(double *out_lat, double *out_lng) {
-  if (!out_lat || !out_lng) return false;
-  if (g_map_view_initialized) {
-    *out_lat = g_map_view_center_lat;
-    *out_lng = g_map_view_center_lng;
+static bool current_render_map_center(const VizApp *app, double *out_lat,
+                                      double *out_lng) {
+  if (!app || !out_lat || !out_lng) return false;
+  if (app->map_view_initialized) {
+    *out_lat = app->map_view_center_lat;
+    *out_lng = app->map_view_center_lng;
     return true;
   }
-  return current_map_target_center(out_lat, out_lng);
+  return current_map_target_center(app, out_lat, out_lng);
 }
 
-static void zoom_map_about_screen_point(GLFWwindow *window, double zoom_factor,
-                                        double cursor_x, double cursor_y) {
-  if (!g_hex_renderer) return;
+static void zoom_map_about_screen_point(VizApp *app, GLFWwindow *window,
+                                        double zoom_factor, double cursor_x,
+                                        double cursor_y) {
+  if (!app || !app->hex_renderer) return;
 
   int win_w, win_h;
   glfwGetWindowSize(window, &win_w, &win_h);
@@ -143,12 +155,12 @@ static void zoom_map_about_screen_point(GLFWwindow *window, double zoom_factor,
   }
 
   double center_lat, center_lng;
-  if (!current_render_map_center(&center_lat, &center_lng)) {
-    g_hex_renderer->zoom = clamp_map_zoom(g_hex_renderer->zoom * zoom_factor);
+  if (!current_render_map_center(app, &center_lat, &center_lng)) {
+    app->hex_renderer->zoom = clamp_map_zoom(app->hex_renderer->zoom * zoom_factor);
     return;
   }
 
-  double old_zoom = g_hex_renderer->zoom;
+  double old_zoom = app->hex_renderer->zoom;
   double new_zoom = clamp_map_zoom(old_zoom * zoom_factor);
   if (fabs(new_zoom - old_zoom) < 1e-12) return;
 
@@ -171,8 +183,8 @@ static void zoom_map_about_screen_point(GLFWwindow *window, double zoom_factor,
   }
   double new_center_lng = focus_lng - (nx * new_zoom) / cos_new_center;
 
-  g_hex_renderer->zoom = new_zoom;
-  set_manual_map_center(new_center_lat, new_center_lng);
+  app->hex_renderer->zoom = new_zoom;
+  set_manual_map_center(app, new_center_lat, new_center_lng);
 }
 
 static VideoQuad VideoQuad_create(GLuint program) {
@@ -476,7 +488,10 @@ static void AttentionOverlay_free(AttentionOverlay *ao) {
 
 // ---- Scroll callback (scrub + zoom) ----
 static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
+  VizApp *app = app_from_window(window);
   int win_w, win_h;
+
+  if (!app) return;
   glfwGetWindowSize(window, &win_w, &win_h);
 
   double cursor_x, cursor_y;
@@ -486,57 +501,58 @@ static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) 
 
   if (cursor_x < half_w) {
     // Cursor over video: horizontal scroll to scrub
-    if (!g_dec || g_dec->duration <= 0.0) return;
+    if (!app->dec || app->dec->duration <= 0.0) return;
 
     double seek_delta = xoffset * 2.0;  // seconds per scroll unit
-    double target = g_dec->current_pts + seek_delta;
+    double target = app->dec->current_pts + seek_delta;
     if (target < 0.0) target = 0.0;
-    if (target > g_dec->duration) target = g_dec->duration;
+    if (target > app->dec->duration) target = app->dec->duration;
 
-    if (VideoDecoder_seek(g_dec, target)) {
-      VideoQuad_upload(g_vq_ptr, g_dec->rgb_buffer, g_dec->width, g_dec->height);
+    if (VideoDecoder_seek(app->dec, target)) {
+      VideoQuad_upload(app->video_quad, app->dec->rgb_buffer, app->dec->width,
+                       app->dec->height);
 
       // Reset timing
-      if (g_video_start_time) *g_video_start_time = glfwGetTime();
-      if (g_video_pts_offset) *g_video_pts_offset = g_dec->current_pts;
-      if (g_video_done) *g_video_done = false;
+      app->video_start_time = glfwGetTime();
+      app->video_pts_offset = app->dec->current_pts;
+      app->video_done = false;
 
       // On backward seek: reset ingest reader and spatial memory
-      if (seek_delta < 0.0 && g_reader) {
-        SpatialMemory *new_sm = SpatialMemory_new(g_h3_resolution, DEFAULT_CAPACITY,
+      if (seek_delta < 0.0 && app->reader) {
+        SpatialMemory *new_sm = SpatialMemory_new(app->h3_resolution, DEFAULT_CAPACITY,
                                                   DEFAULT_PRECISION);
-        g_reader->cursor = 0;
-        SpatialMemory_free(g_sm);
-        g_sm = new_sm;
-        if (!g_sm) {
+        app->reader->cursor = 0;
+        SpatialMemory_free(app->sm);
+        app->sm = new_sm;
+        if (!app->sm) {
           fprintf(stderr, "Failed to reset spatial memory after seek\n");
         }
         // first_ts is a fixed epoch→PTS mapping; don't reset it.
         // The window anchor defines the fixed-width decay buckets, so reset it
         // when replaying from an earlier point in the stream.
-        if (g_window_anchor) *g_window_anchor = -1.0;
-        if (g_gps_trace) GpsTrace_clear(g_gps_trace);
-        if (g_imu_proc) ImuProcessor_reset(g_imu_proc);
-        if (g_imu_gps) {
-          g_imu_gps->imu_cursor = 0;
-          g_imu_gps->gps_cursor = 0;
+        app->window_anchor = -1.0;
+        if (app->gps_trace) GpsTrace_clear(app->gps_trace);
+        if (app->imu_proc) ImuProcessor_reset(app->imu_proc);
+        if (app->imu_gps) {
+          app->imu_gps->imu_cursor = 0;
+          app->imu_gps->gps_cursor = 0;
         }
-        if (g_hex_renderer) {
-          g_hex_renderer->pan_offset_lat = 0.0;
-          g_hex_renderer->pan_offset_lng = 0.0;
-          g_hex_renderer->vertex_count = 0;  // clear stale hex tile geometry
+        if (app->hex_renderer) {
+          app->hex_renderer->pan_offset_lat = 0.0;
+          app->hex_renderer->pan_offset_lng = 0.0;
+          app->hex_renderer->vertex_count = 0;  // clear stale hex tile geometry
         }
-        g_map_view_initialized = false;
-        if (g_jepa_cache) JepaCache_reset(g_jepa_cache);
+        app->map_view_initialized = false;
+        if (app->jepa_cache) JepaCache_reset(app->jepa_cache);
       }
     }
   } else {
     // Cursor over map: vertical scroll to zoom
-    if (!g_hex_renderer) return;
+    if (!app->hex_renderer) return;
     if (yoffset > 0) {
-      zoom_map_about_screen_point(window, 0.9, cursor_x, cursor_y);
+      zoom_map_about_screen_point(app, window, 0.9, cursor_x, cursor_y);
     } else if (yoffset < 0) {
-      zoom_map_about_screen_point(window, 1.1, cursor_x, cursor_y);
+      zoom_map_about_screen_point(app, window, 1.1, cursor_x, cursor_y);
     }
   }
 }
@@ -544,8 +560,10 @@ static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) 
 // ---- Keyboard callback ----
 static void key_callback(GLFWwindow *window, int key, int scancode, int action,
                           int mods) {
+  VizApp *app = app_from_window(window);
   (void)scancode;
   (void)mods;
+  if (!app) return;
   if (action != GLFW_PRESS && action != GLFW_REPEAT) return;
 
   switch (key) {
@@ -554,47 +572,47 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
     glfwSetWindowShouldClose(window, GLFW_TRUE);
     break;
   case GLFW_KEY_SPACE:
-    paused = !paused;
+    app->paused = !app->paused;
     break;
   case GLFW_KEY_EQUAL:  // + key
-    if (g_hex_renderer) {
+    if (app->hex_renderer) {
       int win_w, win_h;
       glfwGetWindowSize(window, &win_w, &win_h);
-      zoom_map_about_screen_point(window, 0.8,
+      zoom_map_about_screen_point(app, window, 0.8,
                                   (double)(win_w + win_w / 2) / 2.0,
                                   (double)win_h / 2.0);
     }
     break;
   case GLFW_KEY_MINUS:
-    if (g_hex_renderer) {
+    if (app->hex_renderer) {
       int win_w, win_h;
       glfwGetWindowSize(window, &win_w, &win_h);
-      zoom_map_about_screen_point(window, 1.25,
+      zoom_map_about_screen_point(app, window, 1.25,
                                   (double)(win_w + win_w / 2) / 2.0,
                                   (double)win_h / 2.0);
     }
     break;
   case GLFW_KEY_C:
-    if (g_hex_renderer) {
-      g_hex_renderer->pan_offset_lat = 0.0;
-      g_hex_renderer->pan_offset_lng = 0.0;
+    if (app->hex_renderer) {
+      app->hex_renderer->pan_offset_lat = 0.0;
+      app->hex_renderer->pan_offset_lng = 0.0;
       double center_lat, center_lng;
-      if (current_map_target_center(&center_lat, &center_lng)) {
-        snap_map_view_to(center_lat, center_lng);
+      if (current_map_target_center(app, &center_lat, &center_lng)) {
+        snap_map_view_to(app, center_lat, center_lng);
       } else {
-        g_map_view_initialized = false;
+        app->map_view_initialized = false;
       }
     }
     break;
   case GLFW_KEY_RIGHT:
-    playback_speed *= 2.0;
-    if (playback_speed > 16.0) playback_speed = 16.0;
-    printf("Speed: %.1fx\n", playback_speed);
+    app->playback_speed *= 2.0;
+    if (app->playback_speed > 16.0) app->playback_speed = 16.0;
+    printf("Speed: %.1fx\n", app->playback_speed);
     break;
   case GLFW_KEY_LEFT:
-    playback_speed *= 0.5;
-    if (playback_speed < 0.25) playback_speed = 0.25;
-    printf("Speed: %.1fx\n", playback_speed);
+    app->playback_speed *= 0.5;
+    if (app->playback_speed < 0.25) app->playback_speed = 0.25;
+    printf("Speed: %.1fx\n", app->playback_speed);
     break;
   default:
     break;
@@ -603,7 +621,9 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
 
 // ---- Mouse button callback (drag to pan map) ----
 static void mouse_button_callback(GLFWwindow *window, int button, int action, int mods) {
+  VizApp *app = app_from_window(window);
   (void)mods;
+  if (!app) return;
   if (button != GLFW_MOUSE_BUTTON_LEFT) return;
 
   if (action == GLFW_PRESS) {
@@ -612,43 +632,45 @@ static void mouse_button_callback(GLFWwindow *window, int button, int action, in
     double cx, cy;
     glfwGetCursorPos(window, &cx, &cy);
     if (cx > (double)win_w / 2.0) {
-      g_dragging = true;
-      g_drag_last_x = cx;
-      g_drag_last_y = cy;
+      app->dragging = true;
+      app->drag_last_x = cx;
+      app->drag_last_y = cy;
     }
   } else if (action == GLFW_RELEASE) {
-    g_dragging = false;
+    app->dragging = false;
   }
 }
 
 // ---- Cursor position callback (drag to pan map) ----
 static void cursor_pos_callback(GLFWwindow *window, double xpos, double ypos) {
-  if (!g_dragging || !g_hex_renderer) return;
+  VizApp *app = app_from_window(window);
+  if (!app || !app->dragging || !app->hex_renderer) return;
 
   int win_w, win_h;
   glfwGetWindowSize(window, &win_w, &win_h);
   int viewport_w = win_w - win_w / 2;
   int viewport_h = win_h;
 
-  double dx = xpos - g_drag_last_x;
-  double dy = ypos - g_drag_last_y;
-  g_drag_last_x = xpos;
-  g_drag_last_y = ypos;
+  double dx = xpos - app->drag_last_x;
+  double dy = ypos - app->drag_last_y;
+  app->drag_last_x = xpos;
+  app->drag_last_y = ypos;
 
   double aspect = (double)viewport_h / (double)viewport_w;
-  double dlat = dy * (2.0 * g_hex_renderer->zoom * aspect / (double)viewport_h);
+  double dlat = dy * (2.0 * app->hex_renderer->zoom * aspect / (double)viewport_h);
   double center_lat, center_lng;
-  if (current_render_map_center(&center_lat, &center_lng)) {
+  if (current_render_map_center(app, &center_lat, &center_lng)) {
     double cos_center = cos(center_lat * M_PI / 180.0);
     if (fabs(cos_center) < 1e-6) {
       cos_center = (cos_center < 0.0) ? -1e-6 : 1e-6;
     }
-    double dlng = -dx * (2.0 * g_hex_renderer->zoom / (double)viewport_w) / cos_center;
-    set_manual_map_center(center_lat + dlat, center_lng + dlng);
+    double dlng = -dx * (2.0 * app->hex_renderer->zoom / (double)viewport_w) /
+                  cos_center;
+    set_manual_map_center(app, center_lat + dlat, center_lng + dlng);
   } else {
-    double dlng = -dx * (2.0 * g_hex_renderer->zoom / (double)viewport_w);
-    g_hex_renderer->pan_offset_lat += dlat;
-    g_hex_renderer->pan_offset_lng += dlng;
+    double dlng = -dx * (2.0 * app->hex_renderer->zoom / (double)viewport_w);
+    app->hex_renderer->pan_offset_lat += dlat;
+    app->hex_renderer->pan_offset_lng += dlng;
   }
 }
 
@@ -736,6 +758,7 @@ int main(int argc, char *argv[]) {
   char *alloc_h5 = NULL;
   VizConfig config;
   VizTileSource tile_source;
+  VizApp app = {0};
 
   int opt;
   bool help_requested = false;
@@ -896,8 +919,11 @@ int main(int argc, char *argv[]) {
     free(alloc_h5);
     return 1;
   }
-  g_time_window_sec = time_window_sec;
-  g_h3_resolution = h3_resolution;
+  app.playback_speed = 1.0;
+  app.time_window_sec = time_window_sec;
+  app.h3_resolution = h3_resolution;
+  app.window_anchor = -1.0;
+  app.first_ts = -1.0;
 
   // ---- Init GLFW ----
   if (!glfwInit()) {
@@ -919,6 +945,7 @@ int main(int argc, char *argv[]) {
 
   glfwMakeContextCurrent(window);
   glfwSwapInterval(1);  // vsync
+  glfwSetWindowUserPointer(window, &app);
   glfwSetKeyCallback(window, key_callback);
   glfwSetScrollCallback(window, scroll_callback);
   glfwSetMouseButtonCallback(window, mouse_button_callback);
@@ -949,10 +976,10 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   printf("Video: %dx%d, %.1fs\n", dec->width, dec->height, dec->duration);
-  g_dec = dec;
+  app.dec = dec;
 
   VideoQuad vq = VideoQuad_create(video_prog);
-  g_vq_ptr = &vq;
+  app.video_quad = &vq;
 
   // Decode first frame for initial display
   if (VideoDecoder_next_frame(dec)) {
@@ -960,16 +987,11 @@ int main(int argc, char *argv[]) {
   }
 
   // ---- Open HDF5 (optional) ----
-  SpatialMemory *sm = NULL;
-  IngestReader *reader = NULL;
   hid_t h5_file = -1;
-  double window_anchor = -1.0;
-  double first_ts = -1.0;
 
-  JepaCache *jepa_cache = NULL;
   if (h5_path) {
-    sm = SpatialMemory_new(g_h3_resolution, DEFAULT_CAPACITY, DEFAULT_PRECISION);
-    if (!sm) {
+    app.sm = SpatialMemory_new(app.h3_resolution, DEFAULT_CAPACITY, DEFAULT_PRECISION);
+    if (!app.sm) {
       fprintf(stderr, "Failed to initialize spatial memory\n");
     }
     h5_file = H5Fopen(h5_path, H5F_ACC_RDONLY, H5P_DEFAULT);
@@ -977,89 +999,79 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "Failed to open HDF5: %s\n", h5_path);
     } else {
       // Always use DINO embeddings for spatial memory
-      reader = IngestReader_open(h5_file, DINO);
-      if (reader) {
-        printf("HDF5: %zu records, %zu-d embeddings, group='%s'\n", reader->n_records,
-               reader->emb_dimension, DINO);
+      app.reader = IngestReader_open(h5_file, DINO);
+      if (app.reader) {
+        printf("HDF5: %zu records, %zu-d embeddings, group='%s'\n",
+               app.reader->n_records, app.reader->emb_dimension, DINO);
       }
 
       // When -g jepa, load JEPA prediction maps for overlay interpolation
       if (strcmp(group, JEPA) == 0) {
-        jepa_cache = JepaCache_load(h5_file);
-        if (!jepa_cache) {
+        app.jepa_cache = JepaCache_load(h5_file);
+        if (!app.jepa_cache) {
           fprintf(stderr, "Warning: -g jepa but no JEPA prediction maps found; "
                           "falling back to DINO attention overlay\n");
         }
       }
     }
   }
-  g_jepa_cache = jepa_cache;
 
   // Open high-rate IMU/GPS reader (independent of embedding reader)
-  ImuGpsReader *imu_gps = NULL;
   if (h5_file >= 0) {
-    imu_gps = ImuGpsReader_open(h5_file);
-    if (imu_gps) {
+    app.imu_gps = ImuGpsReader_open(h5_file);
+    if (app.imu_gps) {
       printf("ImuGps: imu=%s (%zu samples), gps=%s (%zu samples)\n",
-             imu_gps->has_imu ? "yes" : "no", imu_gps->imu_n_records,
-             imu_gps->has_gps ? "yes" : "no", imu_gps->gps_n_records);
+             app.imu_gps->has_imu ? "yes" : "no", app.imu_gps->imu_n_records,
+             app.imu_gps->has_gps ? "yes" : "no", app.imu_gps->gps_n_records);
     }
   }
-  g_imu_gps = imu_gps;
 
   // Create IMU processor — prefer high-rate IMU, fall back to per-embedding
-  ImuProcessor *imu_proc = NULL;
-  if (imu_gps && imu_gps->has_imu) {
-    imu_proc = ImuProcessor_new(0.3f);
+  if (app.imu_gps && app.imu_gps->has_imu) {
+    app.imu_proc = ImuProcessor_new(0.3f);
     printf("IMU: high-rate (100Hz) motion coloring enabled\n");
-  } else if (reader && reader->has_imu) {
-    imu_proc = ImuProcessor_new(0.3f);
+  } else if (app.reader && app.reader->has_imu) {
+    app.imu_proc = ImuProcessor_new(0.3f);
     printf("IMU: per-embedding (3Hz) motion coloring enabled\n");
   }
-  g_imu_proc = imu_proc;
 
   // Pre-compute first_ts from the embedding stream — embeddings are extracted
   // from video frames, so emb_first_ts corresponds to video PTS 0.
   // IMU samples before the video start will have negative video_time and
   // drain harmlessly on the first frame.
-  if (reader) {
+  if (app.reader) {
     IngestRecord peek_rec;
-    size_t saved = reader->cursor;
-    if (IngestReader_next(reader, &peek_rec)) {
-      first_ts = peek_rec.timestamp;
-      reader->cursor = saved;
+    size_t saved = app.reader->cursor;
+    if (IngestReader_next(app.reader, &peek_rec) == INGEST_READ_OK) {
+      app.first_ts = peek_rec.timestamp;
+      app.reader->cursor = saved;
     }
   }
-  if (first_ts < 0.0 && imu_gps && imu_gps->has_imu && imu_gps->imu_n_records > 0) {
+  if (app.first_ts < 0.0 && app.imu_gps && app.imu_gps->has_imu &&
+      app.imu_gps->imu_n_records > 0) {
     // No embedding reader — fall back to IMU first timestamp
-    first_ts = imu_gps->imu_first_ts;
+    app.first_ts = app.imu_gps->imu_first_ts;
   }
-
-  // Set up global pointers for scroll callback
-  g_sm = sm;
-  g_reader = reader;
-  g_first_ts = &first_ts;
-  g_window_anchor = &window_anchor;
 
   // ---- Create hex renderer, tile map, and GPS trace ----
   HexRenderer *hr = HexRenderer_new(hex_prog);
-  g_hex_renderer = hr;
+  app.hex_renderer = hr;
 
   TileMap *tm = TileMap_new(tile_prog, tile_source.style_name,
                             tile_source.url_template,
                             tile_source.api_key[0] ? tile_source.api_key : NULL);
-  g_tile_map = tm;
+  app.tile_map = tm;
 
   if (!tm) {
     fprintf(stderr, "Failed to initialize tile map for style '%s'\n",
             tile_source.style_name);
     HexRenderer_free(hr);
-    if (jepa_cache) JepaCache_free(jepa_cache);
-    if (imu_proc) ImuProcessor_free(imu_proc);
-    if (imu_gps) ImuGpsReader_close(imu_gps);
-    if (reader) IngestReader_close(reader);
+    if (app.jepa_cache) JepaCache_free(app.jepa_cache);
+    if (app.imu_proc) ImuProcessor_free(app.imu_proc);
+    if (app.imu_gps) ImuGpsReader_close(app.imu_gps);
+    if (app.reader) IngestReader_close(app.reader);
     if (h5_file >= 0) H5Fclose(h5_file);
-    if (sm) SpatialMemory_free(sm);
+    if (app.sm) SpatialMemory_free(app.sm);
     VideoQuad_free(&vq);
     VideoDecoder_close(dec);
     glDeleteProgram(video_prog);
@@ -1075,7 +1087,7 @@ int main(int argc, char *argv[]) {
   printf("Tiles: %s\n", tile_source.style_name);
 
   GpsTrace *gt = GpsTrace_new(hex_prog);
-  g_gps_trace = gt;
+  app.gps_trace = gt;
 
   // ---- Create progress bar ----
   ProgressBar pb = ProgressBar_create(hex_prog);  // reuses hex shader (vec2 pos + vec4 color)
@@ -1090,14 +1102,10 @@ int main(int argc, char *argv[]) {
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-  double video_start_time = glfwGetTime();
-  double video_pts_offset = dec->current_pts;
-  bool video_done = false;
+  app.video_start_time = glfwGetTime();
+  app.video_pts_offset = dec->current_pts;
+  app.video_done = false;
   double last_frame_time = glfwGetTime();
-
-  g_video_start_time = &video_start_time;
-  g_video_pts_offset = &video_pts_offset;
-  g_video_done = &video_done;
 
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
@@ -1111,17 +1119,15 @@ int main(int argc, char *argv[]) {
     glfwGetFramebufferSize(window, &win_w, &win_h);
     int half_w = win_w / 2;
 
-    // Re-read sm in case scroll callback replaced it
-    sm = g_sm;
-
     // ---- Decode video frames ----
-    if (!paused && !video_done) {
-      double wall_elapsed = (glfwGetTime() - video_start_time) * playback_speed;
-      double target_pts = video_pts_offset + wall_elapsed;
+    if (!app.paused && !app.video_done) {
+      double wall_elapsed =
+          (glfwGetTime() - app.video_start_time) * app.playback_speed;
+      double target_pts = app.video_pts_offset + wall_elapsed;
 
       while (dec->current_pts < target_pts) {
         if (!VideoDecoder_next_frame(dec)) {
-          video_done = true;
+          app.video_done = true;
           break;
         }
         VideoQuad_upload(&vq, dec->rgb_buffer, dec->width, dec->height);
@@ -1129,35 +1135,44 @@ int main(int argc, char *argv[]) {
 
       // ---- Drain ingest records up to displayed frame ----
       double drain_pts = dec->current_pts;
-      if (reader && sm) {
+      if (app.reader && app.sm) {
         IngestRecord record;
         bool data_changed = false;
-        while (reader->cursor < reader->n_records) {
-          size_t saved_cursor = reader->cursor;
-          if (!IngestReader_next(reader, &record)) break;
-
-          double record_video_time = record.timestamp - first_ts;
-          if (record_video_time > drain_pts) {
-            reader->cursor = saved_cursor;
+        while (app.reader->cursor < app.reader->n_records) {
+          size_t saved_cursor = app.reader->cursor;
+          IngestReadStatus status = IngestReader_next(app.reader, &record);
+          if (status == INGEST_READ_EOF) break;
+          if (status == INGEST_READ_ERROR) {
+            fprintf(stderr, "Failed to read ingest record at index %zu\n",
+                    saved_cursor);
             break;
           }
 
-          SpatialMemory_advance_to_timestamp(sm, record.timestamp, &window_anchor,
-                                             time_window_sec);
+          double record_video_time = record.timestamp - app.first_ts;
+          if (record_video_time > drain_pts) {
+            app.reader->cursor = saved_cursor;
+            break;
+          }
 
-          if (!SpatialMemory_observe(sm, record.lat, record.lng, record.embedding,
+          SpatialMemory_advance_to_timestamp(app.sm, record.timestamp,
+                                             &app.window_anchor,
+                                             app.time_window_sec);
+
+          if (!SpatialMemory_observe(app.sm, record.lat, record.lng,
+                                     record.embedding,
                                      record.embedding_dim * sizeof(float))) {
             continue;
           }
 
           // GPS trace + IMU: skip when high-rate reader handles it
-          if (!(imu_gps && (imu_gps->has_imu || imu_gps->has_gps))) {
-            if (imu_proc && record.has_imu) {
-              ImuPointMeta meta = ImuProcessor_update(imu_proc, record.accel,
+          if (!(app.imu_gps && (app.imu_gps->has_imu || app.imu_gps->has_gps))) {
+            if (app.imu_proc && record.has_imu) {
+              ImuPointMeta meta = ImuProcessor_update(app.imu_proc, record.accel,
                                                       record.gyro, record.timestamp,
                                                       record.lat, record.lng);
               double blended_lat, blended_lng;
-              ImuProcessor_get_blended_position(imu_proc, &blended_lat, &blended_lng);
+              ImuProcessor_get_blended_position(app.imu_proc, &blended_lat,
+                                                &blended_lng);
               GpsTrace_push(gt, blended_lat, blended_lng, &meta);
             } else {
               GpsTrace_push(gt, record.lat, record.lng, NULL);
@@ -1165,10 +1180,10 @@ int main(int argc, char *argv[]) {
           }
 
           if (has_attention_overlay) {
-            if (jepa_cache) {
+            if (app.jepa_cache) {
               // -g jepa: lookup prediction map at this DINO timestamp
               float *interp_map = NULL;
-              if (JepaCache_lookup(jepa_cache, record.timestamp, &interp_map))
+              if (JepaCache_lookup(app.jepa_cache, record.timestamp, &interp_map))
                 AttentionOverlay_upload(&ao, interp_map, JEPA_MAP_DIM);
             } else if (record.attention_map) {
               // -g dino: use DINO attention maps directly
@@ -1180,52 +1195,60 @@ int main(int argc, char *argv[]) {
         }
 
         if (data_changed) {
-          HexRenderer_update(hr, sm);
+          HexRenderer_update(hr, app.sm);
         }
       }
 
       // ---- Drain high-rate IMU up to displayed PTS ----
-      if (imu_gps && imu_gps->has_imu && imu_proc) {
+      if (app.imu_gps && app.imu_gps->has_imu && app.imu_proc) {
         ImuRecord imu_rec;
-        while (imu_gps->imu_cursor < imu_gps->imu_n_records) {
-          size_t saved = imu_gps->imu_cursor;
-          if (!ImuGpsReader_next_imu(imu_gps, &imu_rec)) break;
+        while (app.imu_gps->imu_cursor < app.imu_gps->imu_n_records) {
+          size_t saved = app.imu_gps->imu_cursor;
+          IngestReadStatus status = ImuGpsReader_next_imu(app.imu_gps, &imu_rec);
+          if (status == INGEST_READ_EOF) break;
+          if (status == INGEST_READ_ERROR) {
+            fprintf(stderr, "Failed to read IMU sample at index %zu\n", saved);
+            break;
+          }
 
-          double imu_video_time = imu_rec.timestamp - first_ts;
+          double imu_video_time = imu_rec.timestamp - app.first_ts;
           if (imu_video_time > drain_pts) {
-            imu_gps->imu_cursor = saved;
+            app.imu_gps->imu_cursor = saved;
             break;
           }
 
           // Interpolate GPS at IMU timestamp
           double gps_lat = 0.0, gps_lng = 0.0;
-          if (imu_gps->has_gps) {
-            ImuGpsReader_interpolate_gps(imu_gps, imu_rec.timestamp, &gps_lat, &gps_lng);
+          if (app.imu_gps->has_gps) {
+            ImuGpsReader_interpolate_gps(app.imu_gps, imu_rec.timestamp, &gps_lat,
+                                         &gps_lng);
           }
 
-          ImuPointMeta meta = ImuProcessor_update(imu_proc, imu_rec.accel,
+          ImuPointMeta meta = ImuProcessor_update(app.imu_proc, imu_rec.accel,
                                                   imu_rec.gyro, imu_rec.timestamp,
                                                   gps_lat, gps_lng);
           double blended_lat, blended_lng;
-          ImuProcessor_get_blended_position(imu_proc, &blended_lat, &blended_lng);
+          ImuProcessor_get_blended_position(app.imu_proc, &blended_lat,
+                                            &blended_lng);
           GpsTrace_push(gt, blended_lat, blended_lng, &meta);
         }
       }
 
       // ---- Drain standalone GPS (no IMU) up to displayed PTS ----
-      if (imu_gps && imu_gps->has_gps && !imu_gps->has_imu) {
-        while (imu_gps->gps_cursor < imu_gps->gps_n_records) {
-          double gps_video_time = imu_gps->gps_ts[imu_gps->gps_cursor] - first_ts;
+      if (app.imu_gps && app.imu_gps->has_gps && !app.imu_gps->has_imu) {
+        while (app.imu_gps->gps_cursor < app.imu_gps->gps_n_records) {
+          double gps_video_time = app.imu_gps->gps_ts[app.imu_gps->gps_cursor] -
+                                  app.first_ts;
           if (gps_video_time > drain_pts) break;
-          double lat = imu_gps->gps_lat[imu_gps->gps_cursor];
-          double lng = imu_gps->gps_lng[imu_gps->gps_cursor];
-          imu_gps->gps_cursor++;
+          double lat = app.imu_gps->gps_lat[app.imu_gps->gps_cursor];
+          double lng = app.imu_gps->gps_lng[app.imu_gps->gps_cursor];
+          app.imu_gps->gps_cursor++;
           GpsTrace_push(gt, lat, lng, NULL);
         }
       }
-    } else if (paused) {
-      video_start_time = glfwGetTime();
-      video_pts_offset = dec->current_pts;
+    } else if (app.paused) {
+      app.video_start_time = glfwGetTime();
+      app.video_pts_offset = dec->current_pts;
     }
 
     // ---- Draw ----
@@ -1250,7 +1273,7 @@ int main(int argc, char *argv[]) {
     ProgressBar_draw(&pb, progress);
 
     // Pause icon overlay
-    if (paused) {
+    if (app.paused) {
       ProgressBar_draw_pause_icon(&pb);
     }
 
@@ -1260,19 +1283,21 @@ int main(int argc, char *argv[]) {
     double map_center_lat = 0.0;
     double map_center_lng = 0.0;
     double map_target_lat, map_target_lng;
-    if (current_map_target_center(&map_target_lat, &map_target_lng)) {
-      if (!g_map_view_initialized) {
-        snap_map_view_to(map_target_lat, map_target_lng);
-      } else if (!g_dragging) {
+    if (current_map_target_center(&app, &map_target_lat, &map_target_lng)) {
+      if (!app.map_view_initialized) {
+        snap_map_view_to(&app, map_target_lat, map_target_lng);
+      } else if (!app.dragging) {
         double follow_alpha = 1.0 - exp(-8.0 * frame_dt);
-        g_map_view_center_lat += (map_target_lat - g_map_view_center_lat) * follow_alpha;
-        g_map_view_center_lng += (map_target_lng - g_map_view_center_lng) * follow_alpha;
+        app.map_view_center_lat +=
+            (map_target_lat - app.map_view_center_lat) * follow_alpha;
+        app.map_view_center_lng +=
+            (map_target_lng - app.map_view_center_lng) * follow_alpha;
       }
-      map_center_lat = g_map_view_center_lat;
-      map_center_lng = g_map_view_center_lng;
-    } else if (g_map_view_initialized) {
-      map_center_lat = g_map_view_center_lat;
-      map_center_lng = g_map_view_center_lng;
+      map_center_lat = app.map_view_center_lat;
+      map_center_lng = app.map_view_center_lng;
+    } else if (app.map_view_initialized) {
+      map_center_lat = app.map_view_center_lat;
+      map_center_lng = app.map_view_center_lng;
     }
 
     glDisable(GL_BLEND);
@@ -1301,12 +1326,12 @@ int main(int argc, char *argv[]) {
   glDeleteProgram(hex_prog);
   glDeleteProgram(tile_prog);
 
-  if (jepa_cache) JepaCache_free(jepa_cache);
-  if (imu_proc) ImuProcessor_free(imu_proc);
-  if (imu_gps) ImuGpsReader_close(imu_gps);
-  if (reader) IngestReader_close(reader);
+  if (app.jepa_cache) JepaCache_free(app.jepa_cache);
+  if (app.imu_proc) ImuProcessor_free(app.imu_proc);
+  if (app.imu_gps) ImuGpsReader_close(app.imu_gps);
+  if (app.reader) IngestReader_close(app.reader);
   if (h5_file >= 0) H5Fclose(h5_file);
-  if (sm) SpatialMemory_free(sm);
+  if (app.sm) SpatialMemory_free(app.sm);
 
   glfwDestroyWindow(window);
   glfwTerminate();

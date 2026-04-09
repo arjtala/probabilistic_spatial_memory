@@ -48,10 +48,18 @@ typedef struct {
   bool has_imu;
 } IngestRecord;
 
+typedef enum {
+  INGEST_READ_ERROR = -1,
+  INGEST_READ_EOF = 0,
+  INGEST_READ_OK = 1,
+} IngestReadStatus;
+
 IngestReader *IngestReader_open(hid_t file, const char *group);
 void IngestReader_close(IngestReader *reader);
-bool IngestReader_next(IngestReader *reader, IngestRecord *record);
-void IngestReader_run(IngestReader *reader, SpatialMemory *sm, const double time_window_sec);
+IngestReadStatus IngestReader_next(IngestReader *reader,
+                                   IngestRecord *record);
+bool IngestReader_run(IngestReader *reader, SpatialMemory *sm,
+                      const double time_window_sec);
 
 // ---- High-rate IMU/GPS reader ----
 
@@ -84,8 +92,9 @@ typedef struct {
 } ImuGpsReader;
 
 ImuGpsReader *ImuGpsReader_open(hid_t file);
-bool ImuGpsReader_next_imu(ImuGpsReader *r, ImuRecord *rec);
-void ImuGpsReader_interpolate_gps(ImuGpsReader *r, double timestamp, double *lat, double *lng);
+IngestReadStatus ImuGpsReader_next_imu(ImuGpsReader *r, ImuRecord *rec);
+bool ImuGpsReader_interpolate_gps(ImuGpsReader *r, double timestamp,
+                                  double *lat, double *lng);
 void ImuGpsReader_close(ImuGpsReader *r);
 
 #endif

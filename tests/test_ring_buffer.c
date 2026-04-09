@@ -21,9 +21,22 @@ void test_ring_buffer_new(void) {
 
 void test_ring_buffer_new_invalid_args(void) {
   RingBuffer *no_capacity = RingBuffer_new(0, PRECISION);
-  RingBuffer *bad_precision = RingBuffer_new(CAPACITY, 3);
+  RingBuffer *too_small_precision =
+      RingBuffer_new(CAPACITY, RingBuffer_precision_min() - 1);
+  RingBuffer *too_large_precision =
+      RingBuffer_new(CAPACITY, RingBuffer_precision_max() + 1);
   ASSERT(NULL == no_capacity, 1, NULL == no_capacity);
-  ASSERT(NULL == bad_precision, 1, NULL == bad_precision);
+  ASSERT(NULL == too_small_precision, 1, NULL == too_small_precision);
+  ASSERT(NULL == too_large_precision, 1, NULL == too_large_precision);
+}
+
+void test_ring_buffer_precision_limits(void) {
+  RingBuffer *min_precision = RingBuffer_new(CAPACITY, RingBuffer_precision_min());
+  RingBuffer *max_precision = RingBuffer_new(CAPACITY, RingBuffer_precision_max());
+  ASSERT(NULL != min_precision, 1, NULL != min_precision);
+  ASSERT(NULL != max_precision, 1, NULL != max_precision);
+  RingBuffer_free(min_precision);
+  RingBuffer_free(max_precision);
 }
 
 void test_ring_buffer_current(void) {
@@ -102,6 +115,7 @@ void test_ring_buffer_merge_window(void) {
 int main(void) {
   RUN_TEST(test_ring_buffer_new);
   RUN_TEST(test_ring_buffer_new_invalid_args);
+  RUN_TEST(test_ring_buffer_precision_limits);
   RUN_TEST(test_ring_buffer_current);
   RUN_TEST(test_ring_buffer_advance);
   RUN_TEST(test_ring_buffer_wrap);

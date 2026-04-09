@@ -17,6 +17,10 @@ typedef struct {
   HLL *hlls[];
 } RingBuffer;
 
+size_t RingBuffer_precision_min(void);
+size_t RingBuffer_precision_max(void);
+bool RingBuffer_precision_is_valid(size_t precision);
+
 RingBuffer *RingBuffer_new(const size_t capacity, const size_t precision);
 void RingBuffer_free(RingBuffer *rb);
 void RingBuffer_advance(RingBuffer *rb);

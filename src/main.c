@@ -55,7 +55,13 @@ int main(int argc, char *argv[]) {
 
   printf("Records: %zu, Embedding dim: %zu\n", reader->n_records, reader->emb_dimension);
 
-  IngestReader_run(reader, sm, time_window_sec);
+  if (!IngestReader_run(reader, sm, time_window_sec)) {
+    fprintf(stderr, "Failed while reading records from group '%s'\n", group);
+    IngestReader_close(reader);
+    H5Fclose(file);
+    SpatialMemory_free(sm);
+    return 1;
+  }
 
   printf("Tiles created: %zu\n", SpatialMemory_tile_count(sm));
   HashTableIterator it = HashTable_iterator(sm->tiles);

@@ -29,6 +29,12 @@ void test_sm_new_invalid_resolution(void) {
   ASSERT(NULL == sm, 1, NULL == sm);
 }
 
+void test_sm_new_invalid_precision(void) {
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY,
+                                        RingBuffer_precision_max() + 1);
+  ASSERT(NULL == sm, 1, NULL == sm);
+}
+
 void test_sm_observe(void) {
   SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION);
   const char *pb = "peanut butter";
@@ -154,6 +160,7 @@ void test_sm_same_cell_deduplicates_observations(void) {
 int main(void) {
   RUN_TEST(test_sm_new);
   RUN_TEST(test_sm_new_invalid_resolution);
+  RUN_TEST(test_sm_new_invalid_precision);
   RUN_TEST(test_sm_observe);
   RUN_TEST(test_sm_query);
   RUN_TEST(test_sm_advance_all);

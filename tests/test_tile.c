@@ -27,8 +27,11 @@ void test_tile_new(void) {
 void test_tile_new_invalid_input(void) {
   Tile *bad_resolution = Tile_new(LAT, LNG, 16, CAPACITY, PRECISION);
   Tile *bad_lat = Tile_new(100.0, LNG, RESOLUTION, CAPACITY, PRECISION);
+  Tile *bad_precision = Tile_new(LAT, LNG, RESOLUTION, CAPACITY,
+                                 RingBuffer_precision_min() - 1);
   ASSERT(NULL == bad_resolution, 1, NULL == bad_resolution);
   ASSERT(NULL == bad_lat, 1, NULL == bad_lat);
+  ASSERT(NULL == bad_precision, 1, NULL == bad_precision);
 }
 
 void test_tile_coords_to_cell(void) {

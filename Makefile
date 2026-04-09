@@ -65,6 +65,7 @@ TEST_INGEST = $(BUILD_DIR)/test_ingest
 TEST_JEPA_CACHE = $(BUILD_DIR)/test_jepa_cache
 TEST_VIZ_MATH = $(BUILD_DIR)/test_viz_math
 TEST_VIZ_CONFIG = $(BUILD_DIR)/test_viz_config
+TEST_GPS_TRACE = $(BUILD_DIR)/test_gps_trace
 
 # Default target
 all: $(LIB) $(BIN)
@@ -127,7 +128,7 @@ $(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(VENDOR_HEADERS) $(TOOLCHAIN_INFO)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
 # Test targets
-test: test-ring-buffer test-tile test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config
+test: test-ring-buffer test-tile test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace
 
 test-ring-buffer: $(TEST_RING_BUFFER)
 	./$(TEST_RING_BUFFER)
@@ -179,6 +180,13 @@ $(TEST_VIZ_CONFIG): tests/test_viz_config.c src/viz/viz_config.c include/viz/viz
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) tests/test_viz_config.c src/viz/viz_config.c build/vendor/lib/utilities.o -o $@
 
+test-gps-trace: $(TEST_GPS_TRACE)
+	./$(TEST_GPS_TRACE)
+
+$(TEST_GPS_TRACE): tests/test_gps_trace.c src/viz/gps_trace.c src/viz/viz_math.c include/viz/gps_trace.h include/viz/viz_math.h include/viz/imu_processor.h build/vendor/lib/utilities.o $(TOOLCHAIN_INFO)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(VIZ_CFLAGS) $(VENDOR_INCLUDES) tests/test_gps_trace.c src/viz/gps_trace.c src/viz/viz_math.c build/vendor/lib/utilities.o -o $@ -framework OpenGL -lm
+
 # Clean target
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET_DIR)
@@ -187,7 +195,7 @@ clean:
 rebuild: clean all
 
 # Phony targets
-.PHONY: all viz test test-ring-buffer test-tile test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config clean rebuild show run FORCE
+.PHONY: all viz test test-ring-buffer test-tile test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace clean rebuild show run FORCE
 
 # Show detected files
 show:

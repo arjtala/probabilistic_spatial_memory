@@ -3,13 +3,27 @@
 #include <stdlib.h>
 #include "core/ring_buffer.h"
 
+size_t RingBuffer_precision_min(void) {
+  return 4;
+}
+
+size_t RingBuffer_precision_max(void) {
+  return 8 * sizeof(uint64_t);
+}
+
+bool RingBuffer_precision_is_valid(size_t precision) {
+  return precision >= RingBuffer_precision_min() &&
+         precision <= RingBuffer_precision_max();
+}
+
 RingBuffer *RingBuffer_new(const size_t capacity, const size_t precision) {
   if (capacity == 0) {
     fprintf(stderr, "RingBuffer_new: capacity must be greater than 0\n");
     return NULL;
   }
-  if (precision < 4 || precision > 8 * sizeof(uint64_t)) {
-    fprintf(stderr, "RingBuffer_new: precision %zu is out of range\n", precision);
+  if (!RingBuffer_precision_is_valid(precision)) {
+    fprintf(stderr, "RingBuffer_new: precision %zu is out of range [%zu, %zu]\n",
+            precision, RingBuffer_precision_min(), RingBuffer_precision_max());
     return NULL;
   }
 

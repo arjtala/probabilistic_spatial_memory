@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "ingest/ingest.h"
 
 static void close_dataset(hid_t *dataset) {
@@ -167,9 +168,27 @@ static bool read_full_double_dataset(hid_t dataset, double *out,
   return true;
 }
 
+static void cleanup_imu_gps_open_state(hid_t *imu_ds_ts,
+                                       hid_t *imu_ds_accel,
+                                       hid_t *imu_ds_gyro,
+                                       double **gps_ts,
+                                       double **gps_lat,
+                                       double **gps_lng) {
+  close_dataset(imu_ds_ts);
+  close_dataset(imu_ds_accel);
+  close_dataset(imu_ds_gyro);
+
+  free(*gps_ts);
+  free(*gps_lat);
+  free(*gps_lng);
+  *gps_ts = NULL;
+  *gps_lat = NULL;
+  *gps_lng = NULL;
+}
+
 IngestReader *IngestReader_open(hid_t file, const char *group) {
-  if (file < 0) {
-    fprintf(stderr, "IngestReader_open: invalid file handle\n");
+  if (file < 0 || !group || group[0] == '\0') {
+    fprintf(stderr, "IngestReader_open: invalid file handle or group\n");
     return NULL;
   }
 
@@ -306,9 +325,11 @@ IngestReader *IngestReader_open(hid_t file, const char *group) {
   return reader;
 }
 
-bool IngestReader_next(IngestReader *reader, IngestRecord *record) {
+IngestReadStatus IngestReader_next(IngestReader *reader, IngestRecord *record) {
+  if (record) memset(record, 0, sizeof(*record));
+  if (!reader || !record) return INGEST_READ_ERROR;
   if (reader->cursor >= reader->n_records)
-    return false;
+    return INGEST_READ_EOF;
   size_t cur = reader->cursor;
 
   if (!read_double_row(reader->dataset_ts, cur, &record->timestamp, TIMESTAMPS) ||
@@ -316,7 +337,7 @@ bool IngestReader_next(IngestReader *reader, IngestRecord *record) {
       !read_double_row(reader->dataset_lng, cur, &record->lng, LNG) ||
       !read_float_row(reader->dataset_emb, cur, reader->emb_dimension,
                       reader->embedding_buf, EMBEDDINGS)) {
-    return false;
+    return INGEST_READ_ERROR;
   }
 
   record->embedding = reader->embedding_buf;
@@ -326,7 +347,7 @@ bool IngestReader_next(IngestReader *reader, IngestRecord *record) {
   if (reader->dataset_attn >= 0) {
     if (!read_float_square_map(reader->dataset_attn, cur, reader->attn_size,
                                reader->attn_buf, "spatial_map")) {
-      return false;
+      return INGEST_READ_ERROR;
     }
     record->attention_map = reader->attn_buf;
     record->attn_size = reader->attn_size;
@@ -339,7 +360,7 @@ bool IngestReader_next(IngestReader *reader, IngestRecord *record) {
   if (reader->has_imu) {
     if (!read_float_row(reader->dataset_accel, cur, 3, reader->accel_buf, ACCEL) ||
         !read_float_row(reader->dataset_gyro, cur, 3, reader->gyro_buf, GYRO)) {
-      return false;
+      return INGEST_READ_ERROR;
     }
 
     record->accel[0] = reader->accel_buf[0];
@@ -357,7 +378,7 @@ bool IngestReader_next(IngestReader *reader, IngestRecord *record) {
 
   reader->cursor++;
 
-  return true;
+  return INGEST_READ_OK;
 }
 
 void IngestReader_close(IngestReader *reader) {
@@ -374,10 +395,17 @@ void IngestReader_close(IngestReader *reader) {
   free(reader);
 }
 
-void IngestReader_run(IngestReader *reader, SpatialMemory *sm, const double time_window_sec) {
+bool IngestReader_run(IngestReader *reader, SpatialMemory *sm,
+                      const double time_window_sec) {
   IngestRecord record;
   double window_anchor = -1.0;
-  while (IngestReader_next(reader, &record)) {
+  if (!reader || !sm || time_window_sec <= 0.0) return false;
+
+  while (true) {
+    IngestReadStatus status = IngestReader_next(reader, &record);
+    if (status == INGEST_READ_EOF) return true;
+    if (status == INGEST_READ_ERROR) return false;
+
     SpatialMemory_advance_to_timestamp(sm, record.timestamp, &window_anchor,
                                        time_window_sec);
     if (!SpatialMemory_observe(sm, record.lat, record.lng, record.embedding,
@@ -406,6 +434,8 @@ ImuGpsReader *ImuGpsReader_open(hid_t file) {
   if (link_exists(file, "imu")) {
     hid_t imu_grp = H5Gopen(file, "imu", H5P_DEFAULT);
     if (imu_grp < 0) {
+      cleanup_imu_gps_open_state(&imu_ds_ts, &imu_ds_accel, &imu_ds_gyro,
+                                 &gps_ts, &gps_lat, &gps_lng);
       return NULL;
     }
 
@@ -421,6 +451,8 @@ ImuGpsReader *ImuGpsReader_open(hid_t file) {
       if (!(has_ts && has_accel && has_gyro)) {
         fprintf(stderr, "ImuGpsReader_open: incomplete IMU datasets\n");
         H5Gclose(imu_grp);
+        cleanup_imu_gps_open_state(&imu_ds_ts, &imu_ds_accel, &imu_ds_gyro,
+                                   &gps_ts, &gps_lat, &gps_lng);
         return NULL;
       }
 
@@ -432,17 +464,15 @@ ImuGpsReader *ImuGpsReader_open(hid_t file) {
           !get_dataset_dims(imu_ds_accel, 2, accel_dims, "imu/accel") ||
           !get_dataset_dims(imu_ds_gyro, 2, gyro_dims, "imu/gyro")) {
         H5Gclose(imu_grp);
-        close_dataset(&imu_ds_ts);
-        close_dataset(&imu_ds_accel);
-        close_dataset(&imu_ds_gyro);
+        cleanup_imu_gps_open_state(&imu_ds_ts, &imu_ds_accel, &imu_ds_gyro,
+                                   &gps_ts, &gps_lat, &gps_lng);
         return NULL;
       }
       if (!validate_imu_dataset_shapes(ts_dims[0], accel_dims, gyro_dims,
                                        "ImuGpsReader_open", NULL)) {
         H5Gclose(imu_grp);
-        close_dataset(&imu_ds_ts);
-        close_dataset(&imu_ds_accel);
-        close_dataset(&imu_ds_gyro);
+        cleanup_imu_gps_open_state(&imu_ds_ts, &imu_ds_accel, &imu_ds_gyro,
+                                   &gps_ts, &gps_lat, &gps_lng);
         return NULL;
       }
 
@@ -457,9 +487,8 @@ ImuGpsReader *ImuGpsReader_open(hid_t file) {
   if (link_exists(file, "gps")) {
     hid_t gps_grp = H5Gopen(file, "gps", H5P_DEFAULT);
     if (gps_grp < 0) {
-      close_dataset(&imu_ds_ts);
-      close_dataset(&imu_ds_accel);
-      close_dataset(&imu_ds_gyro);
+      cleanup_imu_gps_open_state(&imu_ds_ts, &imu_ds_accel, &imu_ds_gyro,
+                                 &gps_ts, &gps_lat, &gps_lng);
       return NULL;
     }
 
@@ -478,9 +507,8 @@ ImuGpsReader *ImuGpsReader_open(hid_t file) {
       if (!(has_ts && has_lat && has_lng)) {
         fprintf(stderr, "ImuGpsReader_open: incomplete GPS datasets\n");
         H5Gclose(gps_grp);
-        close_dataset(&imu_ds_ts);
-        close_dataset(&imu_ds_accel);
-        close_dataset(&imu_ds_gyro);
+        cleanup_imu_gps_open_state(&imu_ds_ts, &imu_ds_accel, &imu_ds_gyro,
+                                   &gps_ts, &gps_lat, &gps_lng);
         return NULL;
       }
 
@@ -495,9 +523,8 @@ ImuGpsReader *ImuGpsReader_open(hid_t file) {
         close_dataset(&gps_ds_ts);
         close_dataset(&gps_ds_lat);
         close_dataset(&gps_ds_lng);
-        close_dataset(&imu_ds_ts);
-        close_dataset(&imu_ds_accel);
-        close_dataset(&imu_ds_gyro);
+        cleanup_imu_gps_open_state(&imu_ds_ts, &imu_ds_accel, &imu_ds_gyro,
+                                   &gps_ts, &gps_lat, &gps_lng);
         return NULL;
       }
       if (lat_dims[0] != ts_dims[0] || lng_dims[0] != ts_dims[0]) {
@@ -506,9 +533,8 @@ ImuGpsReader *ImuGpsReader_open(hid_t file) {
         close_dataset(&gps_ds_ts);
         close_dataset(&gps_ds_lat);
         close_dataset(&gps_ds_lng);
-        close_dataset(&imu_ds_ts);
-        close_dataset(&imu_ds_accel);
-        close_dataset(&imu_ds_gyro);
+        cleanup_imu_gps_open_state(&imu_ds_ts, &imu_ds_accel, &imu_ds_gyro,
+                                   &gps_ts, &gps_lat, &gps_lng);
         return NULL;
       }
 
@@ -522,16 +548,12 @@ ImuGpsReader *ImuGpsReader_open(hid_t file) {
             !read_full_double_dataset(gps_ds_ts, gps_ts, "gps/timestamps") ||
             !read_full_double_dataset(gps_ds_lat, gps_lat, "gps/lat") ||
             !read_full_double_dataset(gps_ds_lng, gps_lng, "gps/lng")) {
-          free(gps_ts);
-          free(gps_lat);
-          free(gps_lng);
           H5Gclose(gps_grp);
           close_dataset(&gps_ds_ts);
           close_dataset(&gps_ds_lat);
           close_dataset(&gps_ds_lng);
-          close_dataset(&imu_ds_ts);
-          close_dataset(&imu_ds_accel);
-          close_dataset(&imu_ds_gyro);
+          cleanup_imu_gps_open_state(&imu_ds_ts, &imu_ds_accel, &imu_ds_gyro,
+                                     &gps_ts, &gps_lat, &gps_lng);
           return NULL;
         }
         found_gps = true;
@@ -549,12 +571,8 @@ ImuGpsReader *ImuGpsReader_open(hid_t file) {
 
   ImuGpsReader *r = calloc(1, sizeof(ImuGpsReader));
   if (!r) {
-    close_dataset(&imu_ds_ts);
-    close_dataset(&imu_ds_accel);
-    close_dataset(&imu_ds_gyro);
-    free(gps_ts);
-    free(gps_lat);
-    free(gps_lng);
+    cleanup_imu_gps_open_state(&imu_ds_ts, &imu_ds_accel, &imu_ds_gyro,
+                               &gps_ts, &gps_lat, &gps_lng);
     return NULL;
   }
   r->imu_dataset_ts = -1;
@@ -587,39 +605,44 @@ ImuGpsReader *ImuGpsReader_open(hid_t file) {
   return r;
 }
 
-bool ImuGpsReader_next_imu(ImuGpsReader *r, ImuRecord *rec) {
-  if (!r || !r->has_imu || r->imu_cursor >= r->imu_n_records)
-    return false;
+IngestReadStatus ImuGpsReader_next_imu(ImuGpsReader *r, ImuRecord *rec) {
+  if (rec) memset(rec, 0, sizeof(*rec));
+  if (!r || !rec || !r->has_imu)
+    return INGEST_READ_ERROR;
+  if (r->imu_cursor >= r->imu_n_records)
+    return INGEST_READ_EOF;
   size_t row = r->imu_cursor;
   if (!read_double_row(r->imu_dataset_ts, row, &rec->timestamp, "imu/timestamps") ||
       !read_float_row(r->imu_dataset_accel, row, 3, rec->accel, "imu/accel") ||
       !read_float_row(r->imu_dataset_gyro, row, 3, rec->gyro, "imu/gyro")) {
-    return false;
+    return INGEST_READ_ERROR;
   }
 
   r->imu_cursor++;
-  return true;
+  return INGEST_READ_OK;
 }
 
-void ImuGpsReader_interpolate_gps(ImuGpsReader *r, double timestamp, double *lat, double *lng) {
+bool ImuGpsReader_interpolate_gps(ImuGpsReader *r, double timestamp, double *lat,
+                                  double *lng) {
+  if (!lat || !lng) return false;
   if (!r || !r->has_gps || r->gps_n_records == 0) {
     *lat = 0.0;
     *lng = 0.0;
-    return;
+    return false;
   }
 
   // Before first sample — clamp
   if (timestamp <= r->gps_ts[0]) {
     *lat = r->gps_lat[0];
     *lng = r->gps_lng[0];
-    return;
+    return true;
   }
 
   // After last sample — clamp
   if (timestamp >= r->gps_ts[r->gps_n_records - 1]) {
     *lat = r->gps_lat[r->gps_n_records - 1];
     *lng = r->gps_lng[r->gps_n_records - 1];
-    return;
+    return true;
   }
 
   // Advance cursor forward to bracket the timestamp
@@ -633,12 +656,13 @@ void ImuGpsReader_interpolate_gps(ImuGpsReader *r, double timestamp, double *lat
   if (dt < 1e-12) {
     *lat = r->gps_lat[i];
     *lng = r->gps_lng[i];
-    return;
+    return true;
   }
 
   double t = (timestamp - r->gps_ts[i]) / dt;
   *lat = r->gps_lat[i] + t * (r->gps_lat[i + 1] - r->gps_lat[i]);
   *lng = r->gps_lng[i] + t * (r->gps_lng[i + 1] - r->gps_lng[i]);
+  return true;
 }
 
 void ImuGpsReader_close(ImuGpsReader *r) {
