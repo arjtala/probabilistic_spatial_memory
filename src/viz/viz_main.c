@@ -28,6 +28,9 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+#define MIN_VIDEO_DECODE_BUDGET 4
+#define MAX_VIDEO_DECODE_BUDGET 24
+
 typedef struct {
   bool paused;
   double playback_speed;
@@ -69,6 +72,14 @@ typedef struct {
 
 static VizApp *app_from_window(GLFWwindow *window) {
   return (VizApp *)glfwGetWindowUserPointer(window);
+}
+
+static int video_decode_budget(const VizApp *app) {
+  double scaled = app ? app->playback_speed * 6.0 : 6.0;
+  int budget = (int)ceil(scaled);
+  if (budget < MIN_VIDEO_DECODE_BUDGET) return MIN_VIDEO_DECODE_BUDGET;
+  if (budget > MAX_VIDEO_DECODE_BUDGET) return MAX_VIDEO_DECODE_BUDGET;
+  return budget;
 }
 
 static double clamp_map_zoom(double zoom) {
@@ -882,18 +893,27 @@ int main(int argc, char *argv[]) {
       double wall_elapsed = (frame_time - app.video_start_time) * app.playback_speed;
       double target_pts = app.video_pts_offset + wall_elapsed;
       bool video_frame_advanced = false;
+      int decode_steps = 0;
+      int decode_budget = video_decode_budget(&app);
 
-      while (dec->current_pts < target_pts) {
+      while (dec->current_pts < target_pts && decode_steps < decode_budget) {
         if (!VideoDecoder_next_frame(dec)) {
           app.video_done = true;
           break;
         }
         video_frame_advanced = true;
+        decode_steps++;
       }
 
       // Only the last decoded frame is visible, so upload once per tick.
       if (video_frame_advanced) {
         VideoQuad_upload(&vq, dec->rgb_buffer, dec->width, dec->height);
+      }
+
+      // If we still have backlog after spending this frame's decode budget,
+      // drop the remaining lag and continue from the most recently decoded frame.
+      if (!app.video_done && dec->current_pts < target_pts) {
+        reset_playback_timing(&app, frame_time);
       }
 
       // ---- Drain ingest records up to displayed frame ----

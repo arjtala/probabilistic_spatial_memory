@@ -1,0 +1,172 @@
+#define _POSIX_C_SOURCE 200809L
+
+#include <errno.h>
+#include <math.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include "core/spatial_memory.h"
+
+typedef struct {
+  double lat;
+  double lng;
+} Coord;
+
+static double monotonic_seconds(void) {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
+}
+
+static bool parse_size_arg(const char *text, const char *name, size_t *out) {
+  char *end = NULL;
+  unsigned long long value;
+
+  errno = 0;
+  value = strtoull(text, &end, 10);
+  if (errno != 0 || end == text || *end != '\0' || value == 0ULL) {
+    fprintf(stderr, "Invalid %s: '%s'\n", name, text);
+    return false;
+  }
+  *out = (size_t)value;
+  return true;
+}
+
+static void fill_grid(Coord *coords, size_t count) {
+  size_t side = (size_t)ceil(sqrt((double)count));
+  size_t idx = 0;
+  const double base_lat = 37.7749;
+  const double base_lng = -122.4194;
+  const double step = 0.0025;
+
+  for (size_t y = 0; y < side && idx < count; y++) {
+    double y_off = (double)y - (double)(side - 1) / 2.0;
+    for (size_t x = 0; x < side && idx < count; x++) {
+      double x_off = (double)x - (double)(side - 1) / 2.0;
+      coords[idx].lat = base_lat + y_off * step;
+      coords[idx].lng = base_lng + x_off * step;
+      idx++;
+    }
+  }
+}
+
+static void fail_benchmark(const char *message) {
+  fprintf(stderr, "%s\n", message);
+  exit(EXIT_FAILURE);
+}
+
+static void populate_grid_memory(SpatialMemory *sm, const Coord *coords,
+                                 size_t observe_ops, size_t grid_cells) {
+  for (size_t i = 0; i < observe_ops; i++) {
+    uint64_t payload = (uint64_t)i;
+    const Coord *coord = &coords[i % grid_cells];
+    if (!SpatialMemory_observe(sm, coord->lat, coord->lng,
+                               &payload, sizeof(payload))) {
+      fail_benchmark("SpatialMemory_observe failed during benchmark setup");
+    }
+  }
+}
+
+static void run_same_cell_observe(size_t observe_ops) {
+  SpatialMemory *sm = SpatialMemory_new(DEFAULT_RESOLUTION,
+                                        DEFAULT_CAPACITY,
+                                        DEFAULT_PRECISION);
+  if (!sm) fail_benchmark("Failed to create SpatialMemory for same-cell benchmark");
+
+  const double lat = 37.7749;
+  const double lng = -122.4194;
+  double start = monotonic_seconds();
+  for (size_t i = 0; i < observe_ops; i++) {
+    uint64_t payload = (uint64_t)i;
+    if (!SpatialMemory_observe(sm, lat, lng, &payload, sizeof(payload))) {
+      fail_benchmark("SpatialMemory_observe failed in same-cell benchmark");
+    }
+  }
+  double elapsed = monotonic_seconds() - start;
+
+  printf("observe_same_cell  ops=%zu  tiles=%zu  secs=%.3f  ops/sec=%.0f\n",
+         observe_ops, SpatialMemory_tile_count(sm), elapsed,
+         elapsed > 0.0 ? (double)observe_ops / elapsed : 0.0);
+  SpatialMemory_free(sm);
+}
+
+static void run_grid_observe(const Coord *coords, size_t observe_ops,
+                             size_t grid_cells) {
+  SpatialMemory *sm = SpatialMemory_new(DEFAULT_RESOLUTION,
+                                        DEFAULT_CAPACITY,
+                                        DEFAULT_PRECISION);
+  if (!sm) fail_benchmark("Failed to create SpatialMemory for grid benchmark");
+
+  double start = monotonic_seconds();
+  populate_grid_memory(sm, coords, observe_ops, grid_cells);
+  double elapsed = monotonic_seconds() - start;
+
+  printf("observe_grid       ops=%zu  tiles=%zu  secs=%.3f  ops/sec=%.0f\n",
+         observe_ops, SpatialMemory_tile_count(sm), elapsed,
+         elapsed > 0.0 ? (double)observe_ops / elapsed : 0.0);
+  SpatialMemory_free(sm);
+}
+
+static void run_grid_query(const Coord *coords, size_t observe_ops,
+                           size_t query_ops, size_t grid_cells) {
+  SpatialMemory *sm = SpatialMemory_new(DEFAULT_RESOLUTION,
+                                        DEFAULT_CAPACITY,
+                                        DEFAULT_PRECISION);
+  if (!sm) fail_benchmark("Failed to create SpatialMemory for query benchmark");
+
+  populate_grid_memory(sm, coords, observe_ops, grid_cells);
+
+  double total = 0.0;
+  double start = monotonic_seconds();
+  for (size_t i = 0; i < query_ops; i++) {
+    const Coord *coord = &coords[i % grid_cells];
+    double count = 0.0;
+    if (!SpatialMemory_query(sm, coord->lat, coord->lng,
+                             DEFAULT_CAPACITY - 1, &count)) {
+      fail_benchmark("SpatialMemory_query failed in grid benchmark");
+    }
+    total += count;
+  }
+  double elapsed = monotonic_seconds() - start;
+
+  printf("query_grid         ops=%zu  total=%.0f  secs=%.3f  ops/sec=%.0f\n",
+         query_ops, total, elapsed,
+         elapsed > 0.0 ? (double)query_ops / elapsed : 0.0);
+  SpatialMemory_free(sm);
+}
+
+int main(int argc, char *argv[]) {
+  size_t observe_ops = 200000;
+  size_t query_ops = 200000;
+  size_t grid_cells = 1024;
+
+  if (argc > 1 && !parse_size_arg(argv[1], "observe_ops", &observe_ops)) {
+    return 1;
+  }
+  if (argc > 2 && !parse_size_arg(argv[2], "grid_cells", &grid_cells)) {
+    return 1;
+  }
+  if (argc > 3 && !parse_size_arg(argv[3], "query_ops", &query_ops)) {
+    return 1;
+  }
+
+  Coord *coords = malloc(grid_cells * sizeof(*coords));
+  if (!coords) {
+    fail_benchmark("Failed to allocate benchmark coordinate grid");
+  }
+  fill_grid(coords, grid_cells);
+
+  printf("SpatialMemory benchmark\n");
+  printf("  observe_ops: %zu\n", observe_ops);
+  printf("  grid_cells:  %zu\n", grid_cells);
+  printf("  query_ops:   %zu\n", query_ops);
+
+  run_same_cell_observe(observe_ops);
+  run_grid_observe(coords, observe_ops, grid_cells);
+  run_grid_query(coords, observe_ops, query_ops, grid_cells);
+
+  free(coords);
+  return 0;
+}

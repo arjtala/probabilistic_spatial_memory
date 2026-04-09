@@ -1,0 +1,14 @@
+# Balanced preset for everyday viz use.
+# Override session_dir/video_path/features_path as needed.
+
+session_dir = "./session"
+
+group = "dino"
+time_window_sec = 5.0
+h3_resolution = 10
+
+scrub_sensitivity_sec = 2.0
+map_follow_smoothing = 9.0
+tile_uploads_per_frame = 2
+
+tile_style = "CartoDB.Positron"

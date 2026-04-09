@@ -71,6 +71,7 @@ Merging HLL slots gives "memory over the last N intervals" with natural time dec
 ```bash
 make          # build library and CLI → targets/psm
 make viz      # build visualizer → targets/psm-viz
+make bench-spatial-memory  # run a lightweight SpatialMemory throughput benchmark
 make test     # build and run tests
 make clean    # remove build artifacts and targets/
 ```
@@ -97,6 +98,8 @@ make H3_PREFIX=/opt/h3 HDF5_PREFIX=/opt/hdf5 \
 # Config file (defaults < config < CLI)
 targets/psm-viz -c psm-viz.toml.example
 targets/psm-viz -c /path/to/psm-viz.toml -g jepa
+targets/psm-viz -c configs/psm-viz-balanced.toml -d /path/to/session
+targets/psm-viz -c configs/psm-viz-low-hitch.toml -d /path/to/session
 
 # Directory mode — finds *.mp4 and features.h5 automatically
 targets/psm-viz -d /path/to/session/
@@ -144,6 +147,10 @@ tile_style = "CartoDB.Positron"
 
 Relative paths in the config resolve relative to the config file itself. CLI flags override config values.
 
+Ready-made presets:
+- `configs/psm-viz-balanced.toml`: a good default balance between responsiveness and tile fill speed.
+- `configs/psm-viz-low-hitch.toml`: prioritizes smoother interaction with fewer tile uploads per frame and gentler follow behavior.
+
 Tuning keys:
 - `scrub_sensitivity_sec`: seconds moved per horizontal scroll step on the video pane.
 - `map_follow_smoothing`: exponential follow rate for GPS/IMU-driven recentering. Higher values snap faster.
@@ -173,6 +180,20 @@ Preview the providers here: <https://leaflet-extras.github.io/leaflet-providers/
 | Q / Esc | Quit |
 
 **Layout:** Left half shows video with optional attention/prediction heatmap overlay. Right half shows configurable raster tiles (default: `CartoDB.Positron`) with H3 hex heatmap (viridis), GPS trace ribbon, and camera frustum. The map view follows the latest GPS/IMU-driven position smoothly by default; manual drag temporarily overrides that view until you re-center with `C`.
+
+## Benchmarks
+
+Use the lightweight throughput benchmark to track `SpatialMemory` regressions over time:
+
+```bash
+make bench-spatial-memory
+./targets/benchmark_spatial_memory [observe_ops] [grid_cells] [query_ops]
+```
+
+The benchmark prints three scenarios:
+- `observe_same_cell`: hot-path repeated observations into one cell.
+- `observe_grid`: observations spread across a grid of cells.
+- `query_grid`: repeated queries after pre-populating the grid.
 
 ## Project structure
 
@@ -209,6 +230,8 @@ src/
     imu_processor.c
     viz_config.c
 psm-viz.toml.example  # Sample visualizer config
+configs/            # Ready-to-use psm-viz tuning presets
+benchmarks/         # Lightweight performance benchmarks
 shaders/            # GLSL shaders
 tests/              # Test suites
   test_ring_buffer.c

@@ -9,6 +9,9 @@ session_dir = "./session"
 group = "dino"
 time_window_sec = 5.0
 h3_resolution = 10
+scrub_sensitivity_sec = 2.0
+map_follow_smoothing = 8.0
+tile_uploads_per_frame = 1
 
 # Available tile_style presets:
 #   CartoDB.Positron
@@ -25,3 +28,6 @@ tile_style = "CartoDB.Positron"
 # Optional custom URL override. Supports {z}, {x}, {y}, {s}, and {api_key}.
 # When set, this takes precedence over tile_style.
 # tile_url_template = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+
+# See configs/ for ready-made presets such as psm-viz-balanced.toml and
+# psm-viz-low-hitch.toml.
