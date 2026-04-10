@@ -15,4 +15,5 @@ imu_sample_budget = 384
 gps_point_budget = 48
 tile_uploads_per_frame = 1
 
+heatmap_mode = "total"
 tile_style = "CartoDB.Positron"

@@ -2,6 +2,7 @@ CC = clang
 UNAME_S := $(shell uname -s)
 BREW ?= brew
 PKG_CONFIG ?= pkg-config
+PROFILE ?= local
 comma := ,
 
 pkg_prefix = $(strip $(shell $(PKG_CONFIG) --silence-errors --variable=prefix $(1) 2>/dev/null))
@@ -42,8 +43,28 @@ else
 PTHREAD_FLAGS = -pthread
 endif
 
-CFLAGS = -Wall -Wextra -Werror -std=c99 -O3 -march=native -flto -ffast-math -mtune=native -Iinclude -I. $(H3_CFLAGS) $(HDF5_CFLAGS)
-LDFLAGS = -flto $(H3_LDFLAGS) $(HDF5_LDFLAGS)
+COMMON_WARNINGS = -Wall -Wextra -Werror -std=c99
+COMMON_CFLAGS = $(COMMON_WARNINGS) -Iinclude -I. $(H3_CFLAGS) $(HDF5_CFLAGS)
+COMMON_LDFLAGS = $(H3_LDFLAGS) $(HDF5_LDFLAGS)
+
+ifeq ($(PROFILE),local)
+PROFILE_CFLAGS = -O3 -march=native -mtune=native -ffast-math -flto
+PROFILE_LDFLAGS = -flto
+else ifeq ($(PROFILE),portable)
+PROFILE_CFLAGS = -O3 -flto
+PROFILE_LDFLAGS = -flto
+else ifeq ($(PROFILE),debug)
+PROFILE_CFLAGS = -O0 -g3
+PROFILE_LDFLAGS =
+else ifeq ($(PROFILE),sanitize)
+PROFILE_CFLAGS = -O1 -g3 -fno-omit-frame-pointer -fsanitize=address,undefined
+PROFILE_LDFLAGS = -fsanitize=address,undefined
+else
+$(error Unsupported PROFILE '$(PROFILE)'. Use local, portable, debug, or sanitize)
+endif
+
+CFLAGS = $(COMMON_CFLAGS) $(PROFILE_CFLAGS)
+LDFLAGS = $(PROFILE_LDFLAGS) $(COMMON_LDFLAGS)
 VIZ_CFLAGS = $(GLFW_CFLAGS) $(FFMPEG_CFLAGS) $(CURL_CFLAGS) $(PTHREAD_FLAGS) -Ivendor -DGL_SILENCE_DEPRECATION
 VIZ_RPATHS = $(call rpath_flag,$(H3_PREFIX)) \
              $(call rpath_flag,$(HDF5_PREFIX)) \
@@ -55,7 +76,13 @@ VIZ_LDFLAGS = $(PTHREAD_FLAGS) \
               $(FFMPEG_LDFLAGS) \
               $(CURL_LDFLAGS) \
               $(OPENGL_LDFLAGS)
+ifeq ($(PROFILE),local)
 BUILD_DIR = build
+TARGET_DIR = targets
+else
+BUILD_DIR = build/$(PROFILE)
+TARGET_DIR = targets/$(PROFILE)
+endif
 TOOLCHAIN_INFO = $(BUILD_DIR)/.toolchain-info
 
 # Vendor paths
@@ -83,9 +110,7 @@ VENDOR_OBJ = $(patsubst $(VENDOR)/%.c,$(BUILD_DIR)/vendor/%.o,$(VENDOR_SRCS))
 VIZ_SRCS = src/viz/shader.c src/viz/video_decoder.c src/viz/video_quad.c src/viz/progress_bar.c src/viz/attention_overlay.c src/viz/hex_renderer.c src/viz/tile_map.c src/viz/gps_trace.c src/viz/imu_processor.c src/viz/jepa_cache.c src/viz/viz_math.c src/viz/viz_config.c
 VIZ_OBJ = $(patsubst src/viz/%.c,$(BUILD_DIR)/viz/%.o,$(VIZ_SRCS))
 STB_OBJ = $(BUILD_DIR)/vendor/stb/stb_image_impl.o
-
-# Output directory for binaries
-TARGET_DIR = targets
+UTILITIES_OBJ = $(BUILD_DIR)/vendor/lib/utilities.o
 
 # Library name
 LIB = $(TARGET_DIR)/libpsm.a
@@ -109,6 +134,24 @@ TEST_GPS_TRACE = $(BUILD_DIR)/test_gps_trace
 
 # Default target
 all: $(LIB) $(BIN)
+
+debug:
+	$(MAKE) PROFILE=debug all
+
+portable:
+	$(MAKE) PROFILE=portable all
+
+sanitize:
+	$(MAKE) PROFILE=sanitize all
+
+test-debug:
+	$(MAKE) PROFILE=debug test
+
+test-portable:
+	$(MAKE) PROFILE=portable test
+
+test-sanitize:
+	$(MAKE) PROFILE=sanitize test
 
 # Build the static library
 $(LIB): $(OBJ) $(VENDOR_OBJ)
@@ -155,7 +198,7 @@ $(BUILD_DIR)/viz/%.o: src/viz/%.c $(HEADERS) $(TOOLCHAIN_INFO)
 # Build stb_image object (suppress warnings from vendored header)
 $(STB_OBJ): vendor/stb/stb_image_impl.c vendor/stb/stb_image.h $(TOOLCHAIN_INFO)
 	@mkdir -p $(dir $@)
-	$(CC) -std=c99 -O3 -Ivendor -w -c $< -o $@
+	$(CC) $(COMMON_CFLAGS) $(PROFILE_CFLAGS) -Ivendor -w -c $< -o $@
 
 # Build viz executable
 viz: $(LIB) $(VIZ_OBJ) $(STB_OBJ)
@@ -223,30 +266,30 @@ $(TEST_INGEST): tests/test_ingest.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
 test-jepa-cache: $(TEST_JEPA_CACHE)
 	./$(TEST_JEPA_CACHE)
 
-$(TEST_JEPA_CACHE): tests/test_jepa_cache.c src/viz/jepa_cache.c include/viz/jepa_cache.h include/ingest/ingest.h build/vendor/lib/utilities.o
+$(TEST_JEPA_CACHE): tests/test_jepa_cache.c src/viz/jepa_cache.c include/viz/jepa_cache.h include/ingest/ingest.h $(UTILITIES_OBJ)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_jepa_cache.c src/viz/jepa_cache.c build/vendor/lib/utilities.o -o $@ -lm
+	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_jepa_cache.c src/viz/jepa_cache.c $(UTILITIES_OBJ) -o $@ -lm
 
 test-viz-math: $(TEST_VIZ_MATH)
 	./$(TEST_VIZ_MATH)
 
-$(TEST_VIZ_MATH): tests/test_viz_math.c src/viz/viz_math.c include/viz/viz_math.h include/viz/imu_processor.h build/vendor/lib/utilities.o
+$(TEST_VIZ_MATH): tests/test_viz_math.c src/viz/viz_math.c include/viz/viz_math.h include/viz/imu_processor.h $(UTILITIES_OBJ)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) tests/test_viz_math.c src/viz/viz_math.c build/vendor/lib/utilities.o -o $@ -lm
+	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_viz_math.c src/viz/viz_math.c $(UTILITIES_OBJ) -o $@ -lm
 
 test-viz-config: $(TEST_VIZ_CONFIG)
 	./$(TEST_VIZ_CONFIG)
 
-$(TEST_VIZ_CONFIG): tests/test_viz_config.c src/viz/viz_config.c include/viz/viz_config.h build/vendor/lib/utilities.o
+$(TEST_VIZ_CONFIG): tests/test_viz_config.c src/viz/viz_config.c include/viz/viz_config.h $(UTILITIES_OBJ)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) tests/test_viz_config.c src/viz/viz_config.c build/vendor/lib/utilities.o -o $@
+	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_viz_config.c src/viz/viz_config.c $(UTILITIES_OBJ) -o $@
 
 test-gps-trace: $(TEST_GPS_TRACE)
 	./$(TEST_GPS_TRACE)
 
-$(TEST_GPS_TRACE): tests/test_gps_trace.c src/viz/gps_trace.c src/viz/viz_math.c include/viz/gps_trace.h include/viz/viz_math.h include/viz/imu_processor.h build/vendor/lib/utilities.o $(TOOLCHAIN_INFO)
+$(TEST_GPS_TRACE): tests/test_gps_trace.c src/viz/gps_trace.c src/viz/viz_math.c include/viz/gps_trace.h include/viz/viz_math.h include/viz/imu_processor.h $(UTILITIES_OBJ) $(TOOLCHAIN_INFO)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(VIZ_CFLAGS) $(VENDOR_INCLUDES) tests/test_gps_trace.c src/viz/gps_trace.c src/viz/viz_math.c build/vendor/lib/utilities.o -o $@ $(TEST_OPENGL_LDFLAGS) -lm
+	$(CC) $(CFLAGS) $(VIZ_CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_gps_trace.c src/viz/gps_trace.c src/viz/viz_math.c $(UTILITIES_OBJ) -o $@ $(TEST_OPENGL_LDFLAGS) -lm
 
 # Clean target
 clean:
@@ -256,7 +299,7 @@ clean:
 rebuild: clean all
 
 # Phony targets
-.PHONY: all viz bench-spatial-memory bench-tile-decode test test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace clean rebuild show run FORCE
+.PHONY: all debug portable sanitize viz bench-spatial-memory bench-tile-decode test test-debug test-portable test-sanitize test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace clean rebuild show run FORCE
 
 # Show detected files
 show:

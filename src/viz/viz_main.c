@@ -101,6 +101,15 @@ typedef struct {
   VizFrameStats frame_stats;
 } VizApp;
 
+static void refresh_heatmap_mode(VizApp *app) {
+  if (!app || !app->hex_renderer) return;
+  if (app->sm) {
+    HexRenderer_update(app->hex_renderer, app->sm);
+  } else {
+    app->hex_renderer->vertex_count = 0;
+  }
+}
+
 static VizApp *app_from_window(GLFWwindow *window) {
   return (VizApp *)glfwGetWindowUserPointer(window);
 }
@@ -635,6 +644,16 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
     }
     printf("Debug HUD: %s\n", app->debug_hud_enabled ? "on" : "off");
     break;
+  case GLFW_KEY_M:
+    if (app->hex_renderer) {
+      HexHeatmapMode next_mode =
+          HexRenderer_next_heatmap_mode(app->hex_renderer->heatmap_mode);
+      HexRenderer_set_heatmap_mode(app->hex_renderer, next_mode);
+      refresh_heatmap_mode(app);
+      printf("Heatmap mode: %s\n",
+             HexRenderer_heatmap_mode_name(app->hex_renderer->heatmap_mode));
+    }
+    break;
   case GLFW_KEY_RIGHT:
     app->playback_speed *= 2.0;
     if (app->playback_speed > 16.0) app->playback_speed = 16.0;
@@ -746,9 +765,9 @@ static char *find_file_in_dir(const char *dir, const char *extension,
 // ---- Usage ----
 static void print_usage(const char *prog) {
   fprintf(stderr, "Usage:\n");
-  fprintf(stderr, "  %s -c <config.toml> [-d <dir>] [-v <video>] [-f <features.h5>] [-g group] [-t sec] [-r res]\n", prog);
-  fprintf(stderr, "  %s -d <dir> [-g group] [-t sec] [-r res]\n", prog);
-  fprintf(stderr, "  %s -v <video> [-f <features.h5>] [-g group] [-t sec] [-r res]\n", prog);
+  fprintf(stderr, "  %s -c <config.toml> [-d <dir>] [-v <video>] [-f <features.h5>] [-g group] [-t sec] [-r res] [-m mode]\n", prog);
+  fprintf(stderr, "  %s -d <dir> [-g group] [-t sec] [-r res] [-m mode]\n", prog);
+  fprintf(stderr, "  %s -v <video> [-f <features.h5>] [-g group] [-t sec] [-r res] [-m mode]\n", prog);
   fprintf(stderr, "  %s <video.mp4> [data.h5 group] [time_window_sec] [h3_resolution]\n", prog);
   fprintf(stderr, "\nFlags:\n");
   fprintf(stderr, "  -c <path>   TOML-style config file (defaults < config < CLI)\n");
@@ -758,6 +777,7 @@ static void print_usage(const char *prog) {
   fprintf(stderr, "  -g <name>   HDF5 group name (default: dino)\n");
   fprintf(stderr, "  -t <sec>    Time window in seconds (default: 5.0)\n");
   fprintf(stderr, "  -r <res>    H3 resolution 0-15 (default: 10)\n");
+  fprintf(stderr, "  -m <mode>   Heatmap mode: total | current | recency\n");
   fprintf(stderr, "  -h          Print this help\n");
   fprintf(stderr, "\nConfig keys:\n");
   fprintf(stderr, "  session_dir, video_path, features_path, group,\n");
@@ -768,6 +788,7 @@ static void print_usage(const char *prog) {
   fprintf(stderr, "  imu_sample_budget, gps_point_budget,\n");
   fprintf(stderr, "  tile_uploads_per_frame,\n");
   fprintf(stderr, "  tile_disk_cache_enabled, tile_disk_cache_max_mb,\n");
+  fprintf(stderr, "  heatmap_mode,\n");
   fprintf(stderr, "  tile_style, tile_api_key, tile_url_template\n");
   fprintf(stderr, "\nTile styles:\n");
   VizConfig_print_tile_styles(stderr);
@@ -779,6 +800,7 @@ static void print_usage(const char *prog) {
   fprintf(stderr, "  Scroll V    Zoom map toward cursor (on map pane)\n");
   fprintf(stderr, "  Drag        Pan map (on map pane)\n");
   fprintf(stderr, "  C           Re-center map and resume follow\n");
+  fprintf(stderr, "  M           Cycle heatmap mode\n");
   fprintf(stderr, "  H           Toggle debug title HUD\n");
   fprintf(stderr, "  Q/Esc       Quit\n");
 }
@@ -796,6 +818,7 @@ int main(int argc, char *argv[]) {
   char *alloc_h5 = NULL;
   VizConfig config;
   VizTileSource tile_source;
+  HexHeatmapMode heatmap_mode = HEX_HEATMAP_MODE_TOTAL;
   VizApp app = {0};
 
   int opt;
@@ -822,7 +845,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  while ((opt = getopt(argc, argv, "c:d:v:f:g:t:r:h")) != -1) {
+  while ((opt = getopt(argc, argv, "c:d:v:f:g:t:r:m:h")) != -1) {
     switch (opt) {
     case 'c':
       break;
@@ -871,6 +894,14 @@ int main(int argc, char *argv[]) {
       used_runtime_flags = true;
       if (!VizConfig_parse_int_in_range(optarg, "H3 resolution", 0, 15,
                                         &config.h3_resolution)) {
+        return 1;
+      }
+      break;
+    case 'm':
+      used_runtime_flags = true;
+      if (!VizConfig_set_text(config.heatmap_mode,
+                              sizeof(config.heatmap_mode),
+                              optarg, "heatmap_mode")) {
         return 1;
       }
       break;
@@ -953,6 +984,14 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   if (!VizConfig_resolve_tile_source(&config, &tile_source)) {
+    free(alloc_video);
+    free(alloc_h5);
+    return 1;
+  }
+  if (!HexRenderer_parse_heatmap_mode(config.heatmap_mode, &heatmap_mode)) {
+    fprintf(stderr,
+            "Unknown heatmap_mode '%s'. Expected one of: total, current, recency\n",
+            config.heatmap_mode);
     free(alloc_video);
     free(alloc_h5);
     return 1;
@@ -1112,6 +1151,7 @@ int main(int argc, char *argv[]) {
 
   // ---- Create hex renderer, tile map, and GPS trace ----
   HexRenderer *hr = HexRenderer_new(hex_prog);
+  HexRenderer_set_heatmap_mode(hr, heatmap_mode);
   app.hex_renderer = hr;
 
   TileMap *tm = TileMap_new(tile_prog, tile_source.style_name,
@@ -1151,6 +1191,7 @@ int main(int argc, char *argv[]) {
   printf("Tile disk cache: %s, cap=%d MB\n",
          config.tile_disk_cache_enabled ? "on" : "off",
          config.tile_disk_cache_max_mb);
+  printf("Heatmap mode: %s\n", HexRenderer_heatmap_mode_name(heatmap_mode));
   printf("Budgets: video=%d base/frame, ingest=%d, imu=%d, gps=%d\n",
          app.video_decode_budget, app.ingest_record_budget,
          app.imu_sample_budget, app.gps_point_budget);

@@ -1,0 +1,81 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} portable test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Install shared dependencies
+        run: brew install h3 hdf5
+
+      - name: Install Linux OpenGL test dependency
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev
+
+      - name: Run portable test suite
+        run: make PROFILE=portable test
+
+      - name: Build portable CLI
+        run: |
+          make PROFILE=portable all
+
+  sanitize:
+    name: ubuntu sanitizer test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Install shared dependencies
+        run: brew install h3 hdf5
+
+      - name: Install Linux OpenGL test dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev
+
+      - name: Run sanitizer test suite
+        run: make PROFILE=sanitize test
+
+  debug-build:
+    name: ubuntu debug build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Install shared dependencies
+        run: brew install h3 hdf5
+
+      - name: Build debug CLI
+        run: make PROFILE=debug all

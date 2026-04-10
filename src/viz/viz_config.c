@@ -224,6 +224,7 @@ void VizConfig_init(VizConfig *config) {
   config->tile_uploads_per_frame = 1;
   config->tile_disk_cache_enabled = true;
   config->tile_disk_cache_max_mb = VIZ_CONFIG_DEFAULT_TILE_DISK_CACHE_MAX_MB;
+  snprintf(config->heatmap_mode, sizeof(config->heatmap_mode), "%s", "total");
   snprintf(config->tile_style, sizeof(config->tile_style), "%s",
            "CartoDB.Positron");
 }
@@ -477,6 +478,13 @@ bool VizConfig_load_file(VizConfig *config, const char *path) {
       if (!VizConfig_parse_int_in_range(value_buf, key, 1,
                                         VIZ_CONFIG_MAX_TILE_DISK_CACHE_MAX_MB,
                                         &config->tile_disk_cache_max_mb)) {
+        fclose(file);
+        return false;
+      }
+    } else if (strcmp(key, "heatmap_mode") == 0) {
+      if (!VizConfig_set_text(config->heatmap_mode,
+                              sizeof(config->heatmap_mode),
+                              value_buf, key)) {
         fclose(file);
         return false;
       }

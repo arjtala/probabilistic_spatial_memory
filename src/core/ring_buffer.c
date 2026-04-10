@@ -58,7 +58,9 @@ size_t RingBuffer_precision_min(void) {
 }
 
 size_t RingBuffer_precision_max(void) {
-  return 8 * sizeof(uint64_t);
+  // Project-level practical cap. Higher values explode HLL register memory
+  // (2^p bytes per sketch) long before they are useful here.
+  return 18;
 }
 
 bool RingBuffer_precision_is_valid(size_t precision) {

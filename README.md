@@ -114,8 +114,13 @@ Merging HLL slots gives "memory over the last N intervals" with natural time dec
 ```bash
 make          # build library and CLI → targets/psm
 make viz      # build visualizer → targets/psm-viz
+make debug    # debug-profile build → targets/debug/...
+make portable # portable optimized build → targets/portable/...
+make sanitize # ASan/UBSan build → targets/sanitize/...
 make bench-spatial-memory  # run a lightweight SpatialMemory throughput benchmark
 make test     # build and run tests
+make test-portable         # portable-profile test suite
+make test-sanitize         # sanitizer-backed test suite
 make clean    # remove build artifacts and targets/
 ```
 
@@ -133,6 +138,43 @@ make H3_PREFIX=/opt/h3 HDF5_PREFIX=/opt/hdf5 \
      GLFW_PREFIX=/opt/glfw FFMPEG_PREFIX=/opt/ffmpeg
 ```
 
+Build profiles:
+- `PROFILE=local` (default): fast native build with `-march=native`, `-mtune=native`, `-ffast-math`, and LTO.
+- `PROFILE=portable`: optimized build without host-specific CPU assumptions.
+- `PROFILE=debug`: `-O0 -g3` for debugging.
+- `PROFILE=sanitize`: AddressSanitizer + UndefinedBehaviorSanitizer with frame pointers.
+
+Non-default profiles write outputs under `build/<profile>/` and `targets/<profile>/` so local optimized artifacts stay separate from debug and sanitizer builds.
+
+## CLI
+
+`psm` ingests one HDF5 group into the spatial memory engine and prints either a human-readable summary or JSON.
+
+```bash
+# Human-readable summary
+targets/psm -f features.h5 -g dino -t 5.0 -r 10
+
+# Override ring-buffer configuration
+targets/psm -f features.h5 -g jepa -C 24 -p 12
+
+# JSON output for scripting
+targets/psm -f features.h5 -g dino -j
+
+# Legacy positional args still work
+targets/psm features.h5 dino 5.0 10 12 10
+```
+
+| Flag | Arg | Default | Description |
+|------|-----|---------|-------------|
+| `-f` | `<path>` | — | HDF5 feature file |
+| `-g` | `<name>` | `dino` | HDF5 group name |
+| `-t` | `<sec>` | `5.0` | Time window in seconds |
+| `-r` | `<res>` | `10` | H3 resolution (0-15) |
+| `-C` | `<count>` | `12` | Ring-buffer capacity |
+| `-p` | `<bits>` | `10` | HLL precision |
+| `-j` | — | — | Emit JSON summary instead of text |
+| `-h` | — | — | Print help |
+
 ## Visualization
 
 `psm-viz` renders side-by-side video playback and a spatial memory heatmap with GPS trace overlay, synchronized by timestamp.
@@ -149,7 +191,7 @@ targets/psm-viz -d /path/to/session/
 targets/psm-viz -d /path/to/session/ -g jepa
 
 # Explicit flags
-targets/psm-viz -v video.mp4 -f features.h5 -g dino
+targets/psm-viz -v video.mp4 -f features.h5 -g dino -m total
 
 # Legacy positional args
 targets/psm-viz video.mp4 features.h5 dino 5.0 10
@@ -164,6 +206,7 @@ targets/psm-viz video.mp4 features.h5 dino 5.0 10
 | `-g` | `<name>` | `dino` | HDF5 group name (`dino` or `jepa`) |
 | `-t` | `<sec>` | `5.0` | Time window (seconds) |
 | `-r` | `<res>` | `10` | H3 resolution (0-15) |
+| `-m` | `<mode>` | `total` | Heatmap mode (`total`, `current`, `recency`) |
 | `-h` | — | — | Print help |
 
 `psm-viz.toml` supports:
@@ -187,6 +230,7 @@ gps_point_budget = 64
 tile_uploads_per_frame = 1
 tile_disk_cache_enabled = true
 tile_disk_cache_max_mb = 512
+heatmap_mode = "total"
 tile_style = "CartoDB.Positron"
 
 # Required for Stadia.* presets and any custom template using {api_key}
@@ -214,6 +258,7 @@ Tuning keys:
 - `tile_uploads_per_frame`: baseline max ready tile textures uploaded per frame. Lower values reduce GL-side hitches; higher values fill tiles faster, and the runtime can temporarily raise this when decoded tiles are piling up.
 - `tile_disk_cache_enabled`: enables or disables the on-disk raster tile cache.
 - `tile_disk_cache_max_mb`: maximum on-disk tile cache size per configured tile source before older cached tiles are pruned.
+- `heatmap_mode`: selects how H3 cells are scored before coloring. `total` shows the rolling merged count across the active ring buffer, `current` shows current-bucket activity only, and `recency` shows `current / total` to highlight cells that are active now relative to their longer-term history.
 
 Available `tile_style` presets:
 - `CartoDB.Positron`
@@ -240,6 +285,7 @@ Downloaded raster tiles are cached on disk and replay through the same threaded 
 | Scroll V (map) | Zoom map toward the cursor |
 | Drag (map) | Pan map manually |
 | C | Re-center map and resume smooth follow |
+| M | Cycle heatmap mode (`total` → `current` → `recency`) |
 | H | Toggle live debug title HUD |
 | Q / Esc | Quit |
 
@@ -249,9 +295,14 @@ The debug HUD lives in the window title and shows playback/decode budgets, inges
 
 **Layout:** Left half shows video with optional attention/prediction heatmap overlay. Right half shows configurable raster tiles (default: `CartoDB.Positron`) with H3 hex heatmap (viridis), GPS trace ribbon, and camera frustum. The map view follows the latest GPS/IMU-driven position smoothly by default; manual drag temporarily overrides that view until you re-center with `C`.
 
-**Hex heatmap semantics:** Each tile is colored from its merged distinct-count over the full active ring-buffer horizon, normalized against the hottest tile currently rendered. Low-intensity tiles appear dark purple, mid-range tiles shift toward teal/cyan, and the hottest tiles appear yellow. Alpha also rises with intensity, so stronger cells look more solid.
+**Hex heatmap semantics:** The color ramp is always relative to the hottest tile currently rendered. Low-intensity tiles appear dark purple, mid-range tiles shift toward teal/cyan, and the hottest tiles appear yellow. Alpha also rises with intensity, so stronger cells look more solid.
 
-Time decay is only partly encoded in hue. When a tile has historical count but little or no activity in the current bucket, the renderer reduces alpha so the cell lingers as a dim memory instead of vanishing immediately. The underlying forgetting is stepwise: as the ring buffer advances, the oldest bucket is overwritten, so hex intensity can drop in discrete steps at window boundaries rather than as a perfectly smooth fade.
+Mode-specific behavior:
+- `total`: colors by merged distinct-count across the full active ring-buffer horizon. This is the historical memory view.
+- `current`: colors by the current time bucket only. This is the most immediate activity view.
+- `recency`: colors by `current / total`, highlighting cells that are active now relative to their own accumulated history.
+
+Time decay is only partly encoded in hue. In `total` mode, when a tile has historical count but little or no activity in the current bucket, the renderer reduces alpha so the cell lingers as a dim memory instead of vanishing immediately. The underlying forgetting is stepwise: as the ring buffer advances, the oldest bucket is overwritten, so hex intensity can drop in discrete steps at window boundaries rather than as a perfectly smooth fade.
 
 ## Benchmarks
 

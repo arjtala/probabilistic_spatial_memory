@@ -23,6 +23,7 @@ gps_point_budget = 64
 tile_uploads_per_frame = 1
 tile_disk_cache_enabled = true
 tile_disk_cache_max_mb = 512
+heatmap_mode = "total"
 
 # Available tile_style presets:
 #   CartoDB.Positron
@@ -39,6 +40,12 @@ tile_style = "CartoDB.Positron"
 # Optional custom URL override. Supports {z}, {x}, {y}, {s}, and {api_key}.
 # When set, this takes precedence over tile_style.
 # tile_url_template = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+
+# Heatmap modes:
+#   total    -> rolling merged count across the full ring buffer
+#   current  -> current time bucket only
+#   recency  -> current / total
+# Press M at runtime to cycle modes.
 
 # See configs/ for ready-made presets such as psm-viz-balanced.toml and
 # psm-viz-low-hitch.toml.

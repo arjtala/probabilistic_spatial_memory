@@ -16,6 +16,7 @@
 #define VIZ_CONFIG_STYLE_CAP 64
 #define VIZ_CONFIG_API_KEY_CAP 256
 #define VIZ_CONFIG_URL_CAP 1024
+#define VIZ_CONFIG_HEATMAP_MODE_CAP 32
 
 #define VIZ_CONFIG_DEFAULT_VIDEO_DECODE_BUDGET 6
 #define VIZ_CONFIG_DEFAULT_INGEST_RECORD_BUDGET 128
@@ -53,6 +54,7 @@ typedef struct {
   int tile_uploads_per_frame;
   bool tile_disk_cache_enabled;
   int tile_disk_cache_max_mb;
+  char heatmap_mode[VIZ_CONFIG_HEATMAP_MODE_CAP];
 
   char tile_style[VIZ_CONFIG_STYLE_CAP];
 

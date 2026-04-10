@@ -98,6 +98,7 @@ static void test_defaults_resolve_to_positron(void) {
              VIZ_CONFIG_DEFAULT_TILE_DISK_CACHE_MAX_MB,
          VIZ_CONFIG_DEFAULT_TILE_DISK_CACHE_MAX_MB,
          config.tile_disk_cache_max_mb);
+  assert_str_eq("total", config.heatmap_mode);
   assert_str_eq("CartoDB.Positron", config.tile_style);
 
   ok = VizConfig_resolve_tile_source(&config, &tile_source);
@@ -141,6 +142,7 @@ static void test_load_file_resolves_relative_paths(void) {
       "tile_uploads_per_frame = 3\n"
       "tile_disk_cache_enabled = false\n"
       "tile_disk_cache_max_mb = 64\n"
+      "heatmap_mode = \"current\"\n"
       "tile_style = \"CartoDB.DarkMatter\"\n");
 
   VizConfig_init(&config);
@@ -174,6 +176,7 @@ static void test_load_file_resolves_relative_paths(void) {
          config.tile_disk_cache_enabled ? 1 : 0);
   ASSERT(config.tile_disk_cache_max_mb == 64, 64,
          config.tile_disk_cache_max_mb);
+  assert_str_eq("current", config.heatmap_mode);
   assert_str_eq("CartoDB.DarkMatter", config.tile_style);
 
   ok = VizConfig_resolve_tile_source(&config, &tile_source);
