@@ -13,6 +13,8 @@
 #include "viz/attention_overlay.h"
 #include "viz/progress_bar.h"
 #include "viz/shader.h"
+#include "viz/viz_app.h"
+#include "viz/viz_input.h"
 #include "viz/video_quad.h"
 #include "viz/video_decoder.h"
 #include "viz/hex_renderer.h"
@@ -22,6 +24,7 @@
 #include "viz/imu_processor.h"
 #include "viz/jepa_cache.h"
 #include "viz/viz_config.h"
+#include "viz/viz_debug_hud.h"
 #include "viz/viz_runtime.h"
 #include "viz/viz_math.h"
 #include "ingest/ingest.h"
@@ -31,67 +34,6 @@
 #endif
 
 #define DEBUG_TITLE_UPDATE_INTERVAL_SEC 0.15
-
-typedef struct {
-  bool paused;
-  bool awaiting_initial_play;
-  double playback_speed;
-
-  bool map_view_initialized;
-  double map_view_center_lat;
-  double map_view_center_lng;
-
-  bool dragging;
-  double drag_last_x;
-  double drag_last_y;
-
-  VideoDecoder *dec;
-  VideoQuad *video_quad;
-  HexRenderer *hex_renderer;
-  TileMap *tile_map;
-  GpsTrace *gps_trace;
-  ImuProcessor *imu_proc;
-  IngestReader *reader;
-  ImuGpsReader *imu_gps;
-  JepaCache *jepa_cache;
-  SpatialMemory *sm;
-
-  double first_ts;
-  double window_anchor;
-  double time_window_sec;
-  int h3_resolution;
-
-  double video_start_time;
-  double video_pts_offset;
-  bool video_done;
-
-  bool seek_pending;
-  double pending_seek_target;
-  double scrub_sensitivity_sec;
-  double map_follow_smoothing;
-  int tile_uploads_per_frame;
-  int video_decode_budget;
-  int ingest_record_budget;
-  int imu_sample_budget;
-  int gps_point_budget;
-  VizRuntimeBudgetState budget_state;
-  bool debug_hud_enabled;
-  double next_debug_title_update;
-  VizRuntimeFrameStats frame_stats;
-} VizApp;
-
-static void refresh_heatmap_mode(VizApp *app) {
-  if (!app || !app->hex_renderer) return;
-  if (app->sm) {
-    HexRenderer_update(app->hex_renderer, app->sm);
-  } else {
-    app->hex_renderer->vertex_count = 0;
-  }
-}
-
-static VizApp *app_from_window(GLFWwindow *window) {
-  return (VizApp *)glfwGetWindowUserPointer(window);
-}
 
 static VizRuntimeBudgetConfig current_budget_config(const VizApp *app) {
   VizRuntimeBudgetConfig config = {0};
@@ -106,183 +48,35 @@ static VizRuntimeBudgetConfig current_budget_config(const VizApp *app) {
   return config;
 }
 
-static void reset_window_title(GLFWwindow *window) {
-  if (!window) return;
-  glfwSetWindowTitle(window, "psm-viz");
-}
-
 static void update_debug_window_title(GLFWwindow *window, VizApp *app,
                                       double now) {
   char title[512];
-  char video_budget[32];
-  char ingest_budget[32];
-  char imu_budget[32];
-  char gps_budget[32];
-  char tile_budget[32];
-  char disk_stats[96];
-  TileMapStats tile_stats = {0};
-  const char *state;
-  const char *video_backlog = "";
-  const char *ingest_backlog = "";
-  const char *imu_backlog = "";
-  const char *gps_backlog = "";
-  double current_pts = 0.0;
-  double duration = 0.0;
+  VizDebugHudSnapshot snapshot = {0};
 
   if (!window || !app || !app->debug_hud_enabled) return;
   if (now < app->next_debug_title_update) return;
 
   if (app->tile_map) {
-    TileMap_get_stats(app->tile_map, &tile_stats);
+    TileMap_get_stats(app->tile_map, &snapshot.tile_stats);
   }
   if (app->dec) {
-    current_pts = app->dec->current_pts;
-    duration = app->dec->duration;
+    snapshot.current_pts = app->dec->current_pts;
+    snapshot.duration = app->dec->duration;
   }
 
-  state = app->paused ? "paused" : (app->video_done ? "done" : "play");
-  if (app->frame_stats.video_backlog) video_backlog = "*";
-  if (app->frame_stats.ingest_backlog) ingest_backlog = "*";
-  if (app->frame_stats.imu_backlog) imu_backlog = "*";
-  if (app->frame_stats.gps_backlog) gps_backlog = "*";
-
-  VizRuntime_format_budget_label(video_budget, sizeof(video_budget),
-                                 app->frame_stats.decode_budget,
-                                 app->frame_stats.decode_base_budget);
-  VizRuntime_format_budget_label(ingest_budget, sizeof(ingest_budget),
-                      app->budget_state.effective_ingest_record_budget,
-                      app->ingest_record_budget);
-  VizRuntime_format_budget_label(imu_budget, sizeof(imu_budget),
-                      app->budget_state.effective_imu_sample_budget,
-                      app->imu_sample_budget);
-  VizRuntime_format_budget_label(gps_budget, sizeof(gps_budget),
-                      app->budget_state.effective_gps_point_budget,
-                      app->gps_point_budget);
-  VizRuntime_format_budget_label(tile_budget, sizeof(tile_budget),
-                      app->budget_state.effective_tile_upload_budget,
-                      app->tile_uploads_per_frame);
-  if (tile_stats.disk_cache_enabled) {
-    snprintf(disk_stats, sizeof(disk_stats),
-             "disk h%d w%d p%d m%llu/%llu",
-             tile_stats.disk_cache_hits, tile_stats.disk_cache_writes,
-             tile_stats.disk_cache_prunes,
-             VizRuntime_bytes_to_mib_ceil(tile_stats.disk_cache_bytes),
-             VizRuntime_bytes_to_mib_ceil(tile_stats.disk_cache_max_bytes));
-  } else {
-    snprintf(disk_stats, sizeof(disk_stats), "disk off");
+  snapshot.paused = app->paused;
+  snapshot.video_done = app->video_done;
+  snapshot.playback_speed = app->playback_speed;
+  snapshot.ingest_record_budget = app->ingest_record_budget;
+  snapshot.imu_sample_budget = app->imu_sample_budget;
+  snapshot.gps_point_budget = app->gps_point_budget;
+  snapshot.tile_uploads_per_frame = app->tile_uploads_per_frame;
+  snapshot.frame_stats = app->frame_stats;
+  snapshot.budget_state = app->budget_state;
+  if (VizDebugHud_build_title(title, sizeof(title), &snapshot)) {
+    glfwSetWindowTitle(window, title);
   }
-
-  snprintf(title, sizeof(title),
-           "psm-viz | %s %.2fx | pts %.2f/%.2f | v %d/%s%s | in %d/%s%s | "
-           "imu %d/%s%s | gps %d/%s%s | tiles act%d rdy%d dec%d pix%d up%d/%s c%d | %s",
-           state, app->playback_speed, current_pts, duration,
-           app->frame_stats.decode_steps, video_budget,
-           video_backlog, app->frame_stats.drained_records,
-           ingest_budget, ingest_backlog,
-           app->frame_stats.drained_imu, imu_budget, imu_backlog,
-           app->frame_stats.drained_gps, gps_budget, gps_backlog,
-           tile_stats.active_downloads, tile_stats.ready_downloads,
-           tile_stats.decoding_downloads, tile_stats.decoded_downloads,
-           tile_stats.uploads_last_frame, tile_budget, tile_stats.cache_tiles,
-           disk_stats);
-  glfwSetWindowTitle(window, title);
   app->next_debug_title_update = now + DEBUG_TITLE_UPDATE_INTERVAL_SEC;
-}
-
-static bool current_auto_map_center(const VizApp *app, double *out_lat,
-                                    double *out_lng) {
-  if (!app || !out_lat || !out_lng) return false;
-  if (app->gps_trace && app->gps_trace->count > 0) {
-    size_t last = app->gps_trace->count - 1;
-    *out_lat = app->gps_trace->lats[last];
-    *out_lng = app->gps_trace->lngs[last];
-    return true;
-  }
-  if (app->hex_renderer && app->hex_renderer->vertex_count > 0) {
-    *out_lat = app->hex_renderer->center_lat;
-    *out_lng = app->hex_renderer->center_lng;
-    return true;
-  }
-  return false;
-}
-
-static bool current_map_target_center(const VizApp *app, double *out_lat,
-                                      double *out_lng) {
-  if (!current_auto_map_center(app, out_lat, out_lng)) return false;
-  if (app->hex_renderer) {
-    *out_lat += app->hex_renderer->pan_offset_lat;
-    *out_lng += app->hex_renderer->pan_offset_lng;
-  }
-  return true;
-}
-
-static void snap_map_view_to(VizApp *app, double center_lat, double center_lng) {
-  if (!app) return;
-  app->map_view_center_lat = center_lat;
-  app->map_view_center_lng = center_lng;
-  app->map_view_initialized = true;
-}
-
-static void set_manual_map_center(VizApp *app, double center_lat,
-                                  double center_lng) {
-  if (!app) return;
-  if (app->hex_renderer) {
-    double auto_lat, auto_lng;
-    if (current_auto_map_center(app, &auto_lat, &auto_lng)) {
-      app->hex_renderer->pan_offset_lat = center_lat - auto_lat;
-      app->hex_renderer->pan_offset_lng = center_lng - auto_lng;
-    }
-  }
-  snap_map_view_to(app, center_lat, center_lng);
-}
-
-static bool current_render_map_center(const VizApp *app, double *out_lat,
-                                      double *out_lng) {
-  if (!app || !out_lat || !out_lng) return false;
-  if (app->map_view_initialized) {
-    *out_lat = app->map_view_center_lat;
-    *out_lng = app->map_view_center_lng;
-    return true;
-  }
-  return current_map_target_center(app, out_lat, out_lng);
-}
-
-static void zoom_map_about_screen_point(VizApp *app, GLFWwindow *window,
-                                        double zoom_factor, double cursor_x,
-                                        double cursor_y) {
-  double center_lat, center_lng;
-  double new_center_lat, new_center_lng, new_zoom;
-
-  if (!app || !app->hex_renderer) return;
-
-  int win_w, win_h;
-  glfwGetWindowSize(window, &win_w, &win_h);
-  int half_w = win_w / 2;
-  int viewport_w = win_w - half_w;
-  int viewport_h = win_h;
-  double map_x = cursor_x - (double)half_w;
-  double map_y = cursor_y;
-
-  if (viewport_w <= 0 || viewport_h <= 0 ||
-      map_x < 0.0 || map_x > (double)viewport_w ||
-      map_y < 0.0 || map_y > (double)viewport_h) {
-    return;
-  }
-
-  if (!current_render_map_center(app, &center_lat, &center_lng)) {
-    app->hex_renderer->zoom =
-        VizMap_clamp_zoom(app->hex_renderer->zoom * zoom_factor);
-    return;
-  }
-  if (!VizMap_zoom_about_viewport_point(
-          center_lat, center_lng, app->hex_renderer->zoom, zoom_factor,
-          viewport_w, viewport_h, map_x, map_y, &new_center_lat,
-          &new_center_lng, &new_zoom)) {
-    return;
-  }
-
-  app->hex_renderer->zoom = new_zoom;
-  set_manual_map_center(app, new_center_lat, new_center_lng);
 }
 
 static void reset_playback_timing(VizApp *app, double now) {
@@ -362,184 +156,6 @@ static bool apply_pending_seek(VizApp *app, double now) {
   app->pending_seek_target = app->dec->current_pts;
   app->seek_pending = false;
   return true;
-}
-
-// ---- Scroll callback (scrub + zoom) ----
-static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
-  VizApp *app = app_from_window(window);
-  int win_w, win_h;
-
-  if (!app) return;
-  glfwGetWindowSize(window, &win_w, &win_h);
-
-  double cursor_x, cursor_y;
-  glfwGetCursorPos(window, &cursor_x, &cursor_y);
-
-  double half_w = (double)win_w / 2.0;
-
-  if (cursor_x < half_w) {
-    // Cursor over video: horizontal scroll to scrub
-    if (!app->dec || app->dec->duration <= 0.0) return;
-
-    if (fabs(xoffset) < 1e-9) return;
-    double seek_delta = xoffset * app->scrub_sensitivity_sec;
-    double base_pts = app->seek_pending ? app->pending_seek_target
-                                        : app->dec->current_pts;
-    double target = base_pts + seek_delta;
-    if (target < 0.0) target = 0.0;
-    if (target > app->dec->duration) target = app->dec->duration;
-    app->pending_seek_target = target;
-    app->seek_pending = true;
-  } else {
-    // Cursor over map: vertical scroll to zoom
-    if (!app->hex_renderer) return;
-    if (yoffset > 0) {
-      zoom_map_about_screen_point(app, window, 0.9, cursor_x, cursor_y);
-    } else if (yoffset < 0) {
-      zoom_map_about_screen_point(app, window, 1.1, cursor_x, cursor_y);
-    }
-  }
-}
-
-// ---- Keyboard callback ----
-static void key_callback(GLFWwindow *window, int key, int scancode, int action,
-                          int mods) {
-  VizApp *app = app_from_window(window);
-  (void)scancode;
-  (void)mods;
-  if (!app) return;
-  if (action != GLFW_PRESS && action != GLFW_REPEAT) return;
-
-  switch (key) {
-  case GLFW_KEY_ESCAPE:
-  case GLFW_KEY_Q:
-    glfwSetWindowShouldClose(window, GLFW_TRUE);
-    break;
-  case GLFW_KEY_SPACE:
-    app->paused = !app->paused;
-    if (!app->paused) {
-      app->awaiting_initial_play = false;
-    }
-    break;
-  case GLFW_KEY_EQUAL:  // + key
-    if (app->hex_renderer) {
-      int win_w, win_h;
-      glfwGetWindowSize(window, &win_w, &win_h);
-      zoom_map_about_screen_point(app, window, 0.8,
-                                  (double)(win_w + win_w / 2) / 2.0,
-                                  (double)win_h / 2.0);
-    }
-    break;
-  case GLFW_KEY_MINUS:
-    if (app->hex_renderer) {
-      int win_w, win_h;
-      glfwGetWindowSize(window, &win_w, &win_h);
-      zoom_map_about_screen_point(app, window, 1.25,
-                                  (double)(win_w + win_w / 2) / 2.0,
-                                  (double)win_h / 2.0);
-    }
-    break;
-  case GLFW_KEY_C:
-    if (app->hex_renderer) {
-      app->hex_renderer->pan_offset_lat = 0.0;
-      app->hex_renderer->pan_offset_lng = 0.0;
-      double center_lat, center_lng;
-      if (current_map_target_center(app, &center_lat, &center_lng)) {
-        snap_map_view_to(app, center_lat, center_lng);
-      } else {
-        app->map_view_initialized = false;
-      }
-    }
-    break;
-  case GLFW_KEY_H:
-    app->debug_hud_enabled = !app->debug_hud_enabled;
-    app->next_debug_title_update = 0.0;
-    if (!app->debug_hud_enabled) {
-      reset_window_title(window);
-    }
-    printf("Debug HUD: %s\n", app->debug_hud_enabled ? "on" : "off");
-    break;
-  case GLFW_KEY_M:
-    if (app->hex_renderer) {
-      HexHeatmapMode next_mode =
-          HexRenderer_next_heatmap_mode(app->hex_renderer->heatmap_mode);
-      HexRenderer_set_heatmap_mode(app->hex_renderer, next_mode);
-      refresh_heatmap_mode(app);
-      printf("Heatmap mode: %s\n",
-             HexRenderer_heatmap_mode_name(app->hex_renderer->heatmap_mode));
-    }
-    break;
-  case GLFW_KEY_RIGHT:
-    app->playback_speed *= 2.0;
-    if (app->playback_speed > 16.0) app->playback_speed = 16.0;
-    printf("Speed: %.1fx\n", app->playback_speed);
-    break;
-  case GLFW_KEY_LEFT:
-    app->playback_speed *= 0.5;
-    if (app->playback_speed < 0.25) app->playback_speed = 0.25;
-    printf("Speed: %.1fx\n", app->playback_speed);
-    break;
-  default:
-    break;
-  }
-}
-
-// ---- Mouse button callback (drag to pan map) ----
-static void mouse_button_callback(GLFWwindow *window, int button, int action, int mods) {
-  VizApp *app = app_from_window(window);
-  (void)mods;
-  if (!app) return;
-  if (button != GLFW_MOUSE_BUTTON_LEFT) return;
-
-  if (action == GLFW_PRESS) {
-    int win_w, win_h;
-    glfwGetWindowSize(window, &win_w, &win_h);
-    double cx, cy;
-    glfwGetCursorPos(window, &cx, &cy);
-    if (cx > (double)win_w / 2.0) {
-      app->dragging = true;
-      app->drag_last_x = cx;
-      app->drag_last_y = cy;
-    }
-  } else if (action == GLFW_RELEASE) {
-    app->dragging = false;
-  }
-}
-
-// ---- Cursor position callback (drag to pan map) ----
-static void cursor_pos_callback(GLFWwindow *window, double xpos, double ypos) {
-  VizApp *app = app_from_window(window);
-  double center_lat, center_lng;
-  double new_center_lat, new_center_lng;
-
-  if (!app || !app->dragging || !app->hex_renderer) return;
-
-  int win_w, win_h;
-  glfwGetWindowSize(window, &win_w, &win_h);
-  int viewport_w = win_w - win_w / 2;
-  int viewport_h = win_h;
-
-  double dx = xpos - app->drag_last_x;
-  double dy = ypos - app->drag_last_y;
-  app->drag_last_x = xpos;
-  app->drag_last_y = ypos;
-
-  if (current_render_map_center(app, &center_lat, &center_lng)) {
-    if (!VizMap_pan_center(center_lat, center_lng, app->hex_renderer->zoom,
-                           viewport_w, viewport_h, dx, dy, &new_center_lat,
-                           &new_center_lng)) {
-      return;
-    }
-    set_manual_map_center(app, new_center_lat, new_center_lng);
-  } else {
-    if (!VizMap_pan_center(0.0, 0.0, app->hex_renderer->zoom, viewport_w,
-                           viewport_h, dx, dy, &new_center_lat,
-                           &new_center_lng)) {
-      return;
-    }
-    app->hex_renderer->pan_offset_lat += new_center_lat;
-    app->hex_renderer->pan_offset_lng += new_center_lng;
-  }
 }
 
 // ---- Directory scanning helper ----
@@ -861,10 +477,7 @@ int main(int argc, char *argv[]) {
   glfwMakeContextCurrent(window);
   glfwSwapInterval(1);  // vsync
   glfwSetWindowUserPointer(window, &app);
-  glfwSetKeyCallback(window, key_callback);
-  glfwSetScrollCallback(window, scroll_callback);
-  glfwSetMouseButtonCallback(window, mouse_button_callback);
-  glfwSetCursorPosCallback(window, cursor_pos_callback);
+  VizInput_install_callbacks(window);
 
   printf("OpenGL %s\n", glGetString(GL_VERSION));
 
@@ -1281,9 +894,10 @@ int main(int argc, char *argv[]) {
     double map_center_lat = 0.0;
     double map_center_lng = 0.0;
     double map_target_lat, map_target_lng;
-    if (current_map_target_center(&app, &map_target_lat, &map_target_lng)) {
+    if (VizInput_current_map_target_center(&app, &map_target_lat,
+                                           &map_target_lng)) {
       if (!app.map_view_initialized) {
-        snap_map_view_to(&app, map_target_lat, map_target_lng);
+        VizInput_snap_map_view_to(&app, map_target_lat, map_target_lng);
       } else if (!app.dragging) {
         VizMap_step_follow(app.map_view_center_lat, app.map_view_center_lng,
                            map_target_lat, map_target_lng,
