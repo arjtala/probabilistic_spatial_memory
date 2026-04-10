@@ -134,6 +134,7 @@ TEST_GPS_TRACE = $(BUILD_DIR)/test_gps_trace
 TEST_VIZ_RUNTIME = $(BUILD_DIR)/test_viz_runtime
 TEST_TILE_DISK_CACHE = $(BUILD_DIR)/test_tile_disk_cache
 TEST_MAP_VIEW = $(BUILD_DIR)/test_map_view
+TEST_VIZ_DEBUG_HUD = $(BUILD_DIR)/test_viz_debug_hud
 
 # Default target
 all: $(LIB) $(BIN)
@@ -228,7 +229,7 @@ $(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(VENDOR_HEADERS) $(TOOLCHAIN_INFO)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
 # Test targets
-test: test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view
+test: test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud
 
 test-ring-buffer: $(TEST_RING_BUFFER)
 	./$(TEST_RING_BUFFER)
@@ -315,6 +316,13 @@ $(TEST_MAP_VIEW): tests/test_map_view.c src/viz/map_view.c include/viz/map_view.
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) tests/test_map_view.c src/viz/map_view.c $(UTILITIES_OBJ) -o $@ -lm
 
+test-viz-debug-hud: $(TEST_VIZ_DEBUG_HUD)
+	./$(TEST_VIZ_DEBUG_HUD)
+
+$(TEST_VIZ_DEBUG_HUD): tests/test_viz_debug_hud.c src/viz/viz_debug_hud.c src/viz/viz_runtime.c include/viz/viz_debug_hud.h include/viz/viz_runtime.h $(UTILITIES_OBJ) $(TOOLCHAIN_INFO)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(VIZ_CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_viz_debug_hud.c src/viz/viz_debug_hud.c src/viz/viz_runtime.c $(UTILITIES_OBJ) -o $@ $(GLFW_LDFLAGS) $(TEST_OPENGL_LDFLAGS) -lm
+
 # Clean target
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET_DIR)
@@ -323,7 +331,7 @@ clean:
 rebuild: clean all
 
 # Phony targets
-.PHONY: all debug portable sanitize viz bench-spatial-memory bench-tile-decode test test-debug test-portable test-sanitize test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view clean rebuild show run FORCE
+.PHONY: all debug portable sanitize viz bench-spatial-memory bench-tile-decode test test-debug test-portable test-sanitize test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud clean rebuild show run FORCE
 
 # Show detected files
 show:
