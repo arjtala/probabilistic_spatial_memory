@@ -69,3 +69,13 @@
 - [x] Upgrade `targets/psm` from a demo entrypoint to a real CLI with flags for resolution/capacity/precision and structured output
 - [x] Turn the open questions in `README.md` into explicit experiments and reproducible benchmark sweeps
 - [x] Remove the accidental tracked top-level `endif` artifact
+
+## Follow-Up
+
+- [x] Improve the startup/help overlay readability and make the `P` screenshot action explicit in the on-screen controls
+- [x] Switch screenshot export from BMP to PNG and validate the written files in tests
+- [ ] Add a lightweight map-cell inspector: hover or click a hex and show its count, mode value, and H3 id
+- [ ] Add visual regression coverage for the overlay/screenshot path so UI changes are harder to break silently
+- [ ] Improve PNG compression so screenshots stay valid PNGs but get much smaller on disk
+- [ ] Add a small recording/export flow for short replay clips, not just still screenshots
+- [ ] Add Linux CI for `viz` builds/tests now that the portability work is in place
