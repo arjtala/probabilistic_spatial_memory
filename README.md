@@ -2,12 +2,36 @@
 
 A bounded-memory, time-decayed spatial memory system built on probabilistic data structures. Models *what has been seen*, *where it was seen*, and *how memory fades over time* — from egocentric video captured on [Project Aria](https://www.projectaria.com/) glasses.
 
-## What it does
+## TL;DR
 
-Given a stream of observations tied to locations and timestamps, the system maintains compact approximate summaries per geographic region. Each region tracks distinct items seen over sliding time windows using [HyperLogLog](https://en.wikipedia.org/wiki/HyperLogLog) counters arranged in a ring buffer.
+`psm` turns timestamped egocentric video features into a bounded spatial memory: embeddings are hashed into H3 cells, each cell keeps a sliding ring buffer of HyperLogLog sketches, and the visualizer replays the session as synchronized video plus map.
+
+In the map view, brighter/yellower hexes indicate cells with higher distinct-observation counts relative to the hottest cell in the current scene. Older memory does not disappear continuously; it decays as time buckets roll over, and cells with history but little current activity fade by becoming more transparent.
+
+## Why
+
+This project is a systems-oriented model of episodic spatial memory under hard storage limits. The goal is not to predict behavior or reconstruct every past frame, but to maintain a compact representation of:
+
+- what was seen
+- where it was seen
+- how that memory fades over time
+
+The interesting constraint is that memory stays bounded even as session length grows. Instead of storing raw frames or full embeddings indefinitely, the system keeps approximate, mergeable summaries that can still answer useful questions about familiarity, novelty, and revisitation.
+
+## Design goals
+
+- **Bounded memory:** memory use should remain stable as more observations arrive.
+- **Time decay:** recent experience should matter more than old experience without requiring explicit garbage collection of individual events.
+- **Spatial locality:** observations should be attached to geographic regions so queries stay local and map rendering is natural.
+- **Fast aggregation:** summaries should be cheap to merge across time windows for interactive exploration.
+- **Inspectable behavior:** the visualization should make the memory model legible rather than hiding it behind offline metrics only.
+
+## Core idea
+
+Given a stream of observations tied to locations and timestamps, the system maintains compact approximate summaries per geographic region. Each region tracks distinct observations seen over sliding time windows using [HyperLogLog](https://en.wikipedia.org/wiki/HyperLogLog) counters arranged in a ring buffer.
 
 ```
-(timestamp, lat, lon, observation) → spatial tile → ring buffer of HLLs
+(timestamp, lat, lon, observation) -> spatial tile -> ring buffer of HLLs
 ```
 
 This enables queries like:
@@ -15,6 +39,25 @@ This enables queries like:
 - "Is this region becoming more or less novel over time?"
 
 Memory usage is bounded regardless of how many observations are processed.
+
+## What is being counted?
+
+The current implementation hashes frame-level model embeddings into the spatial memory engine, so the primary signal is an approximate count of distinct semantic observations per region and time window.
+
+That is closer to "unique visual or semantic states" than to raw frame count. In practice, the counting layer is generic enough to support several granularities:
+
+- **Frame-level embeddings (current):** count distinct whole-scene observations.
+- **Object-level embeddings:** count distinct objects encountered in space.
+- **Clustered or LSH-stabilized embeddings:** count distinct semantic categories with more robustness to viewpoint or lighting changes.
+
+This separation matters because the storage layer only needs stable hashed tokens; it does not need to know whether those tokens came from whole frames, objects, or semantic clusters.
+
+## End-to-end pipeline
+
+1. **Offline extraction:** a Project Aria session is processed into synchronized video, GPS, IMU, embeddings, and spatial heatmap outputs stored in HDF5.
+2. **C ingestion:** the reader streams timestamped records, hashes embeddings, maps GPS fixes into H3 cells, and advances time windows from record timestamps rather than wall clock.
+3. **Spatial memory:** each H3 cell owns a fixed-size ring buffer of HLL sketches, giving sliding-window distinct counts with natural forgetting.
+4. **Interactive visualization:** the OpenGL visualizer replays the session as side-by-side video and map views, with model overlays on the video and memory intensity rendered over the map.
 
 ## Data: Project Aria
 
@@ -43,7 +86,7 @@ The high-rate IMU stream drives three visual features on the map:
 
 Dead reckoning (heading + estimated speed) is blended with GPS via a complementary filter to produce smooth inter-GPS-sample positioning.
 
-## Architecture
+## Memory layout
 
 ```
 ┌─────────────────────────────────────────┐
@@ -60,8 +103,8 @@ Dead reckoning (heading + estimated speed) is blended with GPS via a complementa
 └─────────────────────────────────────────┘
 ```
 
-- **Tile**: A geographic region (H3 hex cell) with its own ring buffer
-- **Ring Buffer**: Fixed-size circular buffer of HLL counters, one per time window
+- **Tile**: a geographic region (H3 hex cell) with its own ring buffer
+- **Ring buffer**: fixed-size circular buffer of HLL counters, one per time window
 - **HLL**: HyperLogLog sketch estimating distinct item count
 
 Merging HLL slots gives "memory over the last N intervals" with natural time decay — oldest slots get overwritten as the buffer advances.
@@ -206,6 +249,10 @@ The debug HUD lives in the window title and shows playback/decode budgets, inges
 
 **Layout:** Left half shows video with optional attention/prediction heatmap overlay. Right half shows configurable raster tiles (default: `CartoDB.Positron`) with H3 hex heatmap (viridis), GPS trace ribbon, and camera frustum. The map view follows the latest GPS/IMU-driven position smoothly by default; manual drag temporarily overrides that view until you re-center with `C`.
 
+**Hex heatmap semantics:** Each tile is colored from its merged distinct-count over the full active ring-buffer horizon, normalized against the hottest tile currently rendered. Low-intensity tiles appear dark purple, mid-range tiles shift toward teal/cyan, and the hottest tiles appear yellow. Alpha also rises with intensity, so stronger cells look more solid.
+
+Time decay is only partly encoded in hue. When a tile has historical count but little or no activity in the current bucket, the renderer reduces alpha so the cell lingers as a dim memory instead of vanishing immediately. The underlying forgetting is stepwise: as the ring buffer advances, the oldest bucket is overwritten, so hex intensity can drop in discrete steps at window boundaries rather than as a perfectly smooth fade.
+
 ## Benchmarks
 
 Use the lightweight throughput benchmark to track `SpatialMemory` regressions over time:
@@ -288,6 +335,13 @@ vendor/             # Git submodule
 - [H3](https://h3geo.org/) — Uber's hexagonal hierarchical spatial index (`brew install h3`)
 - [HDF5](https://www.hdfgroup.org/solutions/hdf5/) — Reading embedding datasets produced by Python extraction pipeline (`brew install hdf5`)
 
+## Open questions
+
+- How stable are embedding hashes under semantic-preserving changes such as viewpoint, lighting, or motion blur?
+- Which counting unit is most useful for downstream interpretation: whole-frame states, objects, or clustered semantic tokens?
+- How quickly does a region's familiarity converge, and how sensitive is that to H3 resolution and time-window size?
+- What is the best operational definition of novelty: raw distinct counts, change relative to recent history, or prediction error from the model overlays?
+
 ## Status
 
-Work in progress. See [JOURNAL.md](JOURNAL.md) for development notes and detailed progress.
+The core engine, ingestion pipeline, tests, and interactive visualizer are implemented and documented here. The README is the primary project guide.
