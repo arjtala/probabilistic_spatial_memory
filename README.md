@@ -325,6 +325,15 @@ make bench-tile-decode
 ./targets/benchmark_tile_decode [total_decodes] [thread_count]
 ```
 
+For reproducible multi-point sweeps over the existing benchmark binaries, use:
+
+```bash
+benchmarks/sweep_spatial_memory.sh > spatial_memory_sweep.csv
+benchmarks/sweep_tile_decode.sh > tile_decode_sweep.csv
+```
+
+Both scripts emit CSV to stdout, accept `PROFILE=local|portable|debug|sanitize`, and allow their sweep grids to be overridden with environment variables. See [EXPERIMENTS.md](EXPERIMENTS.md) for the full protocol.
+
 ## Project structure
 
 ```
@@ -340,9 +349,11 @@ include/
     video_decoder.h
     hex_renderer.h
     tile_map.h
+    tile_disk_cache.h
     gps_trace.h
     imu_processor.h
     viz_config.h
+    viz_runtime.h
 src/
   core/             # Core engine
     ring_buffer.c
@@ -355,22 +366,30 @@ src/
     shader.c
     video_decoder.c
     hex_renderer.c
+    tile_disk_cache.c
     tile_map.c
     gps_trace.c
     imu_processor.c
     viz_config.c
+    viz_runtime.c
 psm-viz.toml.example  # Sample visualizer config
 configs/            # Ready-to-use psm-viz tuning presets
 benchmarks/         # Lightweight performance benchmarks
+  sweep_spatial_memory.sh
+  sweep_tile_decode.sh
 shaders/            # GLSL shaders
 tests/              # Test suites
   test_ring_buffer.c
   test_tile.c
+  test_tile_table.c
   test_spatial_memory.c
   test_ingest.c
   test_jepa_cache.c
   test_viz_math.c
   test_viz_config.c
+  test_viz_runtime.c
+  test_tile_disk_cache.c
+EXPERIMENTS.md      # Reproducible experiment protocols and sweep recipes
 targets/            # Build outputs (psm, psm-viz, libpsm.a)
 build/              # Intermediate object files
 vendor/             # Git submodule
@@ -386,12 +405,23 @@ vendor/             # Git submodule
 - [H3](https://h3geo.org/) — Uber's hexagonal hierarchical spatial index (`brew install h3`)
 - [HDF5](https://www.hdfgroup.org/solutions/hdf5/) — Reading embedding datasets produced by Python extraction pipeline (`brew install hdf5`)
 
-## Open questions
+## Experiment backlog
 
-- How stable are embedding hashes under semantic-preserving changes such as viewpoint, lighting, or motion blur?
-- Which counting unit is most useful for downstream interpretation: whole-frame states, objects, or clustered semantic tokens?
-- How quickly does a region's familiarity converge, and how sensitive is that to H3 resolution and time-window size?
-- What is the best operational definition of novelty: raw distinct counts, change relative to recent history, or prediction error from the model overlays?
+The previous open questions are now mapped to explicit experiments in [EXPERIMENTS.md](EXPERIMENTS.md):
+
+- `E1. Embedding-hash stability under semantic-preserving change`
+  Compare matched baseline and perturbed feature exports with `targets/psm -j`, then check hotspot stability in `psm-viz`.
+- `E2. Counting-unit ablation`
+  Re-run the same session with frame-level, object-level, or clustered tokens once those exports exist, using the same `psm -j` harness for comparison.
+- `E3. Familiarity convergence sensitivity sweep`
+  Sweep `h3_resolution` and `time_window_sec` with `targets/psm -j` and record `tile_count`, total mass, current mass, and hottest-tile intensity.
+- `E4. Novelty definition comparison`
+  Compare `total`, `current`, and `current / total` from `psm -j`, then visually cross-check against the JEPA prediction-error overlay in `psm-viz`.
+
+For pure performance regressions, the reproducible benchmark sweep entry points are:
+
+- `benchmarks/sweep_spatial_memory.sh`
+- `benchmarks/sweep_tile_decode.sh`
 
 ## Status
 

@@ -1,0 +1,6 @@
+#ifndef VIZ_TILE_LIMITS_H
+#define VIZ_TILE_LIMITS_H
+
+#define TILE_MAP_MAX_PENDING_DOWNLOADS 8
+
+#endif

@@ -107,7 +107,7 @@ OBJ = $(CORE_OBJ) $(INGEST_OBJ)
 VENDOR_OBJ = $(patsubst $(VENDOR)/%.c,$(BUILD_DIR)/vendor/%.o,$(VENDOR_SRCS))
 
 # Viz source/object files
-VIZ_SRCS = src/viz/shader.c src/viz/video_decoder.c src/viz/video_quad.c src/viz/progress_bar.c src/viz/attention_overlay.c src/viz/hex_renderer.c src/viz/tile_map.c src/viz/gps_trace.c src/viz/imu_processor.c src/viz/jepa_cache.c src/viz/viz_math.c src/viz/viz_config.c
+VIZ_SRCS = $(filter-out src/viz/viz_main.c,$(wildcard src/viz/*.c))
 VIZ_OBJ = $(patsubst src/viz/%.c,$(BUILD_DIR)/viz/%.o,$(VIZ_SRCS))
 STB_OBJ = $(BUILD_DIR)/vendor/stb/stb_image_impl.o
 UTILITIES_OBJ = $(BUILD_DIR)/vendor/lib/utilities.o
@@ -131,6 +131,8 @@ TEST_JEPA_CACHE = $(BUILD_DIR)/test_jepa_cache
 TEST_VIZ_MATH = $(BUILD_DIR)/test_viz_math
 TEST_VIZ_CONFIG = $(BUILD_DIR)/test_viz_config
 TEST_GPS_TRACE = $(BUILD_DIR)/test_gps_trace
+TEST_VIZ_RUNTIME = $(BUILD_DIR)/test_viz_runtime
+TEST_TILE_DISK_CACHE = $(BUILD_DIR)/test_tile_disk_cache
 
 # Default target
 all: $(LIB) $(BIN)
@@ -225,7 +227,7 @@ $(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(VENDOR_HEADERS) $(TOOLCHAIN_INFO)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
 # Test targets
-test: test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace
+test: test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache
 
 test-ring-buffer: $(TEST_RING_BUFFER)
 	./$(TEST_RING_BUFFER)
@@ -291,6 +293,20 @@ $(TEST_GPS_TRACE): tests/test_gps_trace.c src/viz/gps_trace.c src/viz/viz_math.c
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(VIZ_CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_gps_trace.c src/viz/gps_trace.c src/viz/viz_math.c $(UTILITIES_OBJ) -o $@ $(TEST_OPENGL_LDFLAGS) -lm
 
+test-viz-runtime: $(TEST_VIZ_RUNTIME)
+	./$(TEST_VIZ_RUNTIME)
+
+$(TEST_VIZ_RUNTIME): tests/test_viz_runtime.c src/viz/viz_runtime.c include/viz/viz_runtime.h include/viz/viz_config.h include/viz/tile_limits.h $(UTILITIES_OBJ) $(TOOLCHAIN_INFO)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) tests/test_viz_runtime.c src/viz/viz_runtime.c $(UTILITIES_OBJ) -o $@ -lm
+
+test-tile-disk-cache: $(TEST_TILE_DISK_CACHE)
+	./$(TEST_TILE_DISK_CACHE)
+
+$(TEST_TILE_DISK_CACHE): tests/test_tile_disk_cache.c src/viz/tile_disk_cache.c include/viz/tile_disk_cache.h $(TOOLCHAIN_INFO)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) tests/test_tile_disk_cache.c src/viz/tile_disk_cache.c -o $@ -lm
+
 # Clean target
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET_DIR)
@@ -299,7 +315,7 @@ clean:
 rebuild: clean all
 
 # Phony targets
-.PHONY: all debug portable sanitize viz bench-spatial-memory bench-tile-decode test test-debug test-portable test-sanitize test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace clean rebuild show run FORCE
+.PHONY: all debug portable sanitize viz bench-spatial-memory bench-tile-decode test test-debug test-portable test-sanitize test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache clean rebuild show run FORCE
 
 # Show detected files
 show:

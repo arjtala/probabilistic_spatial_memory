@@ -65,5 +65,5 @@
 - [ ] Split remaining large viz modules (`src/viz/viz_main.c`, `src/viz/tile_map.c`) into smaller controller / scheduler / HUD / tile-pipeline pieces
 - [ ] Expand headless tests for viz interaction, adaptive budgets, and tile-cache behavior
 - [x] Upgrade `targets/psm` from a demo entrypoint to a real CLI with flags for resolution/capacity/precision and structured output
-- [ ] Turn the open questions in `README.md` into explicit experiments and reproducible benchmark sweeps
+- [x] Turn the open questions in `README.md` into explicit experiments and reproducible benchmark sweeps
 - [x] Remove the accidental tracked top-level `endif` artifact
