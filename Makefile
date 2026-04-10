@@ -135,6 +135,8 @@ TEST_VIZ_RUNTIME = $(BUILD_DIR)/test_viz_runtime
 TEST_TILE_DISK_CACHE = $(BUILD_DIR)/test_tile_disk_cache
 TEST_MAP_VIEW = $(BUILD_DIR)/test_map_view
 TEST_VIZ_DEBUG_HUD = $(BUILD_DIR)/test_viz_debug_hud
+TEST_SCREENSHOT = $(BUILD_DIR)/test_screenshot
+TEST_UI_OVERLAY = $(BUILD_DIR)/test_ui_overlay
 
 # Default target
 all: $(LIB) $(BIN)
@@ -229,7 +231,7 @@ $(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(VENDOR_HEADERS) $(TOOLCHAIN_INFO)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
 # Test targets
-test: test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud
+test: test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud test-screenshot test-ui-overlay
 
 test-ring-buffer: $(TEST_RING_BUFFER)
 	./$(TEST_RING_BUFFER)
@@ -323,6 +325,20 @@ $(TEST_VIZ_DEBUG_HUD): tests/test_viz_debug_hud.c src/viz/viz_debug_hud.c src/vi
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(VIZ_CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_viz_debug_hud.c src/viz/viz_debug_hud.c src/viz/viz_runtime.c $(UTILITIES_OBJ) -o $@ $(GLFW_LDFLAGS) $(TEST_OPENGL_LDFLAGS) -lm
 
+test-screenshot: $(TEST_SCREENSHOT)
+	./$(TEST_SCREENSHOT)
+
+$(TEST_SCREENSHOT): tests/test_screenshot.c src/viz/screenshot.c include/viz/screenshot.h $(STB_OBJ) $(TOOLCHAIN_INFO)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(VIZ_CFLAGS) tests/test_screenshot.c src/viz/screenshot.c $(STB_OBJ) -o $@ $(GLFW_LDFLAGS) $(TEST_OPENGL_LDFLAGS) -lm
+
+test-ui-overlay: $(TEST_UI_OVERLAY)
+	./$(TEST_UI_OVERLAY)
+
+$(TEST_UI_OVERLAY): tests/test_ui_overlay.c src/viz/ui_overlay.c include/viz/ui_overlay.h $(UTILITIES_OBJ) $(TOOLCHAIN_INFO)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) tests/test_ui_overlay.c src/viz/ui_overlay.c $(UTILITIES_OBJ) -o $@ -lm
+
 # Clean target
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET_DIR)
@@ -331,7 +347,7 @@ clean:
 rebuild: clean all
 
 # Phony targets
-.PHONY: all debug portable sanitize viz bench-spatial-memory bench-tile-decode test test-debug test-portable test-sanitize test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud clean rebuild show run FORCE
+.PHONY: all debug portable sanitize viz bench-spatial-memory bench-tile-decode test test-debug test-portable test-sanitize test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud test-screenshot test-ui-overlay clean rebuild show run FORCE
 
 # Show detected files
 show:

@@ -286,10 +286,15 @@ Downloaded raster tiles are cached on disk and replay through the same threaded 
 | Drag (map) | Pan map manually |
 | C | Re-center map and resume smooth follow |
 | M | Cycle heatmap mode (`total` → `current` → `recency`) |
+| L | Toggle the heatmap legend overlay |
 | H | Toggle live debug title HUD |
+| P | Save a screenshot of the current composed frame to `captures/` as `.png` |
+| ? / F1 | Toggle the help overlay |
 | Q / Esc | Quit |
 
-The visualizer opens paused by default on the first decoded frame, shows a centered startup play overlay, and does not begin playback until you press `Space`.
+The visualizer opens paused by default on the first decoded frame, shows the help/startup overlay immediately, and does not begin playback until you press `Space`. The first `Space` also dismisses that initial help panel.
+
+Screenshots save into `<session_dir>/captures/` when a session directory is configured, otherwise `./captures/`, using names like `psm-viz-000042.png`.
 
 The debug HUD lives in the window title and shows playback/decode budgets, ingest drain activity, tile pipeline queue counts, and tile disk-cache health in real time. For the `v`, `in`, `imu`, `gps`, and `up` fields, the HUD shows `work/current_budget`; when adaptive backpressure boosts a budget above its configured base, the base appears in parentheses, for example `256/384(128)`. A trailing `*` means that lane still had backlog after spending its frame budget. Tile fields are: `act` active network downloads, `rdy` compressed tiles ready for decode, `dec` tiles currently being decoded, `pix` decoded tiles waiting for GL upload, and `c` resident cached tile textures. Disk-cache fields are: `h` disk cache hits, `w` cache writes, `p` pruned files, and `m` cached MiB used versus cap.
 

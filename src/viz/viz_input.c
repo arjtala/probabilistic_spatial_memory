@@ -173,6 +173,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
     app->paused = !app->paused;
     if (!app->paused) {
       app->awaiting_initial_play = false;
+      app->help_overlay_visible = false;
     }
     break;
   case GLFW_KEY_EQUAL:
@@ -213,6 +214,25 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
       glfwSetWindowTitle(window, "psm-viz");
     }
     printf("Debug HUD: %s\n", app->debug_hud_enabled ? "on" : "off");
+    break;
+  case GLFW_KEY_SLASH:
+    if (!(mods & GLFW_MOD_SHIFT)) {
+      app->help_overlay_visible = !app->help_overlay_visible;
+      printf("Help overlay: %s\n", app->help_overlay_visible ? "on" : "off");
+      break;
+    }
+    // fall through for '?'
+  case GLFW_KEY_F1:
+    app->help_overlay_visible = !app->help_overlay_visible;
+    printf("Help overlay: %s\n", app->help_overlay_visible ? "on" : "off");
+    break;
+  case GLFW_KEY_L:
+    app->legend_overlay_visible = !app->legend_overlay_visible;
+    printf("Legend overlay: %s\n", app->legend_overlay_visible ? "on" : "off");
+    break;
+  case GLFW_KEY_P:
+    app->screenshot_requested = true;
+    printf("Screenshot requested (.png)\n");
     break;
   case GLFW_KEY_M:
     if (app->hex_renderer) {

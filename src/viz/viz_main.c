@@ -19,12 +19,16 @@
 #include "viz/video_decoder.h"
 #include "viz/hex_renderer.h"
 #include "viz/map_view.h"
+#include "viz/ui_overlay.h"
+#include "viz/ui_overlay_renderer.h"
 #include "viz/tile_map.h"
 #include "viz/gps_trace.h"
 #include "viz/imu_processor.h"
 #include "viz/jepa_cache.h"
+#include "viz/screenshot.h"
 #include "viz/viz_config.h"
 #include "viz/viz_debug_hud.h"
+#include "viz/viz_overlay_panels.h"
 #include "viz/viz_runtime.h"
 #include "viz/viz_math.h"
 #include "ingest/ingest.h"
@@ -235,7 +239,10 @@ static void print_usage(const char *prog) {
   fprintf(stderr, "  Drag        Pan map (on map pane)\n");
   fprintf(stderr, "  C           Re-center map and resume follow\n");
   fprintf(stderr, "  M           Cycle heatmap mode\n");
+  fprintf(stderr, "  L           Toggle heatmap legend\n");
   fprintf(stderr, "  H           Toggle debug title HUD\n");
+  fprintf(stderr, "  P           Save screenshot to captures/ (.png)\n");
+  fprintf(stderr, "  ?/F1        Toggle help overlay\n");
   fprintf(stderr, "  Q/Esc       Quit\n");
 }
 
@@ -254,6 +261,8 @@ int main(int argc, char *argv[]) {
   VizTileSource tile_source;
   HexHeatmapMode heatmap_mode = HEX_HEATMAP_MODE_TOTAL;
   VizApp app = {0};
+  VizScreenshotSession screenshot_session = {0};
+  bool screenshot_session_ready = false;
 
   int opt;
   bool help_requested = false;
@@ -433,6 +442,8 @@ int main(int argc, char *argv[]) {
   app.paused = config.start_paused;
   app.awaiting_initial_play = config.start_paused;
   app.playback_speed = 1.0;
+  app.help_overlay_visible = true;
+  app.legend_overlay_visible = true;
   app.time_window_sec = time_window_sec;
   app.h3_resolution = h3_resolution;
   app.scrub_sensitivity_sec = config.scrub_sensitivity_sec;
@@ -480,6 +491,25 @@ int main(int argc, char *argv[]) {
   VizInput_install_callbacks(window);
 
   printf("OpenGL %s\n", glGetString(GL_VERSION));
+
+  if (dir_path) {
+    char capture_dir[PATH_MAX];
+    if (snprintf(capture_dir, sizeof(capture_dir), "%s/captures", dir_path) <
+            (int)sizeof(capture_dir) &&
+        VizScreenshot_init(&screenshot_session, capture_dir, "psm-viz", 0)) {
+      screenshot_session_ready = true;
+    }
+  }
+  if (!screenshot_session_ready &&
+      VizScreenshot_init(&screenshot_session, "captures", "psm-viz", 0)) {
+    screenshot_session_ready = true;
+  }
+  if (screenshot_session_ready) {
+    printf("Screenshots: %s/%s-######.png\n", screenshot_session.output_dir,
+           screenshot_session.prefix);
+  } else {
+    fprintf(stderr, "Warning: screenshot export disabled (failed to init output path)\n");
+  }
 
   // ---- Load shaders ----
   GLuint video_prog = Shader_load_program("shaders/video.vert", "shaders/video.frag");
@@ -636,6 +666,9 @@ int main(int argc, char *argv[]) {
 
   // ---- Create progress bar ----
   ProgressBar pb = ProgressBar_create(hex_prog);  // reuses hex shader (vec2 pos + vec4 color)
+  UiOverlayRenderer overlay_renderer = UiOverlayRenderer_create(hex_prog);
+  UiOverlayMesh overlay_mesh;
+  UiOverlay_init(&overlay_mesh);
 
   // ---- Create attention overlay (if shader loaded) ----
   AttentionOverlay ao;
@@ -919,12 +952,50 @@ int main(int argc, char *argv[]) {
     GpsTrace_upload(gt, map_center_lat, map_center_lng);
     HexRenderer_draw(hr, win_w - half_w, win_h, map_center_lat, map_center_lng);
     GpsTrace_draw(gt, win_w - half_w, win_h, hr->zoom);
+    glViewport(0, 0, win_w, win_h);
+    double ui_time = glfwGetTime();
+    const char *status_text =
+        (app.status_message[0] != '\0' && app.status_message_until > ui_time)
+            ? app.status_message
+            : NULL;
+    if (VizOverlayPanels_build(&overlay_mesh, win_w, win_h, half_w,
+                               app.help_overlay_visible,
+                               app.legend_overlay_visible,
+                               app.awaiting_initial_play, hr->heatmap_mode,
+                               hr->zoom,
+                               app.sm ? SpatialMemory_tile_count(app.sm) : 0,
+                               status_text)) {
+      UiOverlayRenderer_draw(&overlay_renderer, &overlay_mesh);
+    }
     update_debug_window_title(window, &app, frame_time);
+    if (app.screenshot_requested) {
+      char screenshot_path[PATH_MAX];
+      bool captured = false;
+
+      if (screenshot_session_ready) {
+        captured = VizScreenshot_capture_region(
+            &screenshot_session, 0, 0, win_w, win_h, screenshot_path,
+            sizeof(screenshot_path));
+      }
+      if (captured) {
+        printf("Screenshot saved: %s\n", screenshot_path);
+        snprintf(app.status_message, sizeof(app.status_message),
+                 "%s", "SCREENSHOT SAVED");
+      } else {
+        fprintf(stderr, "Failed to save screenshot\n");
+        snprintf(app.status_message, sizeof(app.status_message),
+                 "%s", "SCREENSHOT FAILED");
+      }
+      app.status_message_until = glfwGetTime() + 2.0;
+      app.screenshot_requested = false;
+    }
 
     glfwSwapBuffers(window);
   }
 
   // ---- Cleanup ----
+  UiOverlay_free(&overlay_mesh);
+  UiOverlayRenderer_free(&overlay_renderer);
   ProgressBar_free(&pb);
   if (has_attention_overlay) {
     AttentionOverlay_free(&ao);

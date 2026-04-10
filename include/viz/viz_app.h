@@ -17,6 +17,9 @@ typedef struct {
   bool paused;
   bool awaiting_initial_play;
   double playback_speed;
+  bool help_overlay_visible;
+  bool legend_overlay_visible;
+  bool screenshot_requested;
 
   bool map_view_initialized;
   double map_view_center_lat;
@@ -59,6 +62,8 @@ typedef struct {
   bool debug_hud_enabled;
   double next_debug_title_update;
   VizRuntimeFrameStats frame_stats;
+  char status_message[96];
+  double status_message_until;
 } VizApp;
 
 #endif
