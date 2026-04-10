@@ -63,7 +63,7 @@
 - [x] Add CI plus safer build profiles in `Makefile` (`debug`, sanitizers, portable release) and run them on macOS/Linux
 - [x] Add selectable heatmap modes for the map view, configurable via viz config and switchable at runtime
 - [ ] Split remaining large viz modules (`src/viz/viz_main.c`, `src/viz/tile_map.c`) into smaller controller / scheduler / HUD / tile-pipeline pieces
-- [ ] Expand headless tests for viz interaction, adaptive budgets, and tile-cache behavior
+- [x] Expand headless tests for viz interaction, adaptive budgets, and tile-cache behavior
 - [x] Upgrade `targets/psm` from a demo entrypoint to a real CLI with flags for resolution/capacity/precision and structured output
 - [x] Turn the open questions in `README.md` into explicit experiments and reproducible benchmark sweeps
 - [x] Remove the accidental tracked top-level `endif` artifact
