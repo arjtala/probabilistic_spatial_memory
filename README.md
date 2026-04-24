@@ -109,6 +109,8 @@ Dead reckoning (heading + estimated speed) is blended with GPS via a complementa
 
 Merging HLL slots gives "memory over the last N intervals" with natural time decay — oldest slots get overwritten as the buffer advances.
 
+The **effective retention window** per tile is `capacity × time_window_sec`. With the defaults (`-C 12 -t 5.0`) that is **60 seconds** — observations older than that age out of each tile's ring buffer and stop contributing to `-j` / `--last-seen` output. For multi-minute sessions, widen either knob (e.g. `-C 30 -t 60` = 30-minute window) before you start worrying about empty query results.
+
 ## Building
 
 ```bash
@@ -174,6 +176,8 @@ targets/psm features.h5 dino 5.0 10 12 10
 | `-p` | `<bits>` | `10` | HLL precision |
 | `-j` | — | — | Emit JSON summary instead of text |
 | `-h` | — | — | Print help |
+
+> **Retention:** each tile remembers observations for `capacity × time_window_sec` (default 60s). Query output is empty past that horizon — widen `-C` or `-t` for longer sessions.
 
 ## Visualization
 

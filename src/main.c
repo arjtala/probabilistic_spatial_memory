@@ -197,6 +197,9 @@ static void print_usage(const char *program) {
   fprintf(stderr, "  --last-seen LAT,LNG     Query last-seen intervals around (lat,lng)\n");
   fprintf(stderr, "  --k-ring N              H3 neighborhood radius for --last-seen (default: 0)\n");
   fprintf(stderr, "  --top N                 Max results to print for --last-seen (default: 5)\n");
+  fprintf(stderr, "\nRetention window = capacity * time-window (default: 12 * 5.0s = 60s).\n");
+  fprintf(stderr, "Observations older than this age out of each tile's ring buffer.\n");
+  fprintf(stderr, "For multi-minute sessions, widen with e.g. -C 30 -t 60 (30-min window).\n");
 }
 
 static void cli_options_init(CliOptions *options) {
