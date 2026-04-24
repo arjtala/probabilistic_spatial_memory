@@ -37,6 +37,10 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+#ifndef PSM_VERSION
+#define PSM_VERSION "unknown"
+#endif
+
 #define DEBUG_TITLE_UPDATE_INTERVAL_SEC 0.15
 
 static VizRuntimeBudgetConfig current_budget_config(const VizApp *app) {
@@ -216,6 +220,7 @@ static void print_usage(const char *prog) {
   fprintf(stderr, "  -t <sec>    Time window in seconds (default: 5.0)\n");
   fprintf(stderr, "  -r <res>    H3 resolution 0-15 (default: 10)\n");
   fprintf(stderr, "  -m <mode>   Heatmap mode: total | current | recency\n");
+  fprintf(stderr, "  --version   Print psm-viz version and exit\n");
   fprintf(stderr, "  -h          Print this help\n");
   fprintf(stderr, "\nConfig keys:\n");
   fprintf(stderr, "  session_dir, video_path, features_path, group,\n");
@@ -248,6 +253,12 @@ static void print_usage(const char *prog) {
 
 // ---- Main ----
 int main(int argc, char *argv[]) {
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--version") == 0) {
+      printf("psm-viz version %s\n", PSM_VERSION);
+      return 0;
+    }
+  }
   const char *config_path = NULL;
   const char *dir_path;
   const char *video_path;
