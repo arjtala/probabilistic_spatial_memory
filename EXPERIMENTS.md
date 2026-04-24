@@ -171,6 +171,93 @@ Review:
 2. Compare the map hotspot under `recency` against the JEPA prediction-error overlay.
 3. Repeat on several frames from the same route.
 
+## Localization Paradox Alignment
+
+A forthcoming NeurIPS 2026 streaming egocentric memory benchmark — referred to below as the **Localization Paradox benchmark** after its headline finding — evaluates multimodal LLMs on 20K+ "look-back" QA pairs over 613 hours of unscripted Ray-Ban Meta egocentric video. Frontier MLLMs (Gemini 3 Pro, GPT-5, InternVL 3.5) achieve 27-50% semantic accuracy but near-zero temporal grounding (`mIoU` often ≈0). The paper's discussion section explicitly calls for "adaptive temporal indexing… and hierarchical memory buffers that can compress hours of video without losing the granular detail of momentary 'needle' events." PSM's H3-indexed ring buffer of HLL sketches is a candidate substrate for exactly that architectural gap.
+
+Prerequisites for E5-E7 are tracked in `TODO.md` under the "Localization Paradox Alignment" section:
+
+- Per-bucket `(t_min, t_max)` retention, so a query can emit `[t_start, t_end]` intervals.
+- Per-tile exemplar embedding sampler (reservoir), so k-NN retrieval against past observations is possible.
+- `SpatialMemory_query_intervals(...)` API surface.
+
+Two further pipeline components are external to this repo and are described per-experiment below rather than tracked as TODOs:
+
+- **Text-query adapter** (E5, E7): embed a benchmark question via a vision-language text tower (CLIP / SigLIP / DINO) and match against per-tile exemplar embeddings to produce the semantic cue. Sits outside `libpsm`.
+- **Grounded response stage** (E5): forward PSM's top-k `(cell, t_start, t_end)` intervals plus the corresponding evidence frames to an MLLM as explicit grounding context. This is an MLLM API call, not engine code.
+
+### E5. PSM as Retrieval Prefilter for MLLM Temporal Grounding
+
+Question:
+- Does PSM's spatial + temporal prior materially close the Localization Paradox gap on frontier MLLMs?
+
+Current capability:
+- Blocked until the "Localization Paradox Alignment" TODO items land.
+- Once unblocked, fully automatable given a benchmark subset and one MLLM inference endpoint.
+
+Inputs:
+- A benchmark subset with usable spatial context (GPS or coarse scene localization)
+- One target MLLM for grounded answer generation (e.g., Gemini 3 Pro, GPT-5, or an open-source model for ablation)
+- A text encoder for the question cue (the "text-query adapter")
+
+Protocol:
+1. Ingest each session into PSM with fixed `(h3_resolution, time_window_sec, capacity, precision)`.
+2. For each benchmark query, embed the question via the text adapter and combine with the trigger-moment observation to produce the semantic cue.
+3. Call `SpatialMemory_query_intervals(...)` for top-k candidate `(cell, t_start, t_end)` tuples.
+4. Feed the candidates as explicit grounding context to the MLLM alongside the question and the last-visible frame.
+5. Measure `mIoU`, `R@1`, and `GQ@0.5` (the benchmark's grounding metrics) vs. the raw-MLLM baseline in its main results table.
+
+Readout:
+- Absolute `mIoU` on each of the benchmark's 8 cognitive categories, especially Location Trace and Spatial Awareness.
+- Sensitivity to `k` (how much prefilter slack the MLLM needs).
+- Per-query latency: PSM `query_intervals` vs. MLLM full-video scan.
+
+Decision rule:
+- If the prefilter lifts Gemini 3 Pro's `mIoU` above 0.6 on Location Trace + Spatial Awareness, this experiment is a direct architectural rebuttal to the paper's discussion section.
+
+### E6. Counting-Question Fidelity via HLL Cardinality
+
+Question:
+- Is HLL cardinality per tile per window a reliable proxy for "Counting" questions ("how many times have I done X so far?") in the benchmark?
+
+Current capability:
+- `RingBuffer_merge_window` already returns cardinality estimates; `precision` in `[10, 18]` controls error.
+- The benchmark's diagnostic analysis shows Counting is the weakest category across all MLLMs — a gap PSM is structurally well-placed to fill.
+
+Protocol:
+1. Select benchmark sessions containing Counting questions.
+2. For each question, identify the object/activity signature (from the question + trigger context).
+3. Query PSM for the cardinality of that signature across the time window implied by the question.
+4. Compare against the benchmark's ground-truth count.
+5. Sweep HLL precision `{10, 12, 14, 16, 18}` and record count error (MAE, RMSE) plus memory per tile.
+
+Decision rule:
+- Report the smallest precision whose count error falls below the distractor spread used in the benchmark's 5-way MCQ variant — that is the practical lower bound on HLL size for real counting queries.
+
+### E7. Location-Trace Query Latency
+
+Question:
+- How much faster is a PSM look-back than an MLLM's full-video scan for "where did I last have [object]?" queries, and at what retrieval accuracy?
+
+Current capability:
+- Blocked on exemplar embedding retention (see TODO "Localization Paradox Alignment").
+- Once unblocked, answers should run in `O(matching_tiles × capacity)` — typically sub-millisecond on session-scale memories.
+
+Protocol:
+1. Ingest a benchmark session into PSM.
+2. For each "Location Trace" question, time:
+   - PSM's `query_intervals` call (cue → top-k `(cell, t_start, t_end)`).
+   - An MLLM forward pass on the full video up to the trigger timestamp (use the same model evaluated in the benchmark's main results table for a fair baseline).
+3. Measure retrieval Acc@1, Acc@5, Acc@10 against the benchmark's ground-truth interval (hit = ground-truth interval falls in PSM's returned set).
+
+Readout:
+- End-to-end latency delta (expected: 2-4 orders of magnitude).
+- Acc@k curve across `k = 1, 5, 10`.
+- Memory footprint per session at the configured `(h3_resolution, capacity, precision)`.
+
+Decision rule:
+- If PSM achieves ≥50% Acc@5 at <10 ms median query latency while the MLLM baseline is >1 s, this experiment is the operational case for PSM as a memory backbone beneath a reasoning model.
+
 ## Reproducible Benchmark Sweeps
 
 These sweeps use the existing benchmark binaries directly and emit CSV to stdout.
