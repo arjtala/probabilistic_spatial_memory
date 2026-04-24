@@ -64,6 +64,35 @@ size_t SpatialMemory_query_intervals(SpatialMemory *sm, double lat, double lng,
                                      int k_ring, SpatialMemoryInterval *out,
                                      size_t max_out);
 
+// Result row for SpatialMemory_query_similar. Reports the single winning
+// exemplar per tile (the one with the highest cosine similarity to the query)
+// together with the containing cell's merged-window interval for downstream
+// grounding.
+typedef struct {
+  H3Index cell;
+  double similarity;  // cosine similarity in [-1, 1] for the winning exemplar.
+  double exemplar_t;  // timestamp of the winning exemplar.
+  double t_min;       // tile's merged-window [t_min, t_max] (exemplar_t if
+  double t_max;       //  the ring buffer has aged out).
+  double count;       // HLL cardinality over the merged window, or 0 if aged out.
+} SpatialMemorySimilar;
+
+// Rank tiles by the best cosine similarity of any stored exemplar to the query
+// vector. Query is a flat float32 vector of `dim` elements; exemplars whose
+// stored byte size does not match `dim * sizeof(float)` are skipped.
+//
+// k_ring < 0 searches every tile in the SpatialMemory (center_lat / center_lng
+// are ignored). k_ring >= 0 restricts the scan to the H3 k-ring neighborhood
+// around (center_lat, center_lng).
+//
+// Results are sorted by similarity descending; ties broken by t_max descending.
+// Returns the total number of matched tiles; probe mode (out == NULL or
+// max_out == 0) scans without writing.
+size_t SpatialMemory_query_similar(SpatialMemory *sm, const float *query,
+                                   size_t dim, double center_lat,
+                                   double center_lng, int k_ring,
+                                   SpatialMemorySimilar *out, size_t max_out);
+
 void SpatialMemory_free(SpatialMemory *sm);
 
 #endif

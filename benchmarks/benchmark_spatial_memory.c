@@ -168,6 +168,74 @@ static void run_query_intervals(const Coord *coords, size_t observe_ops,
   SpatialMemory_free(sm);
 }
 
+static void run_query_similar(const Coord *coords, size_t observe_ops,
+                              size_t grid_cells, size_t query_ops,
+                              size_t dim, size_t exemplar_capacity) {
+  SpatialMemory *sm = SpatialMemory_new(DEFAULT_RESOLUTION,
+                                        DEFAULT_CAPACITY,
+                                        DEFAULT_PRECISION,
+                                        exemplar_capacity);
+  if (!sm) fail_benchmark("Failed to create SpatialMemory for query_similar benchmark");
+
+  // Per-observation float vector — deterministically seeded by index so the
+  // reservoir gets a spread of values rather than identical bytes.
+  float *vec = (float *)malloc(dim * sizeof(float));
+  if (!vec) {
+    SpatialMemory_free(sm);
+    fail_benchmark("Failed to allocate embedding vector for query_similar setup");
+  }
+  for (size_t i = 0; i < observe_ops; ++i) {
+    const Coord *coord = &coords[i % grid_cells];
+    for (size_t d = 0; d < dim; ++d) {
+      vec[d] = (float)((i * 2654435761u + d * 40503u) & 0xFFFFu) / 65535.0f;
+    }
+    if (!SpatialMemory_observe(sm, (double)i, coord->lat, coord->lng, vec,
+                               dim * sizeof(float))) {
+      free(vec);
+      SpatialMemory_free(sm);
+      fail_benchmark("SpatialMemory_observe failed during query_similar setup");
+    }
+  }
+
+  float *query = (float *)malloc(dim * sizeof(float));
+  if (!query) {
+    free(vec);
+    SpatialMemory_free(sm);
+    fail_benchmark("Failed to allocate query vector");
+  }
+  for (size_t d = 0; d < dim; ++d) query[d] = (float)d / (float)dim;
+
+  const size_t TOP = 10;
+  SpatialMemorySimilar *out = (SpatialMemorySimilar *)malloc(
+      TOP * sizeof(SpatialMemorySimilar));
+  if (!out) {
+    free(query);
+    free(vec);
+    SpatialMemory_free(sm);
+    fail_benchmark("Failed to allocate similar result buffer");
+  }
+
+  size_t hits = 0;
+  double start = monotonic_seconds();
+  for (size_t i = 0; i < query_ops; ++i) {
+    size_t n = SpatialMemory_query_similar(sm, query, dim, 0.0, 0.0, -1, out,
+                                           TOP);
+    if (n > 0) hits++;
+  }
+  double elapsed = monotonic_seconds() - start;
+
+  double mean_us = query_ops > 0 ? (elapsed / (double)query_ops) * 1e6 : 0.0;
+  printf("query_similar      ops=%zu  dim=%zu  exemplars=%zu  tiles=%zu  hits=%zu  secs=%.3f  ops/sec=%.0f  mean_us=%.3f\n",
+         query_ops, dim, exemplar_capacity, SpatialMemory_tile_count(sm),
+         hits, elapsed,
+         elapsed > 0.0 ? (double)query_ops / elapsed : 0.0, mean_us);
+
+  free(out);
+  free(query);
+  free(vec);
+  SpatialMemory_free(sm);
+}
+
 static void run_grid_query(const Coord *coords, size_t observe_ops,
                            size_t query_ops, size_t grid_cells) {
   SpatialMemory *sm = SpatialMemory_new(DEFAULT_RESOLUTION,
@@ -228,6 +296,8 @@ int main(int argc, char *argv[]) {
   run_grid_query(coords, observe_ops, query_ops, grid_cells);
   // Location-trace query latency — representative k_ring=2, top=5.
   run_query_intervals(coords, observe_ops, grid_cells, query_ops, 2, 5);
+  // Semantic retrieval latency — modest dim=128, 4 exemplars per tile.
+  run_query_similar(coords, observe_ops, grid_cells, query_ops, 128, 4);
 
   free(coords);
   return 0;

@@ -148,3 +148,4 @@ Context: a forthcoming NeurIPS 2026 streaming egocentric memory benchmark (the "
 - [x] Expose `SpatialMemory_query_intervals(lat, lng, k_ring, out_tuples)` returning top-k `(cell, t_start, t_end, count)` tuples over the H3 neighborhood
 - [x] `psm --last-seen lat,lng --k-ring N --top N` CLI surface + JSON output (`"mode": "last_seen"` discriminator; `schema_version` unchanged at 1)
 - [x] Benchmark scenario in `benchmarks/benchmark_spatial_memory.c`: "location-trace query latency" over a populated session — first-class measurement for E7
+- [x] `SpatialMemory_query_similar(query, dim, k_ring, center, out)` — rank tiles by cosine similarity of the best exemplar; `psm --similar-to <bin>` / `--center LAT,LNG` / `--exemplars N` CLI; benchmark scenario `query_similar` (E5's text-query adapter now has a concrete backend to target)

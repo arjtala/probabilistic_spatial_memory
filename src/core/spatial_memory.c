@@ -220,6 +220,157 @@ size_t SpatialMemory_query_intervals(SpatialMemory *sm, double lat, double lng,
   return nfound;
 }
 
+static int compare_similar_desc(const void *a, const void *b) {
+  const SpatialMemorySimilar *sa = (const SpatialMemorySimilar *)a;
+  const SpatialMemorySimilar *sb = (const SpatialMemorySimilar *)b;
+  if (sa->similarity > sb->similarity) return -1;
+  if (sa->similarity < sb->similarity) return 1;
+  if (sa->t_max > sb->t_max) return -1;
+  if (sa->t_max < sb->t_max) return 1;
+  return 0;
+}
+
+// Score a single tile by finding its highest-similarity exemplar against the
+// query. Populates *out and returns true on success, or false when the tile
+// has no usable exemplars (wrong byte size, zero-norm, or empty reservoir).
+static bool score_tile_similar(Tile *tile, const float *query, size_t dim,
+                               double q_norm, size_t rb_capacity,
+                               SpatialMemorySimilar *out) {
+  size_t n_ex = Tile_exemplar_count(tile);
+  if (n_ex == 0) return false;
+
+  const size_t want_bytes = dim * sizeof(float);
+  double best_sim = -2.0;  // any valid cosine in [-1, 1] beats this sentinel.
+  double best_t = 0.0;
+  bool found = false;
+
+  for (size_t i = 0; i < n_ex; ++i) {
+    const TileExemplar *ex = Tile_exemplar_at(tile, i);
+    if (!ex || !ex->data || ex->size != want_bytes) continue;
+    const float *v = (const float *)ex->data;
+    double dot = 0.0, v_norm_sq = 0.0;
+    for (size_t d = 0; d < dim; ++d) {
+      double qi = (double)query[d];
+      double vi = (double)v[d];
+      dot += qi * vi;
+      v_norm_sq += vi * vi;
+    }
+    if (v_norm_sq <= 0.0) continue;
+    double sim = dot / (q_norm * sqrt(v_norm_sq));
+    if (sim > best_sim) {
+      best_sim = sim;
+      best_t = ex->t;
+      found = true;
+    }
+  }
+  if (!found) return false;
+
+  double t_min = best_t;
+  double t_max = best_t;
+  double count = 0.0;
+  RingBufferWindow win = RingBuffer_merge_window(tile->rb, rb_capacity - 1);
+  if (win.sketch) {
+    if (!win.is_empty) {
+      t_min = win.t_min;
+      t_max = win.t_max;
+      count = RingBufferHLL_count(win.sketch);
+    }
+    RingBufferHLL_release(win.sketch);
+  }
+
+  out->cell = tile->cellId;
+  out->similarity = best_sim;
+  out->exemplar_t = best_t;
+  out->t_min = t_min;
+  out->t_max = t_max;
+  out->count = count;
+  return true;
+}
+
+size_t SpatialMemory_query_similar(SpatialMemory *sm, const float *query,
+                                   size_t dim, double center_lat,
+                                   double center_lng, int k_ring,
+                                   SpatialMemorySimilar *out, size_t max_out) {
+  if (!sm || !query || dim == 0) return 0;
+
+  double q_norm_sq = 0.0;
+  for (size_t i = 0; i < dim; ++i) {
+    double qi = (double)query[i];
+    q_norm_sq += qi * qi;
+  }
+  if (q_norm_sq <= 0.0) return 0;
+  double q_norm = sqrt(q_norm_sq);
+
+  H3Index *cells = NULL;
+  int64_t n_cells = 0;
+  const bool use_neighborhood = (k_ring >= 0);
+  if (use_neighborhood) {
+    H3Index center;
+    if (!spatial_memory_coords_to_cell(sm, center_lat, center_lng, &center)) {
+      return 0;
+    }
+    if (maxGridDiskSize(k_ring, &n_cells) || n_cells <= 0) {
+      return 0;
+    }
+    cells = (H3Index *)calloc((size_t)n_cells, sizeof(H3Index));
+    if (!cells) return 0;
+    if (gridDisk(center, k_ring, cells)) {
+      free(cells);
+      return 0;
+    }
+  }
+
+  size_t max_scratch;
+  if (use_neighborhood) {
+    max_scratch = (size_t)n_cells;
+  } else {
+    max_scratch = SpatialMemory_tile_count(sm);
+  }
+  if (max_scratch == 0) {
+    free(cells);
+    return 0;
+  }
+
+  SpatialMemorySimilar *scratch = (SpatialMemorySimilar *)malloc(
+      max_scratch * sizeof(SpatialMemorySimilar));
+  if (!scratch) {
+    free(cells);
+    return 0;
+  }
+
+  size_t nfound = 0;
+  if (use_neighborhood) {
+    for (int64_t i = 0; i < n_cells; ++i) {
+      H3Index cell = cells[i];
+      if (cell == H3_NULL) continue;
+      Tile *tile = TileTable_get(sm->tiles, cell);
+      if (!tile) continue;
+      if (score_tile_similar(tile, query, dim, q_norm, sm->capacity,
+                             &scratch[nfound])) {
+        nfound++;
+      }
+    }
+  } else {
+    TileTableIterator it = TileTable_iterator(sm->tiles);
+    while (TileTable_next(&it)) {
+      if (score_tile_similar(it.value, query, dim, q_norm, sm->capacity,
+                             &scratch[nfound])) {
+        nfound++;
+      }
+    }
+  }
+  free(cells);
+
+  qsort(scratch, nfound, sizeof(SpatialMemorySimilar), compare_similar_desc);
+
+  if (out && max_out > 0) {
+    size_t to_copy = (nfound < max_out) ? nfound : max_out;
+    memcpy(out, scratch, to_copy * sizeof(SpatialMemorySimilar));
+  }
+  free(scratch);
+  return nfound;
+}
+
 void SpatialMemory_free(SpatialMemory *sm) {
   if (!sm) return;
   TileTable_free(sm->tiles);

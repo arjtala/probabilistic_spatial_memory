@@ -17,6 +17,9 @@ enum {
   LAST_SEEN_OPT_VAL = 0x1000,
   K_RING_OPT_VAL,
   TOP_OPT_VAL,
+  SIMILAR_TO_OPT_VAL,
+  CENTER_OPT_VAL,
+  EXEMPLARS_OPT_VAL,
 };
 
 typedef enum {
@@ -37,6 +40,12 @@ typedef struct {
   double last_seen_lng;
   int last_seen_k_ring;
   size_t last_seen_top;
+  bool similar_to_mode;
+  const char *similar_to_path;
+  bool has_center;
+  double center_lat;
+  double center_lng;
+  size_t exemplar_capacity;
 } CliOptions;
 
 typedef struct {
@@ -195,8 +204,11 @@ static void print_usage(const char *program) {
   fprintf(stderr, "  -h, --help              Print this help\n");
   fprintf(stderr, "  -v, --version           Print psm version and exit\n");
   fprintf(stderr, "  --last-seen LAT,LNG     Query last-seen intervals around (lat,lng)\n");
-  fprintf(stderr, "  --k-ring N              H3 neighborhood radius for --last-seen (default: 0)\n");
-  fprintf(stderr, "  --top N                 Max results to print for --last-seen (default: 5)\n");
+  fprintf(stderr, "  --k-ring N              H3 neighborhood radius (default: 0)\n");
+  fprintf(stderr, "  --top N                 Max results to print (default: 5)\n");
+  fprintf(stderr, "  --similar-to <path>     Retrieve by embedding similarity (binary float32 LE vector)\n");
+  fprintf(stderr, "  --center LAT,LNG        Optional geographic center for --similar-to\n");
+  fprintf(stderr, "  --exemplars N           Per-tile reservoir size (auto-set to 8 with --similar-to)\n");
   fprintf(stderr, "\nRetention window = capacity * time-window (default: 12 * 5.0s = 60s).\n");
   fprintf(stderr, "Observations older than this age out of each tile's ring buffer.\n");
   fprintf(stderr, "For multi-minute sessions, widen with e.g. -C 30 -t 60 (30-min window).\n");
@@ -216,6 +228,52 @@ static void cli_options_init(CliOptions *options) {
   options->last_seen_lng = 0.0;
   options->last_seen_k_ring = 0;
   options->last_seen_top = 5;
+  options->similar_to_mode = false;
+  options->similar_to_path = NULL;
+  options->has_center = false;
+  options->center_lat = 0.0;
+  options->center_lng = 0.0;
+  options->exemplar_capacity = 0;
+}
+
+static bool load_float_vector_file(const char *path, float **out_data,
+                                   size_t *out_dim) {
+  FILE *f = fopen(path, "rb");
+  if (!f) {
+    fprintf(stderr, "Failed to open %s: %s\n", path, strerror(errno));
+    return false;
+  }
+  if (fseek(f, 0, SEEK_END) != 0) {
+    fprintf(stderr, "Failed to seek in %s\n", path);
+    fclose(f);
+    return false;
+  }
+  long fsz = ftell(f);
+  if (fsz <= 0 || (size_t)fsz % sizeof(float) != 0) {
+    fprintf(stderr,
+            "Invalid size for %s (%ld bytes; must be a nonzero multiple of %zu)\n",
+            path, fsz, sizeof(float));
+    fclose(f);
+    return false;
+  }
+  rewind(f);
+  size_t dim = (size_t)fsz / sizeof(float);
+  float *data = (float *)malloc((size_t)fsz);
+  if (!data) {
+    fprintf(stderr, "Failed to allocate query vector (%ld bytes)\n", fsz);
+    fclose(f);
+    return false;
+  }
+  if (fread(data, 1, (size_t)fsz, f) != (size_t)fsz) {
+    fprintf(stderr, "Failed to read query vector from %s\n", path);
+    free(data);
+    fclose(f);
+    return false;
+  }
+  fclose(f);
+  *out_data = data;
+  *out_dim = dim;
+  return true;
 }
 
 static bool apply_positional_args(CliOptions *options, int argc, char *argv[],
@@ -273,6 +331,9 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
       {"last-seen", required_argument, NULL, LAST_SEEN_OPT_VAL},
       {"k-ring", required_argument, NULL, K_RING_OPT_VAL},
       {"top", required_argument, NULL, TOP_OPT_VAL},
+      {"similar-to", required_argument, NULL, SIMILAR_TO_OPT_VAL},
+      {"center", required_argument, NULL, CENTER_OPT_VAL},
+      {"exemplars", required_argument, NULL, EXEMPLARS_OPT_VAL},
       {0, 0, 0, 0},
   };
 
@@ -341,6 +402,23 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
         return false;
       }
       break;
+    case SIMILAR_TO_OPT_VAL:
+      options->similar_to_path = optarg;
+      options->similar_to_mode = true;
+      break;
+    case CENTER_OPT_VAL:
+      if (!parse_lat_lng_pair(optarg, &options->center_lat,
+                              &options->center_lng)) {
+        return false;
+      }
+      options->has_center = true;
+      break;
+    case EXEMPLARS_OPT_VAL:
+      if (!parse_size_t_in_range(optarg, "exemplars", 0, SIZE_MAX,
+                                 &options->exemplar_capacity)) {
+        return false;
+      }
+      break;
     default:
       print_usage(argv[0]);
       return false;
@@ -349,6 +427,15 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
 
   if (!apply_positional_args(options, argc, argv, optind)) {
     return false;
+  }
+  if (options->last_seen_mode && options->similar_to_mode) {
+    fprintf(stderr, "--last-seen and --similar-to are mutually exclusive\n");
+    return false;
+  }
+  // Auto-enable a modest exemplar reservoir when similarity search is requested
+  // and the user hasn't overridden --exemplars explicitly.
+  if (options->similar_to_mode && options->exemplar_capacity == 0) {
+    options->exemplar_capacity = 8;
   }
   if (!options->filepath) {
     print_usage(argv[0]);
@@ -444,6 +531,111 @@ static bool run_last_seen_output(SpatialMemory *sm, const CliOptions *opts,
   return true;
 }
 
+static void print_similar_text(const SpatialMemorySimilar *results, size_t n,
+                               size_t total_found, size_t dim,
+                               const CliOptions *opts,
+                               const IngestReader *reader, size_t tile_count) {
+  printf("File: %s\n", opts->filepath);
+  printf("Group: %s\n", opts->group);
+  printf("Time window: %.3f sec\n", opts->time_window_sec);
+  printf("H3 resolution: %d\n", opts->h3_resolution);
+  printf("Capacity: %zu\n", opts->capacity);
+  printf("Precision: %zu\n", opts->precision);
+  printf("Records: %zu\n", reader->n_records);
+  printf("Embedding dim: %zu\n", reader->emb_dimension);
+  printf("Tiles created: %zu\n", tile_count);
+  printf("Query: dim=%zu top=%zu", dim, opts->last_seen_top);
+  if (opts->has_center) {
+    printf(" center=%.6f,%.6f k_ring=%d", opts->center_lat, opts->center_lng,
+           opts->last_seen_k_ring);
+  } else {
+    printf(" scope=global");
+  }
+  printf("\n");
+  printf("Similar (%zu shown of %zu matched):\n", n, total_found);
+  for (size_t i = 0; i < n; ++i) {
+    char cell_str[H3_INDEX_HEX_STRING_LENGTH];
+    h3ToString(results[i].cell, cell_str, sizeof(cell_str));
+    printf("  Cell %s  sim=%.4f  exemplar_t=%.3f  t=[%.3f, %.3f]  count=%.3f\n",
+           cell_str, results[i].similarity, results[i].exemplar_t,
+           results[i].t_min, results[i].t_max, results[i].count);
+  }
+}
+
+static void print_similar_json(const SpatialMemorySimilar *results, size_t n,
+                               size_t dim, const CliOptions *opts,
+                               const IngestReader *reader, size_t tile_count) {
+  fputs("{\n", stdout);
+  fputs("  \"schema_version\": 1,\n", stdout);
+  fputs("  \"mode\": \"similar_to\",\n", stdout);
+  fputs("  \"group\": ", stdout);
+  print_json_string(stdout, opts->group);
+  fputs(",\n", stdout);
+  printf("  \"time_window_sec\": %.3f,\n", opts->time_window_sec);
+  printf("  \"h3_resolution\": %d,\n", opts->h3_resolution);
+  printf("  \"capacity\": %zu,\n", opts->capacity);
+  printf("  \"precision\": %zu,\n", opts->precision);
+  printf("  \"record_count\": %zu,\n", reader->n_records);
+  printf("  \"embedding_dim\": %zu,\n", reader->emb_dimension);
+  printf("  \"tile_count\": %zu,\n", tile_count);
+  printf("  \"query\": {\"dim\": %zu, \"top\": %zu", dim, opts->last_seen_top);
+  if (opts->has_center) {
+    printf(", \"center_lat\": %.6f, \"center_lng\": %.6f, \"k_ring\": %d",
+           opts->center_lat, opts->center_lng, opts->last_seen_k_ring);
+  }
+  fputs("},\n", stdout);
+  fputs("  \"results\": [\n", stdout);
+  for (size_t i = 0; i < n; ++i) {
+    char cell_str[H3_INDEX_HEX_STRING_LENGTH];
+    h3ToString(results[i].cell, cell_str, sizeof(cell_str));
+    printf("    {\"cell\":\"%s\",\"similarity\":%.6f,\"exemplar_t\":%.3f,"
+           "\"t_min\":%.3f,\"t_max\":%.3f,\"count\":%.3f}%s\n",
+           cell_str, results[i].similarity, results[i].exemplar_t,
+           results[i].t_min, results[i].t_max, results[i].count,
+           (i + 1 == n) ? "" : ",");
+  }
+  fputs("  ]\n}\n", stdout);
+}
+
+static bool run_similar_output(SpatialMemory *sm, const CliOptions *opts,
+                               const IngestReader *reader) {
+  float *query = NULL;
+  size_t dim = 0;
+  if (!load_float_vector_file(opts->similar_to_path, &query, &dim)) {
+    return false;
+  }
+
+  size_t tile_count = SpatialMemory_tile_count(sm);
+  size_t top = opts->last_seen_top;
+  SpatialMemorySimilar *results = NULL;
+  if (top > 0) {
+    results =
+        (SpatialMemorySimilar *)calloc(top, sizeof(SpatialMemorySimilar));
+    if (!results) {
+      fprintf(stderr, "Failed to allocate similar results buffer\n");
+      free(query);
+      return false;
+    }
+  }
+
+  double center_lat = opts->has_center ? opts->center_lat : 0.0;
+  double center_lng = opts->has_center ? opts->center_lng : 0.0;
+  int k_ring = opts->has_center ? opts->last_seen_k_ring : -1;
+  size_t total_found = SpatialMemory_query_similar(
+      sm, query, dim, center_lat, center_lng, k_ring, results, top);
+  size_t written = (total_found < top) ? total_found : top;
+
+  if (opts->output_format == OUTPUT_JSON) {
+    print_similar_json(results, written, dim, opts, reader, tile_count);
+  } else {
+    print_similar_text(results, written, total_found, dim, opts, reader,
+                       tile_count);
+  }
+  free(results);
+  free(query);
+  return true;
+}
+
 static bool print_tile_summary(H3Index cell_id, Tile *tile, void *user_data) {
   TilePrinterState *state = (TilePrinterState *)user_data;
   char cell_string[H3_INDEX_HEX_STRING_LENGTH];
@@ -483,7 +675,7 @@ int main(int argc, char *argv[]) {
   }
 
   sm = SpatialMemory_new(options.h3_resolution, options.capacity,
-                         options.precision, 0);
+                         options.precision, options.exemplar_capacity);
   if (!sm) {
     fprintf(stderr, "Failed to initialize spatial memory\n");
     return 1;
@@ -516,6 +708,14 @@ int main(int argc, char *argv[]) {
 
   if (options.last_seen_mode) {
     bool ok = run_last_seen_output(sm, &options, reader);
+    IngestReader_close(reader);
+    H5Fclose(file);
+    SpatialMemory_free(sm);
+    return ok ? 0 : 1;
+  }
+
+  if (options.similar_to_mode) {
+    bool ok = run_similar_output(sm, &options, reader);
     IngestReader_close(reader);
     H5Fclose(file);
     SpatialMemory_free(sm);
