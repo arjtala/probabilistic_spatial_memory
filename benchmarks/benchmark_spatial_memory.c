@@ -115,6 +115,59 @@ static void run_grid_observe(const Coord *coords, size_t observe_ops,
   SpatialMemory_free(sm);
 }
 
+static void run_query_intervals(const Coord *coords, size_t observe_ops,
+                                size_t grid_cells, size_t query_ops,
+                                int k_ring, size_t top) {
+  SpatialMemory *sm = SpatialMemory_new(DEFAULT_RESOLUTION,
+                                        DEFAULT_CAPACITY,
+                                        DEFAULT_PRECISION,
+                                        0);
+  if (!sm) {
+    fail_benchmark("Failed to create SpatialMemory for query_intervals benchmark");
+  }
+
+  populate_grid_memory(sm, coords, observe_ops, grid_cells);
+
+  SpatialMemoryInterval *out = NULL;
+  if (top > 0) {
+    out = (SpatialMemoryInterval *)malloc(top * sizeof(SpatialMemoryInterval));
+    if (!out) {
+      SpatialMemory_free(sm);
+      fail_benchmark("Failed to allocate query_intervals results buffer");
+    }
+  }
+
+  double min_lat = coords[0].lat, max_lat = coords[0].lat;
+  double min_lng = coords[0].lng, max_lng = coords[0].lng;
+  for (size_t i = 1; i < grid_cells; ++i) {
+    if (coords[i].lat < min_lat) min_lat = coords[i].lat;
+    if (coords[i].lat > max_lat) max_lat = coords[i].lat;
+    if (coords[i].lng < min_lng) min_lng = coords[i].lng;
+    if (coords[i].lng > max_lng) max_lng = coords[i].lng;
+  }
+
+  size_t hits = 0;
+  double start = monotonic_seconds();
+  for (size_t i = 0; i < query_ops; ++i) {
+    // Deterministic pseudo-random lat/lng within the populated bounding box
+    // (mul-constant hash, no external RNG — keeps bench reproducible).
+    double u = (double)((i * 2654435761u) & 0xFFFFu) / 65535.0;
+    double v = (double)((i * 40503u) & 0xFFFFu) / 65535.0;
+    double lat = min_lat + u * (max_lat - min_lat);
+    double lng = min_lng + v * (max_lng - min_lng);
+    size_t n = SpatialMemory_query_intervals(sm, lat, lng, k_ring, out, top);
+    if (n > 0) hits++;
+  }
+  double elapsed = monotonic_seconds() - start;
+
+  double mean_us = query_ops > 0 ? (elapsed / (double)query_ops) * 1e6 : 0.0;
+  printf("query_intervals    ops=%zu  k_ring=%d  top=%zu  hits=%zu  secs=%.3f  ops/sec=%.0f  mean_us=%.3f\n",
+         query_ops, k_ring, top, hits, elapsed,
+         elapsed > 0.0 ? (double)query_ops / elapsed : 0.0, mean_us);
+  free(out);
+  SpatialMemory_free(sm);
+}
+
 static void run_grid_query(const Coord *coords, size_t observe_ops,
                            size_t query_ops, size_t grid_cells) {
   SpatialMemory *sm = SpatialMemory_new(DEFAULT_RESOLUTION,
@@ -173,6 +226,8 @@ int main(int argc, char *argv[]) {
   run_same_cell_observe(observe_ops);
   run_grid_observe(coords, observe_ops, grid_cells);
   run_grid_query(coords, observe_ops, query_ops, grid_cells);
+  // Location-trace query latency — representative k_ring=2, top=5.
+  run_query_intervals(coords, observe_ops, grid_cells, query_ops, 2, 5);
 
   free(coords);
   return 0;

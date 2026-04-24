@@ -12,6 +12,13 @@
 #define PSM_VERSION "unknown"
 #endif
 
+// Synthetic getopt values for long-only flags introduced by --last-seen mode.
+enum {
+  LAST_SEEN_OPT_VAL = 0x1000,
+  K_RING_OPT_VAL,
+  TOP_OPT_VAL,
+};
+
 typedef enum {
   OUTPUT_TEXT = 0,
   OUTPUT_JSON = 1,
@@ -25,6 +32,11 @@ typedef struct {
   size_t capacity;
   size_t precision;
   OutputFormat output_format;
+  bool last_seen_mode;
+  double last_seen_lat;
+  double last_seen_lng;
+  int last_seen_k_ring;
+  size_t last_seen_top;
 } CliOptions;
 
 typedef struct {
@@ -69,6 +81,32 @@ static bool parse_int_in_range(const char *text, const char *name, int min_value
     return false;
   }
   *out_value = (int)value;
+  return true;
+}
+
+static bool parse_lat_lng_pair(const char *text, double *out_lat,
+                               double *out_lng) {
+  if (!text || !out_lat || !out_lng) return false;
+  const char *comma = strchr(text, ',');
+  if (!comma || comma == text || *(comma + 1) == '\0') {
+    fprintf(stderr, "Invalid lat,lng pair: '%s' (expected LAT,LNG)\n", text);
+    return false;
+  }
+  char *end = NULL;
+  errno = 0;
+  double lat = strtod(text, &end);
+  if (errno != 0 || end != comma) {
+    fprintf(stderr, "Invalid latitude in '%s'\n", text);
+    return false;
+  }
+  errno = 0;
+  double lng = strtod(comma + 1, &end);
+  if (errno != 0 || end == comma + 1 || *end != '\0') {
+    fprintf(stderr, "Invalid longitude in '%s'\n", text);
+    return false;
+  }
+  *out_lat = lat;
+  *out_lng = lng;
   return true;
 }
 
@@ -156,6 +194,9 @@ static void print_usage(const char *program) {
   fprintf(stderr, "  -j, --json              Emit machine-readable JSON summary\n");
   fprintf(stderr, "  -h, --help              Print this help\n");
   fprintf(stderr, "  -v, --version           Print psm version and exit\n");
+  fprintf(stderr, "  --last-seen LAT,LNG     Query last-seen intervals around (lat,lng)\n");
+  fprintf(stderr, "  --k-ring N              H3 neighborhood radius for --last-seen (default: 0)\n");
+  fprintf(stderr, "  --top N                 Max results to print for --last-seen (default: 5)\n");
 }
 
 static void cli_options_init(CliOptions *options) {
@@ -167,6 +208,11 @@ static void cli_options_init(CliOptions *options) {
   options->capacity = DEFAULT_CAPACITY;
   options->precision = DEFAULT_PRECISION;
   options->output_format = OUTPUT_TEXT;
+  options->last_seen_mode = false;
+  options->last_seen_lat = 0.0;
+  options->last_seen_lng = 0.0;
+  options->last_seen_k_ring = 0;
+  options->last_seen_top = 5;
 }
 
 static bool apply_positional_args(CliOptions *options, int argc, char *argv[],
@@ -221,6 +267,9 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
       {"json", no_argument, NULL, 'j'},
       {"help", no_argument, NULL, 'h'},
       {"version", no_argument, NULL, 'v'},
+      {"last-seen", required_argument, NULL, LAST_SEEN_OPT_VAL},
+      {"k-ring", required_argument, NULL, K_RING_OPT_VAL},
+      {"top", required_argument, NULL, TOP_OPT_VAL},
       {0, 0, 0, 0},
   };
 
@@ -270,6 +319,25 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
     case 'v':
       printf("psm version %s\n", PSM_VERSION);
       exit(0);
+    case LAST_SEEN_OPT_VAL:
+      if (!parse_lat_lng_pair(optarg, &options->last_seen_lat,
+                              &options->last_seen_lng)) {
+        return false;
+      }
+      options->last_seen_mode = true;
+      break;
+    case K_RING_OPT_VAL:
+      if (!parse_int_in_range(optarg, "k-ring", 0, 127,
+                              &options->last_seen_k_ring)) {
+        return false;
+      }
+      break;
+    case TOP_OPT_VAL:
+      if (!parse_size_t_in_range(optarg, "top", 1, SIZE_MAX,
+                                 &options->last_seen_top)) {
+        return false;
+      }
+      break;
     default:
       print_usage(argv[0]);
       return false;
@@ -287,6 +355,89 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
     fprintf(stderr, "Group must not be empty\n");
     return false;
   }
+  return true;
+}
+
+static void print_last_seen_text(const SpatialMemoryInterval *results, size_t n,
+                                 size_t total_found, const CliOptions *opts,
+                                 const IngestReader *reader,
+                                 size_t tile_count) {
+  printf("File: %s\n", opts->filepath);
+  printf("Group: %s\n", opts->group);
+  printf("Time window: %.3f sec\n", opts->time_window_sec);
+  printf("H3 resolution: %d\n", opts->h3_resolution);
+  printf("Capacity: %zu\n", opts->capacity);
+  printf("Precision: %zu\n", opts->precision);
+  printf("Records: %zu\n", reader->n_records);
+  printf("Embedding dim: %zu\n", reader->emb_dimension);
+  printf("Tiles created: %zu\n", tile_count);
+  printf("Query: lat=%.6f lng=%.6f k_ring=%d top=%zu\n",
+         opts->last_seen_lat, opts->last_seen_lng,
+         opts->last_seen_k_ring, opts->last_seen_top);
+  printf("Last seen (%zu shown of %zu in neighborhood):\n", n, total_found);
+  for (size_t i = 0; i < n; ++i) {
+    char cell_str[H3_INDEX_HEX_STRING_LENGTH];
+    h3ToString(results[i].cell, cell_str, sizeof(cell_str));
+    printf("  Cell %s  t=[%.3f, %.3f]  count=%.3f\n",
+           cell_str, results[i].t_min, results[i].t_max, results[i].count);
+  }
+}
+
+static void print_last_seen_json(const SpatialMemoryInterval *results,
+                                 size_t n, const CliOptions *opts,
+                                 const IngestReader *reader,
+                                 size_t tile_count) {
+  fputs("{\n", stdout);
+  fputs("  \"schema_version\": 1,\n", stdout);
+  fputs("  \"mode\": \"last_seen\",\n", stdout);
+  fputs("  \"group\": ", stdout);
+  print_json_string(stdout, opts->group);
+  fputs(",\n", stdout);
+  printf("  \"time_window_sec\": %.3f,\n", opts->time_window_sec);
+  printf("  \"h3_resolution\": %d,\n", opts->h3_resolution);
+  printf("  \"capacity\": %zu,\n", opts->capacity);
+  printf("  \"precision\": %zu,\n", opts->precision);
+  printf("  \"record_count\": %zu,\n", reader->n_records);
+  printf("  \"embedding_dim\": %zu,\n", reader->emb_dimension);
+  printf("  \"tile_count\": %zu,\n", tile_count);
+  printf("  \"query\": {\"lat\": %.6f, \"lng\": %.6f, \"k_ring\": %d, \"top\": %zu},\n",
+         opts->last_seen_lat, opts->last_seen_lng,
+         opts->last_seen_k_ring, opts->last_seen_top);
+  fputs("  \"results\": [\n", stdout);
+  for (size_t i = 0; i < n; ++i) {
+    char cell_str[H3_INDEX_HEX_STRING_LENGTH];
+    h3ToString(results[i].cell, cell_str, sizeof(cell_str));
+    printf("    {\"cell\":\"%s\",\"t_min\":%.3f,\"t_max\":%.3f,\"count\":%.3f}%s\n",
+           cell_str, results[i].t_min, results[i].t_max, results[i].count,
+           (i + 1 == n) ? "" : ",");
+  }
+  fputs("  ]\n}\n", stdout);
+}
+
+static bool run_last_seen_output(SpatialMemory *sm, const CliOptions *opts,
+                                 const IngestReader *reader) {
+  size_t tile_count = SpatialMemory_tile_count(sm);
+  size_t top = opts->last_seen_top;
+  SpatialMemoryInterval *results = NULL;
+  if (top > 0) {
+    results = (SpatialMemoryInterval *)calloc(top, sizeof(SpatialMemoryInterval));
+    if (!results) {
+      fprintf(stderr, "Failed to allocate last-seen results buffer\n");
+      return false;
+    }
+  }
+  size_t total_found = SpatialMemory_query_intervals(
+      sm, opts->last_seen_lat, opts->last_seen_lng, opts->last_seen_k_ring,
+      results, top);
+  size_t written = (total_found < top) ? total_found : top;
+
+  if (opts->output_format == OUTPUT_JSON) {
+    print_last_seen_json(results, written, opts, reader, tile_count);
+  } else {
+    print_last_seen_text(results, written, total_found, opts, reader,
+                         tile_count);
+  }
+  free(results);
   return true;
 }
 
@@ -358,6 +509,14 @@ int main(int argc, char *argv[]) {
     H5Fclose(file);
     SpatialMemory_free(sm);
     return 1;
+  }
+
+  if (options.last_seen_mode) {
+    bool ok = run_last_seen_output(sm, &options, reader);
+    IngestReader_close(reader);
+    H5Fclose(file);
+    SpatialMemory_free(sm);
+    return ok ? 0 : 1;
   }
 
   tile_count = SpatialMemory_tile_count(sm);

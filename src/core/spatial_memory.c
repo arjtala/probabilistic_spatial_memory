@@ -1,6 +1,8 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <h3/h3api.h>
 #include "core/spatial_memory.h"
 
 static bool spatial_memory_coords_to_cell(const SpatialMemory *sm, double lat,
@@ -138,6 +140,84 @@ bool SpatialMemory_for_each_tile(SpatialMemory *sm,
     }
   }
   return true;
+}
+
+static int compare_intervals_desc(const void *a, const void *b) {
+  const SpatialMemoryInterval *ia = (const SpatialMemoryInterval *)a;
+  const SpatialMemoryInterval *ib = (const SpatialMemoryInterval *)b;
+  if (ia->t_max > ib->t_max) return -1;
+  if (ia->t_max < ib->t_max) return 1;
+  if (ia->count > ib->count) return -1;
+  if (ia->count < ib->count) return 1;
+  return 0;
+}
+
+size_t SpatialMemory_query_intervals(SpatialMemory *sm, double lat, double lng,
+                                     int k_ring, SpatialMemoryInterval *out,
+                                     size_t max_out) {
+  if (!sm || k_ring < 0) return 0;
+
+  H3Index center;
+  if (!spatial_memory_coords_to_cell(sm, lat, lng, &center)) {
+    return 0;
+  }
+
+  int64_t max_cells = 0;
+  if (maxGridDiskSize(k_ring, &max_cells) || max_cells <= 0) {
+    return 0;
+  }
+
+  H3Index *cells = (H3Index *)calloc((size_t)max_cells, sizeof(H3Index));
+  if (!cells) return 0;
+
+  if (gridDisk(center, k_ring, cells)) {
+    free(cells);
+    return 0;
+  }
+
+  SpatialMemoryInterval *scratch = (SpatialMemoryInterval *)malloc(
+      (size_t)max_cells * sizeof(SpatialMemoryInterval));
+  if (!scratch) {
+    free(cells);
+    return 0;
+  }
+
+  size_t nfound = 0;
+  for (int64_t i = 0; i < max_cells; ++i) {
+    H3Index cell = cells[i];
+    if (cell == H3_NULL) continue;
+
+    Tile *tile = TileTable_get(sm->tiles, cell);
+    if (!tile) continue;
+
+    // Merge across the entire ring buffer (head plus capacity-1 prior slots).
+    RingBufferWindow window =
+        RingBuffer_merge_window(tile->rb, sm->capacity - 1);
+    if (!window.sketch) continue;  // OOM: skip this cell, keep scanning.
+    if (window.is_empty) {
+      RingBufferHLL_release(window.sketch);
+      continue;
+    }
+
+    scratch[nfound].cell = cell;
+    scratch[nfound].t_min = window.t_min;
+    scratch[nfound].t_max = window.t_max;
+    scratch[nfound].count = RingBufferHLL_count(window.sketch);
+    nfound++;
+    RingBufferHLL_release(window.sketch);
+  }
+
+  free(cells);
+
+  qsort(scratch, nfound, sizeof(SpatialMemoryInterval), compare_intervals_desc);
+
+  if (out && max_out > 0) {
+    size_t to_copy = (nfound < max_out) ? nfound : max_out;
+    memcpy(out, scratch, to_copy * sizeof(SpatialMemoryInterval));
+  }
+
+  free(scratch);
+  return nfound;
 }
 
 void SpatialMemory_free(SpatialMemory *sm) {

@@ -33,7 +33,7 @@ for observe_ops in $OBSERVE_OPS_LIST; do
                -v observe_ops="$observe_ops" \
                -v grid_cells="$grid_cells" \
                -v query_ops="$query_ops" '
-          $1 == "observe_same_cell" || $1 == "observe_grid" || $1 == "query_grid" {
+          $1 == "observe_same_cell" || $1 == "observe_grid" || $1 == "query_grid" || $1 == "query_intervals" {
             scenario = $1
             ops = ""
             tiles = ""

@@ -42,6 +42,28 @@ size_t SpatialMemory_tile_count(SpatialMemory *sm);
 bool SpatialMemory_for_each_tile(SpatialMemory *sm,
                                  SpatialMemoryTileVisitor visitor,
                                  void *user_data);
+
+// Result row for SpatialMemory_query_intervals.
+typedef struct {
+  H3Index cell;
+  double t_min;
+  double t_max;
+  double count;  // HLL cardinality estimate over the full ring-buffer window.
+} SpatialMemoryInterval;
+
+// Query the H3 k-ring neighborhood at (lat, lng) for non-empty tiles and
+// return their merged-window [t_min, t_max] intervals along with an
+// observation-count estimate. Results are sorted by t_max descending (most
+// recent first); ties broken by count descending.
+//
+// Writes up to max_out entries to out. Returns the total number of non-empty
+// tiles found in the neighborhood — this may exceed the number actually
+// written, and callers can compare against max_out to detect truncation.
+// Probe mode (out == NULL or max_out == 0) scans without writing.
+size_t SpatialMemory_query_intervals(SpatialMemory *sm, double lat, double lng,
+                                     int k_ring, SpatialMemoryInterval *out,
+                                     size_t max_out);
+
 void SpatialMemory_free(SpatialMemory *sm);
 
 #endif

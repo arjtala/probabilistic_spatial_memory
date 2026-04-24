@@ -238,6 +238,76 @@ void test_sm_exemplar_capacity_propagates_to_tile(void) {
   SpatialMemory_free(sm);
 }
 
+void test_sm_query_intervals_empty(void) {
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  SpatialMemoryInterval out[4];
+  size_t n = SpatialMemory_query_intervals(sm, LAT, LNG, 0, out, 4);
+  ASSERT(0 == (int)n, 0, (int)n);
+  SpatialMemory_free(sm);
+}
+
+void test_sm_query_intervals_single_hit(void) {
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  const char *pb = "peanut butter";
+  SpatialMemory_observe(sm, 123.5, LAT, LNG, pb, strlen(pb));
+
+  SpatialMemoryInterval out[4];
+  size_t n = SpatialMemory_query_intervals(sm, LAT, LNG, 0, out, 4);
+  ASSERT(1 == (int)n, 1, (int)n);
+  ASSERT(CELLID_RS10 == out[0].cell, 1, CELLID_RS10 == out[0].cell);
+  ASSERT(out[0].t_min == 123.5, 1, out[0].t_min == 123.5);
+  ASSERT(out[0].t_max == 123.5, 1, out[0].t_max == 123.5);
+  ASSERT(out[0].count >= 1.0, 1, out[0].count >= 1.0);
+  SpatialMemory_free(sm);
+}
+
+void test_sm_query_intervals_sorted_by_tmax_desc(void) {
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  const char *pb = "peanut butter";
+  // Offsets of 0.01 deg (~1.1 km at LAT=51) are ~17 hops apart at res 10, so
+  // k_ring=30 is needed to cover all three from the middle point.
+  SpatialMemory_observe(sm, 100.0, LAT, LNG, pb, strlen(pb));
+  SpatialMemory_observe(sm, 200.0, LAT + 0.01, LNG, pb, strlen(pb));
+  SpatialMemory_observe(sm, 150.0, LAT + 0.02, LNG, pb, strlen(pb));
+
+  SpatialMemoryInterval out[16];
+  size_t n = SpatialMemory_query_intervals(sm, LAT + 0.01, LNG, 30, out, 16);
+  ASSERT(n >= 3, 1, n >= 3);
+  ASSERT(out[0].t_max == 200.0, 1, out[0].t_max == 200.0);
+  ASSERT(out[1].t_max == 150.0, 1, out[1].t_max == 150.0);
+  ASSERT(out[2].t_max == 100.0, 1, out[2].t_max == 100.0);
+  SpatialMemory_free(sm);
+}
+
+void test_sm_query_intervals_truncation_returns_total(void) {
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  const char *pb = "peanut butter";
+  SpatialMemory_observe(sm, 100.0, LAT, LNG, pb, strlen(pb));
+  SpatialMemory_observe(sm, 200.0, LAT + 0.01, LNG, pb, strlen(pb));
+  SpatialMemory_observe(sm, 150.0, LAT + 0.02, LNG, pb, strlen(pb));
+
+  SpatialMemoryInterval out[1];
+  size_t n = SpatialMemory_query_intervals(sm, LAT + 0.01, LNG, 30, out, 1);
+  ASSERT(n >= 3, 1, n >= 3);  // total found, not number written.
+  ASSERT(out[0].t_max == 200.0, 1, out[0].t_max == 200.0);
+  SpatialMemory_free(sm);
+}
+
+void test_sm_query_intervals_probe_mode(void) {
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  const char *pb = "peanut butter";
+  SpatialMemory_observe(sm, 100.0, LAT, LNG, pb, strlen(pb));
+  SpatialMemory_observe(sm, 200.0, LAT + 0.01, LNG, pb, strlen(pb));
+
+  size_t n_null = SpatialMemory_query_intervals(sm, LAT, LNG, 30, NULL, 10);
+  size_t n_zero_max;
+  SpatialMemoryInterval out[1];
+  n_zero_max = SpatialMemory_query_intervals(sm, LAT, LNG, 30, out, 0);
+  ASSERT(n_null == n_zero_max, 1, n_null == n_zero_max);
+  ASSERT(n_null >= 2, 1, n_null >= 2);
+  SpatialMemory_free(sm);
+}
+
 int main(void) {
   RUN_TEST(test_sm_new);
   RUN_TEST(test_sm_new_invalid_resolution);
@@ -251,6 +321,11 @@ int main(void) {
   RUN_TEST(test_sm_same_cell_deduplicates_observations);
   RUN_TEST(test_sm_for_each_tile_enumerates_entries);
   RUN_TEST(test_sm_exemplar_capacity_propagates_to_tile);
+  RUN_TEST(test_sm_query_intervals_empty);
+  RUN_TEST(test_sm_query_intervals_single_hit);
+  RUN_TEST(test_sm_query_intervals_sorted_by_tmax_desc);
+  RUN_TEST(test_sm_query_intervals_truncation_returns_total);
+  RUN_TEST(test_sm_query_intervals_probe_mode);
 
   return 0;
 }
