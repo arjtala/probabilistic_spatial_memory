@@ -72,8 +72,6 @@ static void test_push_grows_and_preserves_existing_points(void) {
   ASSERT(gt.imu_meta[1].has_imu, 1, gt.imu_meta[1].has_imu ? 1 : 0);
   ASSERT(gt.imu_meta[1].motion == MOTION_RUNNING, MOTION_RUNNING,
          gt.imu_meta[1].motion);
-  assert_close(13.0, gt.center_lat, 1e-9);
-  assert_close(35.0, gt.center_lng, 1e-9);
   ASSERT(gt.dirty, 1, gt.dirty ? 1 : 0);
 
   free_trace_arrays(&gt);
@@ -88,8 +86,8 @@ static void test_push_bootstraps_zero_capacity_trace(void) {
   ASSERT(gt.capacity >= 1, 1, gt.capacity >= 1 ? 1 : 0);
   ASSERT(gt.imu_meta_capacity == gt.capacity, (int)gt.capacity,
          (int)gt.imu_meta_capacity);
-  assert_close(1.0, gt.center_lat, 1e-9);
-  assert_close(2.0, gt.center_lng, 1e-9);
+  assert_close(1.0, gt.lats[0], 1e-9);
+  assert_close(2.0, gt.lngs[0], 1e-9);
 
   free_trace_arrays(&gt);
 }
@@ -101,16 +99,12 @@ static void test_push_rejects_unrepresentable_growth(void) {
   gt.count = SIZE_MAX / 2 + 1;
   gt.capacity = gt.count;
   gt.imu_meta_capacity = gt.count;
-  gt.center_lat = 9.0;
-  gt.center_lng = -7.0;
 
   GpsTrace_push(&gt, 1.0, 2.0, NULL);
 
   ASSERT(gt.count == SIZE_MAX / 2 + 1, 1, 1);
   ASSERT(gt.capacity == SIZE_MAX / 2 + 1, 1, 1);
   ASSERT(gt.imu_meta_capacity == SIZE_MAX / 2 + 1, 1, 1);
-  assert_close(9.0, gt.center_lat, 1e-9);
-  assert_close(-7.0, gt.center_lng, 1e-9);
   ASSERT(!gt.dirty, 0, gt.dirty ? 1 : 0);
 }
 

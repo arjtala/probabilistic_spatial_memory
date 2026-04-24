@@ -8,10 +8,34 @@ struct RingBufferHLL {
   size_t refcount;
 };
 
+// Test-only allocation fault injection. Non-zero skips the wrapper malloc so
+// merge can exercise its OOM path without relying on actual memory exhaustion.
+static int ring_buffer_force_wrap_failure = 0;
+
+void RingBuffer_test_force_wrap_failure(int on) {
+  ring_buffer_force_wrap_failure = on ? 1 : 0;
+}
+
+// Vendor HLL has no native clone primitive. Previous code relied on
+// HLL_merge_copy(src, src) as an idempotent self-merge "clone" trick; this
+// wrapper makes intent explicit at call sites so the surprise doesn't leak.
+static HLL *HLL_clone(const HLL *src) {
+  if (!src) return NULL;
+  HLL *dst = HLL_default(src->p);
+  if (!dst) return NULL;
+  HLL *merged = HLL_merge_copy(dst, src);
+  freeHLL(dst);
+  return merged;
+}
+
 static RingBufferHLL *ring_buffer_hll_wrap(HLL *hll) {
   RingBufferHLL *wrapped;
 
   if (!hll) return NULL;
+  if (ring_buffer_force_wrap_failure) {
+    freeHLL(hll);
+    return NULL;
+  }
   wrapped = malloc(sizeof(*wrapped));
   if (!wrapped) {
     freeHLL(hll);
@@ -126,23 +150,41 @@ RingBufferHLL *RingBuffer_current(RingBuffer *rb) {
   if (!rb || rb->capacity == 0) return NULL;
   return ring_buffer_hll_retain(rb->hlls[rb->head]);
 }
-RingBufferHLL *RingBuffer_merge_window(RingBuffer *rb, size_t n) {
+RingBufferHLL *RingBuffer_merge_window(RingBuffer *rb, size_t n, bool *out_empty) {
   HLL *merged_hll;
   HLL *next;
   HLL *curr_hll;
   RingBufferHLL *current;
+  RingBufferHLL *wrapped;
 
-  if (!rb || rb->capacity == 0) return NULL;
+  if (out_empty) *out_empty = false;
+
+  if (!rb || rb->capacity == 0) {
+    if (out_empty) *out_empty = true;
+    return NULL;
+  }
   current = rb->hlls[rb->head];
   curr_hll = current ? current->hll : NULL;
-  if (!curr_hll) return NULL;
+  if (!curr_hll) {
+    if (out_empty) *out_empty = true;
+    return NULL;
+  }
   if (n > rb->capacity) {
     n = rb->capacity;
   }
 
-  merged_hll = HLL_merge_copy(curr_hll, curr_hll);
-  if (!merged_hll) return NULL;
-  if (n == 0) return ring_buffer_hll_wrap(merged_hll);
+  merged_hll = HLL_clone(curr_hll);
+  if (!merged_hll) {
+    fprintf(stderr, "RingBuffer_merge_window: out of memory\n");
+    return NULL;
+  }
+  if (n == 0) {
+    wrapped = ring_buffer_hll_wrap(merged_hll);
+    if (!wrapped) {
+      fprintf(stderr, "RingBuffer_merge_window: out of memory\n");
+    }
+    return wrapped;
+  }
 
   size_t idx = rb->head;
   for (size_t i = 0; i < n; ++i) {
@@ -150,9 +192,14 @@ RingBufferHLL *RingBuffer_merge_window(RingBuffer *rb, size_t n) {
     next = HLL_merge_copy(merged_hll, rb->hlls[idx]->hll);
     freeHLL(merged_hll);
     if (!next) {
+      fprintf(stderr, "RingBuffer_merge_window: out of memory\n");
       return NULL;
     }
     merged_hll = next;
   }
-  return ring_buffer_hll_wrap(merged_hll);
+  wrapped = ring_buffer_hll_wrap(merged_hll);
+  if (!wrapped) {
+    fprintf(stderr, "RingBuffer_merge_window: out of memory\n");
+  }
+  return wrapped;
 }

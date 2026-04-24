@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
+#include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -67,7 +68,7 @@ void test_ring_buffer_advance(void) {
   RingBuffer_advance(rb);
   RingBufferHLL *after_advance = RingBuffer_current(rb);
   int new_data_size = (int)RingBufferHLL_count(after_advance);
-  RingBufferHLL *merged = RingBuffer_merge_window(rb, 1);
+  RingBufferHLL *merged = RingBuffer_merge_window(rb, 1, NULL);
   orig_data_size = (int)RingBufferHLL_count(merged);
   ASSERT(1 == rb->head, 1, (int)rb->head);
   ASSERT(1 <= orig_data_size, 1, orig_data_size);
@@ -111,9 +112,9 @@ void test_ring_buffer_merge_window(void) {
     RingBufferHLL_release(hll);
     RingBuffer_advance(rb);
   }
-  RingBufferHLL *two_merged = RingBuffer_merge_window(rb, 1);
+  RingBufferHLL *two_merged = RingBuffer_merge_window(rb, 1, NULL);
   int two_merged_count = (int)RingBufferHLL_count(two_merged);
-  RingBufferHLL *all_merged = RingBuffer_merge_window(rb, CAPACITY);
+  RingBufferHLL *all_merged = RingBuffer_merge_window(rb, CAPACITY, NULL);
   int all_merged_count = (int)RingBufferHLL_count(all_merged);
 
   ASSERT(sizes[1] <= two_merged_count, sizes[1], two_merged_count);
@@ -154,6 +155,38 @@ void test_ring_buffer_retained_handle_survives_free(void) {
   RingBufferHLL_release(held);
 }
 
+// Empty ring (NULL rb) must set out_empty=true so callers can distinguish it
+// from an allocation failure.
+void test_ring_buffer_merge_window_empty_flags_empty(void) {
+  bool empty = false;
+  RingBufferHLL *merged = RingBuffer_merge_window(NULL, 1, &empty);
+  ASSERT(NULL == merged, 1, NULL == merged);
+  ASSERT(true == empty, 1, (int)empty);
+
+  // NULL out_empty still returns NULL safely for the empty case.
+  RingBufferHLL *merged_noout = RingBuffer_merge_window(NULL, 1, NULL);
+  ASSERT(NULL == merged_noout, 1, NULL == merged_noout);
+}
+
+// Allocation failure must leave out_empty=false so callers can route to an
+// OOM branch instead of silently swallowing it as an empty result.
+void test_ring_buffer_merge_window_oom_flags_not_empty(void) {
+  RingBuffer *rb = RingBuffer_new(CAPACITY, PRECISION);
+  RingBufferHLL *current = RingBuffer_current(rb);
+  const char *pb = "peanut butter";
+  RingBufferHLL_add(current, pb, strlen(pb));
+  RingBufferHLL_release(current);
+
+  RingBuffer_test_force_wrap_failure(1);
+  bool empty = true;
+  RingBufferHLL *merged = RingBuffer_merge_window(rb, 1, &empty);
+  RingBuffer_test_force_wrap_failure(0);
+
+  ASSERT(NULL == merged, 1, NULL == merged);
+  ASSERT(false == empty, 0, (int)empty);
+  RingBuffer_free(rb);
+}
+
 int main(void) {
   RUN_TEST(test_ring_buffer_new);
   RUN_TEST(test_ring_buffer_new_invalid_args);
@@ -164,6 +197,8 @@ int main(void) {
   RUN_TEST(test_ring_buffer_merge_window);
   RUN_TEST(test_ring_buffer_retained_handle_survives_advance);
   RUN_TEST(test_ring_buffer_retained_handle_survives_free);
+  RUN_TEST(test_ring_buffer_merge_window_empty_flags_empty);
+  RUN_TEST(test_ring_buffer_merge_window_oom_flags_not_empty);
 
   return 0;
 }

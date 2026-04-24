@@ -41,16 +41,6 @@ static void assert_u8_eq(uint8_t expected, uint8_t actual, const char *message) 
   }
 }
 
-static void test_build_default_path_uses_directory_and_extension(void) {
-  char path[PATH_MAX];
-
-  assert_true(VizScreenshot_build_default_path(path, sizeof(path), "captures", 7),
-              "build screenshot path");
-  assert_true(strstr(path, "captures/psm-viz-") != NULL,
-              "path contains capture directory");
-  assert_true(strstr(path, "-007.png") != NULL, "path contains png suffix");
-}
-
 static void test_ensure_directory_and_write_png(void) {
   char dir_template[] = "/tmp/psm_screenshot_XXXXXX";
   char dir_path[PATH_MAX];
@@ -125,7 +115,6 @@ static void test_ensure_directory_and_write_png(void) {
 }
 
 int main(void) {
-  test_build_default_path_uses_directory_and_extension();
   test_ensure_directory_and_write_png();
   return 0;
 }

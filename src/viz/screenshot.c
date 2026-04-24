@@ -4,7 +4,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <time.h>
 #include "viz/gl_platform.h"
 #include "viz/screenshot.h"
 
@@ -244,32 +243,6 @@ bool VizScreenshot_init(VizScreenshotSession *session, const char *directory,
   }
   session->next_index = starting_index;
   return true;
-}
-
-bool VizScreenshot_build_default_path(char *out, size_t out_size,
-                                      const char *directory,
-                                      unsigned long capture_index) {
-  time_t now;
-  struct tm local_tm;
-  const char *dir = directory && directory[0] ? directory : ".";
-
-  if (!out || out_size == 0) return false;
-
-  now = time(NULL);
-#if defined(_POSIX_THREAD_SAFE_FUNCTIONS)
-  if (!localtime_r(&now, &local_tm)) return false;
-#else
-  {
-    struct tm *tmp = localtime(&now);
-    if (!tmp) return false;
-    local_tm = *tmp;
-  }
-#endif
-
-  return snprintf(out, out_size, "%s/psm-viz-%04d%02d%02d-%02d%02d%02d-%03lu.png",
-                  dir, local_tm.tm_year + 1900, local_tm.tm_mon + 1,
-                  local_tm.tm_mday, local_tm.tm_hour, local_tm.tm_min,
-                  local_tm.tm_sec, capture_index) < (int)out_size;
 }
 
 bool VizScreenshot_write_png_rgba(const char *path, int width, int height,

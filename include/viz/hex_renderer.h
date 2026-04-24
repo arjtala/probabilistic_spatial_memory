@@ -24,6 +24,14 @@ typedef struct {
   double pan_offset_lat;
   double pan_offset_lng;
   HexHeatmapMode heatmap_mode;
+  // Reusable CPU-side vertex staging buffer (hoisted out of per-frame update).
+  // verts_capacity tracks capacity in floats (not bytes).
+  float *verts;
+  size_t verts_capacity;
+  // Cached cos(center_lat * pi/180) keyed by center_lat; sentinel -999.0
+  // guarantees first-call miss. Avoid NAN because builds may use -ffast-math.
+  double cached_cos_lat;
+  double cached_cos_lat_key;
 } HexRenderer;
 
 HexRenderer *HexRenderer_new(GLuint program);

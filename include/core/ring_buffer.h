@@ -1,6 +1,7 @@
 #ifndef RING_BUFFER_H
 #define RING_BUFFER_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include "vendor/probabilistic_data_structures/hyperloglog/hll.h"
 
@@ -33,8 +34,19 @@ void RingBuffer_advance(RingBuffer *rb);
 // Caller owns one retained reference and must release it with
 // RingBufferHLL_release.
 RingBufferHLL *RingBuffer_current(RingBuffer *rb);
+// Merge the last n ring-buffer slots (plus the head slot) into a newly
+// allocated handle. Returns NULL on either "no HLLs to merge" or allocation
+// failure; the optional out_empty distinguishes them so callers can surface
+// OOM instead of silently reporting zero.
+//   non-NULL return  -> success; *out_empty == false if provided
+//   NULL + *out_empty = true  -> empty ring (rb NULL/empty or head unset)
+//   NULL + *out_empty = false -> allocation failure (stderr already logged)
 // Caller owns the returned merged handle and must release it with
-// RingBufferHLL_release.
-RingBufferHLL *RingBuffer_merge_window(RingBuffer *rb, size_t n);
+// RingBufferHLL_release. out_empty may be NULL if the caller doesn't care.
+RingBufferHLL *RingBuffer_merge_window(RingBuffer *rb, size_t n, bool *out_empty);
+
+// Test-only hook: when set non-zero, the internal handle-wrapping allocation
+// is forced to fail so the OOM branch can be exercised deterministically.
+void RingBuffer_test_force_wrap_failure(int on);
 
 #endif

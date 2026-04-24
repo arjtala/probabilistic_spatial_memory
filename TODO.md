@@ -78,21 +78,21 @@
 ## Render & Frame Pipeline
 
 - [ ] Replace `TileMap` linear cache scan with an open-addressed hash keyed on packed `(x, y, z)` — `src/viz/tile_map.c:29-55` (eliminates ~7.7k compares/frame at radius 5)
-- [ ] Preallocate `HexRenderer` vertex buffer on the struct and grow-only — `src/viz/hex_renderer.c:240-263` (no more per-frame malloc/free of the scratch buffer)
+- [x] Preallocate `HexRenderer` vertex buffer on the struct and grow-only — `src/viz/hex_renderer.c:240-263` (no more per-frame malloc/free of the scratch buffer)
 - [ ] Cache `H3_boundary` and `cell_center` per `Tile` so `HexRenderer_update` doesn't recompute H3 geometry every frame — `src/viz/tile.c`
 - [ ] Batch `TileMap_draw` into a single draw call instead of per-tile VBO uploads
 - [ ] Move video decode + `sws_scale` off the main thread into a producer thread, reusing the tile-pipeline SPSC pattern — `src/viz/video_decoder.c`
-- [ ] Cache `cos(center_lat * π/180)` in `HexRenderer_draw` rather than recomputing every draw — `src/viz/hex_renderer.c:279-281`
+- [x] Cache `cos(center_lat * π/180)` in `HexRenderer_draw` rather than recomputing every draw — `src/viz/hex_renderer.c:279-281`
 - [ ] Dirty-check the HUD title so `snprintf` + `glfwSetWindowTitle` only run when fields change — `src/viz/viz_debug_hud.c:59`
 
 ## Core Engine Clarity
 
-- [ ] Add an explicit `HLL_clone` helper and replace `HLL_merge_copy(curr, curr)` self-merge-as-clone — `src/core/ring_buffer.c:143`
-- [ ] Distinguish OOM from empty-ring returns in `RingBuffer_merge_window` (error out-param or sentinel) — `src/core/ring_buffer.c:129-158`
-- [ ] Rename `ret` → `send_ret` / `recv_ret` in `VideoDecoder_next_frame` and annotate the state machine — `src/viz/video_decoder.c:121-178`
-- [ ] Add a `max_iterations` guard to `VideoDecoder_seek` to prevent hangs on pathological files
-- [ ] Remove or document the unused running-mean state in `GpsTrace_push`
-- [ ] Delete dead API `VizScreenshot_build_default_path` — `src/viz/screenshot.c:249`
+- [x] Add an explicit `HLL_clone` helper and replace `HLL_merge_copy(curr, curr)` self-merge-as-clone — `src/core/ring_buffer.c:143`
+- [x] Distinguish OOM from empty-ring returns in `RingBuffer_merge_window` (error out-param or sentinel) — `src/core/ring_buffer.c:129-158`
+- [x] Rename `ret` → `send_ret` / `recv_ret` in `VideoDecoder_next_frame` and annotate the state machine — `src/viz/video_decoder.c:121-178`
+- [x] Add a `max_iterations` guard to `VideoDecoder_seek` to prevent hangs on pathological files
+- [x] Remove or document the unused running-mean state in `GpsTrace_push`
+- [x] Delete dead API `VizScreenshot_build_default_path` — `src/viz/screenshot.c:249`
 
 ## Architecture & API Boundaries
 
@@ -116,8 +116,8 @@
 
 ## CLI & Security
 
-- [ ] Add `--version` to `psm` and `psm-viz`; embed `git describe` at build time via `-DPSM_VERSION` in the Makefile — `src/main.c`
-- [ ] Add a `schema_version` field to `psm -j` JSON output so downstream `jq` pipelines stay stable across schema evolution
+- [x] Add `--version` to `psm` and `psm-viz`; embed `git describe` at build time via `-DPSM_VERSION` in the Makefile — `src/main.c`
+- [x] Add a `schema_version` field to `psm -j` JSON output so downstream `jq` pipelines stay stable across schema evolution
 - [ ] Add a `--verify-hdf5` subcommand that checks dataset shapes, dtypes, and timestamp monotonicity before ingest
 - [ ] Validate URL template tokens (whitelist `{s}`/`{z}`/`{x}`/`{y}`/`{api_key}`) and warn when `{api_key}` is used over plain HTTP — API-key exfiltration risk
 - [ ] Reject `..` sequences and null bytes in configured paths (tile cache root, capture dir, HDF5 input)
@@ -130,9 +130,9 @@
 ## CI & Tooling
 
 - [ ] Add an advisory `clang-tidy` CI job + `make lint` target; promote to a gate after the `viz_main.c` split (pre-split noise would drown signal)
-- [ ] Add `make check-format` using the existing `.clang-format`
+- [x] Add `make check-format` using the existing `.clang-format`
 - [ ] Add Linux CI for `viz` builds/tests (`xvfb-run` + OSMesa/EGL headless) now that the portability work is in place
-- [ ] Migrate Makefile test dependencies from the `$(HEADERS)` wildcard to generated per-TU deps (`-MD -MP`) for accurate incremental builds
+- [x] Migrate Makefile test dependencies from the `$(HEADERS)` wildcard to generated per-TU deps (`-MD -MP`) for accurate incremental builds
 
 ## Deferred / Measure First
 

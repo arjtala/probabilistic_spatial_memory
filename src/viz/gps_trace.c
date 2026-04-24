@@ -77,8 +77,6 @@ GpsTrace *GpsTrace_new(GLuint program) {
   gt->count = 0;
   gt->capacity = GPS_TRACE_INITIAL_CAPACITY;
   gt->vertex_count = 0;
-  gt->center_lat = 0.0;
-  gt->center_lng = 0.0;
   gt->dirty = false;
   gt->last_upload_count = 0;
   gt->last_center_lat = 0.0;
@@ -145,11 +143,6 @@ void GpsTrace_push(GpsTrace *gt, double lat, double lng, const ImuPointMeta *imu
   }
   gt->count++;
 
-  // Incremental running average for center
-  double n = (double)gt->count;
-  gt->center_lat += (lat - gt->center_lat) / n;
-  gt->center_lng += (lng - gt->center_lng) / n;
-
   gt->dirty = true;
 }
 
@@ -157,8 +150,6 @@ void GpsTrace_clear(GpsTrace *gt) {
   if (!gt) return;
   gt->count = 0;
   gt->vertex_count = 0;
-  gt->center_lat = 0.0;
-  gt->center_lng = 0.0;
   gt->dirty = true;
   gt->last_upload_count = 0;
   gt->has_any_imu = false;

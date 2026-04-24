@@ -145,6 +145,11 @@ HexRenderer *HexRenderer_new(GLuint program) {
   hr->u_projection = glGetUniformLocation(program, "u_projection");
   hr->zoom = 0.005;  // ~0.005 degrees ≈ 500m at equator
   hr->vertex_count = 0;
+  hr->verts = NULL;
+  hr->verts_capacity = 0;
+  // Sentinel guaranteed to miss on first draw; avoid NAN for -ffast-math safety.
+  hr->cached_cos_lat = -999.0;
+  hr->cached_cos_lat_key = -999.0;
 
   glGenVertexArrays(1, &hr->vao);
   glGenBuffers(1, &hr->vbo);
@@ -237,18 +242,25 @@ void HexRenderer_update(HexRenderer *hr, SpatialMemory *sm) {
   // Triangle fan: center + N boundary verts -> N triangles -> 3*N vertices
   // Max 10 boundary verts per hex -> 30 verts per hex
   size_t max_verts = tile_count * 30;
-  float *verts = malloc(max_verts * 6 * sizeof(float));
-  if (!verts) return;
+  size_t required = max_verts * 6;
+  if (hr->verts_capacity < required) {
+    float *new_verts = realloc(hr->verts, required * sizeof(float));
+    if (!new_verts) {
+      hr->vertex_count = 0;
+      return;
+    }
+    hr->verts = new_verts;
+    hr->verts_capacity = required;
+  }
   HexRendererBuild build = {
       .hr = hr,
       .sm = sm,
-      .verts = verts,
+      .verts = hr->verts,
       .vi = 0,
       .max_value = stats.max_value,
       .cos_center = cos(hr->center_lat * M_PI / 180.0),
   };
   if (!SpatialMemory_for_each_tile(sm, append_hex_renderer_tile, &build)) {
-    free(verts);
     hr->vertex_count = 0;
     return;
   }
@@ -257,10 +269,8 @@ void HexRenderer_update(HexRenderer *hr, SpatialMemory *sm) {
 
   glBindBuffer(GL_ARRAY_BUFFER, hr->vbo);
   glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(build.vi * 6 * sizeof(float)),
-               verts, GL_DYNAMIC_DRAW);
+               hr->verts, GL_DYNAMIC_DRAW);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-  free(verts);
 }
 
 void HexRenderer_draw(HexRenderer *hr, int viewport_w, int viewport_h,
@@ -275,9 +285,14 @@ void HexRenderer_draw(HexRenderer *hr, int viewport_w, int viewport_h,
   double half_w = hr->zoom;
   double half_h = hr->zoom * aspect;
 
-  // Hex vertices are baked relative to hr->center; translate to map_center
-  double cos_center = cos(hr->center_lat * M_PI / 180.0);
-  double offset_x = (map_center_lng - hr->center_lng) * cos_center;
+  // Hex vertices are baked relative to hr->center; translate to map_center.
+  // Cache cos(center_lat * pi/180) keyed by center_lat to avoid recomputing
+  // every draw (called on every frame).
+  if (hr->center_lat != hr->cached_cos_lat_key) {
+    hr->cached_cos_lat = cos(hr->center_lat * M_PI / 180.0);
+    hr->cached_cos_lat_key = hr->center_lat;
+  }
+  double offset_x = (map_center_lng - hr->center_lng) * hr->cached_cos_lat;
   double offset_y = map_center_lat - hr->center_lat;
 
   float proj[16];
@@ -294,5 +309,6 @@ void HexRenderer_free(HexRenderer *hr) {
   if (!hr) return;
   glDeleteBuffers(1, &hr->vbo);
   glDeleteVertexArrays(1, &hr->vao);
+  free(hr->verts);
   free(hr);
 }

@@ -16,9 +16,6 @@ typedef struct {
   size_t count;
   size_t capacity;
   size_t vertex_count;
-  // Own center — running average of all accumulated points
-  double center_lat;
-  double center_lng;
   // Dirty tracking — skip re-upload when nothing changed
   bool dirty;
   size_t last_upload_count;

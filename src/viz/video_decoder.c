@@ -120,30 +120,34 @@ VideoDecoder *VideoDecoder_open(const char *path) {
 
 bool VideoDecoder_next_frame(VideoDecoder *dec) {
   while (true) {
-    int ret = avcodec_receive_frame(dec->codec_ctx, dec->frame);
-    if (ret == 0) {
+    // Result of avcodec_receive_frame on the decoder output side.
+    int recv_ret = avcodec_receive_frame(dec->codec_ctx, dec->frame);
+    if (recv_ret == 0) {
       sws_scale(dec->sws_ctx, (const uint8_t *const *)dec->frame->data,
                 dec->frame->linesize, 0, dec->height,
                 dec->frame_rgb->data, dec->frame_rgb->linesize);
       update_current_pts(dec);
       return true;
     }
-    if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+    if (recv_ret != AVERROR(EAGAIN) && recv_ret != AVERROR_EOF) {
       return false;
     }
-    if (ret == AVERROR_EOF) {
+    if (recv_ret == AVERROR_EOF) {
       return false;
     }
 
     if (dec->draining) {
-      int drain_ret = avcodec_send_packet(dec->codec_ctx, NULL);
-      if (drain_ret < 0 && drain_ret != AVERROR_EOF) {
+      // Result of avcodec_send_packet signalling end-of-stream to the decoder.
+      int send_ret = avcodec_send_packet(dec->codec_ctx, NULL);
+      if (send_ret < 0 && send_ret != AVERROR_EOF) {
         return false;
       }
       dec->draining = false;
       continue;
     }
 
+    // Result of avcodec_send_packet for the most recent demuxed packet.
+    int send_ret = 0;
     bool sent_packet = false;
     while (true) {
       int read_ret = av_read_frame(dec->fmt_ctx, dec->pkt);
@@ -156,19 +160,19 @@ bool VideoDecoder_next_frame(VideoDecoder *dec) {
         continue;
       }
 
-      ret = avcodec_send_packet(dec->codec_ctx, dec->pkt);
+      send_ret = avcodec_send_packet(dec->codec_ctx, dec->pkt);
       av_packet_unref(dec->pkt);
-      if (ret == AVERROR(EAGAIN)) {
+      if (send_ret == AVERROR(EAGAIN)) {
         break;
       }
-      if (ret < 0) {
+      if (send_ret < 0) {
         return false;
       }
       sent_packet = true;
       break;
     }
 
-    if (ret == AVERROR(EAGAIN)) {
+    if (send_ret == AVERROR(EAGAIN)) {
       continue;
     }
     if (dec->draining || sent_packet) {
@@ -190,10 +194,19 @@ bool VideoDecoder_seek(VideoDecoder *dec, double target_seconds) {
   avcodec_flush_buffers(dec->codec_ctx);
   dec->draining = false;
 
-  // Decode forward until we reach or pass target_seconds
+  // Decode forward until we reach or pass target_seconds. Cap iterations to
+  // avoid an unbounded loop on pathological streams whose PTS never advance.
+  const int max_iterations = 4096;
+  int iterations = 0;
   while (VideoDecoder_next_frame(dec)) {
     if (dec->current_pts >= target_seconds) {
       return true;
+    }
+    if (++iterations >= max_iterations) {
+      fprintf(stderr,
+              "VideoDecoder_seek: exceeded %d frames without reaching %.3fs\n",
+              max_iterations, target_seconds);
+      return false;
     }
   }
 

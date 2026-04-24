@@ -5,6 +5,8 @@ PKG_CONFIG ?= pkg-config
 PROFILE ?= local
 comma := ,
 
+PSM_VERSION := $(shell git describe --always --dirty 2>/dev/null || echo "unknown")
+
 pkg_prefix = $(strip $(shell $(PKG_CONFIG) --silence-errors --variable=prefix $(1) 2>/dev/null))
 brew_prefix = $(strip $(shell $(BREW) --prefix $(1) 2>/dev/null))
 rpath_flag = $(if $(1),-Wl$(comma)-rpath$(comma)$(1)/lib)
@@ -44,7 +46,7 @@ PTHREAD_FLAGS = -pthread
 endif
 
 COMMON_WARNINGS = -Wall -Wextra -Werror -std=c99
-COMMON_CFLAGS = $(COMMON_WARNINGS) -Iinclude -I. $(H3_CFLAGS) $(HDF5_CFLAGS)
+COMMON_CFLAGS = $(COMMON_WARNINGS) -Iinclude -I. $(H3_CFLAGS) $(HDF5_CFLAGS) -DPSM_VERSION='"$(PSM_VERSION)"' -MMD -MP
 COMMON_LDFLAGS = $(H3_LDFLAGS) $(HDF5_LDFLAGS)
 
 ifeq ($(PROFILE),local)
@@ -188,16 +190,16 @@ $(TOOLCHAIN_INFO): FORCE
 	fi
 
 # Build project object files
-$(BUILD_DIR)/core/%.o: src/core/%.c $(HEADERS) $(TOOLCHAIN_INFO)
+$(BUILD_DIR)/core/%.o: src/core/%.c $(TOOLCHAIN_INFO)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
-$(BUILD_DIR)/ingest/%.o: src/ingest/%.c $(HEADERS) $(TOOLCHAIN_INFO)
+$(BUILD_DIR)/ingest/%.o: src/ingest/%.c $(TOOLCHAIN_INFO)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
 # Build viz object files
-$(BUILD_DIR)/viz/%.o: src/viz/%.c $(HEADERS) $(TOOLCHAIN_INFO)
+$(BUILD_DIR)/viz/%.o: src/viz/%.c $(TOOLCHAIN_INFO)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(VIZ_CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
@@ -226,7 +228,7 @@ $(BENCH_TILE_DECODE): benchmarks/benchmark_tile_decode.c $(STB_OBJ)
 	$(CC) $(CFLAGS) $(PTHREAD_FLAGS) -Ivendor benchmarks/benchmark_tile_decode.c $(STB_OBJ) -o $@ -lz -lm
 
 # Build vendor object files
-$(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(VENDOR_HEADERS) $(TOOLCHAIN_INFO)
+$(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(TOOLCHAIN_INFO)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
@@ -243,29 +245,29 @@ test-tile-table: $(TEST_TILE_TABLE)
 	./$(TEST_TILE_TABLE)
 
 # Build test executables
-$(TEST_RING_BUFFER): tests/test_ring_buffer.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
+$(TEST_RING_BUFFER): tests/test_ring_buffer.c $(OBJ) $(VENDOR_OBJ)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_ring_buffer.c $(OBJ) $(VENDOR_OBJ) -o $@ -lm
 
-$(TEST_TILE): tests/test_tile.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
+$(TEST_TILE): tests/test_tile.c $(OBJ) $(VENDOR_OBJ)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_tile.c $(OBJ) $(VENDOR_OBJ) -o $@ -lm
 
-$(TEST_TILE_TABLE): tests/test_tile_table.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
+$(TEST_TILE_TABLE): tests/test_tile_table.c $(OBJ) $(VENDOR_OBJ)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_tile_table.c $(OBJ) $(VENDOR_OBJ) -o $@ -lm
 
 test-spatial: $(TEST_SPATIAL)
 	./$(TEST_SPATIAL)
 
-$(TEST_SPATIAL): tests/test_spatial_memory.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
+$(TEST_SPATIAL): tests/test_spatial_memory.c $(OBJ) $(VENDOR_OBJ)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_spatial_memory.c $(OBJ) $(VENDOR_OBJ) -o $@ -lm
 
 test-ingest: $(TEST_INGEST)
 	./$(TEST_INGEST)
 
-$(TEST_INGEST): tests/test_ingest.c $(HEADERS) $(OBJ) $(VENDOR_OBJ)
+$(TEST_INGEST): tests/test_ingest.c $(OBJ) $(VENDOR_OBJ)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_ingest.c $(OBJ) $(VENDOR_OBJ) -o $@ -lm
 
@@ -346,8 +348,16 @@ clean:
 # Rebuild everything
 rebuild: clean all
 
+# Verify formatting with clang-format (read-only check)
+check-format:
+	@files=$$(find src tests -type f \( -name '*.c' -o -name '*.h' \)); \
+	if [ -z "$$files" ]; then \
+		echo "check-format: no sources found"; exit 0; \
+	fi; \
+	clang-format --dry-run --Werror $$files
+
 # Phony targets
-.PHONY: all debug portable sanitize viz bench-spatial-memory bench-tile-decode test test-debug test-portable test-sanitize test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud test-screenshot test-ui-overlay clean rebuild show run FORCE
+.PHONY: all debug portable sanitize viz bench-spatial-memory bench-tile-decode test test-debug test-portable test-sanitize test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud test-screenshot test-ui-overlay check-format clean rebuild show run FORCE
 
 # Show detected files
 show:
@@ -355,3 +365,10 @@ show:
 	@echo "Sources: $(SRCS)"
 	@echo "Vendor sources: $(VENDOR_SRCS)"
 	@echo "Objects: $(OBJ) $(VENDOR_OBJ)"
+
+# Auto-generated header dependencies (.d files produced by -MMD -MP).
+# Covers every profile because $(BUILD_DIR) is profile-aware.
+-include $(OBJ:.o=.d)
+-include $(VENDOR_OBJ:.o=.d)
+-include $(VIZ_OBJ:.o=.d)
+-include $(STB_OBJ:.o=.d)

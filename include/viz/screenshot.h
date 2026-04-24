@@ -15,9 +15,6 @@ typedef struct {
 bool VizScreenshot_ensure_directory(const char *path);
 bool VizScreenshot_init(VizScreenshotSession *session, const char *directory,
                         const char *prefix, unsigned long starting_index);
-bool VizScreenshot_build_default_path(char *out, size_t out_size,
-                                      const char *directory,
-                                      unsigned long capture_index);
 bool VizScreenshot_write_png_rgba(const char *path, int width, int height,
                                   const uint8_t *rgba_pixels);
 bool VizScreenshot_capture_region(VizScreenshotSession *session, int x, int y,

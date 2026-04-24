@@ -8,6 +8,10 @@
 #include <string.h>
 #include "ingest/ingest.h"
 
+#ifndef PSM_VERSION
+#define PSM_VERSION "unknown"
+#endif
+
 typedef enum {
   OUTPUT_TEXT = 0,
   OUTPUT_JSON = 1,
@@ -151,6 +155,7 @@ static void print_usage(const char *program) {
           RingBuffer_precision_max());
   fprintf(stderr, "  -j, --json              Emit machine-readable JSON summary\n");
   fprintf(stderr, "  -h, --help              Print this help\n");
+  fprintf(stderr, "  -v, --version           Print psm version and exit\n");
 }
 
 static void cli_options_init(CliOptions *options) {
@@ -215,13 +220,14 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
       {"precision", required_argument, NULL, 'p'},
       {"json", no_argument, NULL, 'j'},
       {"help", no_argument, NULL, 'h'},
+      {"version", no_argument, NULL, 'v'},
       {0, 0, 0, 0},
   };
 
   if (!options) return false;
   cli_options_init(options);
 
-  while ((opt = getopt_long(argc, argv, "f:g:t:r:C:p:jh", long_options, NULL)) != -1) {
+  while ((opt = getopt_long(argc, argv, "f:g:t:r:C:p:jhv", long_options, NULL)) != -1) {
     switch (opt) {
     case 'f':
       options->filepath = optarg;
@@ -260,6 +266,9 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
       break;
     case 'h':
       print_usage(argv[0]);
+      exit(0);
+    case 'v':
+      printf("psm version %s\n", PSM_VERSION);
       exit(0);
     default:
       print_usage(argv[0]);
@@ -358,6 +367,7 @@ int main(int argc, char *argv[]) {
 
   if (options.output_format == OUTPUT_JSON) {
     fputs("{\n", stdout);
+    fputs("  \"schema_version\": 1,\n", stdout);
     fputs("  \"group\": ", stdout);
     print_json_string(stdout, options.group);
     fputs(",\n", stdout);

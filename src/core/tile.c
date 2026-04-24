@@ -77,8 +77,14 @@ void Tile_advance(Tile *tile) {
 //  from the ring buffer, gets the count, frees the merged HLL, and returns the estimate.
 double Tile_query(Tile *tile, const size_t n) {
   if (!tile) return 0.0;
-  RingBufferHLL *hll = RingBuffer_merge_window(tile->rb, n);
-  if (!hll) return 0.0;
+  bool empty = false;
+  RingBufferHLL *hll = RingBuffer_merge_window(tile->rb, n, &empty);
+  if (!hll) {
+    if (!empty) {
+      fprintf(stderr, "Tile_query: ring buffer merge failed, returning 0\n");
+    }
+    return 0.0;
+  }
   double count = RingBufferHLL_count(hll);
   RingBufferHLL_release(hll);
   return count;
