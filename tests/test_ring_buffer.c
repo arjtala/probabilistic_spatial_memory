@@ -1,5 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
-#include <stdbool.h>
+#include <float.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -46,9 +46,37 @@ void test_ring_buffer_current(void) {
   int curr_count = (int)RingBufferHLL_count(hll);
   ASSERT(0 == curr_count, 0, curr_count);
   const char *pb = "peanut butter";
-  RingBufferHLL_add(hll, pb, strlen(pb));
+  RingBufferHLL_add(hll, 1.0, pb, strlen(pb));
   curr_count = (int)RingBufferHLL_count(hll);
   ASSERT(1 <= curr_count, 1, curr_count);
+  RingBufferHLL_release(hll);
+  RingBuffer_free(rb);
+}
+
+void test_ring_buffer_fresh_slot_has_sentinel_interval(void) {
+  RingBuffer *rb = RingBuffer_new(CAPACITY, PRECISION);
+  RingBufferHLL *hll = RingBuffer_current(rb);
+  double t_min = 0.0;
+  double t_max = 0.0;
+  bool has_interval = RingBufferHLL_interval(hll, &t_min, &t_max);
+  ASSERT(!has_interval, 0, has_interval);
+  RingBufferHLL_release(hll);
+  RingBuffer_free(rb);
+}
+
+void test_ring_buffer_single_observe_seeds_interval(void) {
+  RingBuffer *rb = RingBuffer_new(CAPACITY, PRECISION);
+  RingBufferHLL *hll = RingBuffer_current(rb);
+  const char *pb = "peanut butter";
+  const double t = 42.5;
+
+  RingBufferHLL_add(hll, t, pb, strlen(pb));
+  double t_min = 0.0;
+  double t_max = 0.0;
+  bool has_interval = RingBufferHLL_interval(hll, &t_min, &t_max);
+  ASSERT(has_interval, 1, has_interval);
+  ASSERT(t == t_min, (int)t, (int)t_min);
+  ASSERT(t == t_max, (int)t, (int)t_max);
   RingBufferHLL_release(hll);
   RingBuffer_free(rb);
 }
@@ -57,7 +85,7 @@ void test_ring_buffer_advance(void) {
   RingBuffer *rb = RingBuffer_new(CAPACITY, PRECISION);
   RingBufferHLL *hll = RingBuffer_current(rb);
   const char *pb = "peanut butter";
-  RingBufferHLL_add(hll, pb, strlen(pb));
+  RingBufferHLL_add(hll, 0.0, pb, strlen(pb));
 
   RingBufferHLL *before_advance = RingBuffer_current(rb);
   int orig_data_size = (int)RingBufferHLL_count(before_advance);
@@ -68,8 +96,8 @@ void test_ring_buffer_advance(void) {
   RingBuffer_advance(rb);
   RingBufferHLL *after_advance = RingBuffer_current(rb);
   int new_data_size = (int)RingBufferHLL_count(after_advance);
-  RingBufferHLL *merged = RingBuffer_merge_window(rb, 1, NULL);
-  orig_data_size = (int)RingBufferHLL_count(merged);
+  RingBufferWindow merged_window = RingBuffer_merge_window(rb, 1);
+  orig_data_size = (int)RingBufferHLL_count(merged_window.sketch);
   ASSERT(1 == rb->head, 1, (int)rb->head);
   ASSERT(1 <= orig_data_size, 1, orig_data_size);
   ASSERT(0 == new_data_size, 0, new_data_size);
@@ -77,7 +105,24 @@ void test_ring_buffer_advance(void) {
   RingBufferHLL_release(hll);
   RingBufferHLL_release(before_advance);
   RingBufferHLL_release(after_advance);
-  RingBufferHLL_release(merged);
+  RingBufferHLL_release(merged_window.sketch);
+  RingBuffer_free(rb);
+}
+
+void test_ring_buffer_advance_resets_interval(void) {
+  RingBuffer *rb = RingBuffer_new(CAPACITY, PRECISION);
+  RingBufferHLL *hll = RingBuffer_current(rb);
+  const char *pb = "peanut butter";
+  RingBufferHLL_add(hll, 7.0, pb, strlen(pb));
+  RingBufferHLL_release(hll);
+
+  RingBuffer_advance(rb);
+  RingBufferHLL *next = RingBuffer_current(rb);
+  double t_min = 0.0;
+  double t_max = 0.0;
+  bool has_interval = RingBufferHLL_interval(next, &t_min, &t_max);
+  ASSERT(!has_interval, 0, has_interval);
+  RingBufferHLL_release(next);
   RingBuffer_free(rb);
 }
 
@@ -85,7 +130,7 @@ void test_ring_buffer_wrap(void) {
   RingBuffer *rb = RingBuffer_new(CAPACITY, PRECISION);
   RingBufferHLL *hll = RingBuffer_current(rb);
   const char *pb = "peanut butter";
-  RingBufferHLL_add(hll, pb, strlen(pb));
+  RingBufferHLL_add(hll, 0.0, pb, strlen(pb));
   int curr_size = (int)RingBufferHLL_count(hll);
   ASSERT(curr_size >= 1, curr_size, 1);
 
@@ -94,8 +139,35 @@ void test_ring_buffer_wrap(void) {
   int wrap_size = (int)RingBufferHLL_count(wrapped);
   ASSERT(0 == rb->head, 0, (int)rb->head);
   ASSERT(0 == wrap_size, 0, wrap_size);
+  double t_min = 0.0;
+  double t_max = 0.0;
+  bool has_interval = RingBufferHLL_interval(wrapped, &t_min, &t_max);
+  ASSERT(!has_interval, 0, has_interval);
 
   RingBufferHLL_release(hll);
+  RingBufferHLL_release(wrapped);
+  RingBuffer_free(rb);
+}
+
+void test_ring_buffer_wrap_interval_does_not_leak(void) {
+  RingBuffer *rb = RingBuffer_new(CAPACITY, PRECISION);
+  RingBufferHLL *hll = RingBuffer_current(rb);
+  const char *pb = "peanut butter";
+  RingBufferHLL_add(hll, 99.0, pb, strlen(pb));
+  RingBufferHLL_release(hll);
+
+  for (size_t i = 0; i < CAPACITY; ++i) RingBuffer_advance(rb);
+
+  const char *jelly = "jelly";
+  RingBufferHLL *wrapped = RingBuffer_current(rb);
+  RingBufferHLL_add(wrapped, 500.0, jelly, strlen(jelly));
+
+  double t_min = 0.0;
+  double t_max = 0.0;
+  bool has_interval = RingBufferHLL_interval(wrapped, &t_min, &t_max);
+  ASSERT(has_interval, 1, has_interval);
+  ASSERT(500 == (int)t_min, 500, (int)t_min);
+  ASSERT(500 == (int)t_max, 500, (int)t_max);
   RingBufferHLL_release(wrapped);
   RingBuffer_free(rb);
 }
@@ -107,21 +179,53 @@ void test_ring_buffer_merge_window(void) {
   RingBufferHLL *hll;
   for (size_t i = 0; i < CAPACITY-1; ++i) {
     hll = RingBuffer_current(rb);
-    RingBufferHLL_add(hll, sammich[i], strlen(sammich[i]));
+    RingBufferHLL_add(hll, (double)i, sammich[i], strlen(sammich[i]));
     sizes[i] = (int)RingBufferHLL_count(hll);
     RingBufferHLL_release(hll);
     RingBuffer_advance(rb);
   }
-  RingBufferHLL *two_merged = RingBuffer_merge_window(rb, 1, NULL);
-  int two_merged_count = (int)RingBufferHLL_count(two_merged);
-  RingBufferHLL *all_merged = RingBuffer_merge_window(rb, CAPACITY, NULL);
-  int all_merged_count = (int)RingBufferHLL_count(all_merged);
+  RingBufferWindow two_window = RingBuffer_merge_window(rb, 1);
+  int two_merged_count = (int)RingBufferHLL_count(two_window.sketch);
+  RingBufferWindow all_window = RingBuffer_merge_window(rb, CAPACITY);
+  int all_merged_count = (int)RingBufferHLL_count(all_window.sketch);
 
   ASSERT(sizes[1] <= two_merged_count, sizes[1], two_merged_count);
   ASSERT(all_merged_count >= two_merged_count, all_merged_count, two_merged_count);
 
-  RingBufferHLL_release(two_merged);
-  RingBufferHLL_release(all_merged);
+  RingBufferHLL_release(two_window.sketch);
+  RingBufferHLL_release(all_window.sketch);
+  RingBuffer_free(rb);
+}
+
+void test_ring_buffer_merge_window_reports_empty(void) {
+  RingBuffer *rb = RingBuffer_new(CAPACITY, PRECISION);
+  RingBufferWindow window = RingBuffer_merge_window(rb, CAPACITY);
+  ASSERT(NULL != window.sketch, 1, NULL != window.sketch);
+  ASSERT(window.is_empty, 1, window.is_empty);
+  ASSERT(DBL_MAX == window.t_min, 1, DBL_MAX == window.t_min);
+  ASSERT(-DBL_MAX == window.t_max, 1, -DBL_MAX == window.t_max);
+  RingBufferHLL_release(window.sketch);
+  RingBuffer_free(rb);
+}
+
+void test_ring_buffer_merge_window_spans_slots(void) {
+  RingBuffer *rb = RingBuffer_new(CAPACITY, PRECISION);
+  // Observe one item each in two consecutive slots at different timestamps.
+  RingBufferHLL *h0 = RingBuffer_current(rb);
+  RingBufferHLL_add(h0, 10.0, "a", 1);
+  RingBufferHLL_release(h0);
+  RingBuffer_advance(rb);
+
+  RingBufferHLL *h1 = RingBuffer_current(rb);
+  RingBufferHLL_add(h1, 25.0, "b", 1);
+  RingBufferHLL_release(h1);
+
+  RingBufferWindow window = RingBuffer_merge_window(rb, 1);
+  ASSERT(NULL != window.sketch, 1, NULL != window.sketch);
+  ASSERT(!window.is_empty, 0, window.is_empty);
+  ASSERT(10 == (int)window.t_min, 10, (int)window.t_min);
+  ASSERT(25 == (int)window.t_max, 25, (int)window.t_max);
+  RingBufferHLL_release(window.sketch);
   RingBuffer_free(rb);
 }
 
@@ -130,7 +234,7 @@ void test_ring_buffer_retained_handle_survives_advance(void) {
   RingBufferHLL *held = RingBuffer_current(rb);
   const char *pb = "peanut butter";
 
-  RingBufferHLL_add(held, pb, strlen(pb));
+  RingBufferHLL_add(held, 0.0, pb, strlen(pb));
   RingBuffer_advance(rb);
 
   ASSERT(1 <= (int)RingBufferHLL_count(held), 1, (int)RingBufferHLL_count(held));
@@ -148,43 +252,11 @@ void test_ring_buffer_retained_handle_survives_free(void) {
   RingBufferHLL *held = RingBuffer_current(rb);
   const char *pb = "peanut butter";
 
-  RingBufferHLL_add(held, pb, strlen(pb));
+  RingBufferHLL_add(held, 0.0, pb, strlen(pb));
   RingBuffer_free(rb);
 
   ASSERT(1 <= (int)RingBufferHLL_count(held), 1, (int)RingBufferHLL_count(held));
   RingBufferHLL_release(held);
-}
-
-// Empty ring (NULL rb) must set out_empty=true so callers can distinguish it
-// from an allocation failure.
-void test_ring_buffer_merge_window_empty_flags_empty(void) {
-  bool empty = false;
-  RingBufferHLL *merged = RingBuffer_merge_window(NULL, 1, &empty);
-  ASSERT(NULL == merged, 1, NULL == merged);
-  ASSERT(true == empty, 1, (int)empty);
-
-  // NULL out_empty still returns NULL safely for the empty case.
-  RingBufferHLL *merged_noout = RingBuffer_merge_window(NULL, 1, NULL);
-  ASSERT(NULL == merged_noout, 1, NULL == merged_noout);
-}
-
-// Allocation failure must leave out_empty=false so callers can route to an
-// OOM branch instead of silently swallowing it as an empty result.
-void test_ring_buffer_merge_window_oom_flags_not_empty(void) {
-  RingBuffer *rb = RingBuffer_new(CAPACITY, PRECISION);
-  RingBufferHLL *current = RingBuffer_current(rb);
-  const char *pb = "peanut butter";
-  RingBufferHLL_add(current, pb, strlen(pb));
-  RingBufferHLL_release(current);
-
-  RingBuffer_test_force_wrap_failure(1);
-  bool empty = true;
-  RingBufferHLL *merged = RingBuffer_merge_window(rb, 1, &empty);
-  RingBuffer_test_force_wrap_failure(0);
-
-  ASSERT(NULL == merged, 1, NULL == merged);
-  ASSERT(false == empty, 0, (int)empty);
-  RingBuffer_free(rb);
 }
 
 int main(void) {
@@ -192,13 +264,17 @@ int main(void) {
   RUN_TEST(test_ring_buffer_new_invalid_args);
   RUN_TEST(test_ring_buffer_precision_limits);
   RUN_TEST(test_ring_buffer_current);
+  RUN_TEST(test_ring_buffer_fresh_slot_has_sentinel_interval);
+  RUN_TEST(test_ring_buffer_single_observe_seeds_interval);
   RUN_TEST(test_ring_buffer_advance);
+  RUN_TEST(test_ring_buffer_advance_resets_interval);
   RUN_TEST(test_ring_buffer_wrap);
+  RUN_TEST(test_ring_buffer_wrap_interval_does_not_leak);
   RUN_TEST(test_ring_buffer_merge_window);
+  RUN_TEST(test_ring_buffer_merge_window_reports_empty);
+  RUN_TEST(test_ring_buffer_merge_window_spans_slots);
   RUN_TEST(test_ring_buffer_retained_handle_survives_advance);
   RUN_TEST(test_ring_buffer_retained_handle_survives_free);
-  RUN_TEST(test_ring_buffer_merge_window_empty_flags_empty);
-  RUN_TEST(test_ring_buffer_merge_window_oom_flags_not_empty);
 
   return 0;
 }

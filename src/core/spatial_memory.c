@@ -11,7 +11,8 @@ static bool spatial_memory_coords_to_cell(const SpatialMemory *sm, double lat,
 }
 
 SpatialMemory *SpatialMemory_new(const int resolution, const size_t capacity,
-                                 const size_t precision) {
+                                 const size_t precision,
+                                 const size_t exemplar_capacity) {
   if (resolution < 0 || resolution > 15) {
     fprintf(stderr, "SpatialMemory_new: H3 resolution must be in [0, 15], got %d\n",
             resolution);
@@ -42,11 +43,12 @@ SpatialMemory *SpatialMemory_new(const int resolution, const size_t capacity,
   sm->resolution = resolution;
   sm->capacity = capacity;
   sm->precision = precision;
+  sm->exemplar_capacity = exemplar_capacity;
   return sm;
 }
 
-bool SpatialMemory_observe(SpatialMemory *sm, const double lat, const double lng,
-                           const void *data, size_t size) {
+bool SpatialMemory_observe(SpatialMemory *sm, double t, const double lat,
+                           const double lng, const void *data, size_t size) {
   if (!sm || !data || size == 0) {
     return false;
   }
@@ -56,7 +58,8 @@ bool SpatialMemory_observe(SpatialMemory *sm, const double lat, const double lng
   }
   Tile *tile = TileTable_get(sm->tiles, cell_id);
   if (NULL == tile) {
-    tile = Tile_new(lat, lng, sm->resolution, sm->capacity, sm->precision);
+    tile = Tile_new(lat, lng, sm->resolution, sm->capacity, sm->precision,
+                    sm->exemplar_capacity);
     if (!tile) {
       return false;
     }
@@ -65,7 +68,7 @@ bool SpatialMemory_observe(SpatialMemory *sm, const double lat, const double lng
       return false;
     }
   }
-  Tile_add(tile, data, size);
+  Tile_observe(tile, t, data, size);
   return true;
 }
 

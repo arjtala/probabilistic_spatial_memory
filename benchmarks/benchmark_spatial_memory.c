@@ -62,7 +62,10 @@ static void populate_grid_memory(SpatialMemory *sm, const Coord *coords,
   for (size_t i = 0; i < observe_ops; i++) {
     uint64_t payload = (uint64_t)i;
     const Coord *coord = &coords[i % grid_cells];
-    if (!SpatialMemory_observe(sm, coord->lat, coord->lng,
+    // Real ingest drives SpatialMemory_observe with an HDF5 timestamp; the
+    // benchmark has no such stream, so use the loop counter as a monotonic
+    // stand-in. The precise value is irrelevant for throughput measurements.
+    if (!SpatialMemory_observe(sm, (double)i, coord->lat, coord->lng,
                                &payload, sizeof(payload))) {
       fail_benchmark("SpatialMemory_observe failed during benchmark setup");
     }
@@ -72,7 +75,8 @@ static void populate_grid_memory(SpatialMemory *sm, const Coord *coords,
 static void run_same_cell_observe(size_t observe_ops) {
   SpatialMemory *sm = SpatialMemory_new(DEFAULT_RESOLUTION,
                                         DEFAULT_CAPACITY,
-                                        DEFAULT_PRECISION);
+                                        DEFAULT_PRECISION,
+                                        0);
   if (!sm) fail_benchmark("Failed to create SpatialMemory for same-cell benchmark");
 
   const double lat = 37.7749;
@@ -80,7 +84,8 @@ static void run_same_cell_observe(size_t observe_ops) {
   double start = monotonic_seconds();
   for (size_t i = 0; i < observe_ops; i++) {
     uint64_t payload = (uint64_t)i;
-    if (!SpatialMemory_observe(sm, lat, lng, &payload, sizeof(payload))) {
+    if (!SpatialMemory_observe(sm, (double)i, lat, lng, &payload,
+                               sizeof(payload))) {
       fail_benchmark("SpatialMemory_observe failed in same-cell benchmark");
     }
   }
@@ -96,7 +101,8 @@ static void run_grid_observe(const Coord *coords, size_t observe_ops,
                              size_t grid_cells) {
   SpatialMemory *sm = SpatialMemory_new(DEFAULT_RESOLUTION,
                                         DEFAULT_CAPACITY,
-                                        DEFAULT_PRECISION);
+                                        DEFAULT_PRECISION,
+                                        0);
   if (!sm) fail_benchmark("Failed to create SpatialMemory for grid benchmark");
 
   double start = monotonic_seconds();
@@ -113,7 +119,8 @@ static void run_grid_query(const Coord *coords, size_t observe_ops,
                            size_t query_ops, size_t grid_cells) {
   SpatialMemory *sm = SpatialMemory_new(DEFAULT_RESOLUTION,
                                         DEFAULT_CAPACITY,
-                                        DEFAULT_PRECISION);
+                                        DEFAULT_PRECISION,
+                                        0);
   if (!sm) fail_benchmark("Failed to create SpatialMemory for query benchmark");
 
   populate_grid_memory(sm, coords, observe_ops, grid_cells);

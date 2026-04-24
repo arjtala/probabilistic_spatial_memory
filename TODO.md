@@ -143,8 +143,8 @@
 
 Context: a forthcoming NeurIPS 2026 streaming egocentric memory benchmark (the "Localization Paradox benchmark" after its headline finding) exposes models' failure to return supporting `[t_start, t_end]` intervals for look-back questions — frontier MLLMs score near-zero `mIoU` despite respectable semantic accuracy. PSM's H3-indexed ring-buffered memory is a natural substrate for closing that gap. These items add the minimum primitives needed to emit intervals and retrieve exemplars; experiments E5-E7 in `EXPERIMENTS.md` consume them.
 
-- [ ] Retain `(t_min, t_max)` per ring-buffer bucket alongside the HLL sketch — enables returning `[t_start, t_end]` candidate intervals; cost ~`16B × capacity × tile_count`
-- [ ] Reservoir-sampled per-tile exemplar embeddings (configurable `N` per tile) — enables k-NN retrieval against past observations for "visual detail recall" and "last seen" queries
+- [x] Retain `(t_min, t_max)` per ring-buffer bucket alongside the HLL sketch — enables returning `[t_start, t_end]` candidate intervals; cost ~`16B × capacity × tile_count`
+- [x] Reservoir-sampled per-tile exemplar embeddings (configurable `N` per tile) — enables k-NN retrieval against past observations for "visual detail recall" and "last seen" queries
 - [ ] Expose `SpatialMemory_query_intervals(lat, lng, k_ring, out_tuples)` returning top-k `(cell, t_start, t_end, count)` tuples over the H3 neighborhood
 - [ ] `psm --last-seen lat,lng --k N` CLI surface + JSON output (bump `schema_version` when adding fields; see also CLI & Security → `schema_version` item)
 - [ ] Benchmark scenario in `benchmarks/benchmark_spatial_memory.c`: "location-trace query latency" over a populated session — first-class measurement for E7

@@ -12,19 +12,26 @@
 #define DEFAULT_RESOLUTION 10
 
 typedef struct {
-  TileTable *tiles;  // dynamic map of tile pointers keyed by H3Index
-  int resolution;    // H3 resolution for all tiles
-  size_t capacity;   // ring buffer capacity (shared across tiles)
-  size_t precision;  // HLL precision (shared across tiles)
+  TileTable *tiles;          // dynamic map of tile pointers keyed by H3Index
+  int resolution;            // H3 resolution for all tiles
+  size_t capacity;           // ring buffer capacity (shared across tiles)
+  size_t precision;          // HLL precision (shared across tiles)
+  size_t exemplar_capacity;  // per-tile reservoir capacity (0 = disabled)
 } SpatialMemory;
 
 typedef bool (*SpatialMemoryTileVisitor)(H3Index cell_id, Tile *tile,
                                          void *user_data);
 
+// Construct a new SpatialMemory. Pass 0 for exemplar_capacity to disable
+// per-tile reservoir sampling (no allocation, no sampling work during
+// observe). Larger values create a fixed-size reservoir per tile.
 SpatialMemory *SpatialMemory_new(const int resolution, const size_t capacity,
-                                 const size_t precision);
-bool SpatialMemory_observe(SpatialMemory *sm, const double lat, const double lng,
-                           const void *data, size_t size);
+                                 const size_t precision,
+                                 const size_t exemplar_capacity);
+// Record an observation at timestamp t. Widens the per-slot [t_min, t_max]
+// interval and feeds the per-tile exemplar reservoir (when configured).
+bool SpatialMemory_observe(SpatialMemory *sm, double t, const double lat,
+                           const double lng, const void *data, size_t size);
 size_t SpatialMemory_advance_to_timestamp(SpatialMemory *sm, double timestamp,
                                           double *window_anchor,
                                           double time_window_sec);

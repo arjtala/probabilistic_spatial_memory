@@ -408,7 +408,8 @@ bool IngestReader_run(IngestReader *reader, SpatialMemory *sm,
 
     SpatialMemory_advance_to_timestamp(sm, record.timestamp, &window_anchor,
                                        time_window_sec);
-    if (!SpatialMemory_observe(sm, record.lat, record.lng, record.embedding,
+    if (!SpatialMemory_observe(sm, record.timestamp, record.lat, record.lng,
+                               record.embedding,
                                record.embedding_dim * sizeof(float))) {
       fprintf(stderr, "IngestReader_run: skipping invalid observation at timestamp %.3f\n",
               record.timestamp);

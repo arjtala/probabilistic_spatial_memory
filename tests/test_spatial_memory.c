@@ -52,31 +52,32 @@ static Tile *find_tile_for_cell(SpatialMemory *sm, H3Index cell_id) {
 }
 
 void test_sm_new(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
   ASSERT(NULL != sm, 1, NULL != sm);
   ASSERT(RESOLUTION == sm->resolution, RESOLUTION, sm->resolution);
   ASSERT(CAPACITY == sm->capacity, CAPACITY, (int)sm->capacity);
   ASSERT(PRECISION == sm->precision, PRECISION, (int)sm->precision);
+  ASSERT(0 == (int)sm->exemplar_capacity, 0, (int)sm->exemplar_capacity);
   ASSERT(0 == (int)SpatialMemory_tile_count(sm), 0,
          (int)SpatialMemory_tile_count(sm));
   SpatialMemory_free(sm);
 }
 
 void test_sm_new_invalid_resolution(void) {
-  SpatialMemory *sm = SpatialMemory_new(16, CAPACITY, PRECISION);
+  SpatialMemory *sm = SpatialMemory_new(16, CAPACITY, PRECISION, 0);
   ASSERT(NULL == sm, 1, NULL == sm);
 }
 
 void test_sm_new_invalid_precision(void) {
   SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY,
-                                        RingBuffer_precision_max() + 1);
+                                        RingBuffer_precision_max() + 1, 0);
   ASSERT(NULL == sm, 1, NULL == sm);
 }
 
 void test_sm_observe(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
   const char *pb = "peanut butter";
-  bool ok = SpatialMemory_observe(sm, LAT, LNG, pb, strlen(pb));
+  bool ok = SpatialMemory_observe(sm, 0.0, LAT, LNG, pb, strlen(pb));
   ASSERT(ok, 1, ok);
 
   LatLng loc;
@@ -96,10 +97,10 @@ void test_sm_observe(void) {
 }
 
 void test_sm_query(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
   const char *pb = "peanut butter";
   double query_count = 0.0;
-  bool ok = SpatialMemory_observe(sm, LAT, LNG, pb, strlen(pb));
+  bool ok = SpatialMemory_observe(sm, 0.0, LAT, LNG, pb, strlen(pb));
   ASSERT(ok, 1, ok);
   ok = SpatialMemory_query(sm, LAT, LNG, 1, &query_count);
   ASSERT(ok, 1, ok);
@@ -109,7 +110,7 @@ void test_sm_query(void) {
 }
 
 void test_sm_advance_all(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
   const char *pb = "peanut butter";
   LatLng loc;
   loc.lat = degsToRads(LAT);
@@ -121,7 +122,7 @@ void test_sm_advance_all(void) {
     exit(EXIT_FAILURE);
   }
 
-  bool ok = SpatialMemory_observe(sm, LAT, LNG, pb, strlen(pb));
+  bool ok = SpatialMemory_observe(sm, 0.0, LAT, LNG, pb, strlen(pb));
   ASSERT(ok, 1, ok);
   SpatialMemory_advance_all(sm);
   Tile *tile = find_tile_for_cell(sm, cellId);
@@ -135,12 +136,12 @@ void test_sm_multi_tile(void) {
   const char *sushi = "sushi";
   const double tokyo_lat = 35.68;
   const double tokyo_lng = 139.68;
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
   double count_lon = 0.0;
   double count_tok = 0.0;
-  bool ok = SpatialMemory_observe(sm, LAT, LNG, pb, strlen(pb));
+  bool ok = SpatialMemory_observe(sm, 0.0, LAT, LNG, pb, strlen(pb));
   ASSERT(ok, 1, ok);
-  ok = SpatialMemory_observe(sm, tokyo_lat, tokyo_lng, sushi, strlen(sushi));
+  ok = SpatialMemory_observe(sm, 1.0, tokyo_lat, tokyo_lng, sushi, strlen(sushi));
   ASSERT(ok, 1, ok);
   ok = SpatialMemory_query(sm, LAT, LNG, 0, &count_lon);
   ASSERT(ok, 1, ok);
@@ -154,16 +155,16 @@ void test_sm_multi_tile(void) {
 }
 
 void test_sm_invalid_observe_does_not_crash(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
   const char *pb = "peanut butter";
-  bool ok = SpatialMemory_observe(sm, 100.0, LNG, pb, strlen(pb));
+  bool ok = SpatialMemory_observe(sm, 0.0, 100.0, LNG, pb, strlen(pb));
   ASSERT(!ok, 0, ok);
   ASSERT(0 == (int)SpatialMemory_tile_count(sm), 0, (int)SpatialMemory_tile_count(sm));
   SpatialMemory_free(sm);
 }
 
 void test_sm_invalid_query_returns_false(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
   double count = 123.0;
   bool ok = SpatialMemory_query(sm, 100.0, LNG, 0, &count);
   ASSERT(!ok, 0, ok);
@@ -172,17 +173,17 @@ void test_sm_invalid_query_returns_false(void) {
 }
 
 void test_sm_same_cell_deduplicates_observations(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
   const char *pb = "peanut butter";
   double first_count = 0.0;
   double second_count = 0.0;
 
-  bool ok = SpatialMemory_observe(sm, LAT, LNG, pb, strlen(pb));
+  bool ok = SpatialMemory_observe(sm, 0.0, LAT, LNG, pb, strlen(pb));
   ASSERT(ok, 1, ok);
   ok = SpatialMemory_query(sm, LAT, LNG, 0, &first_count);
   ASSERT(ok, 1, ok);
 
-  ok = SpatialMemory_observe(sm, LAT, LNG, pb, strlen(pb));
+  ok = SpatialMemory_observe(sm, 1.0, LAT, LNG, pb, strlen(pb));
   ASSERT(ok, 1, ok);
   ok = SpatialMemory_query(sm, LAT, LNG, 0, &second_count);
   ASSERT(ok, 1, ok);
@@ -193,16 +194,47 @@ void test_sm_same_cell_deduplicates_observations(void) {
 }
 
 void test_sm_for_each_tile_enumerates_entries(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
   const char *pb = "peanut butter";
   TileVisitState state = {0};
 
-  bool ok = SpatialMemory_observe(sm, LAT, LNG, pb, strlen(pb));
+  bool ok = SpatialMemory_observe(sm, 0.0, LAT, LNG, pb, strlen(pb));
   ASSERT(ok, 1, ok);
   ok = SpatialMemory_for_each_tile(sm, count_tiles, &state);
   ASSERT(ok, 1, ok);
   ASSERT(1 == (int)state.count, 1, (int)state.count);
   ASSERT(state.saw_expected_cell, 1, state.saw_expected_cell);
+  SpatialMemory_free(sm);
+}
+
+void test_sm_exemplar_capacity_propagates_to_tile(void) {
+  const size_t cap = 4;
+  SpatialMemory *sm =
+      SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, cap);
+  ASSERT(NULL != sm, 1, NULL != sm);
+  ASSERT(cap == sm->exemplar_capacity, (int)cap, (int)sm->exemplar_capacity);
+
+  const char *items[] = {"alpha", "bravo", "charlie"};
+  for (size_t i = 0; i < sizeof(items) / sizeof(items[0]); ++i) {
+    bool ok = SpatialMemory_observe(sm, (double)i, LAT, LNG, items[i],
+                                    strlen(items[i]));
+    ASSERT(ok, 1, ok);
+  }
+
+  LatLng loc;
+  loc.lat = degsToRads(LAT);
+  loc.lng = degsToRads(LNG);
+  H3Index cellId;
+  H3Error err = latLngToCell(&loc, RESOLUTION, &cellId);
+  if (err) {
+    fprintf(stderr, "Failed to create H3Index : invalid lat/lng or resolution\n");
+    exit(EXIT_FAILURE);
+  }
+
+  Tile *tile = find_tile_for_cell(sm, cellId);
+  ASSERT(NULL != tile, 1, NULL != tile);
+  ASSERT(3 == (int)Tile_exemplar_count(tile), 3,
+         (int)Tile_exemplar_count(tile));
   SpatialMemory_free(sm);
 }
 
@@ -218,6 +250,7 @@ int main(void) {
   RUN_TEST(test_sm_invalid_query_returns_false);
   RUN_TEST(test_sm_same_cell_deduplicates_observations);
   RUN_TEST(test_sm_for_each_tile_enumerates_entries);
+  RUN_TEST(test_sm_exemplar_capacity_propagates_to_tile);
 
   return 0;
 }

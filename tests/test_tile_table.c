@@ -11,7 +11,7 @@
 #define RESOLUTION 10
 
 static Tile *make_tile(double lat, double lng) {
-  Tile *tile = Tile_new(lat, lng, RESOLUTION, CAPACITY, PRECISION);
+  Tile *tile = Tile_new(lat, lng, RESOLUTION, CAPACITY, PRECISION, 0);
   if (!tile) {
     fprintf(stderr, "Failed to create tile for test\n");
     exit(EXIT_FAILURE);
