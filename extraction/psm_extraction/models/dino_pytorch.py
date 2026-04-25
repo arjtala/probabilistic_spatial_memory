@@ -16,7 +16,7 @@ The runner emits:
 """
 
 import os
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import numpy as np
@@ -111,7 +111,11 @@ class DINOPyTorchRunner(ModelRunner):
         )
 
     def embed_images(
-        self, paths: Sequence[Path], batch_size: int = 16
+        self,
+        paths: Sequence[Path],
+        batch_size: int = 16,
+        *,
+        progress: Callable[[int], None] | None = None,
     ) -> tuple[np.ndarray, np.ndarray | None]:
         """Return `(embeddings, attention_maps)`.
 
@@ -127,8 +131,9 @@ class DINOPyTorchRunner(ModelRunner):
 
         embeddings: list[np.ndarray] = []
         attentions: list[np.ndarray] = []
+        n_total = len(paths)
         with torch.inference_mode():
-            for start in range(0, len(paths), batch_size):
+            for start in range(0, n_total, batch_size):
                 batch = [
                     Image.open(p).convert("RGB")
                     for p in paths[start : start + batch_size]
@@ -164,6 +169,9 @@ class DINOPyTorchRunner(ModelRunner):
                     attentions.append(
                         cls_to_patch.detach().cpu().to(torch.float32).numpy()
                     )
+
+                if progress is not None:
+                    progress(min(start + batch_size, n_total))
 
         emb = np.concatenate(embeddings, axis=0)
         if attentions:

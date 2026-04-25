@@ -24,13 +24,19 @@ class StubRunner(ModelRunner):
         self.backend = "stub"
 
     def embed_images(
-        self, paths: Sequence[Path], batch_size: int = 16
+        self,
+        paths: Sequence[Path],
+        batch_size: int = 16,
+        *,
+        progress=None,
     ) -> np.ndarray:
         rng = np.random.default_rng(0)
         feats = rng.standard_normal((len(paths), self.embedding_dim)).astype(
             np.float32
         )
         norms = np.linalg.norm(feats, axis=1, keepdims=True)
+        if progress is not None:
+            progress(len(paths))
         return feats / np.clip(norms, 1e-12, None)
 
     def embed_text(self, query: str) -> np.ndarray:
@@ -39,7 +45,7 @@ class StubRunner(ModelRunner):
         )
 
 
-def _fake_extract_frames(video, fps, out_dir, *, verbose=False):
+def _fake_extract_frames(video, fps, out_dir, *, verbose=False, force=False):
     out_dir.mkdir(parents=True, exist_ok=True)
     paths = []
     for i in range(6):
@@ -213,7 +219,7 @@ def test_extract_writes_multiple_model_groups(tmp_path: Path) -> None:
             self.patch_grid = (2, 2)
             self.preprocess = "stub-dino"
 
-        def embed_images(self, paths, batch_size: int = 16):
+        def embed_images(self, paths, batch_size: int = 16, *, progress=None):
             embeddings = np.zeros((len(paths), self.embedding_dim), dtype=np.float32)
             attention = np.zeros((len(paths), 2, 2), dtype=np.float32)
             return embeddings, attention
@@ -272,7 +278,7 @@ def test_extract_rejects_runner_dim_mismatch(tmp_path: Path) -> None:
     video.write_bytes(b"")
 
     class WrongDimRunner(StubRunner):
-        def embed_images(self, paths, batch_size: int = 16):
+        def embed_images(self, paths, batch_size: int = 16, *, progress=None):
             return np.zeros((len(paths), self.embedding_dim + 1), dtype=np.float32)
 
     runner = WrongDimRunner()

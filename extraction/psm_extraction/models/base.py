@@ -7,8 +7,8 @@ load → embed batches of frames → optionally embed a text query → close.
 """
 
 import abc
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Sequence
 
 import numpy as np
 
@@ -40,9 +40,17 @@ class ModelRunner(abc.ABC):
 
     @abc.abstractmethod
     def embed_images(
-        self, paths: Sequence[Path], batch_size: int = 16
+        self,
+        paths: Sequence[Path],
+        batch_size: int = 16,
+        *,
+        progress: Callable[[int], None] | None = None,
     ) -> np.ndarray:
-        """Return a `(N, embedding_dim)` float32 array for the given image paths."""
+        """Return a `(N, embedding_dim)` float32 array for the given image paths.
+
+        `progress`, when supplied, is called with the running count of frames
+        completed so far. Runners should invoke it after each batch.
+        """
 
     @abc.abstractmethod
     def embed_text(self, query: str) -> np.ndarray:

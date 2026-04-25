@@ -22,7 +22,7 @@ the encoder-only path. Tracked as a Phase 4 follow-up.
 """
 
 import os
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import numpy as np
@@ -119,7 +119,11 @@ class VJEPAPyTorchRunner(ModelRunner):
         return max(1, min(requested, 8))
 
     def embed_images(
-        self, paths: Sequence[Path], batch_size: int = 4
+        self,
+        paths: Sequence[Path],
+        batch_size: int = 4,
+        *,
+        progress: Callable[[int], None] | None = None,
     ) -> tuple[np.ndarray, np.ndarray | None]:
         """Embed each frame by replicating it to fill the clip window.
 
@@ -144,10 +148,11 @@ class VJEPAPyTorchRunner(ModelRunner):
                 file=sys.stderr,
             )
         batch_size = safe_batch
+        n_total = len(paths)
 
         embeddings: list[np.ndarray] = []
         with torch.inference_mode():
-            for start in range(0, len(paths), batch_size):
+            for start in range(0, n_total, batch_size):
                 batch_paths = paths[start : start + batch_size]
                 opened = [Image.open(p).convert("RGB") for p in batch_paths]
                 try:
@@ -168,6 +173,8 @@ class VJEPAPyTorchRunner(ModelRunner):
                 # representation per clip.
                 pooled = hidden.mean(dim=1)
                 embeddings.append(pooled.detach().cpu().to(torch.float32).numpy())
+                if progress is not None:
+                    progress(min(start + batch_size, n_total))
 
         emb = np.concatenate(embeddings, axis=0)
         return emb, None

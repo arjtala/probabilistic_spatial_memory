@@ -5,6 +5,7 @@ the same file) and optional sensor-group writing from JSON sidecars.
 """
 
 import dataclasses
+import hashlib
 import shutil
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from .io import (
     video_duration,
 )
 from .models import ModelRunner
+from .progress import make_progress_logger, stage_banner
 from .writer import FeaturesWriter
 
 
@@ -53,6 +55,12 @@ class ExtractOptions:
     source_video_attr: str | None = None
     session_id: str | None = None
     verbose: bool = False
+    force_reextract: bool = False
+    """If True, wipe and re-extract frames even if a matching cache exists."""
+    force_reembed: bool = False
+    """If True, ignore cached embeddings and re-run model inference."""
+    cache_dir: Path | None = None
+    """Where per-model embedding caches go; defaults to opts.output.parent."""
 
 
 @dataclasses.dataclass
@@ -169,14 +177,14 @@ def _validate_opts(opts: ExtractOptions) -> None:
         seen.add(group_name)
 
 
-def _embed_with_optional_maps(runner: ModelRunner, paths, batch_size):
+def _embed_with_optional_maps(runner: ModelRunner, paths, batch_size, *, progress=None):
     """Call runner.embed_images and normalize its return shape.
 
     Some runners (DINO) emit `(embeddings, attention_maps)`; others (CLIP,
     JEPA) emit just embeddings. This wrapper hides that asymmetry from the
     orchestrator.
     """
-    out = runner.embed_images(paths, batch_size=batch_size)
+    out = runner.embed_images(paths, batch_size=batch_size, progress=progress)
     if isinstance(out, tuple):
         embeddings, maps = out
     else:
@@ -184,14 +192,69 @@ def _embed_with_optional_maps(runner: ModelRunner, paths, batch_size):
     return embeddings, maps
 
 
+def _embedding_cache_path(opts: "ExtractOptions", group_name: str, runner: ModelRunner) -> Path:
+    """Stable path for a per-model embedding cache.
+
+    Cache key includes everything that affects the produced embedding: the
+    runner's model_id + checkpoint, video path, sample_fps, and group name.
+    Different settings → different cache → no stale reuse.
+    """
+    key = "|".join(
+        [
+            runner.model_id,
+            runner.checkpoint,
+            str(opts.video.resolve()),
+            f"{opts.sample_fps:.6f}",
+            group_name,
+        ]
+    )
+    digest = hashlib.sha1(key.encode()).hexdigest()[:10]
+    base_dir = opts.cache_dir if opts.cache_dir is not None else opts.output.parent
+    return base_dir / f".{opts.output.stem}.{group_name}.{digest}.npz"
+
+
+def _save_embeddings_cache(path: Path, embeddings: np.ndarray, maps: np.ndarray | None) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, np.ndarray] = {"embeddings": embeddings.astype(np.float32, copy=False)}
+    if maps is not None:
+        payload["maps"] = maps.astype(np.float32, copy=False)
+        payload["has_maps"] = np.array([1], dtype=np.uint8)
+    else:
+        payload["has_maps"] = np.array([0], dtype=np.uint8)
+    np.savez(path, **payload)
+
+
+def _load_embeddings_cache(path: Path) -> tuple[np.ndarray, np.ndarray | None]:
+    arr = np.load(path)
+    has_maps = bool(arr["has_maps"][0]) if "has_maps" in arr.files else False
+    embeddings = np.asarray(arr["embeddings"], dtype=np.float32)
+    maps = np.asarray(arr["maps"], dtype=np.float32) if has_maps else None
+    return embeddings, maps
+
+
 def extract(opts: ExtractOptions) -> ExtractResult:
     """Run the full pipeline. Side effect: writes opts.output."""
     _validate_opts(opts)
+    stage_banner(
+        "extract",
+        f"video={opts.video.name} sample_fps={opts.sample_fps} "
+        f"models={[name for name, _ in opts.runners]} output={opts.output.name}",
+    )
     duration = video_duration(opts.video, verbose=opts.verbose)
 
     frames_dir = _resolve_frames_dir(opts)
+    stage_banner("frames", f"sampling at {opts.sample_fps} fps into {frames_dir}")
     frame_paths = extract_frames(
-        opts.video, opts.sample_fps, frames_dir, verbose=opts.verbose
+        opts.video,
+        opts.sample_fps,
+        frames_dir,
+        verbose=opts.verbose,
+        force=opts.force_reextract,
+    )
+    stage_banner(
+        "frames",
+        f"{len(frame_paths)} JPEGs ready"
+        + (f" (duration={duration:.1f}s)" if duration is not None else ""),
     )
     timestamps = np.arange(len(frame_paths), dtype=np.float64) / opts.sample_fps
 
@@ -245,9 +308,42 @@ def extract(opts: ExtractOptions) -> ExtractResult:
     embedding_dims: dict[str, int] = {}
     runner_outputs: list[tuple[str, ModelRunner, np.ndarray, np.ndarray | None]] = []
     for group_name, runner in opts.runners:
-        embeddings, maps = _embed_with_optional_maps(
-            runner, frame_paths, opts.batch_size
-        )
+        cache_path = _embedding_cache_path(opts, group_name, runner)
+        cache_hit = False
+        if cache_path.exists() and not opts.force_reembed:
+            try:
+                cached_emb, cached_maps = _load_embeddings_cache(cache_path)
+            except Exception:  # noqa: BLE001
+                cached_emb = None  # type: ignore[assignment]
+                cached_maps = None
+            else:
+                if cached_emb.shape[0] == timestamps.shape[0]:
+                    embeddings, maps = cached_emb, cached_maps
+                    cache_hit = True
+                    stage_banner(
+                        f"embed:{group_name}",
+                        f"reused {cache_path.name} ({cached_emb.shape[0]} vectors, dim={cached_emb.shape[1]})",
+                    )
+        if not cache_hit:
+            stage_banner(
+                f"embed:{group_name}",
+                f"running {runner.model_id} (ckpt={runner.checkpoint}, "
+                f"backend={runner.backend}) over {len(frame_paths)} frames",
+            )
+            progress = make_progress_logger(f"embed:{group_name}", len(frame_paths))
+            embeddings, maps = _embed_with_optional_maps(
+                runner, frame_paths, opts.batch_size, progress=progress
+            )
+            try:
+                _save_embeddings_cache(cache_path, embeddings, maps)
+                stage_banner(
+                    f"embed:{group_name}", f"cached -> {cache_path.name}"
+                )
+            except OSError as exc:
+                stage_banner(
+                    f"embed:{group_name}",
+                    f"warning: failed to write cache {cache_path}: {exc}",
+                )
         if embeddings.shape[0] != timestamps.shape[0]:
             raise RuntimeError(
                 f"runner for group {group_name!r}: embedding count "
@@ -319,6 +415,7 @@ def extract(opts: ExtractOptions) -> ExtractResult:
                 prediction_maps=prediction_maps,
             )
 
+    stage_banner("write", f"wrote {opts.output.name}")
     if not opts.keep_frames:
         shutil.rmtree(frames_dir, ignore_errors=True)
 

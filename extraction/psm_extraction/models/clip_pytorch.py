@@ -7,8 +7,8 @@ package.
 """
 
 import os
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Sequence
 
 import numpy as np
 
@@ -60,7 +60,11 @@ class CLIPPyTorchRunner(ModelRunner):
         self.patch_grid = None
 
     def embed_images(
-        self, paths: Sequence[Path], batch_size: int = 16
+        self,
+        paths: Sequence[Path],
+        batch_size: int = 16,
+        *,
+        progress: Callable[[int], None] | None = None,
     ) -> np.ndarray:
         from PIL import Image
 
@@ -68,8 +72,9 @@ class CLIPPyTorchRunner(ModelRunner):
         if not paths:
             return np.zeros((0, self.embedding_dim), dtype=np.float32)
         chunks: list[np.ndarray] = []
+        n_total = len(paths)
         with torch.inference_mode():
-            for start in range(0, len(paths), batch_size):
+            for start in range(0, n_total, batch_size):
                 batch = [
                     Image.open(p).convert("RGB") for p in paths[start : start + batch_size]
                 ]
@@ -83,6 +88,8 @@ class CLIPPyTorchRunner(ModelRunner):
                 if self.normalized:
                     feats = torch.nn.functional.normalize(feats, dim=-1)
                 chunks.append(feats.detach().cpu().to(torch.float32).numpy())
+                if progress is not None:
+                    progress(min(start + batch_size, n_total))
         return np.concatenate(chunks, axis=0)
 
     def embed_text(self, query: str) -> np.ndarray:

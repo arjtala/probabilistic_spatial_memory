@@ -119,6 +119,21 @@ def _build_parser() -> argparse.ArgumentParser:
     extract.add_argument("--source-video-attr", help="Override the root attr.")
     extract.add_argument("--session-id", help="Aria session id to record at root.")
     extract.add_argument("--verbose", action="store_true")
+    extract.add_argument(
+        "--force-reextract",
+        action="store_true",
+        help="Wipe and re-run ffmpeg even if a matching frames cache exists.",
+    )
+    extract.add_argument(
+        "--force-reembed",
+        action="store_true",
+        help="Re-run model inference even when a cached embedding file exists.",
+    )
+    extract.add_argument(
+        "--cache-dir",
+        type=Path,
+        help="Where per-model embedding caches go; defaults to <output>.parent.",
+    )
 
     return parser
 
@@ -197,6 +212,9 @@ def _handle_extract(args: argparse.Namespace) -> int:
                 source_video_attr=args.source_video_attr,
                 session_id=args.session_id,
                 verbose=args.verbose,
+                force_reextract=args.force_reextract,
+                force_reembed=args.force_reembed,
+                cache_dir=args.cache_dir,
             )
         )
     finally:
