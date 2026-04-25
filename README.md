@@ -227,6 +227,17 @@ targets/psm features.h5 dino 5.0 10 12 10
 
 When a session HDF5 with a per-frame `dino` / `jepa` / `gps` group sits next to the video (or is passed via `--gps-source PATH`), the script interpolates real GPS onto the CLIP frame timestamps so retrieved cells are real H3 cells around the captured route. With no GPS available — or if you pass `--no-gps` — frames lay onto a synthetic H3 snake-grid so each fixed-duration segment lands in its own pseudo-cell.
 
+The demo is a thin shim over `python -m psm_extraction extract` (Phase 2 of the extraction pipeline). For programmatic / batch use, prefer the package CLI directly:
+
+```bash
+python -m psm_extraction extract \
+  --video /path/to/video.mp4 \
+  --output /path/to/clip_features.h5 \
+  --models clip \
+  --backend auto \
+  --sample-fps 2 --segment-sec 1
+```
+
 ```bash
 # Plain video, no GPS — synthetic snake-grid
 conda activate playground

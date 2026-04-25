@@ -1,0 +1,169 @@
+"""End-to-end orchestrator test using a stub runner — no ffmpeg, no torch."""
+
+from pathlib import Path
+from typing import Sequence
+from unittest import mock
+
+import h5py
+import numpy as np
+import pytest
+
+from psm_extraction import schema
+from psm_extraction.extract import ExtractOptions, extract
+from psm_extraction.models import ModelRunner
+
+
+class StubRunner(ModelRunner):
+    def __init__(self) -> None:
+        self.model_id = "stub/clip"
+        self.checkpoint = "stub-fixed-1"
+        self.embedding_dim = 4
+        self.normalized = True
+        self.preprocess = "stub"
+        self.patch_grid = None
+        self.backend = "stub"
+
+    def embed_images(
+        self, paths: Sequence[Path], batch_size: int = 16
+    ) -> np.ndarray:
+        rng = np.random.default_rng(0)
+        feats = rng.standard_normal((len(paths), self.embedding_dim)).astype(
+            np.float32
+        )
+        norms = np.linalg.norm(feats, axis=1, keepdims=True)
+        return feats / np.clip(norms, 1e-12, None)
+
+    def embed_text(self, query: str) -> np.ndarray:
+        return np.ones(self.embedding_dim, dtype=np.float32) / np.sqrt(
+            self.embedding_dim
+        )
+
+
+def _fake_extract_frames(video, fps, out_dir, *, verbose=False):
+    out_dir.mkdir(parents=True, exist_ok=True)
+    paths = []
+    for i in range(6):
+        p = out_dir / f"frame_{i:06d}.jpg"
+        p.write_bytes(b"\xff\xd8\xff")  # tiny placeholder; runner is a stub
+        paths.append(p)
+    return paths
+
+
+def _fake_video_duration(video, *, verbose=False):
+    return 6.0
+
+
+@pytest.fixture(autouse=True)
+def _patch_io(monkeypatch):
+    from psm_extraction import extract as extract_mod
+
+    monkeypatch.setattr(extract_mod, "extract_frames", _fake_extract_frames)
+    monkeypatch.setattr(extract_mod, "video_duration", _fake_video_duration)
+    yield
+
+
+def test_extract_writes_v2_compliant_file_with_synthetic_grid(tmp_path: Path) -> None:
+    video = tmp_path / "data.mp4"
+    video.write_bytes(b"")  # exists check only; runner is a stub
+    output = tmp_path / "out.h5"
+
+    runner = StubRunner()
+    result = extract(
+        ExtractOptions(
+            video=video,
+            output=output,
+            runner=runner,
+            sample_fps=2.0,
+            segment_sec=1.0,
+            use_gps=False,
+        )
+    )
+
+    assert result.frame_count == 6
+    assert result.track_mode == "synthetic_snake_grid"
+    assert result.track_source is None
+
+    with h5py.File(output, "r") as h:
+        assert int(h.attrs["schema_version"]) == schema.SCHEMA_VERSION
+        assert "clip" in h
+        group = h["clip"]
+        assert group["embeddings"].shape == (6, 4)
+        assert int(group.attrs["embedding_dim"]) == 4
+        assert str(group.attrs["model"]) == "stub/clip"
+        assert float(group.attrs["sample_fps"]) == 2.0
+        assert bool(group.attrs["normalized"]) is True
+
+
+def test_extract_uses_real_gps_when_available(tmp_path: Path) -> None:
+    # Build a sibling features.h5 with a dino group covering the video range.
+    sibling = tmp_path / "features.h5"
+    with h5py.File(sibling, "w") as h:
+        dino = h.create_group("dino")
+        dino.create_dataset("timestamps", data=np.linspace(1000.0, 1010.0, 11))
+        dino.create_dataset("lat", data=np.linspace(51.0, 51.1, 11))
+        dino.create_dataset("lng", data=np.full(11, -0.18))
+        dino.create_dataset(
+            "embeddings", data=np.zeros((11, 4), dtype=np.float32)
+        )
+
+    video = tmp_path / "data.mp4"
+    video.write_bytes(b"")
+    output = tmp_path / "out.h5"
+
+    runner = StubRunner()
+    result = extract(
+        ExtractOptions(
+            video=video,
+            output=output,
+            runner=runner,
+            sample_fps=2.0,
+            segment_sec=1.0,
+            use_gps=True,
+        )
+    )
+
+    assert result.track_mode == "real_gps"
+    assert result.track_source == sibling
+    assert result.track_source_group == "dino"
+    with h5py.File(output, "r") as h:
+        # Frame timestamps span 0..2.5s; the track runs 0..10s with lat
+        # linearly increasing from 51.0 to 51.1 (i.e. 0.01 / sec). Six
+        # frames at 2 fps therefore land on lat = 51.0 + t*0.01.
+        frame_t = np.array([0.0, 0.5, 1.0, 1.5, 2.0, 2.5])
+        np.testing.assert_allclose(h["clip/lat"][...], 51.0 + frame_t * 0.01)
+        assert "interpolation" in h["clip"].attrs
+
+
+def test_extract_rejects_reserved_group(tmp_path: Path) -> None:
+    video = tmp_path / "data.mp4"
+    video.write_bytes(b"")
+    runner = StubRunner()
+    with pytest.raises(ValueError, match="reserved"):
+        extract(
+            ExtractOptions(
+                video=video,
+                output=tmp_path / "out.h5",
+                runner=runner,
+                group_name="gps",
+            )
+        )
+
+
+def test_extract_rejects_runner_dim_mismatch(tmp_path: Path) -> None:
+    video = tmp_path / "data.mp4"
+    video.write_bytes(b"")
+
+    class WrongDimRunner(StubRunner):
+        def embed_images(self, paths, batch_size: int = 16):
+            return np.zeros((len(paths), self.embedding_dim + 1), dtype=np.float32)
+
+    runner = WrongDimRunner()
+    with pytest.raises(RuntimeError, match="embedding_dim"):
+        extract(
+            ExtractOptions(
+                video=video,
+                output=tmp_path / "out.h5",
+                runner=runner,
+                use_gps=False,
+            )
+        )

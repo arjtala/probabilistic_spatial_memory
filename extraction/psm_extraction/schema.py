@@ -9,8 +9,6 @@ only reads dataset arrays and ignores attrs, so it stays compatible with both
 versions; v2 is purely additive metadata.
 """
 
-from __future__ import annotations
-
 import dataclasses
 from typing import Final
 

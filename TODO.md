@@ -168,13 +168,13 @@ Schema v1 is the format the existing `features.h5` uses (no file-level metadata,
 
 ### Phase 2 — CLIP runner end-to-end
 
-- [ ] `models/base.py` ModelRunner protocol (one frame in → embedding out) with a `--backend {auto,pytorch,mlx,cpu}` CLI knob; auto-pick MLX on Apple Silicon (M-series including M4) and PyTorch CUDA elsewhere
-- [ ] `models/clip_pytorch.py` runner reusing the logic from `scripts/e5_clip_demo.py` (PyTorch MPS / CUDA / CPU)
-- [ ] `models/clip_mlx.py` MLX-native CLIP for Apple Silicon (uses `mlx-clip` or equivalent; declared under an `[mlx]` optional extra in `pyproject.toml`)
-- [ ] `io/video.py` ffmpeg-backed frame reader
-- [ ] `align.py` linear interpolation of GPS / IMU onto frame timestamps
-- [ ] `python -m psm_extraction extract --video data.mp4 --models clip --output features.h5` produces a v2-compliant file consumed unchanged by `psm --similar-to`
-- [ ] Smoke test against a synthetic video fixture (from FFmpeg's `testsrc`); both backends must produce embeddings within a tight cosine-similarity tolerance of each other on the same input
+- [x] `models/base.py` ModelRunner ABC with `model_id`, `checkpoint`, `embedding_dim`, `normalized`, `preprocess`, `patch_grid`, `backend`, `embed_images`, `embed_text`, `close`. CLI knob `--backend {auto,pytorch,mlx,cpu}` lands in `python -m psm_extraction extract`.
+- [x] `models/clip_pytorch.py` runner backed by HuggingFace transformers; auto-picks cuda > mps > cpu when `device='auto'`.
+- [ ] `models/clip_mlx.py` MLX-native CLIP for Apple Silicon. CURRENTLY A STUB raising NotImplementedError so the auto-pick falls through to PyTorch MPS until the upstream mlx-clip API is verified end-to-end. Tracked as a Phase 2 follow-up.
+- [x] `io/video.py` ffmpeg-backed frame reader (lifted from the demo).
+- [x] `align.py` GPS interpolation onto frame timestamps via `load_session_track` + `map_frames_to_gps`; synthetic snake-grid fallback for plain videos. IMU interpolation is deferred (the C ingest doesn't consume per-frame IMU snapshots; viz consumers can read `imu/` directly from the canonical sensor group).
+- [x] `python -m psm_extraction extract --video data.mp4 --models clip --output features.h5` produces a v2-compliant file consumed unchanged by `psm --similar-to`. Same flow exposed via the refactored `scripts/e5_clip_demo.py` thin shim.
+- [ ] Smoke test against a synthetic video fixture (FFmpeg `testsrc`) under both backends, verifying embeddings match within a tight cosine-similarity tolerance. Blocked on the MLX runner.
 
 ### Phase 3 — Aria VRS + DINOv3 + V-JEPA 2
 

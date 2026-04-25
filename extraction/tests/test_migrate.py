@@ -1,7 +1,5 @@
 """Migration tests: synthesize a v1-shaped file, migrate, audit attrs."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import h5py

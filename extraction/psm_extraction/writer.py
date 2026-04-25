@@ -1,7 +1,5 @@
 """HDF5 writer that emits schema-v2-compliant features.h5 files."""
 
-from __future__ import annotations
-
 import datetime
 from pathlib import Path
 from typing import Iterable

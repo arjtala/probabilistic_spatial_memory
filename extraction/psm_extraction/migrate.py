@@ -9,8 +9,6 @@ Datasets are never modified. The migration is idempotent: running it on an
 already-v2 file is a no-op that returns `{"already_at": SCHEMA_VERSION}`.
 """
 
-from __future__ import annotations
-
 import datetime
 from pathlib import Path
 from typing import Any

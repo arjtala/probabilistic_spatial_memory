@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "psm-extraction"
 version = "0.1.0"
 description = "Extraction pipeline producing features.h5 files for the probabilistic_spatial_memory C engine."
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 authors = [{ name = "PSM contributors" }]
 license = { text = "MIT" }
 readme = { text = "See ../README.md", content-type = "text/plain" }

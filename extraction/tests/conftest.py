@@ -3,8 +3,6 @@
 Adds `extraction/` to sys.path so tests can run without `pip install -e .`.
 """
 
-from __future__ import annotations
-
 import sys
 from pathlib import Path
 

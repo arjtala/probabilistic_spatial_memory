@@ -1,7 +1,5 @@
 """Round-trip tests for FeaturesWriter."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import h5py

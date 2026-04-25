@@ -1,7 +1,5 @@
 """Schema constants and ModelGroupSpec basics."""
 
-from __future__ import annotations
-
 import pytest
 
 from psm_extraction import schema
