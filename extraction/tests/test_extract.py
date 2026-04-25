@@ -96,6 +96,69 @@ def test_extract_writes_v2_compliant_file_with_synthetic_grid(tmp_path: Path) ->
         assert bool(group.attrs["normalized"]) is True
 
 
+def test_extract_writes_sensor_groups_from_sidecars_even_when_track_is_h5(
+    tmp_path: Path,
+) -> None:
+    """Auto-detected gps.json + imu.json must populate sensor groups even
+    when the per-frame track came from a sibling features.h5."""
+    import json as _json
+
+    # h5 sibling (track interpolation source) — has dino with timestamps/lat/lng.
+    sibling = tmp_path / "features.h5"
+    with h5py.File(sibling, "w") as h:
+        dino = h.create_group("dino")
+        dino.create_dataset("timestamps", data=np.linspace(1000.0, 1010.0, 11))
+        dino.create_dataset("lat", data=np.full(11, 51.0))
+        dino.create_dataset("lng", data=np.full(11, -0.18))
+        dino.create_dataset("embeddings", data=np.zeros((11, 4), dtype=np.float32))
+
+    # JSON sidecars in the same dir (sensor-group sources).
+    (tmp_path / "gps.json").write_text(
+        _json.dumps([{
+            "stream_id": "281-1",
+            "samples": [
+                {"timestamp": 1.0, "latitude": 51.0, "longitude": -0.18},
+                {"timestamp": 2.0, "latitude": 51.001, "longitude": -0.18},
+            ],
+        }])
+    )
+    (tmp_path / "imu.json").write_text(
+        _json.dumps([{
+            "stream_id": "1202-1",
+            "samples": [
+                {"timestamp": 0.001, "accel": [0.1, 0.0, 9.8], "gyro": [0.0, 0.0, 0.0]},
+                {"timestamp": 0.002, "accel": [0.2, 0.0, 9.8], "gyro": [0.0, 0.0, 0.0]},
+            ],
+        }])
+    )
+
+    video = tmp_path / "data.mp4"
+    video.write_bytes(b"")
+    output = tmp_path / "out.h5"
+
+    runner = StubRunner()
+    result = extract(
+        ExtractOptions(
+            video=video,
+            output=output,
+            runners=[("clip", runner)],
+            sample_fps=2.0,
+            segment_sec=1.0,
+            use_gps=True,
+        )
+    )
+
+    assert result.track_mode == "real_gps"
+    assert result.track_source == sibling
+    assert set(result.sensor_groups_written) == {"gps", "imu"}
+
+    with h5py.File(output, "r") as h:
+        assert "gps" in h
+        assert "imu" in h
+        assert h["gps/timestamps"].shape == (2,)
+        assert h["imu/accel"].shape == (2, 3)
+
+
 def test_extract_uses_real_gps_when_available(tmp_path: Path) -> None:
     # Build a sibling features.h5 with a dino group covering the video range.
     sibling = tmp_path / "features.h5"

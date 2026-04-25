@@ -133,6 +133,22 @@ def _load_imu(opts: ExtractOptions) -> tuple[IMUSidecar | None, Path | None]:
     return None, None
 
 
+def _load_gps_sidecar(opts: ExtractOptions) -> tuple[GPSSidecar | None, Path | None]:
+    """Pick a gps.json sidecar regardless of where the per-frame track came from.
+
+    Sensor-group writing is independent of track resolution: even when the
+    per-frame interpolation source was an existing features.h5 (auto-detected
+    h5_guess), we still want a `gps` group in the output so the file matches
+    the original Aria pipeline's shape and the viz can draw the trace.
+    """
+    if opts.gps_json is not None:
+        return read_gps_json(opts.gps_json), opts.gps_json
+    auto = opts.video.parent / "gps.json"
+    if auto.exists():
+        return read_gps_json(auto), auto
+    return None, None
+
+
 def _validate_opts(opts: ExtractOptions) -> None:
     if not opts.video.exists():
         raise RuntimeError(f"video not found: {opts.video}")
@@ -197,6 +213,7 @@ def extract(opts: ExtractOptions) -> ExtractResult:
         interpolation = None
 
     imu_sidecar, imu_source = _load_imu(opts)
+    gps_sidecar, gps_sidecar_source = _load_gps_sidecar(opts)
     metadata = None
     if opts.metadata_json is not None:
         metadata = read_metadata_json(opts.metadata_json)
@@ -206,15 +223,19 @@ def extract(opts: ExtractOptions) -> ExtractResult:
         except (OSError, ValueError):
             metadata = None
 
+    # JSON sidecars carry relative timestamps; if metadata.json gives us the
+    # capture epoch, shift to absolute Unix seconds so the produced file is
+    # directly comparable to the existing pipeline's output. The shift is
+    # applied uniformly to model-group timestamps and to any sensor group
+    # we write from a JSON sidecar (so all groups in the file share a clock).
     epoch_offset = 0.0
-    if track_mode == "real_gps" and track_source is not None and track_source.suffix == ".json":
-        # JSON sidecars carry relative timestamps; if metadata.json gives us
-        # the capture epoch we shift to absolute Unix seconds so the produced
-        # file is comparable to the existing pipeline's output.
-        if metadata is not None:
-            epoch = capture_time_epoch(metadata)
-            if epoch is not None:
-                epoch_offset = epoch
+    using_json_sources = gps_sidecar is not None or imu_sidecar is not None or (
+        track_source is not None and track_source.suffix == ".json"
+    )
+    if using_json_sources and metadata is not None:
+        epoch = capture_time_epoch(metadata)
+        if epoch is not None:
+            epoch_offset = epoch
 
     if epoch_offset:
         timestamps_out = timestamps + epoch_offset
@@ -248,15 +269,14 @@ def extract(opts: ExtractOptions) -> ExtractResult:
         source_video=source_video_attr,
         session_id=opts.session_id,
     ) as writer:
-        if track_mode == "real_gps" and track_source is not None and track_source.suffix == ".json":
-            sidecar = read_gps_json(track_source)
-            sidecar_ts = sidecar.timestamps
+        if gps_sidecar is not None:
+            gps_ts = gps_sidecar.timestamps
             if epoch_offset:
-                sidecar_ts = sidecar_ts + epoch_offset
+                gps_ts = gps_ts + epoch_offset
             writer.write_gps_group(
-                timestamps=sidecar_ts,
-                lat=sidecar.lat,
-                lng=sidecar.lng,
+                timestamps=gps_ts,
+                lat=gps_sidecar.lat,
+                lng=gps_sidecar.lng,
                 rate_hz_nominal=None,
             )
             sensor_groups_written.append("gps")
