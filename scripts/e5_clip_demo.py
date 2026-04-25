@@ -155,6 +155,22 @@ def parse_args() -> argparse.Namespace:
         help="Spacing between synthetic pseudo-cells in degrees (default: 0.02).",
     )
     parser.add_argument(
+        "--gps-source",
+        type=Path,
+        help=(
+            "Path to a session HDF5 (e.g. features.h5) with a per-frame track "
+            "in a 'dino', 'jepa', or 'gps' group. When set or auto-detected "
+            "next to the video, real GPS is interpolated onto CLIP frame "
+            "timestamps so retrieved cells are real H3 cells, not a synthetic "
+            "snake-grid. Auto-detect: <video_dir>/features.h5."
+        ),
+    )
+    parser.add_argument(
+        "--no-gps",
+        action="store_true",
+        help="Force the synthetic snake-grid even if real GPS is available.",
+    )
+    parser.add_argument(
         "--force-reembed",
         action="store_true",
         help="Re-extract frames and rebuild the HDF5 even if artifacts already exist.",
@@ -301,6 +317,68 @@ def encode_text(
     return feats[0].detach().cpu().to(torch.float32).numpy()
 
 
+def load_session_track(
+    features_path: Path,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, str] | None:
+    """Load (relative_seconds, lat, lng, source_group) from a session HDF5.
+
+    Tries 'dino' first (per-frame aligned, ~30 fps), then 'jepa', then the raw
+    'gps' group (~1 fps). All paths are normalized to relative seconds since
+    the first sample so the caller can match against CLIP frame timestamps
+    without needing the video's absolute start time. Returns None if no
+    usable group is found.
+    """
+    if not features_path.exists():
+        return None
+    try:
+        with h5py.File(features_path, "r") as handle:
+            for candidate in ("dino", "jepa", "gps"):
+                if candidate not in handle:
+                    continue
+                group = handle[candidate]
+                if not all(name in group for name in ("timestamps", "lat", "lng")):
+                    continue
+                ts = np.asarray(group["timestamps"], dtype=np.float64)
+                lat = np.asarray(group["lat"], dtype=np.float64)
+                lng = np.asarray(group["lng"], dtype=np.float64)
+                if ts.shape != lat.shape or ts.shape != lng.shape or ts.size == 0:
+                    continue
+                order = np.argsort(ts)
+                ts = ts[order]
+                lat = lat[order]
+                lng = lng[order]
+                # Drop any non-finite GPS samples (Aria captures occasionally
+                # produce NaN lat/lng during fix loss).
+                mask = np.isfinite(ts) & np.isfinite(lat) & np.isfinite(lng)
+                if not mask.any():
+                    continue
+                ts = ts[mask]
+                lat = lat[mask]
+                lng = lng[mask]
+                if ts.size == 0:
+                    continue
+                rel = ts - ts[0]
+                return rel, lat, lng, candidate
+    except (OSError, KeyError):
+        return None
+    return None
+
+
+def map_frames_to_gps_track(
+    frame_timestamps: np.ndarray,
+    track_rel_ts: np.ndarray,
+    track_lat: np.ndarray,
+    track_lng: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Linear-interpolate a GPS track onto CLIP frame timestamps."""
+    if track_rel_ts.size == 0:
+        raise RuntimeError("GPS track is empty; cannot interpolate")
+    clipped = np.clip(frame_timestamps, track_rel_ts[0], track_rel_ts[-1])
+    lats = np.interp(clipped, track_rel_ts, track_lat)
+    lngs = np.interp(clipped, track_rel_ts, track_lng)
+    return lats, lngs
+
+
 def synthetic_track(
     timestamps: np.ndarray,
     segment_sec: float,
@@ -343,6 +421,9 @@ def write_hdf5(
     time_window_sec: float,
     grid_columns: int,
     cell_step_deg: float,
+    track_mode: str,
+    gps_source: Path | None,
+    gps_source_group: str | None,
 ) -> None:
     with h5py.File(features_path, "w") as handle:
         group = handle.create_group(group_name)
@@ -355,9 +436,14 @@ def write_hdf5(
         group.attrs["sample_fps"] = sample_fps
         group.attrs["segment_sec"] = segment_sec
         group.attrs["time_window_sec"] = time_window_sec
-        group.attrs["synthetic_track"] = "snake_grid"
-        group.attrs["grid_columns"] = grid_columns
-        group.attrs["cell_step_deg"] = cell_step_deg
+        group.attrs["track_mode"] = track_mode
+        if track_mode == "synthetic_snake_grid":
+            group.attrs["grid_columns"] = grid_columns
+            group.attrs["cell_step_deg"] = cell_step_deg
+        if gps_source is not None:
+            group.attrs["gps_source"] = str(gps_source.resolve())
+        if gps_source_group is not None:
+            group.attrs["gps_source_group"] = gps_source_group
 
 
 def read_feature_metadata(features_path: Path, group_name: str) -> dict[str, object]:
@@ -375,6 +461,10 @@ def read_feature_metadata(features_path: Path, group_name: str) -> dict[str, obj
             "segment_sec": float(group.attrs.get("segment_sec", 0.0) or 0.0),
             "time_window_sec": float(group.attrs.get("time_window_sec", 0.0) or 0.0),
             "sample_fps": float(group.attrs.get("sample_fps", 0.0) or 0.0),
+            "track_mode": attr_text(group.attrs.get("track_mode"))
+            or "synthetic_snake_grid",
+            "gps_source": attr_text(group.attrs.get("gps_source")),
+            "gps_source_group": attr_text(group.attrs.get("gps_source_group")),
         }
 
 
@@ -475,6 +565,7 @@ def print_summary(
     embedding_dim: int,
     exemplars: int,
     psm_payload: dict[str, object],
+    feature_meta: dict[str, object],
 ) -> None:
     results = psm_payload.get("results", [])
     if not isinstance(results, list):
@@ -497,6 +588,14 @@ def print_summary(
         f"time_window_sec={time_window_sec:.3f}  "
         f"capacity={capacity}  exemplars={exemplars}"
     )
+    track_mode = str(feature_meta.get("track_mode") or "synthetic_snake_grid")
+    if track_mode == "real_gps":
+        gps_source = feature_meta.get("gps_source")
+        gps_group = feature_meta.get("gps_source_group")
+        suffix = f" ({gps_group} group)" if gps_group else ""
+        print(f"Track: real GPS from {gps_source}{suffix}")
+    else:
+        print("Track: synthetic snake-grid (no GPS available)")
 
     if not results:
         print("No similar intervals returned by psm.")
@@ -588,9 +687,38 @@ def main() -> int:
         if embeddings.shape[0] != timestamps.shape[0]:
             raise RuntimeError("frame count and embedding count diverged")
 
-        lats, lngs, segment_count = synthetic_track(
-            timestamps, segment_sec, args.grid_columns, args.cell_step_deg
-        )
+        gps_source: Path | None = None
+        track: tuple[np.ndarray, np.ndarray, np.ndarray, str] | None = None
+        if not args.no_gps:
+            gps_source = args.gps_source
+            if gps_source is None:
+                candidate = args.video.parent / "features.h5"
+                if candidate.exists():
+                    gps_source = candidate
+            if gps_source is not None:
+                track = load_session_track(gps_source)
+                if track is None and args.gps_source is not None:
+                    raise RuntimeError(
+                        f"--gps-source {gps_source} has no usable dino/jepa/gps "
+                        f"group with timestamps + lat + lng"
+                    )
+
+        if track is not None:
+            track_rel_ts, track_lat, track_lng, track_group = track
+            lats, lngs = map_frames_to_gps_track(
+                timestamps, track_rel_ts, track_lat, track_lng
+            )
+            track_mode = "real_gps"
+            gps_source_group = track_group
+            segment_count = 0
+        else:
+            lats, lngs, segment_count = synthetic_track(
+                timestamps, segment_sec, args.grid_columns, args.cell_step_deg
+            )
+            track_mode = "synthetic_snake_grid"
+            gps_source = None
+            gps_source_group = None
+
         write_hdf5(
             features_path,
             args.group,
@@ -605,6 +733,9 @@ def main() -> int:
             time_window_sec=time_window_sec,
             grid_columns=args.grid_columns,
             cell_step_deg=args.cell_step_deg,
+            track_mode=track_mode,
+            gps_source=gps_source,
+            gps_source_group=gps_source_group,
         )
         feature_meta = {
             "timestamps": timestamps,
@@ -614,6 +745,9 @@ def main() -> int:
             "time_window_sec": time_window_sec,
             "sample_fps": sample_fps,
             "segment_count": segment_count,
+            "track_mode": track_mode,
+            "gps_source": str(gps_source) if gps_source else None,
+            "gps_source_group": gps_source_group,
         }
         if not args.keep_frames:
             shutil.rmtree(frames_dir, ignore_errors=True)
@@ -663,6 +797,9 @@ def main() -> int:
         "precision": args.precision,
         "exemplars": exemplars,
         "device": str(device),
+        "track_mode": feature_meta.get("track_mode"),
+        "gps_source": feature_meta.get("gps_source"),
+        "gps_source_group": feature_meta.get("gps_source_group"),
     }
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
@@ -681,6 +818,7 @@ def main() -> int:
         int(feature_meta["embedding_dim"]),
         exemplars,
         psm_payload,
+        feature_meta,
     )
     return 0
 

@@ -197,15 +197,24 @@ targets/psm features.h5 dino 5.0 10 12 10
 
 `scripts/e5_clip_demo.py` is a minimal plain-video harness for the E5 text-query path. It samples frames with `ffmpeg`, embeds the frames and the text query with CLIP, writes a native `clip` HDF5 group plus the raw `float32` LE query file, then calls `targets/psm --similar-to -j` and prints the retrieved intervals.
 
-Because a standalone video has no GPS, the script lays fixed-duration segments onto a synthetic H3 snake-grid so each segment lands in its own pseudo-cell. That keeps the returned intervals narrow enough to act as a concrete content-query demo instead of collapsing the entire video into one tile.
+When a session HDF5 with a per-frame `dino` / `jepa` / `gps` group sits next to the video (or is passed via `--gps-source PATH`), the script interpolates real GPS onto the CLIP frame timestamps so retrieved cells are real H3 cells around the captured route. With no GPS available — or if you pass `--no-gps` — frames lay onto a synthetic H3 snake-grid so each fixed-duration segment lands in its own pseudo-cell.
 
 ```bash
+# Plain video, no GPS — synthetic snake-grid
 conda activate playground
 python scripts/e5_clip_demo.py /path/to/video.mp4 "a person opening a refrigerator" \
   --output-dir /tmp/psm-e5
+
+# Aria session with features.h5 next to the video — auto-detected real GPS
+python scripts/e5_clip_demo.py /tmp/hdd/<session>/data.mp4 "a zebra crossing" \
+  --output-dir /tmp/hdd/<session>/e5/zebra-crossing
+
+# Explicit GPS source (any HDF5 with a dino/jepa/gps group)
+python scripts/e5_clip_demo.py video.mp4 "a red bus" \
+  --gps-source /path/to/features.h5
 ```
 
-First run downloads the CLIP checkpoint. Artifacts include `clip_features.h5`, `query.f32`, and `psm_results.json`.
+First run downloads the CLIP checkpoint. Artifacts include `clip_features.h5`, `query.f32`, `psm_results.json`, and a `manifest.json` recording the track mode (`real_gps` vs `synthetic_snake_grid`) plus the source group when GPS was used.
 
 ## Visualization
 
