@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "psm-extraction"
+version = "0.1.0"
+description = "Extraction pipeline producing features.h5 files for the probabilistic_spatial_memory C engine."
+requires-python = ">=3.10"
+authors = [{ name = "PSM contributors" }]
+license = { text = "MIT" }
+readme = { text = "See ../README.md", content-type = "text/plain" }
+dependencies = [
+  "h5py>=3.8",
+  "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+clip = ["torch>=2.2", "transformers>=4.40", "Pillow>=10"]
+mlx = ["mlx>=0.10"]
+aria = ["projectaria-tools"]
+all = ["psm-extraction[clip,mlx,aria]"]
+
+[project.scripts]
+psm-extraction = "psm_extraction.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["psm_extraction*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -76,6 +76,34 @@ A Python extraction pipeline (offline) runs each session through two vision foun
 
 The CLS embeddings are hashed into the spatial memory engine (HyperLogLog counters per H3 hex cell). The spatial maps are rendered as semi-transparent heatmap overlays on the video.
 
+## HDF5 feature schema
+
+PSM consumes a `features.h5` file containing per-frame embeddings, plus optional sensor streams. The C ingest only reads dataset arrays — attrs are advisory metadata for downstream tooling.
+
+Schema **v2** (current, set by `psm-extraction`) makes the file self-documenting:
+
+- **Root attrs**: `schema_version=2`, `producer="psm-extraction"`, `producer_version`, `created_at_utc`, `timestamp_unit="unix_seconds_f64"`, `coord_system="WGS84_degrees"`, optional `source_video` and `session_id`.
+- **Sensor groups** (canonical raw sources of truth):
+  - `gps/{timestamps, lat, lng}` — float64; optional `@rate_hz_nominal` attr.
+  - `imu/{timestamps, accel, gyro}` — accel/gyro as `(N, 3)` float32; optional `@rate_hz_nominal`.
+- **Model groups** (`dino`, `jepa`, `clip`, …) — per-frame data plus interpolated sensors:
+  - Required datasets: `timestamps` (float64), `lat`/`lng` (float64), `embeddings` (`(N, D)` float32).
+  - Optional: `attention_maps`/`prediction_maps` (`(N, h, w)` float32), `accel`/`gyro` (`(N, 3)` float32, interpolated from the canonical `imu` group).
+  - Required attrs: `model`, `checkpoint`, `embedding_dim`, `sample_fps`, `sampling`, `preprocess`, `normalized`.
+  - Optional attrs: `patch_grid` (`[h, w]`), `interpolation` (string describing how lat/lng/imu were resampled).
+
+Schema **v1** is the format the existing external pipeline produces (data-only, no attrs). PSM reads both transparently; v1 → v2 is a non-destructive in-place migration:
+
+```bash
+# Auto-detect missing attrs and back-fill best-effort defaults for known
+# groups (dino/jepa/clip). Idempotent and pure metadata: never modifies datasets.
+python -m psm_extraction migrate /tmp/hdd/<session>/features.h5 \
+  --source-video /tmp/hdd/<session>/data.mp4 \
+  --session-id <session>
+```
+
+The extraction pipeline producing v2 files lives in `extraction/` (`pip install -e extraction[dev,clip,mlx]` for development). See `TODO.md` → "Extraction Pipeline" for the phased roadmap (Phase 1 ships the schema + writer + migration; later phases add CLIP, DINOv3, V-JEPA 2, and Aria VRS readers).
+
 ## IMU visualization
 
 The high-rate IMU stream drives three visual features on the map:

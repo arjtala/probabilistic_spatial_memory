@@ -149,3 +149,46 @@ Context: a forthcoming NeurIPS 2026 streaming egocentric memory benchmark (the "
 - [x] `psm --last-seen lat,lng --k-ring N --top N` CLI surface + JSON output (`"mode": "last_seen"` discriminator; `schema_version` unchanged at 1)
 - [x] Benchmark scenario in `benchmarks/benchmark_spatial_memory.c`: "location-trace query latency" over a populated session — first-class measurement for E7
 - [x] `SpatialMemory_query_similar(query, dim, k_ring, center, out)` — rank tiles by cosine similarity of the best exemplar; `psm --similar-to <bin>` / `--center LAT,LNG` / `--exemplars N` CLI; benchmark scenario `query_similar` (E5's text-query adapter now has a concrete backend to target)
+
+## Extraction Pipeline
+
+Self-contained Python package under `extraction/` that produces the `features.h5` files PSM consumes. Replaces the external pipeline whose machine has gone missing. The C engine stays light; the Python pipeline is an optional sibling consumed only by people producing data.
+
+Schema v1 is the format the existing `features.h5` uses (no file-level metadata, no per-group model attrs). Schema v2 adds explicit `schema_version`, `producer`, `model`, `checkpoint`, `embedding_dim`, `sample_fps`, `normalized`, etc. so a consumer can audit a file. The C ingest treats both as compatible since it only reads dataset arrays, not attrs.
+
+### Phase 1 — Schema v2 + writer + migration
+
+- [ ] `extraction/psm_extraction/schema.py` — versioned constants (root + per-group attrs, dataset names, dtypes, expected shapes), plus `ModelGroupSpec` dataclass for the writer's typed surface
+- [ ] `extraction/psm_extraction/writer.py` — `FeaturesWriter` context manager that emits v2-compliant files (root attrs, sensor groups, model groups), validating dataset shapes/dtypes
+- [ ] `extraction/psm_extraction/migrate.py` — `migrate_v1_to_v2` adds missing attrs in-place using best-effort defaults for known groups (dino/jepa/clip); idempotent on already-v2 files
+- [ ] `extraction/psm_extraction/__main__.py` — `python -m psm_extraction migrate <file>` CLI surface
+- [ ] `extraction/pyproject.toml` — minimal package metadata (h5py + numpy core; pytest dev; clip/aria as optional extras for later phases)
+- [ ] Round-trip + migration tests under `extraction/tests/` (pytest)
+- [ ] README §"HDF5 feature schema" — short doc describing v2 root + per-group contracts
+
+### Phase 2 — CLIP runner end-to-end
+
+- [ ] `models/base.py` ModelRunner protocol (one frame in → embedding out) with a `--backend {auto,pytorch,mlx,cpu}` CLI knob; auto-pick MLX on Apple Silicon (M-series including M4) and PyTorch CUDA elsewhere
+- [ ] `models/clip_pytorch.py` runner reusing the logic from `scripts/e5_clip_demo.py` (PyTorch MPS / CUDA / CPU)
+- [ ] `models/clip_mlx.py` MLX-native CLIP for Apple Silicon (uses `mlx-clip` or equivalent; declared under an `[mlx]` optional extra in `pyproject.toml`)
+- [ ] `io/video.py` ffmpeg-backed frame reader
+- [ ] `align.py` linear interpolation of GPS / IMU onto frame timestamps
+- [ ] `python -m psm_extraction extract --video data.mp4 --models clip --output features.h5` produces a v2-compliant file consumed unchanged by `psm --similar-to`
+- [ ] Smoke test against a synthetic video fixture (from FFmpeg's `testsrc`); both backends must produce embeddings within a tight cosine-similarity tolerance of each other on the same input
+
+### Phase 3 — Aria VRS + DINOv3 + V-JEPA 2
+
+- [ ] `io/aria_vrs.py` — VRS reader behind an optional `[aria]` extra (depends on `projectaria-tools`)
+- [ ] `io/json_sidecar.py` — fallback for `gps.json` + `imu.json` (the format the existing session has)
+- [ ] `models/dino_pytorch.py` — DINOv3 PyTorch runner (1024-d embeddings + 14×14 attention maps); fall through to MPS on Apple Silicon if MLX port isn't ready
+- [ ] `models/dino_mlx.py` — MLX-native DINOv3 if/when an MLX port exists (skip if upstream Apple/Meta haven't shipped one)
+- [ ] `models/jepa_pytorch.py` — V-JEPA 2 (1024-d embeddings + 16×16 prediction maps); same MLX-port caveat as DINO
+- [ ] Pinned checkpoints recorded in HDF5 attrs; refuse to mix groups produced by different versions inside one file
+- [ ] End-to-end smoke run reproducing the Fulham `features.h5` shape on Apple Silicon (M4) within a target wall-clock budget
+
+### Phase 4 — Polish
+
+- [ ] `add-group` subcommand: append a new model group to an existing v2 file (closes the Level 3 merge with the existing Aria pipeline once a CLIP runner exists)
+- [ ] Configurable interpolation method on `align.py` with explicit `@interpolation` attr in HDF5
+- [ ] Optional gzip/lzf compression on `attention_maps` / `prediction_maps`
+- [ ] Drop or make optional the redundant per-group IMU snapshots (`dino/accel`, `dino/gyro`, etc.); the canonical `imu/` group is enough for downstream consumers
