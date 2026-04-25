@@ -73,6 +73,10 @@ class DINOPyTorchRunner(ModelRunner):
         # normalization). Recording the descriptor lets a reader audit which
         # preprocessing path produced the embeddings.
         self.preprocess = "dinov2_autoimageprocessor"
+        # DINOv3 (and DINOv2-with-registers) prepend `num_register_tokens`
+        # register tokens after the CLS token, before the patch tokens. The
+        # config exposes this; defaults to 0 for plain DINOv2.
+        self._num_register_tokens = int(getattr(cfg, "num_register_tokens", 0))
         self._patch_grid: tuple[int, int] | None = None
 
     @property
@@ -84,17 +88,27 @@ class DINOPyTorchRunner(ModelRunner):
         self._patch_grid = value
 
     def _probe_patch_grid(self, attentions_shape: tuple[int, ...]) -> tuple[int, int]:
-        # attentions[-1] has shape (B, heads, tokens, tokens). tokens = 1 + h*w
-        # for a CLS-prefixed ViT. Compute the patch grid from the token count.
+        # attentions[-1] has shape (B, heads, tokens, tokens). For a typical
+        # CLS-prefixed ViT, tokens = 1 + num_register + h*w where num_register
+        # is 0 for DINOv2-base and 4 for DINOv3 / DINOv2-with-registers. We
+        # subtract the known register count first; fall back to brute-forcing
+        # plausible counts if the config didn't expose one.
         tokens = int(attentions_shape[-1])
-        n_patches = tokens - 1
-        side = int(round(n_patches**0.5))
-        if side * side != n_patches:
-            raise RuntimeError(
-                f"unexpected DINO attention token count {tokens}; "
-                f"can't infer a square patch grid"
-            )
-        return (side, side)
+        for r in (self._num_register_tokens, 0, 1, 2, 4, 8):
+            n_patches = tokens - 1 - r
+            if n_patches <= 0:
+                continue
+            side = int(round(n_patches**0.5))
+            if side > 0 and side * side == n_patches:
+                if r != self._num_register_tokens:
+                    self._num_register_tokens = r
+                return (side, side)
+        raise RuntimeError(
+            f"unexpected DINO attention token count {tokens}; "
+            f"can't infer a square patch grid (tried register counts "
+            f"0,1,2,4,8 around config.num_register_tokens="
+            f"{self._num_register_tokens})"
+        )
 
     def embed_images(
         self, paths: Sequence[Path], batch_size: int = 16
@@ -126,21 +140,26 @@ class DINOPyTorchRunner(ModelRunner):
                         img.close()
                 inputs = {k: v.to(self._device) for k, v in inputs.items()}
                 outputs = self._model(**inputs, output_attentions=True)
-                # Mean-pool patch tokens, excluding CLS.
+                attn = getattr(outputs, "attentions", None)
+                if attn is not None and len(attn) > 0 and self._patch_grid is None:
+                    # Probe up-front so we know how many register tokens to
+                    # skip in the embedding pool below.
+                    self._patch_grid = self._probe_patch_grid(tuple(attn[-1].shape))
+
+                # Mean-pool patch tokens, excluding CLS + register tokens.
                 hidden = outputs.last_hidden_state  # (B, tokens, D)
-                patch_features = hidden[:, 1:, :].mean(dim=1)  # (B, D)
+                patch_start = 1 + self._num_register_tokens
+                patch_features = hidden[:, patch_start:, :].mean(dim=1)  # (B, D)
                 embeddings.append(
                     patch_features.detach().cpu().to(torch.float32).numpy()
                 )
 
-                attn = getattr(outputs, "attentions", None)
                 if attn is not None and len(attn) > 0:
                     last = attn[-1]  # (B, heads, tokens, tokens)
-                    if self._patch_grid is None:
-                        self._patch_grid = self._probe_patch_grid(tuple(last.shape))
                     h, w = self._patch_grid
-                    # CLS-to-patch row, averaged across heads.
-                    cls_to_patch = last[:, :, 0, 1:].mean(dim=1)
+                    # CLS-to-patch attention, skipping register tokens too,
+                    # averaged across heads.
+                    cls_to_patch = last[:, :, 0, patch_start:].mean(dim=1)
                     cls_to_patch = cls_to_patch.reshape(-1, h, w)
                     attentions.append(
                         cls_to_patch.detach().cpu().to(torch.float32).numpy()
