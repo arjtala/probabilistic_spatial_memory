@@ -102,20 +102,48 @@ class VJEPAPyTorchRunner(ModelRunner):
     def frames_per_clip(self) -> int:
         return self._fpc
 
+    def _safe_batch_size(self, requested: int) -> int:
+        """Cap batch_size so the SDPA attention matrix doesn't OOM.
+
+        V-JEPA 2 attention is O((batch * fpc * spatial_patches)^2) in memory;
+        for ViT-L/16 at 256x256 (256 spatial patches) and fpc=64 a single batch
+        already produces a 16384-token sequence, and even batch=2 explodes past
+        a reasonable MPS budget. Cap based on fpc.
+        """
+        if self._fpc >= 64:
+            return max(1, min(requested, 1))
+        if self._fpc >= 32:
+            return max(1, min(requested, 2))
+        if self._fpc >= 16:
+            return max(1, min(requested, 4))
+        return max(1, min(requested, 8))
+
     def embed_images(
         self, paths: Sequence[Path], batch_size: int = 4
     ) -> tuple[np.ndarray, np.ndarray | None]:
         """Embed each frame by replicating it to fill the clip window.
 
-        Default `batch_size=4` is intentionally small — each "video" passed to
-        the processor expands to `fpc` frames, so a batch of 4 with `fpc=64`
-        already pushes 256 frames through the encoder per forward pass.
+        `batch_size` is clamped per `_safe_batch_size` so the orchestrator's
+        default (16) doesn't trigger a multi-GB SDPA allocation. With the
+        canonical `vjepa2-vitl-fpc64-256` checkpoint the effective batch is 1
+        regardless of the requested value.
         """
+        import sys
+
         from PIL import Image
 
         torch = self._torch
         if not paths:
             return np.zeros((0, self.embedding_dim), dtype=np.float32), None
+
+        safe_batch = self._safe_batch_size(batch_size)
+        if safe_batch != batch_size:
+            print(
+                f"VJEPAPyTorchRunner: clamping batch_size {batch_size}->{safe_batch} "
+                f"to avoid OOM (fpc={self._fpc}, attention scales quadratically)",
+                file=sys.stderr,
+            )
+        batch_size = safe_batch
 
         embeddings: list[np.ndarray] = []
         with torch.inference_mode():
