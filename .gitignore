@@ -10,3 +10,5 @@ phrases/
 targets/
 .aider*
 .claude/
+__pycache__/
+*.pyc

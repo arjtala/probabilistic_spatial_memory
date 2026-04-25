@@ -162,6 +162,12 @@ targets/psm -f features.h5 -g jepa -C 24 -p 12
 # JSON output for scripting
 targets/psm -f features.h5 -g dino -j
 
+# Last-seen interval query around a coordinate
+targets/psm -f features.h5 -g dino --last-seen 37.484000,-122.148000 --k-ring 1 --top 5 -j
+
+# Similarity retrieval from a raw float32 LE query vector
+targets/psm -f clip_features.h5 -g clip --similar-to query.f32 --top 5 --exemplars 8 -j
+
 # Legacy positional args still work
 targets/psm features.h5 dino 5.0 10 12 10
 ```
@@ -176,8 +182,30 @@ targets/psm features.h5 dino 5.0 10 12 10
 | `-p` | `<bits>` | `10` | HLL precision |
 | `-j` | — | — | Emit JSON summary instead of text |
 | `-h` | — | — | Print help |
+| `--last-seen` | `LAT,LNG` | — | Return top interval hits around a coordinate |
+| `--similar-to` | `<path>` | — | Query by embedding similarity from a raw `float32` LE vector |
+| `--center` | `LAT,LNG` | — | Restrict `--similar-to` to a centered search neighborhood |
+| `--k-ring` | `<N>` | `0` | H3 neighborhood radius for `--last-seen` or centered `--similar-to` |
+| `--top` | `<N>` | `5` | Maximum query hits to print |
+| `--exemplars` | `<N>` | `8*` | Per-tile exemplar reservoir; auto-set to `8` with `--similar-to` |
 
 > **Retention:** each tile remembers observations for `capacity × time_window_sec` (default 60s). Query output is empty past that horizon — widen `-C` or `-t` for longer sessions.
+
+`--similar-to` expects a binary file containing a flat `float32` little-endian vector in the same embedding space as the HDF5 group's `embeddings` dataset. With `-j`, similarity results include `similarity`, `exemplar_t`, and the retained `t_min`/`t_max` interval for each matching tile.
+
+## E5 Demo
+
+`scripts/e5_clip_demo.py` is a minimal plain-video harness for the E5 text-query path. It samples frames with `ffmpeg`, embeds the frames and the text query with CLIP, writes a native `clip` HDF5 group plus the raw `float32` LE query file, then calls `targets/psm --similar-to -j` and prints the retrieved intervals.
+
+Because a standalone video has no GPS, the script lays fixed-duration segments onto a synthetic H3 snake-grid so each segment lands in its own pseudo-cell. That keeps the returned intervals narrow enough to act as a concrete content-query demo instead of collapsing the entire video into one tile.
+
+```bash
+conda activate playground
+python scripts/e5_clip_demo.py /path/to/video.mp4 "a person opening a refrigerator" \
+  --output-dir /tmp/psm-e5
+```
+
+First run downloads the CLIP checkpoint. Artifacts include `clip_features.h5`, `query.f32`, and `psm_results.json`.
 
 ## Visualization
 

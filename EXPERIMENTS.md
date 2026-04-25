@@ -192,25 +192,26 @@ Question:
 - Does PSM's spatial + temporal prior materially close the Localization Paradox gap on frontier MLLMs?
 
 Current capability:
-- Blocked until the "Localization Paradox Alignment" TODO items land.
-- Once unblocked, fully automatable given a benchmark subset and one MLLM inference endpoint.
+- `SpatialMemory_query_similar(...)` / `psm --similar-to` now provide the retrieval backend for the text-query adapter.
+- `scripts/e5_clip_demo.py` is a minimal local demo over a plain video using CLIP image/text embeddings and a synthetic track.
+- Full benchmark evaluation is still external to this repo: it needs a benchmark subset and one MLLM inference endpoint.
 
 Inputs:
 - A benchmark subset with usable spatial context (GPS or coarse scene localization)
 - One target MLLM for grounded answer generation (e.g., Gemini 3 Pro, GPT-5, or an open-source model for ablation)
-- A text encoder for the question cue (the "text-query adapter")
+- A shared image/text encoder for the question cue (the "text-query adapter"; CLIP / SigLIP / similar)
 
 Protocol:
 1. Ingest each session into PSM with fixed `(h3_resolution, time_window_sec, capacity, precision)`.
-2. For each benchmark query, embed the question via the text adapter and combine with the trigger-moment observation to produce the semantic cue.
-3. Call `SpatialMemory_query_intervals(...)` for top-k candidate `(cell, t_start, t_end)` tuples.
+2. For each benchmark query, embed the question via the text adapter and combine with the trigger-moment observation if the adapter requires frame-conditioned disambiguation.
+3. Call `SpatialMemory_query_similar(...)` (or `psm --similar-to <query.f32>`) for top-k candidate `(cell, t_start, t_end)` tuples from matching tiles.
 4. Feed the candidates as explicit grounding context to the MLLM alongside the question and the last-visible frame.
 5. Measure `mIoU`, `R@1`, and `GQ@0.5` (the benchmark's grounding metrics) vs. the raw-MLLM baseline in its main results table.
 
 Readout:
 - Absolute `mIoU` on each of the benchmark's 8 cognitive categories, especially Location Trace and Spatial Awareness.
 - Sensitivity to `k` (how much prefilter slack the MLLM needs).
-- Per-query latency: PSM `query_intervals` vs. MLLM full-video scan.
+- Per-query latency: PSM `query_similar` vs. MLLM full-video scan.
 
 Decision rule:
 - If the prefilter lifts Gemini 3 Pro's `mIoU` above 0.6 on Location Trace + Spatial Awareness, this experiment is a direct architectural rebuttal to the paper's discussion section.
