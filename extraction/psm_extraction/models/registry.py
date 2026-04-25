@@ -132,7 +132,7 @@ def make_runner(
         from .jepa_pytorch import VJEPAPyTorchRunner
 
         return VJEPAPyTorchRunner(
-            checkpoint=checkpoint or "facebook/vjepa2-vit-large",
+            checkpoint=checkpoint or "facebook/vjepa2-vitl-fpc64-256",
             device="cpu" if chosen == "cpu" else device,
             **kwargs,
         )
