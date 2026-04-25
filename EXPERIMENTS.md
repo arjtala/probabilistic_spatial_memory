@@ -192,8 +192,9 @@ Question:
 - Does PSM's spatial + temporal prior materially close the Localization Paradox gap on frontier MLLMs?
 
 Current capability:
-- `SpatialMemory_query_similar(...)` / `psm --similar-to` now provide the retrieval backend for the text-query adapter.
+- `SpatialMemory_query_similar(...)` / `psm --similar-to` provide the retrieval backend for the text-query adapter.
 - `scripts/e5_clip_demo.py` is a minimal local demo over a plain video using CLIP image/text embeddings and a synthetic track.
+- The in-tree extraction pipeline (`python -m psm_extraction extract --models clip,dino[,jepa]`) reproduces the Aria pipeline's `features.h5` shape end-to-end on Apple Silicon — verified on a 15-min Fulham session with DINOv3 attention-distribution parity to the original. So a benchmark session that ships `data.mp4 + gps.json + imu.json + metadata.json` can be ingested entirely in-house, no external pipeline required.
 - Full benchmark evaluation is still external to this repo: it needs a benchmark subset and one MLLM inference endpoint.
 
 Inputs:

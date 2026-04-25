@@ -227,7 +227,7 @@ targets/psm features.h5 dino 5.0 10 12 10
 
 When a session HDF5 with a per-frame `dino` / `jepa` / `gps` group sits next to the video (or is passed via `--gps-source PATH`), the script interpolates real GPS onto the CLIP frame timestamps so retrieved cells are real H3 cells around the captured route. With no GPS available — or if you pass `--no-gps` — frames lay onto a synthetic H3 snake-grid so each fixed-duration segment lands in its own pseudo-cell.
 
-The demo is a thin shim over `python -m psm_extraction extract` (Phase 2 of the extraction pipeline). For programmatic / batch use, prefer the package CLI directly:
+The demo is a thin shim over `python -m psm_extraction extract`. For programmatic / batch use, prefer the package CLI directly:
 
 ```bash
 # CLIP only
@@ -244,10 +244,20 @@ python -m psm_extraction extract \
   --video /path/to/data.mp4 \
   --output /path/to/features.h5 \
   --models clip,dino,jepa \
-  --checkpoint dino:facebook/dinov2-large \
+  --checkpoint dino:facebook/dinov3-vitl16-pretrain-lvd1689m \
   --sample-fps 30 --segment-sec 1 \
   --session-id <session>
 ```
+
+### Long-run survival features
+
+Long extractions (a 22-minute DINOv3 ViT-Large pass on 27 k frames is normal on M4 MPS) ship with three pieces of survival hygiene:
+
+- **Stage banners + throttled progress** on stderr — every long run prints `[extract] / [frames] / [embed:<group>] / [write]` markers and a `[embed:<group>] N/total (X.X%)  rate it/s  elapsed=Ts  eta=Ts` line every ~2 s. JSON manifest still piped on stdout for `jq`.
+- **Frame cache** — ffmpeg writes a `.extract_manifest.json` next to the JPEGs recording `(video, sample_fps, frame_count)`. Subsequent runs with matching params skip the ffmpeg step. Pass `--force-reextract` to wipe and re-run.
+- **Per-model embedding cache** — after each runner finishes, embeddings (and any attention/prediction maps) save to a hashed `.npz` sidecar. Resuming after a kill picks up the cached results instead of re-running inference. Pass `--force-reembed` to ignore the cache; `--cache-dir <path>` overrides the default location (next to the output HDF5).
+
+Cache key for the embedding sidecar = `model_id + checkpoint + video_path + sample_fps + group_name`, so different params can never reuse stale caches.
 
 ```bash
 # Plain video, no GPS — synthetic snake-grid

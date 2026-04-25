@@ -158,13 +158,13 @@ Schema v1 is the format the existing `features.h5` uses (no file-level metadata,
 
 ### Phase 1 — Schema v2 + writer + migration
 
-- [ ] `extraction/psm_extraction/schema.py` — versioned constants (root + per-group attrs, dataset names, dtypes, expected shapes), plus `ModelGroupSpec` dataclass for the writer's typed surface
-- [ ] `extraction/psm_extraction/writer.py` — `FeaturesWriter` context manager that emits v2-compliant files (root attrs, sensor groups, model groups), validating dataset shapes/dtypes
-- [ ] `extraction/psm_extraction/migrate.py` — `migrate_v1_to_v2` adds missing attrs in-place using best-effort defaults for known groups (dino/jepa/clip); idempotent on already-v2 files
-- [ ] `extraction/psm_extraction/__main__.py` — `python -m psm_extraction migrate <file>` CLI surface
-- [ ] `extraction/pyproject.toml` — minimal package metadata (h5py + numpy core; pytest dev; clip/aria as optional extras for later phases)
-- [ ] Round-trip + migration tests under `extraction/tests/` (pytest)
-- [ ] README §"HDF5 feature schema" — short doc describing v2 root + per-group contracts
+- [x] `extraction/psm_extraction/schema.py` — versioned constants (root + per-group attrs, dataset names, dtypes, expected shapes), plus `ModelGroupSpec` dataclass for the writer's typed surface
+- [x] `extraction/psm_extraction/writer.py` — `FeaturesWriter` context manager that emits v2-compliant files (root attrs, sensor groups, model groups), validating dataset shapes/dtypes
+- [x] `extraction/psm_extraction/migrate.py` — `migrate_v1_to_v2` adds missing attrs in-place using best-effort defaults for known groups (dino/jepa/clip); idempotent on already-v2 files
+- [x] `extraction/psm_extraction/__main__.py` — `python -m psm_extraction migrate <file>` CLI surface
+- [x] `extraction/pyproject.toml` — minimal package metadata (h5py + numpy core; pytest dev; clip/aria as optional extras for later phases)
+- [x] Round-trip + migration tests under `extraction/tests/` (pytest)
+- [x] README §"HDF5 feature schema" — short doc describing v2 root + per-group contracts
 
 ### Phase 2 — CLIP runner end-to-end
 
@@ -183,15 +183,33 @@ Schema v1 is the format the existing `features.h5` uses (no file-level metadata,
 - [x] `models/jepa_pytorch.py` — V-JEPA 2 encoder runner via `AutoVideoProcessor` + `AutoModel` (requires `transformers >= 4.53`). Replicates each ffmpeg-extracted frame across the model's clip window (`fpc`, e.g. 64 for `vjepa2-vitl-fpc64-256`) per the upstream model-card recipe; mean-pooled encoder tokens give the 1024-d embedding. Prediction-map computation is deferred to Phase 4. Compute caveat: each "video" forward pass touches `fpc` frames, so V-JEPA 2 inference is ~`fpc`x more expensive than DINO; pick a sparse `--sample-fps` (0.5–1.0) for multi-minute videos. On macOS the runner intentionally bypasses `decord` (which is unsupported there) by feeding pre-decoded PIL frames directly to `AutoVideoProcessor.videos=`.
 - [x] Multi-model orchestration — `ExtractOptions.runners: list[(group_name, runner)]` lets one frame pass populate any combination of `clip`/`dino`/`jepa` groups in the same v2 file. CLI exposes `--models clip,dino,jepa` and `--checkpoint FAMILY:PATH` overrides per family.
 - [x] Sensor groups — when `gps.json` / `imu.json` (and optionally `metadata.json`) sit next to the video, the orchestrator writes `gps` and `imu` sensor groups too, so the produced `features.h5` matches the original Aria pipeline's shape end-to-end.
+- [x] DINO register-token support — DINOv3 prepends 4 register tokens after the CLS; the runner reads `config.num_register_tokens` and skips them when slicing CLS-to-patch attention and when mean-pooling the embedding. Falls back to brute-forcing common register counts if config doesn't expose the field.
+- [x] V-JEPA 2 SDPA OOM cap — `VJEPAPyTorchRunner._safe_batch_size()` clamps batch_size based on `fpc` so the orchestrator's default doesn't trigger a 64 GB attention-matrix allocation. Emits a stderr note when clamping kicks in.
+- [x] Sensor groups land independently of track resolution — orchestrator writes `gps` from `gps.json` and `imu` from `imu.json` regardless of whether the per-frame track came from features.h5 or a JSON sidecar. (Bug from initial Phase 3: gps group was only written when track_source itself was JSON.)
+- [x] V-JEPA 2 default checkpoint fixed to `facebook/vjepa2-vitl-fpc64-256` in the registry fallback (was a placeholder string in the Phase 3 first cut).
+- [x] End-to-end smoke run reproducing the Fulham `features.h5` shape on Apple Silicon (M4): DINOv3 ViT-Large at 30 fps over 27069 frames in 22m09s, attention-distribution parity verified at frame 628 (top-1 fraction ~5.7%, matching the original).
 - [ ] `io/aria_vrs.py` — VRS reader behind an optional `[aria]` extra (depends on `projectaria-tools`). Deferred: the user's existing sessions ship JSON sidecars that cover the GPS/IMU path; raw VRS support is only needed for fresh captures.
 - [ ] `models/dino_mlx.py` / `models/jepa_mlx.py` — MLX-native runners. Deferred: no MLX-CLIP/DINO/JEPA package detected in the user's env; PyTorch MPS is the auto-pick on Apple Silicon.
 - [ ] Pinned checkpoints recorded in HDF5 attrs; refuse to mix groups produced by different versions inside one file. Partial: `checkpoint` is recorded per group; cross-version mixing isn't enforced yet.
-- [ ] End-to-end smoke run reproducing the Fulham `features.h5` shape on Apple Silicon (M4) within a target wall-clock budget. Deferred: requires real model downloads + benchmarking; can be done as a separate validation pass once the runners are exercised on the real session.
 - [ ] Synthetic-video smoke test (FFmpeg `testsrc`) producing a v2 file via `clip` runner under PyTorch+CPU — covers the full pipeline in CI without GPU. Phase 2 follow-up still open.
+
+### Phase 3.5 — Engineering hygiene for long runs
+
+After losing ~18 minutes of DINOv3 inference to a poorly-timed `pkill`, shipped a small set of "long-run survival" features so the next time something kills mid-extraction, the cost is bounded.
+
+- [x] `psm_extraction/progress.py` — `stage_banner(stage, msg)` for stage transitions and `make_progress_logger(stage, n_total)` for throttled per-batch progress (~once per 2 s, first/last samples always print). Output to stderr so stdout's JSON manifest still pipes through `jq`.
+- [x] `ModelRunner.embed_images(..., progress=callable)` kwarg threaded through every runner — CLIP, DINO, V-JEPA 2 all call it after each batch.
+- [x] Frame cache in `io/video.py` — ffmpeg writes a `.extract_manifest.json` recording `(video, sample_fps, frame_count)`. Subsequent runs with matching params skip ffmpeg and reuse the JPEGs. `--force-reextract` bypasses.
+- [x] Per-model embedding cache in `extract.py` — after each runner finishes, embeddings (+ attention/prediction maps) save to a hashed `.npz` sidecar in `<output>.parent`. Cache key includes `model_id + checkpoint + video_path + sample_fps + group_name`, so different params can never reuse stale caches. `--force-reembed` bypasses; `--cache-dir` overrides location.
 
 ### Phase 4 — Polish
 
+### Phase 4 — Polish
+
+- [ ] V-JEPA 2 `prediction_maps` — currently the runner emits encoder embeddings only. The original Aria pipeline produced 16×16 prediction-error maps via the JEPA predictor head against context+target patch sampling. Re-enables the JEPA prediction-error overlay in `psm-viz`. ~200 LOC + careful reading of V-JEPA 2's loss path.
+- [ ] Per-model `--sample-fps` — the orchestrator currently shares one frame-extraction pass across all runners. Adding per-model rates lets a single command produce DINO at 30 fps + JEPA at 0.5 fps in one run, matching the original pipeline's pattern without merging two output files.
 - [ ] `add-group` subcommand: append a new model group to an existing v2 file (closes the Level 3 merge with the existing Aria pipeline once a CLIP runner exists)
 - [ ] Configurable interpolation method on `align.py` with explicit `@interpolation` attr in HDF5
 - [ ] Optional gzip/lzf compression on `attention_maps` / `prediction_maps`
 - [ ] Drop or make optional the redundant per-group IMU snapshots (`dino/accel`, `dino/gyro`, etc.); the canonical `imu/` group is enough for downstream consumers
+- [ ] Incremental embedding checkpoint (mid-batch) — the per-model `.npz` cache saves only after a runner finishes. Saving every N batches would protect against kills *during* a 22-minute DINOv3 inference, not just between runners.
