@@ -178,13 +178,16 @@ Schema v1 is the format the existing `features.h5` uses (no file-level metadata,
 
 ### Phase 3 — Aria VRS + DINOv3 + V-JEPA 2
 
-- [ ] `io/aria_vrs.py` — VRS reader behind an optional `[aria]` extra (depends on `projectaria-tools`)
-- [ ] `io/json_sidecar.py` — fallback for `gps.json` + `imu.json` (the format the existing session has)
-- [ ] `models/dino_pytorch.py` — DINOv3 PyTorch runner (1024-d embeddings + 14×14 attention maps); fall through to MPS on Apple Silicon if MLX port isn't ready
-- [ ] `models/dino_mlx.py` — MLX-native DINOv3 if/when an MLX port exists (skip if upstream Apple/Meta haven't shipped one)
-- [ ] `models/jepa_pytorch.py` — V-JEPA 2 (1024-d embeddings + 16×16 prediction maps); same MLX-port caveat as DINO
-- [ ] Pinned checkpoints recorded in HDF5 attrs; refuse to mix groups produced by different versions inside one file
-- [ ] End-to-end smoke run reproducing the Fulham `features.h5` shape on Apple Silicon (M4) within a target wall-clock budget
+- [x] `io/json_sidecar.py` — Aria-style `gps.json` + `imu.json` reader. Picks the largest non-empty stream by default; filters Aria's denormalized pre-fix samples; emits numpy arrays sorted by timestamp. `metadata.json` parser surfaces the `capture_time_epoch` so the orchestrator can convert relative sidecar timestamps to absolute Unix seconds, matching the existing pipeline's output.
+- [x] `models/dino_pytorch.py` — DINO runner via `AutoModel.from_pretrained`. Mean-pooled patch tokens for embeddings; last-layer CLS-to-patch attention reshaped to the probed patch grid for `attention_maps`. `model_id` auto-derives `facebookresearch/dinov2` vs `dinov3` from the checkpoint string.
+- [x] `models/jepa_pytorch.py` — V-JEPA 2 encoder runner (mean-pooled encoder tokens). Surfaces a clear runtime error if the checkpoint isn't loadable through `AutoModel`; prediction-map computation is deferred to Phase 4 once the upstream inference recipe stabilizes.
+- [x] Multi-model orchestration — `ExtractOptions.runners: list[(group_name, runner)]` lets one frame pass populate any combination of `clip`/`dino`/`jepa` groups in the same v2 file. CLI exposes `--models clip,dino,jepa` and `--checkpoint FAMILY:PATH` overrides per family.
+- [x] Sensor groups — when `gps.json` / `imu.json` (and optionally `metadata.json`) sit next to the video, the orchestrator writes `gps` and `imu` sensor groups too, so the produced `features.h5` matches the original Aria pipeline's shape end-to-end.
+- [ ] `io/aria_vrs.py` — VRS reader behind an optional `[aria]` extra (depends on `projectaria-tools`). Deferred: the user's existing sessions ship JSON sidecars that cover the GPS/IMU path; raw VRS support is only needed for fresh captures.
+- [ ] `models/dino_mlx.py` / `models/jepa_mlx.py` — MLX-native runners. Deferred: no MLX-CLIP/DINO/JEPA package detected in the user's env; PyTorch MPS is the auto-pick on Apple Silicon.
+- [ ] Pinned checkpoints recorded in HDF5 attrs; refuse to mix groups produced by different versions inside one file. Partial: `checkpoint` is recorded per group; cross-version mixing isn't enforced yet.
+- [ ] End-to-end smoke run reproducing the Fulham `features.h5` shape on Apple Silicon (M4) within a target wall-clock budget. Deferred: requires real model downloads + benchmarking; can be done as a separate validation pass once the runners are exercised on the real session.
+- [ ] Synthetic-video smoke test (FFmpeg `testsrc`) producing a v2 file via `clip` runner under PyTorch+CPU — covers the full pipeline in CI without GPU. Phase 2 follow-up still open.
 
 ### Phase 4 — Polish
 

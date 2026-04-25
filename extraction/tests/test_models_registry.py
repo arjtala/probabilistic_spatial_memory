@@ -41,7 +41,7 @@ def test_resolve_backend_auto_picks_mlx_only_when_runner_works() -> None:
 
 def test_make_runner_rejects_unsupported_family() -> None:
     with pytest.raises(ValueError, match="unsupported model family"):
-        registry.make_runner("dino")
+        registry.make_runner("vmamba")
 
 
 def test_make_runner_with_mlx_raises_until_implemented() -> None:

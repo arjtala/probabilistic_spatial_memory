@@ -72,7 +72,7 @@ def test_extract_writes_v2_compliant_file_with_synthetic_grid(tmp_path: Path) ->
         ExtractOptions(
             video=video,
             output=output,
-            runner=runner,
+            runners=[("clip", runner)],
             sample_fps=2.0,
             segment_sec=1.0,
             use_gps=False,
@@ -82,6 +82,8 @@ def test_extract_writes_v2_compliant_file_with_synthetic_grid(tmp_path: Path) ->
     assert result.frame_count == 6
     assert result.track_mode == "synthetic_snake_grid"
     assert result.track_source is None
+    assert result.group_names == ["clip"]
+    assert result.embedding_dims == {"clip": 4}
 
     with h5py.File(output, "r") as h:
         assert int(h.attrs["schema_version"]) == schema.SCHEMA_VERSION
@@ -115,7 +117,7 @@ def test_extract_uses_real_gps_when_available(tmp_path: Path) -> None:
         ExtractOptions(
             video=video,
             output=output,
-            runner=runner,
+            runners=[("clip", runner)],
             sample_fps=2.0,
             segment_sec=1.0,
             use_gps=True,
@@ -134,6 +136,46 @@ def test_extract_uses_real_gps_when_available(tmp_path: Path) -> None:
         assert "interpolation" in h["clip"].attrs
 
 
+def test_extract_writes_multiple_model_groups(tmp_path: Path) -> None:
+    """Two stub runners → two model groups in one file, one frame pass."""
+    video = tmp_path / "data.mp4"
+    video.write_bytes(b"")
+
+    class StubDino(StubRunner):
+        def __init__(self) -> None:
+            super().__init__()
+            self.model_id = "stub/dinov2"
+            self.checkpoint = "stub-dino-1"
+            self.embedding_dim = 8
+            self.patch_grid = (2, 2)
+            self.preprocess = "stub-dino"
+
+        def embed_images(self, paths, batch_size: int = 16):
+            embeddings = np.zeros((len(paths), self.embedding_dim), dtype=np.float32)
+            attention = np.zeros((len(paths), 2, 2), dtype=np.float32)
+            return embeddings, attention
+
+    runners = [("clip", StubRunner()), ("dino", StubDino())]
+    result = extract(
+        ExtractOptions(
+            video=video,
+            output=tmp_path / "out.h5",
+            runners=runners,
+            sample_fps=2.0,
+            segment_sec=1.0,
+            use_gps=False,
+        )
+    )
+    assert result.group_names == ["clip", "dino"]
+    assert result.embedding_dims == {"clip": 4, "dino": 8}
+
+    with h5py.File(result.features_path, "r") as h:
+        assert h["clip/embeddings"].shape == (6, 4)
+        assert h["dino/embeddings"].shape == (6, 8)
+        assert h["dino/attention_maps"].shape == (6, 2, 2)
+        assert list(h["dino"].attrs["patch_grid"]) == [2, 2]
+
+
 def test_extract_rejects_reserved_group(tmp_path: Path) -> None:
     video = tmp_path / "data.mp4"
     video.write_bytes(b"")
@@ -143,8 +185,21 @@ def test_extract_rejects_reserved_group(tmp_path: Path) -> None:
             ExtractOptions(
                 video=video,
                 output=tmp_path / "out.h5",
-                runner=runner,
-                group_name="gps",
+                runners=[("gps", runner)],
+            )
+        )
+
+
+def test_extract_rejects_duplicate_group_names(tmp_path: Path) -> None:
+    video = tmp_path / "data.mp4"
+    video.write_bytes(b"")
+    with pytest.raises(ValueError, match="duplicate"):
+        extract(
+            ExtractOptions(
+                video=video,
+                output=tmp_path / "out.h5",
+                runners=[("clip", StubRunner()), ("clip", StubRunner())],
+                use_gps=False,
             )
         )
 
@@ -163,7 +218,7 @@ def test_extract_rejects_runner_dim_mismatch(tmp_path: Path) -> None:
             ExtractOptions(
                 video=video,
                 output=tmp_path / "out.h5",
-                runner=runner,
+                runners=[("clip", runner)],
                 use_gps=False,
             )
         )

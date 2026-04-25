@@ -205,8 +205,7 @@ def main() -> int:
                 ExtractOptions(
                     video=args.video,
                     output=features_path,
-                    runner=runner,
-                    group_name=args.group,
+                    runners=[(args.group, runner)],
                     sample_fps=args.sample_fps,
                     segment_sec=args.segment_sec,
                     batch_size=args.batch_size,
@@ -221,7 +220,7 @@ def main() -> int:
             )
             sample_fps = result.sample_fps
             timestamps = result.timestamps
-            embedding_dim = result.embedding_dim
+            embedding_dim = result.embedding_dims[args.group]
             track_mode = result.track_mode
 
         query_vec = runner.embed_text(args.query)

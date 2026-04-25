@@ -67,6 +67,9 @@ def resolve_backend(requested: str) -> str:
     )
 
 
+SUPPORTED_FAMILIES = ("clip", "dino", "jepa")
+
+
 def make_runner(
     name: str,
     *,
@@ -77,35 +80,61 @@ def make_runner(
 ) -> ModelRunner:
     """Construct a runner for the named model family.
 
-    name: short family identifier. For Phase 2, only 'clip' is supported.
+    name: short family identifier. Supported in Phase 3: 'clip', 'dino', 'jepa'.
     checkpoint: HF / hub identifier; defaults to the family's canonical small
         variant when omitted.
     backend: see resolve_backend().
     device: only consulted by PyTorch backends. 'auto' picks cuda > mps > cpu.
     """
-    if name != "clip":
-        raise ValueError(f"unsupported model family: {name!r}; supported: ['clip']")
+    if name not in SUPPORTED_FAMILIES:
+        raise ValueError(
+            f"unsupported model family: {name!r}; supported: {list(SUPPORTED_FAMILIES)}"
+        )
 
     chosen = resolve_backend(backend)
-    if chosen == "cpu":
+
+    if name == "clip":
+        if chosen == "mlx":
+            from .clip_mlx import CLIPMLXRunner
+
+            return CLIPMLXRunner(
+                checkpoint=checkpoint or "openai/clip-vit-base-patch32",
+                **kwargs,
+            )
         from .clip_pytorch import CLIPPyTorchRunner
 
         return CLIPPyTorchRunner(
             checkpoint=checkpoint or "openai/clip-vit-base-patch32",
-            device="cpu",
+            device="cpu" if chosen == "cpu" else device,
             **kwargs,
         )
-    if chosen == "mlx":
-        from .clip_mlx import CLIPMLXRunner
 
-        return CLIPMLXRunner(
-            checkpoint=checkpoint or "openai/clip-vit-base-patch32",
+    if name == "dino":
+        if chosen == "mlx":
+            raise NotImplementedError(
+                "MLX-native DINO runner is not implemented yet; "
+                "use backend='pytorch'."
+            )
+        from .dino_pytorch import DINOPyTorchRunner
+
+        return DINOPyTorchRunner(
+            checkpoint=checkpoint or "facebook/dinov2-base",
+            device="cpu" if chosen == "cpu" else device,
             **kwargs,
         )
-    from .clip_pytorch import CLIPPyTorchRunner
 
-    return CLIPPyTorchRunner(
-        checkpoint=checkpoint or "openai/clip-vit-base-patch32",
-        device=device,
-        **kwargs,
-    )
+    if name == "jepa":
+        if chosen == "mlx":
+            raise NotImplementedError(
+                "MLX-native V-JEPA 2 runner is not implemented yet; "
+                "use backend='pytorch'."
+            )
+        from .jepa_pytorch import VJEPAPyTorchRunner
+
+        return VJEPAPyTorchRunner(
+            checkpoint=checkpoint or "facebook/vjepa2-vit-large",
+            device="cpu" if chosen == "cpu" else device,
+            **kwargs,
+        )
+
+    raise AssertionError(f"unreachable: model family {name!r}")

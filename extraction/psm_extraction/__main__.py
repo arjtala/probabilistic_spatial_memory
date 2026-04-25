@@ -61,11 +61,16 @@ def _build_parser() -> argparse.ArgumentParser:
     extract.add_argument(
         "--models",
         default="clip",
-        help="Comma-separated model family names. Phase 2 supports 'clip' only.",
+        help="Comma-separated model family names. Supported: clip, dino, jepa.",
     )
     extract.add_argument(
         "--checkpoint",
-        help="Override the default checkpoint for the chosen model family.",
+        action="append",
+        help=(
+            "Per-family checkpoint override of the form FAMILY:CHECKPOINT, "
+            "e.g. --checkpoint dino:facebook/dinov2-large. May be passed "
+            "multiple times to override multiple families."
+        ),
     )
     extract.add_argument(
         "--backend",
@@ -86,6 +91,21 @@ def _build_parser() -> argparse.ArgumentParser:
         "--gps-source",
         type=Path,
         help="HDF5 with a dino/jepa/gps group; auto-detect <video_dir>/features.h5.",
+    )
+    extract.add_argument(
+        "--gps-json",
+        type=Path,
+        help="Aria-style gps.json sidecar; auto-detect <video_dir>/gps.json.",
+    )
+    extract.add_argument(
+        "--imu-json",
+        type=Path,
+        help="Aria-style imu.json sidecar; auto-detect <video_dir>/imu.json.",
+    )
+    extract.add_argument(
+        "--metadata-json",
+        type=Path,
+        help="Aria metadata.json (used to derive the absolute timestamp epoch).",
     )
     extract.add_argument(
         "--no-gps",
@@ -121,33 +141,55 @@ def _handle_migrate(args: argparse.Namespace) -> int:
 
 def _handle_extract(args: argparse.Namespace) -> int:
     from .extract import ExtractOptions, extract
-    from .models import make_runner
+    from .models import SUPPORTED_FAMILIES, make_runner
 
     requested = [m.strip() for m in args.models.split(",") if m.strip()]
-    if requested != ["clip"]:
+    if not requested:
+        raise SystemExit("--models cannot be empty")
+    unsupported = [m for m in requested if m not in SUPPORTED_FAMILIES]
+    if unsupported:
         raise SystemExit(
-            f"Phase 2 supports --models clip; got {args.models!r}. "
-            "Multi-model support lands in Phase 3."
+            f"unsupported model families: {unsupported}; "
+            f"supported: {list(SUPPORTED_FAMILIES)}"
         )
 
-    runner = make_runner(
-        "clip",
-        checkpoint=args.checkpoint,
-        backend=args.backend,
-        device=args.device,
-    )
+    checkpoints: dict[str, str] = {}
+    for entry in args.checkpoint or []:
+        if ":" not in entry:
+            raise SystemExit(
+                f"--checkpoint must be of the form FAMILY:PATH; got {entry!r}"
+            )
+        family, path = entry.split(":", 1)
+        if family not in requested:
+            raise SystemExit(
+                f"--checkpoint {entry!r} references {family!r}, which is not in --models"
+            )
+        checkpoints[family] = path
+
+    runners: list[tuple[str, object]] = []
     try:
+        for family in requested:
+            runner = make_runner(
+                family,
+                checkpoint=checkpoints.get(family),
+                backend=args.backend,
+                device=args.device,
+            )
+            runners.append((family, runner))
+
         result = extract(
             ExtractOptions(
                 video=args.video,
                 output=args.output,
-                runner=runner,
-                group_name=args.group,
+                runners=runners,
                 sample_fps=args.sample_fps,
                 segment_sec=args.segment_sec,
                 batch_size=args.batch_size,
                 use_gps=not args.no_gps,
                 gps_source=args.gps_source,
+                gps_json=args.gps_json,
+                imu_json=args.imu_json,
+                metadata_json=args.metadata_json,
                 grid_columns=args.grid_columns,
                 cell_step_deg=args.cell_step_deg,
                 keep_frames=args.keep_frames,
@@ -158,18 +200,23 @@ def _handle_extract(args: argparse.Namespace) -> int:
             )
         )
     finally:
-        runner.close()
+        for _name, runner in runners:
+            try:
+                runner.close()
+            except Exception:  # noqa: BLE001
+                pass
+
     payload = {
         "features_path": str(result.features_path),
-        "group_name": result.group_name,
+        "group_names": result.group_names,
         "frame_count": result.frame_count,
-        "embedding_dim": result.embedding_dim,
+        "embedding_dims": result.embedding_dims,
         "sample_fps": result.sample_fps,
         "duration_sec": result.duration_sec,
         "track_mode": result.track_mode,
         "track_source": str(result.track_source) if result.track_source else None,
         "track_source_group": result.track_source_group,
-        "backend": runner.backend if hasattr(runner, "backend") else None,
+        "sensor_groups_written": result.sensor_groups_written,
     }
     print(json.dumps(payload, indent=2))
     return 0

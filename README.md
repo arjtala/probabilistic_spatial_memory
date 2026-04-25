@@ -230,12 +230,23 @@ When a session HDF5 with a per-frame `dino` / `jepa` / `gps` group sits next to 
 The demo is a thin shim over `python -m psm_extraction extract` (Phase 2 of the extraction pipeline). For programmatic / batch use, prefer the package CLI directly:
 
 ```bash
+# CLIP only
 python -m psm_extraction extract \
   --video /path/to/video.mp4 \
   --output /path/to/clip_features.h5 \
   --models clip \
   --backend auto \
   --sample-fps 2 --segment-sec 1
+
+# Reproduce the Aria pipeline shape: clip + dino + jepa groups in one v2 file,
+# pulling gps.json + imu.json + metadata.json from <video_dir> automatically.
+python -m psm_extraction extract \
+  --video /path/to/data.mp4 \
+  --output /path/to/features.h5 \
+  --models clip,dino,jepa \
+  --checkpoint dino:facebook/dinov2-large \
+  --sample-fps 30 --segment-sec 1 \
+  --session-id <session>
 ```
 
 ```bash
