@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Minimal E5 demo: CLIP text query -> psm --similar-to -> retrieved intervals.
+"""Minimal E5 demo: CLIP text query -> psm --search -> retrieved intervals.
 
 Thin shim over the in-tree extraction package. The first run builds (or
 auto-detects from a sibling features.h5) a CLIP-embedded clip group and
@@ -51,7 +51,7 @@ def parse_args() -> argparse.Namespace:
         description=(
             "Sample a video, embed frames + query in CLIP, write a v2 PSM "
             "HDF5 group via the in-tree psm_extraction package, run "
-            "psm --similar-to, and print the retrieved intervals."
+            "psm --search, and print the retrieved intervals."
         )
     )
     parser.add_argument("video", type=Path, help="Video to index.")
@@ -114,7 +114,7 @@ def run_psm(
         "-p", str(precision),
         "--top", str(top),
         "--exemplars", str(exemplars),
-        "--similar-to", str(query_path),
+        "--search", str(query_path),
         "-j",
     ]
     if verbose:

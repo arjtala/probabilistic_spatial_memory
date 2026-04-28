@@ -148,7 +148,7 @@ Context: a forthcoming NeurIPS 2026 streaming egocentric memory benchmark (the "
 - [x] Expose `SpatialMemory_query_intervals(lat, lng, k_ring, out_tuples)` returning top-k `(cell, t_start, t_end, count)` tuples over the H3 neighborhood
 - [x] `psm --last-seen lat,lng --k-ring N --top N` CLI surface + JSON output (`"mode": "last_seen"` discriminator; `schema_version` unchanged at 1)
 - [x] Benchmark scenario in `benchmarks/benchmark_spatial_memory.c`: "location-trace query latency" over a populated session — first-class measurement for E7
-- [x] `SpatialMemory_query_similar(query, dim, k_ring, center, out)` — rank tiles by cosine similarity of the best exemplar; `psm --similar-to <bin>` / `--center LAT,LNG` / `--exemplars N` CLI; benchmark scenario `query_similar` (E5's text-query adapter now has a concrete backend to target)
+- [x] `SpatialMemory_query_similar(query, dim, k_ring, center, out)` — rank tiles by cosine similarity of the best exemplar; `psm --search <bin>` / `--center LAT,LNG` / `--exemplars N` CLI; benchmark scenario `query_similar` (E5's text-query adapter now has a concrete backend to target)
 
 ## Extraction Pipeline
 
@@ -173,7 +173,7 @@ Schema v1 is the format the existing `features.h5` uses (no file-level metadata,
 - [ ] `models/clip_mlx.py` MLX-native CLIP for Apple Silicon. CURRENTLY A STUB raising NotImplementedError so the auto-pick falls through to PyTorch MPS until the upstream mlx-clip API is verified end-to-end. Tracked as a Phase 2 follow-up.
 - [x] `io/video.py` ffmpeg-backed frame reader (lifted from the demo).
 - [x] `align.py` GPS interpolation onto frame timestamps via `load_session_track` + `map_frames_to_gps`; synthetic snake-grid fallback for plain videos. IMU interpolation is deferred (the C ingest doesn't consume per-frame IMU snapshots; viz consumers can read `imu/` directly from the canonical sensor group).
-- [x] `python -m psm_extraction extract --video data.mp4 --models clip --output features.h5` produces a v2-compliant file consumed unchanged by `psm --similar-to`. Same flow exposed via the refactored `scripts/e5_clip_demo.py` thin shim.
+- [x] `python -m psm_extraction extract --video data.mp4 --models clip --output features.h5` produces a v2-compliant file consumed unchanged by `psm --search`. Same flow exposed via the refactored `scripts/e5_clip_demo.py` thin shim.
 - [ ] Smoke test against a synthetic video fixture (FFmpeg `testsrc`) under both backends, verifying embeddings match within a tight cosine-similarity tolerance. Blocked on the MLX runner.
 
 ### Phase 3 — Aria VRS + DINOv3 + V-JEPA 2

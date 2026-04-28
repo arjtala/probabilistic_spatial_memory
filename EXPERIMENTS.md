@@ -192,7 +192,7 @@ Question:
 - Does PSM's spatial + temporal prior materially close the Localization Paradox gap on frontier MLLMs?
 
 Current capability:
-- `SpatialMemory_query_similar(...)` / `psm --similar-to` provide the retrieval backend for the text-query adapter.
+- `SpatialMemory_query_similar(...)` / `psm --search` provide the retrieval backend for the text-query adapter.
 - `scripts/e5_clip_demo.py` is a minimal local demo over a plain video using CLIP image/text embeddings and a synthetic track.
 - The in-tree extraction pipeline (`python -m psm_extraction extract --models clip,dino[,jepa]`) reproduces the Aria pipeline's `features.h5` shape end-to-end on Apple Silicon — verified on a 15-min Fulham session with DINOv3 attention-distribution parity to the original. So a benchmark session that ships `data.mp4 + gps.json + imu.json + metadata.json` can be ingested entirely in-house, no external pipeline required.
 - Full benchmark evaluation is still external to this repo: it needs a benchmark subset and one MLLM inference endpoint.
@@ -205,7 +205,7 @@ Inputs:
 Protocol:
 1. Ingest each session into PSM with fixed `(h3_resolution, time_window_sec, capacity, precision)`.
 2. For each benchmark query, embed the question via the text adapter and combine with the trigger-moment observation if the adapter requires frame-conditioned disambiguation.
-3. Call `SpatialMemory_query_similar(...)` (or `psm --similar-to <query.f32>`) for top-k candidate `(cell, t_start, t_end)` tuples from matching tiles.
+3. Call `SpatialMemory_query_similar(...)` (or `psm --search <query.f32>`) for top-k candidate `(cell, t_start, t_end)` tuples from matching tiles.
 4. Feed the candidates as explicit grounding context to the MLLM alongside the question and the last-visible frame.
 5. Measure `mIoU`, `R@1`, and `GQ@0.5` (the benchmark's grounding metrics) vs. the raw-MLLM baseline in its main results table.
 
@@ -259,6 +259,56 @@ Readout:
 
 Decision rule:
 - If PSM achieves ≥50% Acc@5 at <10 ms median query latency while the MLLM baseline is >1 s, this experiment is the operational case for PSM as a memory backbone beneath a reasoning model.
+
+### E8. Cross-Session Place-Memory Stability
+
+Question:
+- On two separate captures of the same route, does PSM return the same top-k tiles and the same per-tile exemplars? That is, does the spatial memory carry a stable place-level identity across visits separated by hours, days, or weeks?
+
+Motivation:
+- Recent work on temporally consistent instance segmentation under sparse revisits (e.g., 4D indoor scene tracking that extends mAP to a temporal-identity metric) argues for stability across intermittent observations as a first-class evaluation axis. PSM operates at the *place* level rather than the *object* level, but the same question applies: does revisiting the same hex produce the same memory?
+- This is the cross-session counterpart to E1 (which probes single-session perturbation stability).
+
+Current capability:
+- Fully automatable with `psm --search -j` and `psm --last-seen -j`.
+- HLL sketches are mergeable, so a "merged across sessions" condition is also reachable by ingesting both sessions into a single run.
+
+Inputs:
+- Two or more captures of the same route under naturally varying conditions (different time of day, weather, foot traffic, minor route perturbations).
+- A small fixed query bank — the same `query.f32` files used for the demo (`q-bus.bin`, `q-zebra.bin`, etc.).
+
+Protocol:
+1. Hold `(group, h3_resolution, time_window_sec, capacity, precision, exemplars)` fixed across all sessions.
+2. For each session `s` and each query `q`, run:
+   ```bash
+   targets/psm -f "$SESSION_$s/features.h5" -g clip \
+     --search "$QBANK/$q.bin" --top 10 --exemplars 8 -j > "out/$s.$q.json"
+   ```
+3. Compute three stability scores per query:
+   - **Cell overlap @k**: Jaccard of the top-k cell sets across session pairs.
+   - **Rank correlation @k**: Spearman ρ on the cell rankings of the cells common to both sessions.
+   - **Exemplar drift**: cosine distance between the best exemplar embedding returned for each common cell across sessions.
+4. Repeat for `--last-seen LAT,LNG` at a small set of fixed coordinates along the route — this gives a query-free spatial baseline.
+
+Suggested summary:
+
+```bash
+jq -s '
+  def cells(x): [x.tiles[].cell];
+  def topk(x; k): cells(x)[:k];
+  {
+    overlap_top5:  ((topk(.[0]; 5)  - (topk(.[0]; 5)  - topk(.[1]; 5)))  | length) / 5,
+    overlap_top10: ((topk(.[0]; 10) - (topk(.[0]; 10) - topk(.[1]; 10))) | length) / 10
+  }' out/s1.bus.json out/s2.bus.json
+```
+
+Primary readout:
+- **Cell overlap @5** ≥ 0.6 across paired sessions on the same query is the headline number — the place memory is stable enough to support cross-session lookback.
+- **Rank correlation** disambiguates "right cells, wrong order" from "wrong cells entirely".
+- **Exemplar drift** isolates whether instability comes from the spatial layer (HLL/H3) or the appearance layer (per-tile reservoir).
+
+Decision rule:
+- If cell overlap @5 stays above 0.6 on the cue queries while a `--last-seen`-only baseline is at chance, the embedding-driven retrieval is providing genuine place-identity beyond raw geographic prior — that is the structural claim worth defending in the paper's evaluation.
 
 ## Reproducible Benchmark Sweeps
 

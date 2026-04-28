@@ -17,7 +17,7 @@ enum {
   LAST_SEEN_OPT_VAL = 0x1000,
   K_RING_OPT_VAL,
   TOP_OPT_VAL,
-  SIMILAR_TO_OPT_VAL,
+  SEARCH_OPT_VAL,
   CENTER_OPT_VAL,
   EXEMPLARS_OPT_VAL,
 };
@@ -40,8 +40,8 @@ typedef struct {
   double last_seen_lng;
   int last_seen_k_ring;
   size_t last_seen_top;
-  bool similar_to_mode;
-  const char *similar_to_path;
+  bool search_mode;
+  const char *search_path;
   bool has_center;
   double center_lat;
   double center_lng;
@@ -206,9 +206,9 @@ static void print_usage(const char *program) {
   fprintf(stderr, "  --last-seen LAT,LNG     Query last-seen intervals around (lat,lng)\n");
   fprintf(stderr, "  --k-ring N              H3 neighborhood radius (default: 0)\n");
   fprintf(stderr, "  --top N                 Max results to print (default: 5)\n");
-  fprintf(stderr, "  --similar-to <path>     Retrieve by embedding similarity (binary float32 LE vector)\n");
-  fprintf(stderr, "  --center LAT,LNG        Optional geographic center for --similar-to\n");
-  fprintf(stderr, "  --exemplars N           Per-tile reservoir size (auto-set to 8 with --similar-to)\n");
+  fprintf(stderr, "  --search <path>         Retrieve by embedding similarity (binary float32 LE vector)\n");
+  fprintf(stderr, "  --center LAT,LNG        Optional geographic center for --search\n");
+  fprintf(stderr, "  --exemplars N           Per-tile reservoir size (auto-set to 8 with --search)\n");
   fprintf(stderr, "\nRetention window = capacity * time-window (default: 12 * 5.0s = 60s).\n");
   fprintf(stderr, "Observations older than this age out of each tile's ring buffer.\n");
   fprintf(stderr, "For multi-minute sessions, widen with e.g. -C 30 -t 60 (30-min window).\n");
@@ -228,8 +228,8 @@ static void cli_options_init(CliOptions *options) {
   options->last_seen_lng = 0.0;
   options->last_seen_k_ring = 0;
   options->last_seen_top = 5;
-  options->similar_to_mode = false;
-  options->similar_to_path = NULL;
+  options->search_mode = false;
+  options->search_path = NULL;
   options->has_center = false;
   options->center_lat = 0.0;
   options->center_lng = 0.0;
@@ -331,7 +331,7 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
       {"last-seen", required_argument, NULL, LAST_SEEN_OPT_VAL},
       {"k-ring", required_argument, NULL, K_RING_OPT_VAL},
       {"top", required_argument, NULL, TOP_OPT_VAL},
-      {"similar-to", required_argument, NULL, SIMILAR_TO_OPT_VAL},
+      {"search", required_argument, NULL, SEARCH_OPT_VAL},
       {"center", required_argument, NULL, CENTER_OPT_VAL},
       {"exemplars", required_argument, NULL, EXEMPLARS_OPT_VAL},
       {0, 0, 0, 0},
@@ -402,9 +402,9 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
         return false;
       }
       break;
-    case SIMILAR_TO_OPT_VAL:
-      options->similar_to_path = optarg;
-      options->similar_to_mode = true;
+    case SEARCH_OPT_VAL:
+      options->search_path = optarg;
+      options->search_mode = true;
       break;
     case CENTER_OPT_VAL:
       if (!parse_lat_lng_pair(optarg, &options->center_lat,
@@ -428,13 +428,13 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
   if (!apply_positional_args(options, argc, argv, optind)) {
     return false;
   }
-  if (options->last_seen_mode && options->similar_to_mode) {
-    fprintf(stderr, "--last-seen and --similar-to are mutually exclusive\n");
+  if (options->last_seen_mode && options->search_mode) {
+    fprintf(stderr, "--last-seen and --search are mutually exclusive\n");
     return false;
   }
   // Auto-enable a modest exemplar reservoir when similarity search is requested
   // and the user hasn't overridden --exemplars explicitly.
-  if (options->similar_to_mode && options->exemplar_capacity == 0) {
+  if (options->search_mode && options->exemplar_capacity == 0) {
     options->exemplar_capacity = 8;
   }
   if (!options->filepath) {
@@ -567,7 +567,7 @@ static void print_similar_json(const SpatialMemorySimilar *results, size_t n,
                                const IngestReader *reader, size_t tile_count) {
   fputs("{\n", stdout);
   fputs("  \"schema_version\": 1,\n", stdout);
-  fputs("  \"mode\": \"similar_to\",\n", stdout);
+  fputs("  \"mode\": \"search\",\n", stdout);
   fputs("  \"group\": ", stdout);
   print_json_string(stdout, opts->group);
   fputs(",\n", stdout);
@@ -601,7 +601,7 @@ static bool run_similar_output(SpatialMemory *sm, const CliOptions *opts,
                                const IngestReader *reader) {
   float *query = NULL;
   size_t dim = 0;
-  if (!load_float_vector_file(opts->similar_to_path, &query, &dim)) {
+  if (!load_float_vector_file(opts->search_path, &query, &dim)) {
     return false;
   }
 
@@ -714,7 +714,7 @@ int main(int argc, char *argv[]) {
     return ok ? 0 : 1;
   }
 
-  if (options.similar_to_mode) {
+  if (options.search_mode) {
     bool ok = run_similar_output(sm, &options, reader);
     IngestReader_close(reader);
     H5Fclose(file);

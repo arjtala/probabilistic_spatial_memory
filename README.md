@@ -194,7 +194,7 @@ targets/psm -f features.h5 -g dino -j
 targets/psm -f features.h5 -g dino --last-seen 37.484000,-122.148000 --k-ring 1 --top 5 -j
 
 # Similarity retrieval from a raw float32 LE query vector
-targets/psm -f clip_features.h5 -g clip --similar-to query.f32 --top 5 --exemplars 8 -j
+targets/psm -f clip_features.h5 -g clip --search query.f32 --top 5 --exemplars 8 -j
 
 # Legacy positional args still work
 targets/psm features.h5 dino 5.0 10 12 10
@@ -211,19 +211,19 @@ targets/psm features.h5 dino 5.0 10 12 10
 | `-j` | — | — | Emit JSON summary instead of text |
 | `-h` | — | — | Print help |
 | `--last-seen` | `LAT,LNG` | — | Return top interval hits around a coordinate |
-| `--similar-to` | `<path>` | — | Query by embedding similarity from a raw `float32` LE vector |
-| `--center` | `LAT,LNG` | — | Restrict `--similar-to` to a centered search neighborhood |
-| `--k-ring` | `<N>` | `0` | H3 neighborhood radius for `--last-seen` or centered `--similar-to` |
+| `--search` | `<path>` | — | Query by embedding similarity from a raw `float32` LE vector |
+| `--center` | `LAT,LNG` | — | Restrict `--search` to a centered search neighborhood |
+| `--k-ring` | `<N>` | `0` | H3 neighborhood radius for `--last-seen` or centered `--search` |
 | `--top` | `<N>` | `5` | Maximum query hits to print |
-| `--exemplars` | `<N>` | `8*` | Per-tile exemplar reservoir; auto-set to `8` with `--similar-to` |
+| `--exemplars` | `<N>` | `8*` | Per-tile exemplar reservoir; auto-set to `8` with `--search` |
 
 > **Retention:** each tile remembers observations for `capacity × time_window_sec` (default 60s). Query output is empty past that horizon — widen `-C` or `-t` for longer sessions.
 
-`--similar-to` expects a binary file containing a flat `float32` little-endian vector in the same embedding space as the HDF5 group's `embeddings` dataset. With `-j`, similarity results include `similarity`, `exemplar_t`, and the retained `t_min`/`t_max` interval for each matching tile.
+`--search` expects a binary file containing a flat `float32` little-endian vector in the same embedding space as the HDF5 group's `embeddings` dataset. With `-j`, results include `similarity`, `exemplar_t`, and the retained `t_min`/`t_max` interval for each matching tile.
 
 ## E5 Demo
 
-`scripts/e5_clip_demo.py` is a minimal plain-video harness for the E5 text-query path. It samples frames with `ffmpeg`, embeds the frames and the text query with CLIP, writes a native `clip` HDF5 group plus the raw `float32` LE query file, then calls `targets/psm --similar-to -j` and prints the retrieved intervals.
+`scripts/e5_clip_demo.py` is a minimal plain-video harness for the E5 text-query path. It samples frames with `ffmpeg`, embeds the frames and the text query with CLIP, writes a native `clip` HDF5 group plus the raw `float32` LE query file, then calls `targets/psm --search -j` and prints the retrieved intervals.
 
 When a session HDF5 with a per-frame `dino` / `jepa` / `gps` group sits next to the video (or is passed via `--gps-source PATH`), the script interpolates real GPS onto the CLIP frame timestamps so retrieved cells are real H3 cells around the captured route. With no GPS available — or if you pass `--no-gps` — frames lay onto a synthetic H3 snake-grid so each fixed-duration segment lands in its own pseudo-cell.
 
