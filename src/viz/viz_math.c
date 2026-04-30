@@ -132,3 +132,25 @@ void build_ortho_projection(float matrix[16], double half_w, double half_h,
   matrix[12] = (float)(-offset_x / half_w);
   matrix[13] = (float)(-offset_y / half_h);
 }
+
+void build_map_projection(float matrix[16], MapProjectionMode projection_mode,
+                          double half_w, double half_h, double offset_x,
+                          double offset_y) {
+  double m00, m01, m10, m11;
+  double proj_half_w, proj_half_h;
+
+  build_identity_matrix(matrix);
+  VizMap_projection_basis(projection_mode, &m00, &m01, &m10, &m11);
+  VizMap_projected_half_extents(projection_mode, half_w, half_h, &proj_half_w,
+                                &proj_half_h);
+  if (proj_half_w <= 0.0) proj_half_w = half_w;
+  if (proj_half_h <= 0.0) proj_half_h = half_h;
+
+  matrix[0] = (float)(m00 / proj_half_w);
+  matrix[4] = (float)(m01 / proj_half_w);
+  matrix[1] = (float)(m10 / proj_half_h);
+  matrix[5] = (float)(m11 / proj_half_h);
+  matrix[10] = -1.0f;
+  matrix[12] = (float)(-(m00 * offset_x + m01 * offset_y) / proj_half_w);
+  matrix[13] = (float)(-(m10 * offset_x + m11 * offset_y) / proj_half_h);
+}

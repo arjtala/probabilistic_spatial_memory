@@ -366,18 +366,19 @@ void GpsTrace_upload(GpsTrace *gt, double proj_center_lat, double proj_center_ln
   gt->last_center_lng = center_lng;
 }
 
-void GpsTrace_draw(GpsTrace *gt, int viewport_w, int viewport_h, double zoom) {
+void GpsTrace_draw(GpsTrace *gt, int viewport_w, int viewport_h, double zoom,
+                   MapProjectionMode projection_mode) {
   if (!gt || gt->vertex_count < 6) return;  // need at least position icon
 
   glUseProgram(gt->program);
 
-  // Same ortho projection as HexRenderer
+  // Same pane projection as the basemap + hex renderer.
   double aspect = (double)viewport_h / (double)viewport_w;
   double half_w = zoom;
   double half_h = zoom * aspect;
 
   float proj[16];
-  build_ortho_projection(proj, half_w, half_h, 0.0, 0.0);
+  build_map_projection(proj, projection_mode, half_w, half_h, 0.0, 0.0);
 
   glUniformMatrix4fv(gt->u_projection, 1, GL_FALSE, proj);
 

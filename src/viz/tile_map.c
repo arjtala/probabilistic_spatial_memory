@@ -162,7 +162,8 @@ void TileMap_configure_disk_cache(TileMap *tm, bool enabled, size_t max_bytes) {
 }
 
 void TileMap_draw(TileMap *tm, double center_lat, double center_lng,
-                  double zoom_degrees, int viewport_w, int viewport_h,
+                  double zoom_degrees, MapProjectionMode projection_mode,
+                  int viewport_w, int viewport_h,
                   int upload_budget) {
   if (center_lat == 0.0 && center_lng == 0.0) {
     tm->last_upload_count = 0;
@@ -183,16 +184,26 @@ void TileMap_draw(TileMap *tm, double center_lat, double center_lng,
   double aspect = (double)viewport_h / (double)viewport_w;
   double half_w = zoom_degrees;
   double half_h = zoom_degrees * aspect;
+  double basis_xx, basis_xy, basis_yx, basis_yy;
+  double visible_half_span = half_w;
 
   float proj[16];
-  build_ortho_projection(proj, half_w, half_h, 0.0, 0.0);
+  build_map_projection(proj, projection_mode, half_w, half_h, 0.0, 0.0);
 
   glUseProgram(tm->program);
   glUniformMatrix4fv(tm->u_projection, 1, GL_FALSE, proj);
 
   // Dynamic grid radius: enough tiles to cover the viewport
   double tile_degrees = 360.0 / pow(2.0, z);
-  int tiles_needed = (int)ceil(2.0 * zoom_degrees / tile_degrees) + 1;
+  VizMap_projection_basis(projection_mode, &basis_xx, &basis_xy, &basis_yx,
+                          &basis_yy);
+  (void)basis_xx;
+  (void)basis_yx;
+  (void)basis_yy;
+  if (projection_mode == MAP_PROJECTION_ISOMETRIC) {
+    visible_half_span = fmax(half_h, half_w + fabs(basis_xy) * half_h);
+  }
+  int tiles_needed = (int)ceil(2.0 * visible_half_span / tile_degrees) + 1;
   int radius = (tiles_needed / 2) + 1;
   if (radius < 2) radius = 2;
   if (radius > 5) radius = 5;

@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <curl/curl.h>
 #include "viz/gl_platform.h"
+#include "viz/map_view.h"
 #include "viz/tile_limits.h"
 #include "viz/tile_disk_cache.h"
 
@@ -85,7 +86,8 @@ TileMap *TileMap_new(GLuint program, const char *style_name,
                      const char *url_template, const char *api_key);
 void TileMap_configure_disk_cache(TileMap *tm, bool enabled, size_t max_bytes);
 void TileMap_draw(TileMap *tm, double center_lat, double center_lng,
-                  double zoom_degrees, int viewport_w, int viewport_h,
+                  double zoom_degrees, MapProjectionMode projection_mode,
+                  int viewport_w, int viewport_h,
                   int upload_budget);
 void TileMap_get_stats(TileMap *tm, TileMapStats *out_stats);
 void TileMap_free(TileMap *tm);

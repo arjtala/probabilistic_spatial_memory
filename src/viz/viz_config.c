@@ -2,6 +2,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -492,7 +493,8 @@ bool VizConfig_load_file(VizConfig *config, const char *path) {
     } else if (strcmp(key, "hex_extrude_scale") == 0) {
       char *endp = NULL;
       double parsed = strtod(value_buf, &endp);
-      if (endp == value_buf || parsed < 0.0 || parsed > 1.0) {
+      if (endp == value_buf || *endp != '\0' || !isfinite(parsed) ||
+          parsed < 0.0 || parsed > 1.0) {
         fprintf(stderr, "%s must be in [0.0, 1.0]\n", key);
         fclose(file);
         return false;

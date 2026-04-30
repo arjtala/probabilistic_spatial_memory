@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include "viz/gl_platform.h"
 #include "viz/imu_processor.h"
+#include "viz/map_view.h"
 
 typedef struct {
   GLuint vao;
@@ -34,7 +35,8 @@ GpsTrace *GpsTrace_new(GLuint program);
 void GpsTrace_push(GpsTrace *gt, double lat, double lng, const ImuPointMeta *imu);
 void GpsTrace_clear(GpsTrace *gt);
 void GpsTrace_upload(GpsTrace *gt, double proj_center_lat, double proj_center_lng);
-void GpsTrace_draw(GpsTrace *gt, int viewport_w, int viewport_h, double zoom);
+void GpsTrace_draw(GpsTrace *gt, int viewport_w, int viewport_h, double zoom,
+                   MapProjectionMode projection_mode);
 void GpsTrace_free(GpsTrace *gt);
 
 #endif

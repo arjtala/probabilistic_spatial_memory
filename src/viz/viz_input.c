@@ -108,8 +108,9 @@ static void zoom_map_about_screen_point(VizApp *app, GLFWwindow *window,
     return;
   }
   if (!VizMap_zoom_about_viewport_point(
-          center_lat, center_lng, app->hex_renderer->zoom, zoom_factor,
-          viewport_w, viewport_h, map_x, map_y, &new_center_lat,
+          center_lat, center_lng, app->hex_renderer->zoom,
+          app->hex_renderer->projection_mode, zoom_factor, viewport_w,
+          viewport_h, map_x, map_y, &new_center_lat,
           &new_center_lng, &new_zoom)) {
     return;
   }
@@ -246,8 +247,13 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
     break;
   case GLFW_KEY_E:
     if (app->hex_renderer) {
+      MapProjectionMode next_mode =
+          VizMap_next_projection_mode(app->hex_renderer->projection_mode);
+      HexRenderer_set_projection_mode(app->hex_renderer, next_mode);
       HexRenderer_toggle_extrude(app->hex_renderer);
-      printf("3D extrusion: %s (scale=%.2f)\n",
+      refresh_heatmap_mode(app);
+      printf("Map projection: %s, 3D extrusion: %s (scale=%.2f)\n",
+             VizMap_projection_mode_name(app->hex_renderer->projection_mode),
              app->hex_renderer->extrude_scale > 0.0 ? "on" : "off",
              app->hex_renderer->extrude_scale);
     }
@@ -312,13 +318,15 @@ static void cursor_pos_callback(GLFWwindow *window, double xpos, double ypos) {
 
   if (current_render_map_center(app, &center_lat, &center_lng)) {
     if (!VizMap_pan_center(center_lat, center_lng, app->hex_renderer->zoom,
-                           viewport_w, viewport_h, dx, dy, &new_center_lat,
+                           app->hex_renderer->projection_mode, viewport_w,
+                           viewport_h, dx, dy, &new_center_lat,
                            &new_center_lng)) {
       return;
     }
     set_manual_map_center(app, new_center_lat, new_center_lng);
   } else {
-    if (!VizMap_pan_center(0.0, 0.0, app->hex_renderer->zoom, viewport_w,
+    if (!VizMap_pan_center(0.0, 0.0, app->hex_renderer->zoom,
+                           app->hex_renderer->projection_mode, viewport_w,
                            viewport_h, dx, dy, &new_center_lat,
                            &new_center_lng)) {
       return;
