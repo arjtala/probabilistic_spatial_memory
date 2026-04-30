@@ -231,7 +231,7 @@ static void print_usage(const char *prog) {
   fprintf(stderr, "  imu_sample_budget, gps_point_budget,\n");
   fprintf(stderr, "  tile_uploads_per_frame,\n");
   fprintf(stderr, "  tile_disk_cache_enabled, tile_disk_cache_max_mb,\n");
-  fprintf(stderr, "  heatmap_mode,\n");
+  fprintf(stderr, "  heatmap_mode, hex_extrude_scale,\n");
   fprintf(stderr, "  tile_style, tile_api_key, tile_url_template\n");
   fprintf(stderr, "\nTile styles:\n");
   VizConfig_print_tile_styles(stderr);
@@ -244,6 +244,7 @@ static void print_usage(const char *prog) {
   fprintf(stderr, "  Drag        Pan map (on map pane)\n");
   fprintf(stderr, "  C           Re-center map and resume follow\n");
   fprintf(stderr, "  M           Cycle heatmap mode\n");
+  fprintf(stderr, "  E           Toggle 3D hex extrusion\n");
   fprintf(stderr, "  L           Toggle heatmap legend\n");
   fprintf(stderr, "  H           Toggle debug title HUD\n");
   fprintf(stderr, "  P           Save screenshot to captures/ (.png)\n");
@@ -625,6 +626,7 @@ int main(int argc, char *argv[]) {
   // ---- Create hex renderer, tile map, and GPS trace ----
   HexRenderer *hr = HexRenderer_new(hex_prog);
   HexRenderer_set_heatmap_mode(hr, heatmap_mode);
+  HexRenderer_set_extrude_scale(hr, config.hex_extrude_scale);
   app.hex_renderer = hr;
 
   TileMap *tm = TileMap_new(tile_prog, tile_source.style_name,

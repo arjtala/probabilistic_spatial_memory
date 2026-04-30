@@ -55,6 +55,9 @@ typedef struct {
   bool tile_disk_cache_enabled;
   int tile_disk_cache_max_mb;
   char heatmap_mode[VIZ_CONFIG_HEATMAP_MODE_CAP];
+  // 0.0 disables hex extrusion; >0 enables cabinet-projection 3D mode.
+  // Sane range is 0.10–0.50 (fraction of viewport half-height for max cell).
+  double hex_extrude_scale;
 
   char tile_style[VIZ_CONFIG_STYLE_CAP];
 

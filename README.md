@@ -332,6 +332,7 @@ tile_uploads_per_frame = 1
 tile_disk_cache_enabled = true
 tile_disk_cache_max_mb = 512
 heatmap_mode = "total"
+hex_extrude_scale = 0.0
 tile_style = "CartoDB.Positron"
 
 # Required for Stadia.* presets and any custom template using {api_key}
@@ -360,6 +361,7 @@ Tuning keys:
 - `tile_disk_cache_enabled`: enables or disables the on-disk raster tile cache.
 - `tile_disk_cache_max_mb`: maximum on-disk tile cache size per configured tile source before older cached tiles are pruned.
 - `heatmap_mode`: selects how H3 cells are scored before coloring. `total` shows the rolling merged count across the active ring buffer, `current` shows current-bucket activity only, and `recency` shows `current / total` to highlight cells that are active now relative to their longer-term history.
+- `hex_extrude_scale`: cabinet-projection 3D extrusion. `0.0` (default) renders flat hexes; values in `0.10`–`0.50` raise the tallest cell by that fraction of the visible viewport so dominant memory cells read as terrain. Toggle at runtime with `E`.
 
 Available `tile_style` presets:
 - `CartoDB.Positron`
@@ -387,6 +389,7 @@ Downloaded raster tiles are cached on disk and replay through the same threaded 
 | Drag (map) | Pan map manually |
 | C | Re-center map and resume smooth follow |
 | M | Cycle heatmap mode (`total` → `current` → `recency`) |
+| E | Toggle 3D hex extrusion (cabinet projection) |
 | L | Toggle the heatmap legend overlay |
 | H | Toggle live debug title HUD |
 | P | Save a screenshot of the current composed frame to `captures/` as `.png` |
@@ -399,9 +402,9 @@ Screenshots save into `<session_dir>/captures/` when a session directory is conf
 
 The debug HUD lives in the window title and shows playback/decode budgets, ingest drain activity, tile pipeline queue counts, and tile disk-cache health in real time. For the `v`, `in`, `imu`, `gps`, and `up` fields, the HUD shows `work/current_budget`; when adaptive backpressure boosts a budget above its configured base, the base appears in parentheses, for example `256/384(128)`. A trailing `*` means that lane still had backlog after spending its frame budget. Tile fields are: `act` active network downloads, `rdy` compressed tiles ready for decode, `dec` tiles currently being decoded, `pix` decoded tiles waiting for GL upload, and `c` resident cached tile textures. Disk-cache fields are: `h` disk cache hits, `w` cache writes, `p` pruned files, and `m` cached MiB used versus cap.
 
-**Layout:** Left half shows video with optional attention/prediction heatmap overlay. Right half shows configurable raster tiles (default: `CartoDB.Positron`) with H3 hex heatmap (viridis), GPS trace ribbon, and camera frustum. The map view follows the latest GPS/IMU-driven position smoothly by default; manual drag temporarily overrides that view until you re-center with `C`.
+**Layout:** Left half shows video with optional attention/prediction heatmap overlay. Right half shows configurable raster tiles (default: `CartoDB.Positron`) with H3 hex heatmap (RGB-cube tour: black → red → yellow → green → cyan → blue → magenta → white), GPS trace ribbon, and camera frustum. The map view follows the latest GPS/IMU-driven position smoothly by default; manual drag temporarily overrides that view until you re-center with `C`.
 
-**Hex heatmap semantics:** The color ramp is always relative to the hottest tile currently rendered. Low-intensity tiles appear dark purple, mid-range tiles shift toward teal/cyan, and the hottest tiles appear yellow. Alpha also rises with intensity, so stronger cells look more solid.
+**Hex heatmap semantics:** The color ramp is always relative to the hottest tile currently rendered. The colormap is an RGB-cube tour — low-intensity tiles appear near-black, climbing through red, yellow, green, cyan, blue, magenta, and ending at white for the hottest tiles. Alpha also rises with intensity, so stronger cells look more solid. The ramp is striking but not perceptually uniform; cube-corner transitions (e.g. yellow→green) look like bigger jumps than mid-edge transitions of equal numeric distance.
 
 Mode-specific behavior:
 - `total`: colors by merged distinct-count across the full active ring-buffer horizon. This is the historical memory view.

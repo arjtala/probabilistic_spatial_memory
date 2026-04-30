@@ -29,25 +29,28 @@ static void assert_in_unit_interval(float value) {
 static void test_count_to_color(void) {
   float r, g, b, a;
 
+  // Negative t clamps to 0 -> black, fully unsaturated.
   count_to_color(-1.0, &r, &g, &b, &a);
-  assert_close(0.2777, r, 1e-4);
-  assert_close(0.0054, g, 1e-4);
-  assert_close(0.3341, b, 1e-4);
+  assert_close(0.0, r, 1e-4);
+  assert_close(0.0, g, 1e-4);
+  assert_close(0.0, b, 1e-4);
   assert_close(0.7, a, 1e-4);
 
+  // t=0.5 sits halfway through segment 3 (green->cyan): G=1, B=0.5.
   count_to_color(0.5, &r, &g, &b, &a);
   assert_close(0.0, r, 1e-4);
-  assert_close(0.8531734, g, 1e-4);
-  assert_close(1.0, b, 1e-4);
+  assert_close(1.0, g, 1e-4);
+  assert_close(0.5, b, 1e-4);
   assert_close(0.85, a, 1e-4);
   assert_in_unit_interval(r);
   assert_in_unit_interval(g);
   assert_in_unit_interval(b);
 
+  // t>1 clamps to 1 -> white at the top of the cube tour.
   count_to_color(2.0, &r, &g, &b, &a);
-  assert_close(0.9869, r, 1e-4);
-  assert_close(0.9064, g, 1e-4);
-  assert_close(0.1314, b, 1e-4);
+  assert_close(1.0, r, 1e-4);
+  assert_close(1.0, g, 1e-4);
+  assert_close(1.0, b, 1e-4);
   assert_close(1.0, a, 1e-4);
 }
 

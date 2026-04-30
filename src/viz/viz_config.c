@@ -225,6 +225,7 @@ void VizConfig_init(VizConfig *config) {
   config->tile_disk_cache_enabled = true;
   config->tile_disk_cache_max_mb = VIZ_CONFIG_DEFAULT_TILE_DISK_CACHE_MAX_MB;
   snprintf(config->heatmap_mode, sizeof(config->heatmap_mode), "%s", "total");
+  config->hex_extrude_scale = 0.0;
   snprintf(config->tile_style, sizeof(config->tile_style), "%s",
            "CartoDB.Positron");
 }
@@ -488,6 +489,15 @@ bool VizConfig_load_file(VizConfig *config, const char *path) {
         fclose(file);
         return false;
       }
+    } else if (strcmp(key, "hex_extrude_scale") == 0) {
+      char *endp = NULL;
+      double parsed = strtod(value_buf, &endp);
+      if (endp == value_buf || parsed < 0.0 || parsed > 1.0) {
+        fprintf(stderr, "%s must be in [0.0, 1.0]\n", key);
+        fclose(file);
+        return false;
+      }
+      config->hex_extrude_scale = parsed;
     } else if (strcmp(key, "tile_style") == 0) {
       if (!VizConfig_set_text(config->tile_style, sizeof(config->tile_style),
                               value_buf, key)) {

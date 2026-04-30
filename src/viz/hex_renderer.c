@@ -24,6 +24,17 @@ typedef struct {
   double cos_center;
 } HexRendererBuild;
 
+typedef struct {
+  Tile *tile;
+  double lat;
+} HexSortEntry;
+
+typedef struct {
+  HexSortEntry *entries;
+  size_t count;
+  size_t capacity;
+} HexSortBuffer;
+
 static double tile_heatmap_value(HexHeatmapMode mode, Tile *tile,
                                  SpatialMemory *sm, double *out_total,
                                  double *out_current) {
@@ -67,17 +78,28 @@ static bool collect_hex_renderer_stats(H3Index cell_id, Tile *tile,
   return true;
 }
 
-static bool append_hex_renderer_tile(H3Index cell_id, Tile *tile,
-                                     void *user_data) {
-  HexRendererBuild *build = (HexRendererBuild *)user_data;
-  (void)cell_id;
-  if (!build || !tile || !build->sm || !build->verts) return false;
+// Vertex layout: vec3 position (xy + extrude height) + vec4 color = 7 floats.
+#define HEX_VERT_FLOATS 7
 
+static inline void emit_vert(float *verts, size_t *vi, float x, float y,
+                             float z, float r, float g, float b, float a) {
+  size_t off = (*vi) * HEX_VERT_FLOATS;
+  verts[off + 0] = x;
+  verts[off + 1] = y;
+  verts[off + 2] = z;
+  verts[off + 3] = r;
+  verts[off + 4] = g;
+  verts[off + 5] = b;
+  verts[off + 6] = a;
+  (*vi)++;
+}
+
+static void emit_tile_geometry(HexRendererBuild *build, Tile *tile) {
   double total = 0.0;
   double current = 0.0;
   double value = tile_heatmap_value(build->hr->heatmap_mode, tile, build->sm,
                                     &total, &current);
-  if (value <= 0.0) return true;
+  if (value <= 0.0) return;
   double t = value / build->max_value;
 
   float r, g, b, a;
@@ -97,6 +119,13 @@ static bool append_hex_renderer_tile(H3Index cell_id, Tile *tile,
                      build->cos_center);
   float cy = (float)(radsToDegs(cell_center.lat) - build->hr->center_lat);
 
+  bool extruded = build->hr->extrude_scale > 0.0;
+  float h = extruded ? (float)t : 0.0f;
+  // Side walls: slightly darker for depth cue, half-alpha so the basemap
+  // shows through them the same way it shows through translucent tops.
+  float sr = r * 0.80f, sg = g * 0.80f, sb = b * 0.80f;
+  float sa = a * 0.50f;
+
   for (int i = 0; i < boundary.numVerts; i++) {
     int next = (i + 1) % boundary.numVerts;
 
@@ -109,31 +138,47 @@ static bool append_hex_renderer_tile(H3Index cell_id, Tile *tile,
     float by1 = (float)(radsToDegs(boundary.verts[next].lat) -
                         build->hr->center_lat);
 
-    build->verts[build->vi * 6 + 0] = cx;
-    build->verts[build->vi * 6 + 1] = cy;
-    build->verts[build->vi * 6 + 2] = r;
-    build->verts[build->vi * 6 + 3] = g;
-    build->verts[build->vi * 6 + 4] = b;
-    build->verts[build->vi * 6 + 5] = a;
-    build->vi++;
+    if (extruded) {
+      // Side wall as two triangles (b0_bottom, b1_bottom, b1_top) +
+      // (b0_bottom, b1_top, b0_top). Rendered before the top cap so the
+      // cap occludes its own walls correctly.
+      emit_vert(build->verts, &build->vi, bx0, by0, 0.0f, sr, sg, sb, sa);
+      emit_vert(build->verts, &build->vi, bx1, by1, 0.0f, sr, sg, sb, sa);
+      emit_vert(build->verts, &build->vi, bx1, by1, h,    sr, sg, sb, sa);
+      emit_vert(build->verts, &build->vi, bx0, by0, 0.0f, sr, sg, sb, sa);
+      emit_vert(build->verts, &build->vi, bx1, by1, h,    sr, sg, sb, sa);
+      emit_vert(build->verts, &build->vi, bx0, by0, h,    sr, sg, sb, sa);
+    }
 
-    build->verts[build->vi * 6 + 0] = bx0;
-    build->verts[build->vi * 6 + 1] = by0;
-    build->verts[build->vi * 6 + 2] = r;
-    build->verts[build->vi * 6 + 3] = g;
-    build->verts[build->vi * 6 + 4] = b;
-    build->verts[build->vi * 6 + 5] = a;
-    build->vi++;
-
-    build->verts[build->vi * 6 + 0] = bx1;
-    build->verts[build->vi * 6 + 1] = by1;
-    build->verts[build->vi * 6 + 2] = r;
-    build->verts[build->vi * 6 + 3] = g;
-    build->verts[build->vi * 6 + 4] = b;
-    build->verts[build->vi * 6 + 5] = a;
-    build->vi++;
+    // Top cap (or the only cap when not extruded).
+    emit_vert(build->verts, &build->vi, cx,  cy,  h, r, g, b, a);
+    emit_vert(build->verts, &build->vi, bx0, by0, h, r, g, b, a);
+    emit_vert(build->verts, &build->vi, bx1, by1, h, r, g, b, a);
   }
+}
 
+static int hex_sort_back_to_front(const void *a, const void *b) {
+  // Cabinet skew points up-and-right (positive Y component), so cells with
+  // larger lat are drawn first (farther back). Strict ordering avoids
+  // qsort instability on ties.
+  const HexSortEntry *ea = (const HexSortEntry *)a;
+  const HexSortEntry *eb = (const HexSortEntry *)b;
+  if (ea->lat > eb->lat) return -1;
+  if (ea->lat < eb->lat) return 1;
+  return 0;
+}
+
+static bool collect_hex_sort_entry(H3Index cell_id, Tile *tile,
+                                   void *user_data) {
+  HexSortBuffer *buf = (HexSortBuffer *)user_data;
+  (void)cell_id;
+  if (!buf || !tile) return false;
+  if (buf->count >= buf->capacity) return false;
+  LatLng center;
+  cellToLatLng(tile->cellId, &center);
+  buf->entries[buf->count].tile = tile;
+  buf->entries[buf->count].lat = radsToDegs(center.lat);
+  buf->count++;
   return true;
 }
 
@@ -143,10 +188,15 @@ HexRenderer *HexRenderer_new(GLuint program) {
 
   hr->program = program;
   hr->u_projection = glGetUniformLocation(program, "u_projection");
+  hr->u_extrude_dir = glGetUniformLocation(program, "u_extrude_dir");
   hr->zoom = 0.005;  // ~0.005 degrees ≈ 500m at equator
   hr->vertex_count = 0;
   hr->verts = NULL;
   hr->verts_capacity = 0;
+  hr->extrude_scale = 0.0;
+  hr->extrude_scale_default = 0.0;
+  hr->sort_scratch = NULL;
+  hr->sort_scratch_capacity = 0;
   // Sentinel guaranteed to miss on first draw; avoid NAN for -ffast-math safety.
   hr->cached_cos_lat = -999.0;
   hr->cached_cos_lat_key = -999.0;
@@ -157,11 +207,13 @@ HexRenderer *HexRenderer_new(GLuint program) {
   glBindVertexArray(hr->vao);
   glBindBuffer(GL_ARRAY_BUFFER, hr->vbo);
 
-  // Layout: vec2 position, vec4 color = 6 floats per vertex
-  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+  // Layout: vec3 position, vec4 color = 7 floats per vertex.
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+                        HEX_VERT_FLOATS * sizeof(float), (void *)0);
   glEnableVertexAttribArray(0);
-  glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
-                        (void *)(2 * sizeof(float)));
+  glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE,
+                        HEX_VERT_FLOATS * sizeof(float),
+                        (void *)(3 * sizeof(float)));
   glEnableVertexAttribArray(1);
 
   glBindVertexArray(0);
@@ -211,6 +263,25 @@ void HexRenderer_set_heatmap_mode(HexRenderer *hr, HexHeatmapMode mode) {
   hr->heatmap_mode = mode;
 }
 
+void HexRenderer_set_extrude_scale(HexRenderer *hr, double scale) {
+  if (!hr) return;
+  if (scale < 0.0) scale = 0.0;
+  if (scale > 1.0) scale = 1.0;
+  hr->extrude_scale = scale;
+  if (scale > 0.0) hr->extrude_scale_default = scale;
+}
+
+void HexRenderer_toggle_extrude(HexRenderer *hr) {
+  if (!hr) return;
+  if (hr->extrude_scale > 0.0) {
+    hr->extrude_scale = 0.0;
+    return;
+  }
+  // First-time toggle with no configured default picks a sane value.
+  if (hr->extrude_scale_default <= 0.0) hr->extrude_scale_default = 0.25;
+  hr->extrude_scale = hr->extrude_scale_default;
+}
+
 void HexRenderer_update(HexRenderer *hr, SpatialMemory *sm) {
   if (!hr || !sm) return;
   size_t tile_count = SpatialMemory_tile_count(sm);
@@ -238,11 +309,11 @@ void HexRenderer_update(HexRenderer *hr, SpatialMemory *sm) {
     hr->center_lng = stats.sum_lng / (double)stats.n_tiles;
   }
 
-  // Each hex has at most MAX_CELL_BNDRY_VERTS boundary vertices
-  // Triangle fan: center + N boundary verts -> N triangles -> 3*N vertices
-  // Max 10 boundary verts per hex -> 30 verts per hex
-  size_t max_verts = tile_count * 30;
-  size_t required = max_verts * 6;
+  // Per hex (max 10 boundary verts): top cap = 30 verts, side walls = 60
+  // verts when extruded. 90 verts/hex worst case, 30 when flat.
+  size_t verts_per_hex = (hr->extrude_scale > 0.0) ? 90 : 30;
+  size_t max_verts = tile_count * verts_per_hex;
+  size_t required = max_verts * HEX_VERT_FLOATS;
   if (hr->verts_capacity < required) {
     float *new_verts = realloc(hr->verts, required * sizeof(float));
     if (!new_verts) {
@@ -252,6 +323,31 @@ void HexRenderer_update(HexRenderer *hr, SpatialMemory *sm) {
     hr->verts = new_verts;
     hr->verts_capacity = required;
   }
+
+  // Sort tiles back-to-front so alpha composites correctly across stacked
+  // side walls. Cheap (~hundreds of tiles).
+  size_t sort_required = tile_count * sizeof(HexSortEntry);
+  if (hr->sort_scratch_capacity < sort_required) {
+    HexSortEntry *resized = realloc(hr->sort_scratch, sort_required);
+    if (!resized) {
+      hr->vertex_count = 0;
+      return;
+    }
+    hr->sort_scratch = resized;
+    hr->sort_scratch_capacity = sort_required;
+  }
+  HexSortBuffer sort_buf = {
+      .entries = (HexSortEntry *)hr->sort_scratch,
+      .count = 0,
+      .capacity = tile_count,
+  };
+  if (!SpatialMemory_for_each_tile(sm, collect_hex_sort_entry, &sort_buf)) {
+    hr->vertex_count = 0;
+    return;
+  }
+  qsort(sort_buf.entries, sort_buf.count, sizeof(HexSortEntry),
+        hex_sort_back_to_front);
+
   HexRendererBuild build = {
       .hr = hr,
       .sm = sm,
@@ -260,15 +356,15 @@ void HexRenderer_update(HexRenderer *hr, SpatialMemory *sm) {
       .max_value = stats.max_value,
       .cos_center = cos(hr->center_lat * M_PI / 180.0),
   };
-  if (!SpatialMemory_for_each_tile(sm, append_hex_renderer_tile, &build)) {
-    hr->vertex_count = 0;
-    return;
+  for (size_t i = 0; i < sort_buf.count; i++) {
+    emit_tile_geometry(&build, sort_buf.entries[i].tile);
   }
 
   hr->vertex_count = build.vi;
 
   glBindBuffer(GL_ARRAY_BUFFER, hr->vbo);
-  glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(build.vi * 6 * sizeof(float)),
+  glBufferData(GL_ARRAY_BUFFER,
+               (GLsizeiptr)(build.vi * HEX_VERT_FLOATS * sizeof(float)),
                hr->verts, GL_DYNAMIC_DRAW);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
@@ -300,6 +396,15 @@ void HexRenderer_draw(HexRenderer *hr, int viewport_w, int viewport_h,
 
   glUniformMatrix4fv(hr->u_projection, 1, GL_FALSE, proj);
 
+  // Cabinet skew direction in world degrees per unit normalized height.
+  // (0.3, 0.85) ≈ up-and-slightly-right; scale by zoom so the look is
+  // stable across zoom levels. extrude_scale=0 collapses to flat.
+  float ed_x = (float)(hr->extrude_scale * hr->zoom * 0.30);
+  float ed_y = (float)(hr->extrude_scale * hr->zoom * 0.85);
+  if (hr->u_extrude_dir >= 0) {
+    glUniform2f(hr->u_extrude_dir, ed_x, ed_y);
+  }
+
   glBindVertexArray(hr->vao);
   glDrawArrays(GL_TRIANGLES, 0, (GLsizei)hr->vertex_count);
   glBindVertexArray(0);
@@ -310,5 +415,6 @@ void HexRenderer_free(HexRenderer *hr) {
   glDeleteBuffers(1, &hr->vbo);
   glDeleteVertexArrays(1, &hr->vao);
   free(hr->verts);
+  free(hr->sort_scratch);
   free(hr);
 }

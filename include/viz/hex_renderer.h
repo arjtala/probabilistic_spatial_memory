@@ -24,10 +24,19 @@ typedef struct {
   double pan_offset_lat;
   double pan_offset_lng;
   HexHeatmapMode heatmap_mode;
+  // Cabinet-projection extrusion: 0 disables (flat); >0 raises hex height
+  // proportional to intensity. Units = fraction of viewport half-height,
+  // so the tallest cell rises by (extrude_scale * zoom) world degrees.
+  double extrude_scale;
+  double extrude_scale_default;
+  GLint u_extrude_dir;
   // Reusable CPU-side vertex staging buffer (hoisted out of per-frame update).
   // verts_capacity tracks capacity in floats (not bytes).
   float *verts;
   size_t verts_capacity;
+  // Sort scratch (cell pointer + lat) reused across frames.
+  void *sort_scratch;
+  size_t sort_scratch_capacity;
   // Cached cos(center_lat * pi/180) keyed by center_lat; sentinel -999.0
   // guarantees first-call miss. Avoid NAN because builds may use -ffast-math.
   double cached_cos_lat;
@@ -39,6 +48,8 @@ bool HexRenderer_parse_heatmap_mode(const char *text, HexHeatmapMode *out_mode);
 const char *HexRenderer_heatmap_mode_name(HexHeatmapMode mode);
 HexHeatmapMode HexRenderer_next_heatmap_mode(HexHeatmapMode mode);
 void HexRenderer_set_heatmap_mode(HexRenderer *hr, HexHeatmapMode mode);
+void HexRenderer_set_extrude_scale(HexRenderer *hr, double scale);
+void HexRenderer_toggle_extrude(HexRenderer *hr);
 void HexRenderer_update(HexRenderer *hr, SpatialMemory *sm);
 void HexRenderer_draw(HexRenderer *hr, int viewport_w, int viewport_h,
                       double map_center_lat, double map_center_lng);

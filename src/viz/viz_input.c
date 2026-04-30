@@ -244,6 +244,14 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
              HexRenderer_heatmap_mode_name(app->hex_renderer->heatmap_mode));
     }
     break;
+  case GLFW_KEY_E:
+    if (app->hex_renderer) {
+      HexRenderer_toggle_extrude(app->hex_renderer);
+      printf("3D extrusion: %s (scale=%.2f)\n",
+             app->hex_renderer->extrude_scale > 0.0 ? "on" : "off",
+             app->hex_renderer->extrude_scale);
+    }
+    break;
   case GLFW_KEY_RIGHT:
     app->playback_speed *= 2.0;
     if (app->playback_speed > 16.0) app->playback_speed = 16.0;

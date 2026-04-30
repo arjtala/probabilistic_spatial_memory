@@ -113,6 +113,11 @@
 
 - [ ] Add a lightweight map-cell inspector: hover or click a hex, show its count, mode value, recency, and H3 id; wire to an `I` toggle key
 - [ ] Add a legend panel showing the numeric ramp for the active `HexHeatmapMode` (today's legend only shows "LOW"/"HIGH")
+- [ ] 3D hex extrusion mode: render hex height proportional to `count / max_count` so dominant memory cells read at a glance instead of compressing into hue+alpha. Config knob (`hex_extrude_scale`) + runtime toggle key. Touches `src/viz/hex_renderer.c` and `shaders/hex.vert`/`hex.frag`; map-pane camera gains a small fixed pitch when active.
+
+## Paper Figures
+
+- [ ] Embedding-space companion figure to the geographic heatmap: project per-tile exemplar embeddings to 2D (UMAP or PCA), render as inferno density. Pairs with `psm-viz`'s geographic view to show what memory *contains* alongside where it *landed*. ~30 LOC Python over `features.h5`; lives under `scripts/` not the C engine.
 
 ## CLI & Security
 
