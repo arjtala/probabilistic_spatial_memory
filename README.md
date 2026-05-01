@@ -6,7 +6,7 @@ A bounded-memory, time-decayed spatial memory system built on probabilistic data
 
 `psm` turns timestamped egocentric video features into a bounded spatial memory: embeddings are hashed into H3 cells, each cell keeps a sliding ring buffer of HyperLogLog sketches, and the visualizer replays the session as synchronized video plus map.
 
-In the map view, brighter/yellower hexes indicate cells with higher distinct-observation counts relative to the hottest cell in the current scene. Older memory does not disappear continuously; it decays as time buckets roll over, and cells with history but little current activity fade by becoming more transparent.
+In the map view, hexes are colored along an RGB-cube tour (near-black for sparse cells, climbing through red, yellow, green, cyan, blue, magenta, and ending at white for the hottest cell relative to the current scene). Optional 3D extrusion (`E` to toggle) raises a cell's height in proportion to its intensity so dominant memory cells read at a glance. Older memory does not disappear continuously; it decays as time buckets roll over, and cells with history but little current activity fade by becoming more transparent.
 
 ## Why
 
