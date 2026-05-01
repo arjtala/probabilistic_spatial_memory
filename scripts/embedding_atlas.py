@@ -142,6 +142,78 @@ def render_density(coords: np.ndarray, out_path: Path, title: str) -> None:
     print(f"[atlas] wrote {out_path}", file=sys.stderr)
 
 
+def _draw_north_arrow(ax) -> None:
+    # Top-right corner of the data axes; "N" with a tick.
+    ax.annotate(
+        "N",
+        xy=(0.94, 0.92),
+        xycoords="axes fraction",
+        ha="center",
+        va="bottom",
+        color="white",
+        fontsize=10,
+        fontweight="bold",
+    )
+    ax.annotate(
+        "",
+        xy=(0.94, 0.92),
+        xytext=(0.94, 0.82),
+        xycoords="axes fraction",
+        textcoords="axes fraction",
+        arrowprops={
+            "arrowstyle": "-|>",
+            "color": "white",
+            "lw": 1.4,
+            "mutation_scale": 12,
+        },
+    )
+
+
+def _draw_scale_bar(ax, lat: np.ndarray, lng: np.ndarray) -> None:
+    # Lower-left scale bar in metres. 1° lat ≈ 111_320 m; 1° lng ≈ that × cos(lat).
+    span_lng = float(lng.max() - lng.min())
+    mid_lat = float(np.median(lat))
+    metres_per_deg_lng = 111_320.0 * np.cos(np.deg2rad(mid_lat))
+    span_m = span_lng * metres_per_deg_lng
+    if span_m <= 0:
+        return
+    # Round to a nice 1/2/5 × 10^n target ≈ a quarter of the visible width.
+    target = span_m / 4.0
+    pow10 = 10 ** np.floor(np.log10(target))
+    candidates = [1.0, 2.0, 5.0, 10.0]
+    target_m = min(candidates, key=lambda c: abs(c * pow10 - target)) * pow10
+
+    bar_deg = target_m / metres_per_deg_lng
+    x0_axes = 0.06
+    y0_axes = 0.08
+    y_text = y0_axes + 0.03
+    # Convert axes fraction → data coords for the bar's x extent.
+    x_min = float(lng.min())
+    x_max = float(lng.max())
+    pad_data = (x_max - x_min) * x0_axes
+    x_start = x_min + pad_data
+    x_end = x_start + bar_deg
+    y_data = lat.min() + (lat.max() - lat.min()) * y0_axes
+    ax.plot(
+        [x_start, x_end],
+        [y_data, y_data],
+        color="white",
+        lw=2.0,
+        solid_capstyle="butt",
+        zorder=5,
+    )
+    label = f"{int(target_m)} m" if target_m >= 1 else f"{target_m:.1f} m"
+    ax.text(
+        (x_start + x_end) / 2.0,
+        lat.min() + (lat.max() - lat.min()) * y_text,
+        label,
+        color="white",
+        fontsize=8,
+        ha="center",
+        zorder=5,
+    )
+
+
 def render_paired(
     lat: np.ndarray,
     lng: np.ndarray,
@@ -166,7 +238,7 @@ def render_paired(
     colors = np.array([cell_color[c] for c in cells])
 
     fig, (ax_geo, ax_emb) = plt.subplots(
-        1, 2, figsize=(15.0, 7.5), facecolor="black"
+        1, 2, figsize=(15.0, 7.8), facecolor="black"
     )
 
     # Geographic panel: lng on x, lat on y, equal-area aspect via cos(lat).
@@ -182,7 +254,9 @@ def render_paired(
     ax_emb.set_xlabel("dim 1", color="white")
     ax_emb.set_ylabel("dim 2", color="white")
 
-    # Query overlays as white-edged circles in BOTH panels.
+    # Query overlays as colored-edge circles in BOTH panels. We collect proxy
+    # artists so the figure-level legend reads the colors back unambiguously.
+    query_handles: list = []
     if queries:
         emb_norm = emb / (np.linalg.norm(emb, axis=1, keepdims=True) + 1e-9)
         palette = ["#FFFFFF", "#FFD166", "#7DF9FF", "#FF6EC7", "#A0E060"]
@@ -199,46 +273,99 @@ def render_paired(
             ax_geo.scatter(
                 lng[idx], lat[idx],
                 s=44, facecolors="none", edgecolors=edge, linewidths=1.0,
-                label=f"{label}", zorder=4,
+                zorder=4,
             )
             ax_emb.scatter(
                 coords[idx, 0], coords[idx, 1],
                 s=44, facecolors="none", edgecolors=edge, linewidths=1.0,
-                label=f"{label}", zorder=4,
+                zorder=4,
+            )
+            query_handles.append(
+                plt.Line2D(
+                    [0], [0],
+                    marker="o",
+                    markerfacecolor="none",
+                    markeredgecolor=edge,
+                    markeredgewidth=1.2,
+                    markersize=8,
+                    linestyle="None",
+                    label=f"{label} (top {topk})",
+                )
             )
 
-    # Per-panel styling.
     _style_axes(ax_geo, "geographic (lat / lng)")
     _style_axes(ax_emb, "embedding (UMAP)")
 
-    if queries:
-        leg = ax_emb.legend(
-            loc="best", fontsize=8, framealpha=0.7,
-            facecolor="#111111", edgecolor="#444444",
+    _draw_north_arrow(ax_geo)
+    _draw_scale_bar(ax_geo, lat, lng)
+
+    # Figure-level shared query legend, centered above both panels so it
+    # clearly applies to overlays in both.
+    if query_handles:
+        leg = fig.legend(
+            handles=query_handles,
+            loc="upper center",
+            bbox_to_anchor=(0.5, 0.96),
+            ncol=len(query_handles),
+            fontsize=9,
+            frameon=True,
+            framealpha=0.85,
+            facecolor="#1a1a1a",
+            edgecolor="#444444",
         )
         for txt in leg.get_texts():
             txt.set_color("white")
 
-    # Cell-color legend below both panels: short H3 prefix per swatch.
-    swatch_w = 0.8 / max(len(unique_cells), 1)
-    for i, c in enumerate(unique_cells):
-        rect_x = 0.1 + i * swatch_w
+    # Cell-color legend strip across the bottom, sitting on a lighter rounded
+    # panel for readability.
+    n = len(unique_cells)
+    if n > 0:
+        # Background panel (extends across the legend area).
+        panel_y = 0.020
+        panel_h = 0.052
+        panel_x0 = 0.06
+        panel_x1 = 0.94
         fig.patches.append(
             plt.Rectangle(
-                (rect_x, 0.02), swatch_w * 0.9, 0.018,
+                (panel_x0, panel_y),
+                panel_x1 - panel_x0,
+                panel_h,
                 transform=fig.transFigure,
-                facecolor=cell_color[c], edgecolor="none",
+                facecolor="#1a1a1a",
+                edgecolor="#444444",
+                linewidth=0.8,
+                zorder=0,
             )
         )
-        fig.text(
-            rect_x + swatch_w * 0.45, 0.005,
-            c[-6:],  # last 6 hex chars are visually distinct enough
-            transform=fig.transFigure,
-            color="white", fontsize=6, ha="center",
-        )
+        # Per-cell swatch + ID label.
+        swatch_total = (panel_x1 - panel_x0) - 0.02
+        swatch_w = swatch_total / n
+        for i, c in enumerate(unique_cells):
+            rect_x = panel_x0 + 0.01 + i * swatch_w
+            fig.patches.append(
+                plt.Rectangle(
+                    (rect_x, panel_y + 0.024),
+                    swatch_w * 0.85,
+                    0.018,
+                    transform=fig.transFigure,
+                    facecolor=cell_color[c],
+                    edgecolor="none",
+                    zorder=1,
+                )
+            )
+            fig.text(
+                rect_x + swatch_w * 0.425,
+                panel_y + 0.008,
+                c[-6:],
+                transform=fig.transFigure,
+                color="white",
+                fontsize=8,
+                ha="center",
+            )
 
-    fig.suptitle(title, color="white", fontsize=12, y=0.985)
-    fig.tight_layout(rect=(0, 0.05, 1, 0.97))
+    fig.suptitle(title, color="white", fontsize=12, y=0.99)
+    # Leave room at top for shared query legend, bottom for cell legend.
+    fig.tight_layout(rect=(0, 0.085, 1, 0.93))
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
     print(f"[atlas] wrote {out_path}", file=sys.stderr)
