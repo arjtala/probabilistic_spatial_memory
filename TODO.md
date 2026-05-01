@@ -113,7 +113,19 @@
 
 - [ ] Add a lightweight map-cell inspector: hover or click a hex, show its count, mode value, recency, and H3 id; wire to an `I` toggle key
 - [ ] Add a legend panel showing the numeric ramp for the active `HexHeatmapMode` (today's legend only shows "LOW"/"HIGH")
-- [ ] 3D hex extrusion mode: render hex height proportional to `count / max_count` so dominant memory cells read at a glance instead of compressing into hue+alpha. Config knob (`hex_extrude_scale`) + runtime toggle key. Touches `src/viz/hex_renderer.c` and `shaders/hex.vert`/`hex.frag`; map-pane camera gains a small fixed pitch when active.
+- [x] 3D hex extrusion mode: cabinet-projection hex height proportional to `count / max_count`. Config knob (`hex_extrude_scale`) + `E` toggle. Lives entirely inside `src/viz/hex_renderer.c` and `shaders/hex.vert` — basemap stays flat top-down.
+
+## Vector Basemap Rebuild (Future)
+
+A full Mapbox/Apple-style 3D map look (tilted camera, billboarded labels, extruded buildings) is out of scope for the cabinet-extrusion idiom that ships today. It needs a real 3D camera, vector tiles instead of raster, and a label renderer. Tracked here so we don't lose the scope estimate:
+
+- [ ] Phase 1 — Vector tile pipeline. Replace raster CartoDB tiles with Protomaps PMTiles. Tasks: PMTiles header/index parser + range-request fetcher (~300 LOC); MVT (Mapbox Vector Tile) protobuf decoder (nanopb or hand-rolled, ~500 LOC); replace `tile_map.c` raster path with vector polygon + line rendering (~1 day GL work for line tessellation with miter joins). End state: water/parks/road network on screen, no labels, no buildings.
+- [ ] Phase 2 — True perspective camera. Replace ortho 2×2 basis with view + perspective matrices, pitch, far plane, and frustum-cull. Touches every renderer's draw call. End state: tiltable map view, raster-equivalent rendering still works.
+- [ ] Phase 3 — Building extrusion. Read `osm:height` (or estimated) tag from MVT, generate side-wall + top-cap mesh per building footprint. End state: 3D city silhouette under hex memory layer.
+- [ ] Phase 4 — Billboarded labels. Glyph atlas (extend `ui_overlay`'s font path), world-positioned text always facing camera, basic anti-collision. ~2 days. The visual gap between "data hexes on a map" and "looks like a real map" is mostly here.
+- [ ] Phase 5 — Style. Hardcoded color/width/font-size table per feature class; defer JSON style-spec parsing.
+
+Total realistic effort: 5–6 focused days for a baseline; weeks to match a polished Mapbox aesthetic. Not on the critical path for the research questions in `EXPERIMENTS.md`; revisit when (a) experiments stabilize, or (b) `psm-viz` becomes a polished demo for a talk.
 
 ## Paper Figures
 
