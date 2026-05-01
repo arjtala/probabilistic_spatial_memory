@@ -185,7 +185,7 @@ def main() -> int:
     from psm_extraction.models import make_runner
 
     runner = make_runner(
-        family="clip",
+        "clip",
         checkpoint=args.clip_checkpoint,
         backend="auto",
         device=args.clip_device,
