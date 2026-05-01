@@ -31,6 +31,45 @@ def _resolve_device(requested: str) -> "object":
     return torch.device("cpu")
 
 
+def _coerce_clip_features(out, model, modality: str):
+    # transformers 5.x's CLIPModel.get_{image,text}_features returns a
+    # BaseModelOutputWithPooling whose pooler_output is already the
+    # projected embedding (shape == projection_dim). Older versions
+    # returned a tensor directly. Either way, only project further when
+    # the shape clearly comes from the pre-projection encoder hidden
+    # state (last dim == hidden_size != projection_dim).
+    import torch
+
+    config = getattr(model, "config", None)
+    proj_dim = int(getattr(config, "projection_dim", -1)) if config is not None else -1
+    if isinstance(out, torch.Tensor):
+        tensor = out
+    else:
+        tensor = (
+            getattr(out, "image_embeds", None)
+            or getattr(out, "text_embeds", None)
+            or getattr(out, "pooler_output", None)
+        )
+        if tensor is None:
+            last = getattr(out, "last_hidden_state", None)
+            if last is not None and last.dim() == 3:
+                tensor = last[:, 0, :]
+        if tensor is None:
+            raise RuntimeError(
+                f"Unexpected CLIP {modality} output shape: {type(out).__name__}"
+            )
+    if proj_dim > 0 and tensor.shape[-1] == proj_dim:
+        return tensor
+    projection = getattr(
+        model,
+        "visual_projection" if modality == "image" else "text_projection",
+        None,
+    )
+    if projection is None:
+        return tensor
+    return projection(tensor)
+
+
 class CLIPPyTorchRunner(ModelRunner):
     def __init__(
         self,
@@ -85,6 +124,7 @@ class CLIPPyTorchRunner(ModelRunner):
                         img.close()
                 inputs = {k: v.to(self._device) for k, v in inputs.items()}
                 feats = self._model.get_image_features(**inputs)
+                feats = _coerce_clip_features(feats, self._model, "image")
                 if self.normalized:
                     feats = torch.nn.functional.normalize(feats, dim=-1)
                 chunks.append(feats.detach().cpu().to(torch.float32).numpy())
@@ -98,6 +138,7 @@ class CLIPPyTorchRunner(ModelRunner):
             inputs = self._processor(text=[query], return_tensors="pt", padding=True)
             inputs = {k: v.to(self._device) for k, v in inputs.items()}
             feats = self._model.get_text_features(**inputs)
+            feats = _coerce_clip_features(feats, self._model, "text")
             if self.normalized:
                 feats = torch.nn.functional.normalize(feats, dim=-1)
         return feats[0].detach().cpu().to(torch.float32).numpy().astype(np.float32)
