@@ -1,7 +1,6 @@
 #ifndef VIZ_VIZ_MATH_H
 #define VIZ_VIZ_MATH_H
 
-#include "viz/map_view.h"
 #include "viz/imu_processor.h"
 
 void count_to_color(double t, float *r, float *g, float *b, float *a);
@@ -15,8 +14,5 @@ bool compute_aspect_quad(float quad[16], int video_w, int video_h,
 void build_identity_matrix(float matrix[16]);
 void build_ortho_projection(float matrix[16], double half_w, double half_h,
                             double offset_x, double offset_y);
-void build_map_projection(float matrix[16], MapProjectionMode projection_mode,
-                          double half_w, double half_h, double offset_x,
-                          double offset_y);
 
 #endif

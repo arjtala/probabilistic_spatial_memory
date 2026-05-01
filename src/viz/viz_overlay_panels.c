@@ -86,7 +86,7 @@ static bool build_help_panel(UiOverlayMesh *mesh, bool awaiting_initial_play) {
   const float x = 24.0f;
   const float y = 24.0f;
   const float w = 384.0f;
-  const float h = awaiting_initial_play ? 298.0f : 272.0f;
+  const float h = awaiting_initial_play ? 278.0f : 252.0f;
   float line_y = y + 20.0f;
 
   if (!add_panel_frame(mesh, x, y, w, h)) return false;
@@ -121,20 +121,17 @@ static bool build_help_panel(UiOverlayMesh *mesh, bool awaiting_initial_play) {
                        "M          CYCLE HEATMAP MODE") &&
          add_text_line(mesh, x + 16.0f, line_y + 6.0f * line_step, body_scale,
                        BODY,
-                       "E          TOGGLE ISO MAP + EXTRUDE") &&
+                       "L          TOGGLE LEGEND") &&
          add_text_line(mesh, x + 16.0f, line_y + 7.0f * line_step, body_scale,
                        BODY,
-                       "L          TOGGLE LEGEND") &&
+                       "H          TOGGLE TITLE HUD") &&
          add_text_line(mesh, x + 16.0f, line_y + 8.0f * line_step, body_scale,
                        BODY,
-                       "H          TOGGLE TITLE HUD") &&
+                       "P          SAVE .PNG SCREENSHOT") &&
          add_text_line(mesh, x + 16.0f, line_y + 9.0f * line_step, body_scale,
                        BODY,
-                       "P          SAVE .PNG SCREENSHOT") &&
-         add_text_line(mesh, x + 16.0f, line_y + 10.0f * line_step, body_scale,
-                       BODY,
                        "? / F1     TOGGLE HELP") &&
-         add_text_line(mesh, x + 16.0f, line_y + 11.0f * line_step, note_scale,
+         add_text_line(mesh, x + 16.0f, line_y + 10.0f * line_step, note_scale,
                        MUTED,
                        "FILES GO TO captures/*.PNG");
 }

@@ -244,7 +244,7 @@ static void print_usage(const char *prog) {
   fprintf(stderr, "  Drag        Pan map (on map pane)\n");
   fprintf(stderr, "  C           Re-center map and resume follow\n");
   fprintf(stderr, "  M           Cycle heatmap mode\n");
-  fprintf(stderr, "  E           Toggle isometric map + 3D hex extrusion\n");
+  fprintf(stderr, "  E           Toggle 3D hex extrusion\n");
   fprintf(stderr, "  L           Toggle heatmap legend\n");
   fprintf(stderr, "  H           Toggle debug title HUD\n");
   fprintf(stderr, "  P           Save screenshot to captures/ (.png)\n");
@@ -627,9 +627,6 @@ int main(int argc, char *argv[]) {
   HexRenderer *hr = HexRenderer_new(hex_prog);
   HexRenderer_set_heatmap_mode(hr, heatmap_mode);
   HexRenderer_set_extrude_scale(hr, config.hex_extrude_scale);
-  if (config.hex_extrude_scale > 0.0) {
-    HexRenderer_set_projection_mode(hr, MAP_PROJECTION_ISOMETRIC);
-  }
   app.hex_renderer = hr;
 
   TileMap *tm = TileMap_new(tile_prog, tile_source.style_name,
@@ -962,14 +959,12 @@ int main(int argc, char *argv[]) {
 
     glDisable(GL_BLEND);
     TileMap_draw(tm, map_center_lat, map_center_lng, hr->zoom,
-                 hr->projection_mode,
                  win_w - half_w, win_h,
                  app.budget_state.effective_tile_upload_budget);
     glEnable(GL_BLEND);
     GpsTrace_upload(gt, map_center_lat, map_center_lng);
     HexRenderer_draw(hr, win_w - half_w, win_h, map_center_lat, map_center_lng);
-    GpsTrace_draw(gt, win_w - half_w, win_h, hr->zoom,
-                  hr->projection_mode);
+    GpsTrace_draw(gt, win_w - half_w, win_h, hr->zoom);
     glViewport(0, 0, win_w, win_h);
     double ui_time = glfwGetTime();
     const char *status_text =

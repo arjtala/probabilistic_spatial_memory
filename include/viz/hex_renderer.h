@@ -2,7 +2,6 @@
 #define VIZ_HEX_RENDERER_H
 
 #include "viz/gl_platform.h"
-#include "viz/map_view.h"
 #include "core/spatial_memory.h"
 
 typedef enum {
@@ -25,7 +24,6 @@ typedef struct {
   double pan_offset_lat;
   double pan_offset_lng;
   HexHeatmapMode heatmap_mode;
-  MapProjectionMode projection_mode;
   // Cabinet-projection extrusion: 0 disables (flat); >0 raises hex height
   // proportional to intensity. Units = fraction of viewport half-height,
   // so the tallest cell rises by (extrude_scale * zoom) world degrees.
@@ -50,8 +48,6 @@ bool HexRenderer_parse_heatmap_mode(const char *text, HexHeatmapMode *out_mode);
 const char *HexRenderer_heatmap_mode_name(HexHeatmapMode mode);
 HexHeatmapMode HexRenderer_next_heatmap_mode(HexHeatmapMode mode);
 void HexRenderer_set_heatmap_mode(HexRenderer *hr, HexHeatmapMode mode);
-void HexRenderer_set_projection_mode(HexRenderer *hr,
-                                     MapProjectionMode projection_mode);
 void HexRenderer_set_extrude_scale(HexRenderer *hr, double scale);
 void HexRenderer_toggle_extrude(HexRenderer *hr);
 void HexRenderer_update(HexRenderer *hr, SpatialMemory *sm);

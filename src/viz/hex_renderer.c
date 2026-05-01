@@ -190,7 +190,6 @@ HexRenderer *HexRenderer_new(GLuint program) {
   hr->u_projection = glGetUniformLocation(program, "u_projection");
   hr->u_extrude_dir = glGetUniformLocation(program, "u_extrude_dir");
   hr->zoom = 0.005;  // ~0.005 degrees ≈ 500m at equator
-  hr->projection_mode = MAP_PROJECTION_ORTHOGRAPHIC;
   hr->vertex_count = 0;
   hr->verts = NULL;
   hr->verts_capacity = 0;
@@ -262,15 +261,6 @@ void HexRenderer_set_heatmap_mode(HexRenderer *hr, HexHeatmapMode mode) {
     mode = HEX_HEATMAP_MODE_TOTAL;
   }
   hr->heatmap_mode = mode;
-}
-
-void HexRenderer_set_projection_mode(HexRenderer *hr,
-                                     MapProjectionMode projection_mode) {
-  if (!hr) return;
-  if (projection_mode < 0 || projection_mode >= MAP_PROJECTION_COUNT) {
-    projection_mode = MAP_PROJECTION_ORTHOGRAPHIC;
-  }
-  hr->projection_mode = projection_mode;
 }
 
 void HexRenderer_set_extrude_scale(HexRenderer *hr, double scale) {
@@ -385,7 +375,8 @@ void HexRenderer_draw(HexRenderer *hr, int viewport_w, int viewport_h,
 
   glUseProgram(hr->program);
 
-  // Build the shared map projection matrix for the current pane mode.
+  // Build orthographic projection matrix
+  // Map [center - zoom, center + zoom] to [-1, 1]
   double aspect = (double)viewport_h / (double)viewport_w;
   double half_w = hr->zoom;
   double half_h = hr->zoom * aspect;
@@ -401,22 +392,15 @@ void HexRenderer_draw(HexRenderer *hr, int viewport_w, int viewport_h,
   double offset_y = map_center_lat - hr->center_lat;
 
   float proj[16];
-  build_map_projection(proj, hr->projection_mode, half_w, half_h, offset_x,
-                       offset_y);
+  build_ortho_projection(proj, half_w, half_h, offset_x, offset_y);
 
   glUniformMatrix4fv(hr->u_projection, 1, GL_FALSE, proj);
 
   // Cabinet skew direction in world degrees per unit normalized height.
   // (0.3, 0.85) ≈ up-and-slightly-right; scale by zoom so the look is
   // stable across zoom levels. extrude_scale=0 collapses to flat.
-  float ed_x = (float)(hr->extrude_scale * hr->zoom *
-                       (hr->projection_mode == MAP_PROJECTION_ISOMETRIC
-                            ? 0.18
-                            : 0.30));
-  float ed_y = (float)(hr->extrude_scale * hr->zoom *
-                       (hr->projection_mode == MAP_PROJECTION_ISOMETRIC
-                            ? 0.95
-                            : 0.85));
+  float ed_x = (float)(hr->extrude_scale * hr->zoom * 0.30);
+  float ed_y = (float)(hr->extrude_scale * hr->zoom * 0.85);
   if (hr->u_extrude_dir >= 0) {
     glUniform2f(hr->u_extrude_dir, ed_x, ed_y);
   }
