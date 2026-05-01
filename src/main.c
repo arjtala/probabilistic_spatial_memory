@@ -6,7 +6,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <h3/h3api.h>
 #include "ingest/ingest.h"
+
+static void cell_center_degrees(H3Index cell, double *out_lat, double *out_lng) {
+  LatLng center;
+  cellToLatLng(cell, &center);
+  *out_lat = radsToDegs(center.lat);
+  *out_lng = radsToDegs(center.lng);
+}
 
 #ifndef PSM_VERSION
 #define PSM_VERSION "unknown"
@@ -467,9 +475,12 @@ static void print_last_seen_text(const SpatialMemoryInterval *results, size_t n,
   printf("Last seen (%zu shown of %zu in neighborhood):\n", n, total_found);
   for (size_t i = 0; i < n; ++i) {
     char cell_str[H3_INDEX_HEX_STRING_LENGTH];
+    double lat, lng;
     h3ToString(results[i].cell, cell_str, sizeof(cell_str));
-    printf("  Cell %s  t=[%.3f, %.3f]  count=%.3f\n",
-           cell_str, results[i].t_min, results[i].t_max, results[i].count);
+    cell_center_degrees(results[i].cell, &lat, &lng);
+    printf("  Cell %s  (%.6f,%.6f)  t=[%.3f, %.3f]  count=%.3f\n",
+           cell_str, lat, lng,
+           results[i].t_min, results[i].t_max, results[i].count);
   }
 }
 
@@ -496,9 +507,13 @@ static void print_last_seen_json(const SpatialMemoryInterval *results,
   fputs("  \"results\": [\n", stdout);
   for (size_t i = 0; i < n; ++i) {
     char cell_str[H3_INDEX_HEX_STRING_LENGTH];
+    double lat, lng;
     h3ToString(results[i].cell, cell_str, sizeof(cell_str));
-    printf("    {\"cell\":\"%s\",\"t_min\":%.3f,\"t_max\":%.3f,\"count\":%.3f}%s\n",
-           cell_str, results[i].t_min, results[i].t_max, results[i].count,
+    cell_center_degrees(results[i].cell, &lat, &lng);
+    printf("    {\"cell\":\"%s\",\"lat\":%.6f,\"lng\":%.6f,"
+           "\"t_min\":%.3f,\"t_max\":%.3f,\"count\":%.3f}%s\n",
+           cell_str, lat, lng,
+           results[i].t_min, results[i].t_max, results[i].count,
            (i + 1 == n) ? "" : ",");
   }
   fputs("  ]\n}\n", stdout);
@@ -555,9 +570,12 @@ static void print_similar_text(const SpatialMemorySimilar *results, size_t n,
   printf("Similar (%zu shown of %zu matched):\n", n, total_found);
   for (size_t i = 0; i < n; ++i) {
     char cell_str[H3_INDEX_HEX_STRING_LENGTH];
+    double lat, lng;
     h3ToString(results[i].cell, cell_str, sizeof(cell_str));
-    printf("  Cell %s  sim=%.4f  exemplar_t=%.3f  t=[%.3f, %.3f]  count=%.3f\n",
-           cell_str, results[i].similarity, results[i].exemplar_t,
+    cell_center_degrees(results[i].cell, &lat, &lng);
+    printf("  Cell %s  (%.6f,%.6f)  sim=%.4f  exemplar_t=%.3f  t=[%.3f, %.3f]  count=%.3f\n",
+           cell_str, lat, lng,
+           results[i].similarity, results[i].exemplar_t,
            results[i].t_min, results[i].t_max, results[i].count);
   }
 }
@@ -587,10 +605,14 @@ static void print_similar_json(const SpatialMemorySimilar *results, size_t n,
   fputs("  \"results\": [\n", stdout);
   for (size_t i = 0; i < n; ++i) {
     char cell_str[H3_INDEX_HEX_STRING_LENGTH];
+    double lat, lng;
     h3ToString(results[i].cell, cell_str, sizeof(cell_str));
-    printf("    {\"cell\":\"%s\",\"similarity\":%.6f,\"exemplar_t\":%.3f,"
+    cell_center_degrees(results[i].cell, &lat, &lng);
+    printf("    {\"cell\":\"%s\",\"lat\":%.6f,\"lng\":%.6f,"
+           "\"similarity\":%.6f,\"exemplar_t\":%.3f,"
            "\"t_min\":%.3f,\"t_max\":%.3f,\"count\":%.3f}%s\n",
-           cell_str, results[i].similarity, results[i].exemplar_t,
+           cell_str, lat, lng,
+           results[i].similarity, results[i].exemplar_t,
            results[i].t_min, results[i].t_max, results[i].count,
            (i + 1 == n) ? "" : ",");
   }

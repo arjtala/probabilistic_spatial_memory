@@ -219,7 +219,7 @@ targets/psm features.h5 dino 5.0 10 12 10
 
 > **Retention:** each tile remembers observations for `capacity × time_window_sec` (default 60s). Query output is empty past that horizon — widen `-C` or `-t` for longer sessions.
 
-`--search` expects a binary file containing a flat `float32` little-endian vector in the same embedding space as the HDF5 group's `embeddings` dataset. With `-j`, results include `similarity`, `exemplar_t`, and the retained `t_min`/`t_max` interval for each matching tile.
+`--search` expects a binary file containing a flat `float32` little-endian vector in the same embedding space as the HDF5 group's `embeddings` dataset. With `-j`, each result includes `cell` (H3 hex string), `lat`/`lng` (cell center, degrees), `similarity` (cosine), `exemplar_t` (timestamp of the matching exemplar), the retained `t_min`/`t_max` interval, and the HLL `count` over the active retention horizon. `--last-seen` results carry the same fields minus `similarity` and `exemplar_t`.
 
 ## E5 Demo
 
