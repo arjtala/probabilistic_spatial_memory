@@ -20,7 +20,8 @@ dev = ["pytest>=7"]
 clip = ["torch>=2.2", "transformers>=4.40", "Pillow>=10"]
 mlx = ["mlx>=0.10"]
 aria = ["projectaria-tools"]
-all = ["psm-extraction[clip,mlx,aria]"]
+viz = ["matplotlib>=3.7", "umap-learn>=0.5", "h3>=4.0"]
+all = ["psm-extraction[clip,mlx,aria,viz]"]
 
 [project.scripts]
 psm-extraction = "psm_extraction.__main__:main"

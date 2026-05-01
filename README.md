@@ -102,7 +102,20 @@ python -m psm_extraction migrate /tmp/hdd/<session>/features.h5 \
   --session-id <session>
 ```
 
-The extraction pipeline producing v2 files lives in `extraction/` (`pip install -e extraction[dev,clip,mlx]` for development). See `TODO.md` → "Extraction Pipeline" for the phased roadmap (Phase 1 ships the schema + writer + migration; later phases add CLIP, DINOv3, V-JEPA 2, and Aria VRS readers).
+The extraction pipeline producing v2 files lives in `extraction/`. Optional extras (listed in `extraction/pyproject.toml`):
+
+| Extra | Pulls in | Needed for |
+|---|---|---|
+| `dev` | `pytest` | running the extraction test suite |
+| `clip` | `torch`, `transformers`, `Pillow` | CLIP runner — text/image embeddings, the `--search` query path |
+| `mlx` | `mlx` | Apple Silicon MLX runners (currently stubbed; Phase 2 follow-up) |
+| `aria` | `projectaria-tools` | raw VRS reading (Phase 3 follow-up; sidecar JSON works without it) |
+| `viz` | `matplotlib`, `umap-learn`, `h3` | `scripts/embedding_atlas.py` (paper-figure helper) |
+| `all` | union of the above | one-shot dev install |
+
+Typical setup for the full demo: `pip install -e extraction[clip,viz]`.
+
+See `TODO.md` → "Extraction Pipeline" for the phased roadmap (Phase 1 ships the schema + writer + migration; later phases add CLIP, DINOv3, V-JEPA 2, and Aria VRS readers).
 
 ## IMU visualization
 
