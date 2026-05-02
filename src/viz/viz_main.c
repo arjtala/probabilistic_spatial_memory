@@ -282,9 +282,14 @@ int main(int argc, char *argv[]) {
 
   VizConfig_init(&config);
 
+  // First pass extracts -c/-h. The optstring must mirror the full set of
+  // flags accepted by the runtime-flag pass below so that unknown-to-this-
+  // pass options don't terminate getopt early on POSIX (macOS) — without
+  // this, `psm-viz -v X -c cfg.toml ...` skipped the config file entirely
+  // because getopt stopped at -v's argument.
   opterr = 0;
   optind = 1;
-  while ((opt = getopt(argc, argv, ":c:h")) != -1) {
+  while ((opt = getopt(argc, argv, ":c:d:v:f:g:t:r:m:h")) != -1) {
     if (opt == 'c') config_path = optarg;
     if (opt == 'h') help_requested = true;
   }
