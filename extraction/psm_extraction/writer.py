@@ -189,8 +189,11 @@ class FeaturesWriter:
             group.attrs["interpolation"] = spec.interpolation
 
     def close(self) -> None:
-        if self._h is not None:
-            self._h.close()
+        # Local-variable narrowing pattern: pyrefly does not narrow
+        # `self._h` through the `is not None` guard alone (mutable attribute).
+        h = self._h
+        if h is not None:
+            h.close()
             self._h = None
 
     def __enter__(self) -> "FeaturesWriter":

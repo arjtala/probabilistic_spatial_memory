@@ -219,12 +219,21 @@ def test_extract_writes_multiple_model_groups(tmp_path: Path) -> None:
             self.patch_grid = (2, 2)
             self.preprocess = "stub-dino"
 
-        def embed_images(self, paths, batch_size: int = 16, *, progress=None):
+        def embed_images(
+            self,
+            paths: Sequence[Path],
+            batch_size: int = 16,
+            *,
+            progress=None,
+        ) -> tuple[np.ndarray, np.ndarray | None]:
             embeddings = np.zeros((len(paths), self.embedding_dim), dtype=np.float32)
             attention = np.zeros((len(paths), 2, 2), dtype=np.float32)
             return embeddings, attention
 
-    runners = [("clip", StubRunner()), ("dino", StubDino())]
+    runners: list[tuple[str, ModelRunner]] = [
+        ("clip", StubRunner()),
+        ("dino", StubDino()),
+    ]
     result = extract(
         ExtractOptions(
             video=video,

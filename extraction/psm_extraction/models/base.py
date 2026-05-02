@@ -4,13 +4,21 @@ The runner is responsible for its own preprocessing (resize, normalize, etc.)
 and for producing L2-normalized embeddings unless `normalized` is False with a
 documented reason. The orchestrator (`extract.py`) treats runners as opaque:
 load → embed batches of frames → optionally embed a text query → close.
+
+Some runners (DINO, JEPA) also emit per-frame attention/prediction maps
+alongside embeddings; they return a `(embeddings, maps)` tuple. CLIP
+emits embeddings only. The orchestrator's `_embed_with_optional_maps`
+helper normalizes the two return shapes.
 """
 
 import abc
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Union
 
 import numpy as np
+
+EmbedResult = Union[np.ndarray, tuple[np.ndarray, "np.ndarray | None"]]
 
 
 class ModelRunner(abc.ABC):
@@ -32,7 +40,7 @@ class ModelRunner(abc.ABC):
     preprocess: str
     """Human-readable description of the preprocessing pipeline."""
 
-    patch_grid: tuple[int, int] | None
+    patch_grid: "tuple[int, int] | None"
     """`(h, w)` patch grid for attention/prediction-map producers; None otherwise."""
 
     backend: str
@@ -44,9 +52,10 @@ class ModelRunner(abc.ABC):
         paths: Sequence[Path],
         batch_size: int = 16,
         *,
-        progress: Callable[[int], None] | None = None,
-    ) -> np.ndarray:
-        """Return a `(N, embedding_dim)` float32 array for the given image paths.
+        progress: "Callable[[int], None] | None" = None,
+    ) -> EmbedResult:
+        """Return a `(N, embedding_dim)` float32 array for the given image paths,
+        or a `(embeddings, maps)` tuple when the runner emits per-frame maps.
 
         `progress`, when supplied, is called with the running count of frames
         completed so far. Runners should invoke it after each batch.

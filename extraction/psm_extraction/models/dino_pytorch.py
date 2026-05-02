@@ -77,15 +77,8 @@ class DINOPyTorchRunner(ModelRunner):
         # register tokens after the CLS token, before the patch tokens. The
         # config exposes this; defaults to 0 for plain DINOv2.
         self._num_register_tokens = int(getattr(cfg, "num_register_tokens", 0))
-        self._patch_grid: tuple[int, int] | None = None
-
-    @property
-    def patch_grid(self) -> tuple[int, int] | None:
-        return self._patch_grid
-
-    @patch_grid.setter
-    def patch_grid(self, value: tuple[int, int] | None) -> None:
-        self._patch_grid = value
+        # Probed lazily on the first batch from the attention shape.
+        self.patch_grid: tuple[int, int] | None = None
 
     def _probe_patch_grid(self, attentions_shape: tuple[int, ...]) -> tuple[int, int]:
         # attentions[-1] has shape (B, heads, tokens, tokens). For a typical
@@ -146,10 +139,10 @@ class DINOPyTorchRunner(ModelRunner):
                 inputs = {k: v.to(self._device) for k, v in inputs.items()}
                 outputs = self._model(**inputs, output_attentions=True)
                 attn = getattr(outputs, "attentions", None)
-                if attn is not None and len(attn) > 0 and self._patch_grid is None:
+                if attn is not None and len(attn) > 0 and self.patch_grid is None:
                     # Probe up-front so we know how many register tokens to
                     # skip in the embedding pool below.
-                    self._patch_grid = self._probe_patch_grid(tuple(attn[-1].shape))
+                    self.patch_grid = self._probe_patch_grid(tuple(attn[-1].shape))
 
                 # Mean-pool patch tokens, excluding CLS + register tokens.
                 hidden = outputs.last_hidden_state  # (B, tokens, D)
@@ -161,7 +154,10 @@ class DINOPyTorchRunner(ModelRunner):
 
                 if attn is not None and len(attn) > 0:
                     last = attn[-1]  # (B, heads, tokens, tokens)
-                    h, w = self._patch_grid
+                    # patch_grid was probed above on the same `attn`, so it
+                    # cannot be None here.
+                    assert self.patch_grid is not None
+                    h, w = self.patch_grid
                     # CLS-to-patch attention, skipping register tokens too,
                     # averaged across heads.
                     cls_to_patch = last[:, :, 0, patch_start:].mean(dim=1)

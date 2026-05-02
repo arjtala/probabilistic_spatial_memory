@@ -19,7 +19,11 @@ DEFAULT_CHECKPOINT = "openai/clip-vit-base-patch32"
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 
-def _resolve_device(requested: str) -> "object":
+def _resolve_device(requested: str):
+    """Return a `torch.device`. Untyped on purpose — `torch` is an optional
+    runtime dependency; importing it eagerly for the annotation would defeat
+    the [clip] extra. Callers treat the return value duck-typed (`.type`
+    attribute, passable to `.to()`)."""
     import torch
 
     if requested != "auto":

@@ -310,12 +310,16 @@ def extract(opts: ExtractOptions) -> ExtractResult:
     for group_name, runner in opts.runners:
         cache_path = _embedding_cache_path(opts, group_name, runner)
         cache_hit = False
+        # Pre-bind so static type checkers can see these are assigned on every
+        # path before the post-loop shape checks. Real values come either from
+        # the cache load or the embed call below.
+        embeddings: np.ndarray = np.zeros((0, 0), dtype=np.float32)
+        maps: np.ndarray | None = None
         if cache_path.exists() and not opts.force_reembed:
             try:
                 cached_emb, cached_maps = _load_embeddings_cache(cache_path)
             except Exception:  # noqa: BLE001
-                cached_emb = None  # type: ignore[assignment]
-                cached_maps = None
+                pass
             else:
                 if cached_emb.shape[0] == timestamps.shape[0]:
                     embeddings, maps = cached_emb, cached_maps

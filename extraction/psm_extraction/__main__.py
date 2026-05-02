@@ -181,7 +181,9 @@ def _handle_extract(args: argparse.Namespace) -> int:
             )
         checkpoints[family] = path
 
-    runners: list[tuple[str, object]] = []
+    from .models.base import ModelRunner
+
+    runners: list[tuple[str, ModelRunner]] = []
     try:
         for family in requested:
             runner = make_runner(

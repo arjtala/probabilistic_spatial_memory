@@ -219,7 +219,9 @@ def main() -> int:
             text = q.get("query")
             if not text:
                 raise SystemExit(f"question {qid!r} missing 'query'")
-            gts_rel = [tuple(map(float, iv)) for iv in q.get("intervals", [])]
+            gts_rel: list[tuple[float, float]] = [
+                (float(iv[0]), float(iv[1])) for iv in q.get("intervals", [])
+            ]
 
             qvec = runner.embed_text(text).astype(np.float32)
             qpath = tmp_dir / f"{qid}.f32"

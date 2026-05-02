@@ -10,12 +10,12 @@ mlx-clip API stabilizes.
 Until then, on Apple Silicon the PyTorch MPS backend is the auto-pick.
 """
 
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Sequence
 
 import numpy as np
 
-from .base import ModelRunner
+from .base import EmbedResult, ModelRunner
 
 
 class CLIPMLXRunner(ModelRunner):
@@ -27,8 +27,12 @@ class CLIPMLXRunner(ModelRunner):
         )
 
     def embed_images(
-        self, paths: Sequence[Path], batch_size: int = 16
-    ) -> np.ndarray:  # pragma: no cover
+        self,
+        paths: Sequence[Path],
+        batch_size: int = 16,
+        *,
+        progress: "Callable[[int], None] | None" = None,
+    ) -> EmbedResult:  # pragma: no cover
         raise NotImplementedError
 
     def embed_text(self, query: str) -> np.ndarray:  # pragma: no cover
