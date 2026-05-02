@@ -18,15 +18,12 @@ The runner emits:
 import os
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Any
 
 import numpy as np
 
 from .base import EmbedResult, ModelRunner
 from .clip_pytorch import _resolve_device
-
-if TYPE_CHECKING:
-    import torch  # noqa: F401
 
 DEFAULT_CHECKPOINT = "facebook/dinov2-base"
 
@@ -41,6 +38,11 @@ def _model_id_from_checkpoint(checkpoint: str) -> str:
 
 
 class DINOPyTorchRunner(ModelRunner):
+    _device: Any
+    _processor: Any
+    _model: Any
+    _torch: Any
+
     def __init__(
         self,
         checkpoint: str = DEFAULT_CHECKPOINT,
@@ -59,9 +61,8 @@ class DINOPyTorchRunner(ModelRunner):
         self._torch = __import__("torch")
         self.checkpoint = checkpoint
         self.model_id = _model_id_from_checkpoint(checkpoint)
-        device_obj: "torch.device" = _resolve_device(device)
-        self._device = device_obj
-        self.backend = f"pytorch-{device_obj.type}"
+        self._device = _resolve_device(device)
+        self.backend = f"pytorch-{self._device.type}"
 
         processor = AutoImageProcessor.from_pretrained(checkpoint)
         if processor is None:
@@ -70,7 +71,7 @@ class DINOPyTorchRunner(ModelRunner):
         self._model = (
             AutoModel.from_pretrained(checkpoint, output_attentions=True)
             .eval()
-            .to(device_obj)
+            .to(self._device)
         )
 
         cfg = self._model.config

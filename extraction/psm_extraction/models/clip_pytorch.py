@@ -9,14 +9,11 @@ package.
 import os
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Any
 
 import numpy as np
 
 from .base import EmbedResult, ModelRunner
-
-if TYPE_CHECKING:
-    import torch  # noqa: F401
 
 DEFAULT_CHECKPOINT = "openai/clip-vit-base-patch32"
 
@@ -79,6 +76,14 @@ def _coerce_clip_features(out, model, modality: str):
 
 
 class CLIPPyTorchRunner(ModelRunner):
+    # Declared `Any` so pyrefly doesn't infer torch.device's descriptor
+    # protocol semantics (which it treats as read-only for an instance
+    # attribute). The actual runtime value is always a torch.device.
+    _device: Any
+    _processor: Any
+    _model: Any
+    _torch: Any
+
     def __init__(
         self,
         checkpoint: str = DEFAULT_CHECKPOINT,
@@ -97,14 +102,13 @@ class CLIPPyTorchRunner(ModelRunner):
         self._torch = __import__("torch")
         self.checkpoint = checkpoint
         self.model_id = "openai/clip"
-        device_obj: "torch.device" = _resolve_device(device)
-        self._device = device_obj
-        self.backend = f"pytorch-{device_obj.type}"
+        self._device = _resolve_device(device)
+        self.backend = f"pytorch-{self._device.type}"
         processor = AutoProcessor.from_pretrained(checkpoint, use_fast=False)
         if processor is None:
             raise RuntimeError(f"AutoProcessor returned None for {checkpoint!r}")
         self._processor = processor
-        self._model = CLIPModel.from_pretrained(checkpoint).eval().to(device_obj)
+        self._model = CLIPModel.from_pretrained(checkpoint).eval().to(self._device)
         proj_dim = self._model.config.projection_dim
         if proj_dim is None:
             raise RuntimeError(
