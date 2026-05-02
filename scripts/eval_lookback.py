@@ -29,14 +29,22 @@ Question file (YAML or JSON):
     questions:
       - id: q1
         query: "a red bus"
+        category: object_recall        # optional; free-form group label
         intervals:                     # seconds from session start
           - [253.0, 268.0]
         notes: "stop on Wandsworth Bridge Rd"
       - id: q2
         query: "a zebra crossing"
+        category: location_trace
         intervals:
           - [161.0, 250.0]
           - [382.0, 467.0]
+
+`category` is free-form; suggested values to mirror the benchmark's
+cognitive taxonomy: `visual_detail_recall`, `sequential_action`,
+`time_duration`, `counting`, `temporal_ordering`, `object_comparison`,
+`location_trace`, `spatial_awareness`. Anything missing the field is
+grouped under `(uncategorized)`.
 """
 from __future__ import annotations
 
@@ -277,6 +285,7 @@ def main() -> int:
             records.append({
                 "id": qid,
                 "query": text,
+                "category": q.get("category", "(uncategorized)") or "(uncategorized)",
                 "notes": q.get("notes", ""),
                 "intervals_gt": gts_rel,
                 "preds": preds,
@@ -368,6 +377,32 @@ def main() -> int:
                 f"| `{r['id']}` | {r['query']} | n/a (no GT to violate; top-1 exemplar at {ex_t}) |"
             )
 
+    # ---- Per-category breakdown ----
+    # Group scored records by category. Skips negative controls because
+    # mIoU is undefined when there's no GT.
+    by_category: dict[str, list[dict]] = {}
+    for r in scored:
+        by_category.setdefault(r["category"], []).append(r)
+    if len(by_category) > 1 or (by_category and "(uncategorized)" not in by_category):
+        print()
+        print("### Per-category breakdown (scored only)")
+        print()
+        print(
+            "| category | n | exemplar mIoU @1 | exemplar mIoU @k | "
+            "exemplar Hit @k |"
+        )
+        print("|---|---|---|---|---|")
+        for cat in sorted(by_category):
+            cat_records = by_category[cat]
+            cn = len(cat_records)
+            cat_miou_top1 = sum(r["exemplar_iou_top1"] for r in cat_records) / cn
+            cat_miou_at_k = sum(r["exemplar_iou_at_k"] for r in cat_records) / cn
+            cat_hit = sum(1 for r in cat_records if r["exemplar_hit_at_k"])
+            print(
+                f"| `{cat}` | {cn} | {cat_miou_top1:.3f} | {cat_miou_at_k:.3f} | "
+                f"{cat_hit / cn:.1%} ({cat_hit}/{cn}) |"
+            )
+
     if args.out:
         out_data = {
             "features": str(args.features),
@@ -395,6 +430,15 @@ def main() -> int:
                 "exemplar_miou_top1": miou_exemplar_top1,
                 f"exemplar_miou_at_{args.top}": miou_exemplar_at_k,
                 f"exemplar_hit_rate_at_{args.top}": exemplar_hit_rate,
+            },
+            "by_category": {
+                cat: {
+                    "n": len(records_in_cat),
+                    "exemplar_miou_top1": sum(r["exemplar_iou_top1"] for r in records_in_cat) / len(records_in_cat),
+                    f"exemplar_miou_at_{args.top}": sum(r["exemplar_iou_at_k"] for r in records_in_cat) / len(records_in_cat),
+                    f"exemplar_hit_rate_at_{args.top}": sum(1 for r in records_in_cat if r["exemplar_hit_at_k"]) / len(records_in_cat),
+                }
+                for cat, records_in_cat in by_category.items()
             },
             "records": records,
         }
