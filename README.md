@@ -384,6 +384,17 @@ Available `tile_style` presets:
 - `CartoDB.DarkMatter`
 - `Stadia.AlidadeSmooth` (`tile_api_key` required)
 - `Stadia.AlidadeSmoothDark` (`tile_api_key` required)
+- `Stamen.Watercolor` (`tile_api_key` required) — painterly hand-drawn aesthetic, hosted by Stadia
+- `Stamen.Toner` (`tile_api_key` required) — high-contrast black & white
+- `Stamen.TonerLite` (`tile_api_key` required) — softer Toner variant
+- `Stamen.Terrain` (`tile_api_key` required) — illustrated terrain shading
+
+`Stadia.*` and `Stamen.*` styles all use the same Stadia Maps API key (free tier covers 200k tiles/month). Sign up at <https://stadiamaps.com/>, then drop the key into your config:
+
+```toml
+tile_style = "Stamen.Watercolor"
+tile_api_key = "your-stadia-api-key"
+```
 
 Preview the providers here: <https://leaflet-extras.github.io/leaflet-providers/preview/>
 

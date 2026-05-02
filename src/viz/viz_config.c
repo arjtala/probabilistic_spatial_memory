@@ -30,6 +30,22 @@ static const TileStylePreset k_tile_presets[] = {
     {"Stadia.AlidadeSmoothDark",
      "https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}.png?api_key={api_key}",
      true},
+    // Stamen designs, hosted by Stadia after the Stamen wind-down. Same
+    // free tier (200k tiles/mo) and tile_api_key as the Stadia.Alidade
+    // entries above. Watercolor uses a .jpg extension because the
+    // painterly textures are dramatically smaller as JPEG than PNG.
+    {"Stamen.Watercolor",
+     "https://tiles.stadiamaps.com/tiles/stamen_watercolor/{z}/{x}/{y}.jpg?api_key={api_key}",
+     true},
+    {"Stamen.Toner",
+     "https://tiles.stadiamaps.com/tiles/stamen_toner/{z}/{x}/{y}.png?api_key={api_key}",
+     true},
+    {"Stamen.TonerLite",
+     "https://tiles.stadiamaps.com/tiles/stamen_toner_lite/{z}/{x}/{y}.png?api_key={api_key}",
+     true},
+    {"Stamen.Terrain",
+     "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}.png?api_key={api_key}",
+     true},
 };
 
 static const size_t k_tile_preset_count =
