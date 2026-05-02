@@ -6,39 +6,68 @@
 #include <time.h>
 #include "core/tile.h"
 
-// Simple PRNG used by the reservoir sampler. Thread safety is not required —
-// Tile observes are single-threaded per SpatialMemory. The reservoir does not
-// need cryptographic quality. arc4random has been in the BSD family for
-// years and is exposed on Darwin via <stdlib.h>; the rand()+srand() fallback
-// is taken only where arc4random is not detected.
+// xoshiro256** PRNG used by the reservoir sampler. Public domain, fast,
+// good statistical quality, and — crucially for evaluation reproducibility
+// — explicitly seedable via Tile_set_random_seed(). Thread safety is not
+// required: Tile observes are single-threaded per SpatialMemory. The
+// reservoir does not need cryptographic quality.
+//
+// Reference: https://prng.di.unimi.it/xoshiro256starstar.c
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || \
     defined(__NetBSD__) || defined(__DragonFly__)
 #define TILE_HAS_ARC4RANDOM 1
 #endif
 
-static uint64_t tile_rand_uint64(void) {
+static uint64_t tile_prng_state[4];
+static int tile_prng_seeded = 0;
+
+static uint64_t splitmix64(uint64_t *x) {
+  uint64_t z = (*x += 0x9e3779b97f4a7c15ULL);
+  z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+  z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+  return z ^ (z >> 31);
+}
+
+static void tile_prng_seed_from(uint64_t seed) {
+  uint64_t s = seed;
+  // splitmix64 expansion gives four well-distributed seed words even for a
+  // small input seed (e.g. 0).
+  tile_prng_state[0] = splitmix64(&s);
+  tile_prng_state[1] = splitmix64(&s);
+  tile_prng_state[2] = splitmix64(&s);
+  tile_prng_state[3] = splitmix64(&s);
+  tile_prng_seeded = 1;
+}
+
+static void tile_prng_seed_entropic(void) {
+  uint64_t seed;
 #if defined(TILE_HAS_ARC4RANDOM)
-  uint64_t hi = (uint64_t)arc4random();
-  uint64_t lo = (uint64_t)arc4random();
-  return (hi << 32) | lo;
+  seed = ((uint64_t)arc4random() << 32) | (uint64_t)arc4random();
 #else
-  static int seeded = 0;
-  if (!seeded) {
-    // One-shot seeding guard. time(NULL) is coarse but plenty for a
-    // sampling reservoir; we also XOR in a process-address bit for
-    // slight additional variation across invocations in the same second.
-    unsigned int seed = (unsigned int)time(NULL) ^
-                        (unsigned int)(uintptr_t)&seeded;
-    srand(seed);
-    seeded = 1;
-  }
-  uint64_t a = (uint64_t)(unsigned int)rand();
-  uint64_t b = (uint64_t)(unsigned int)rand();
-  uint64_t c = (uint64_t)(unsigned int)rand();
-  // rand() returns [0, RAND_MAX] which is only 31 bits on many systems —
-  // combine three calls to get full 64-bit coverage.
-  return (a << 33) ^ (b << 17) ^ c;
+  seed = (uint64_t)time(NULL) ^ (uint64_t)(uintptr_t)&tile_prng_state;
 #endif
+  tile_prng_seed_from(seed);
+}
+
+void Tile_set_random_seed(uint64_t seed) {
+  tile_prng_seed_from(seed);
+}
+
+static inline uint64_t tile_rotl(const uint64_t x, int k) {
+  return (x << k) | (x >> (64 - k));
+}
+
+static uint64_t tile_rand_uint64(void) {
+  if (!tile_prng_seeded) tile_prng_seed_entropic();
+  const uint64_t result = tile_rotl(tile_prng_state[1] * 5, 7) * 9;
+  const uint64_t t = tile_prng_state[1] << 17;
+  tile_prng_state[2] ^= tile_prng_state[0];
+  tile_prng_state[3] ^= tile_prng_state[1];
+  tile_prng_state[1] ^= tile_prng_state[2];
+  tile_prng_state[0] ^= tile_prng_state[3];
+  tile_prng_state[2] ^= t;
+  tile_prng_state[3] = tile_rotl(tile_prng_state[3], 45);
+  return result;
 }
 
 bool Tile_coords_to_cell(double lat, double lng, int resolution,

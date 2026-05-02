@@ -122,6 +122,7 @@ def run_psm_search(
     h3_resolution: int,
     precision: int,
     exemplars: int,
+    seed: int | None,
     verbose: bool,
 ) -> dict:
     cmd = [
@@ -137,6 +138,8 @@ def run_psm_search(
         "--search", str(query_path),
         "-j",
     ]
+    if seed is not None:
+        cmd.extend(["--seed", str(seed)])
     if verbose:
         print("+ " + " ".join(cmd), file=sys.stderr)
     proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
@@ -169,6 +172,10 @@ def main() -> int:
     ap.add_argument(
         "--exemplar-tolerance", type=float, default=1.5,
         help="seconds ± exemplar_t treated as the exemplar-predicted interval",
+    )
+    ap.add_argument(
+        "--seed", type=int, default=42,
+        help="reservoir-sampler seed for reproducibility (default 42; pass -1 to disable)",
     )
     ap.add_argument("--out", type=Path, help="write detailed JSON record here")
     ap.add_argument("--verbose", action="store_true")
@@ -226,6 +233,7 @@ def main() -> int:
                 h3_resolution=args.h3_resolution,
                 precision=args.precision,
                 exemplars=args.exemplars,
+                seed=(None if args.seed < 0 else args.seed),
                 verbose=args.verbose,
             )
 
@@ -371,6 +379,7 @@ def main() -> int:
             "exemplars": args.exemplars,
             "iou_threshold": iou_threshold,
             "exemplar_tolerance_sec": args.exemplar_tolerance,
+            "psm_seed": (None if args.seed < 0 else args.seed),
             "session_start_unix": session_start,
             "clip_checkpoint": args.clip_checkpoint,
             "clip_backend": runner.backend,

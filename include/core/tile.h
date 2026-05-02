@@ -47,4 +47,10 @@ double Tile_query(Tile *tile, const size_t n);
 size_t Tile_exemplar_count(const Tile *tile);
 const TileExemplar *Tile_exemplar_at(const Tile *tile, size_t idx);
 
+// Seed the reservoir sampler's PRNG. When this is called the sampler becomes
+// deterministic across runs for the same observe sequence — required for
+// reproducible evaluation. If never called, the sampler seeds itself once
+// from arc4random / time at first use.
+void Tile_set_random_seed(uint64_t seed);
+
 #endif

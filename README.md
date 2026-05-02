@@ -229,6 +229,7 @@ targets/psm features.h5 dino 5.0 10 12 10
 | `--k-ring` | `<N>` | `0` | H3 neighborhood radius for `--last-seen` or centered `--search` |
 | `--top` | `<N>` | `5` | Maximum query hits to print |
 | `--exemplars` | `<N>` | `8*` | Per-tile exemplar reservoir; auto-set to `8` with `--search` |
+| `--seed` | `<N>` | — | Reservoir-sampler PRNG seed (uint64). Same seed + same input ⇒ bit-identical exemplar selections. Without it, the sampler self-seeds entropically on first use. |
 
 > **Retention:** each tile remembers observations for `capacity × time_window_sec` (default 60s). Query output is empty past that horizon — widen `-C` or `-t` for longer sessions.
 

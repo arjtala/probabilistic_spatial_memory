@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <h3/h3api.h>
+#include "core/tile.h"
 #include "ingest/ingest.h"
 
 static void cell_center_degrees(H3Index cell, double *out_lat, double *out_lng) {
@@ -28,6 +29,7 @@ enum {
   SEARCH_OPT_VAL,
   CENTER_OPT_VAL,
   EXEMPLARS_OPT_VAL,
+  SEED_OPT_VAL,
 };
 
 typedef enum {
@@ -54,6 +56,8 @@ typedef struct {
   double center_lat;
   double center_lng;
   size_t exemplar_capacity;
+  bool has_seed;
+  uint64_t seed;
 } CliOptions;
 
 typedef struct {
@@ -217,6 +221,7 @@ static void print_usage(const char *program) {
   fprintf(stderr, "  --search <path>         Retrieve by embedding similarity (binary float32 LE vector)\n");
   fprintf(stderr, "  --center LAT,LNG        Optional geographic center for --search\n");
   fprintf(stderr, "  --exemplars N           Per-tile reservoir size (auto-set to 8 with --search)\n");
+  fprintf(stderr, "  --seed N                Reservoir-sampler seed (uint64, decimal or 0x...) for reproducible runs\n");
   fprintf(stderr, "\nRetention window = capacity * time-window (default: 12 * 5.0s = 60s).\n");
   fprintf(stderr, "Observations older than this age out of each tile's ring buffer.\n");
   fprintf(stderr, "For multi-minute sessions, widen with e.g. -C 30 -t 60 (30-min window).\n");
@@ -242,6 +247,8 @@ static void cli_options_init(CliOptions *options) {
   options->center_lat = 0.0;
   options->center_lng = 0.0;
   options->exemplar_capacity = 0;
+  options->has_seed = false;
+  options->seed = 0;
 }
 
 static bool load_float_vector_file(const char *path, float **out_data,
@@ -342,6 +349,7 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
       {"search", required_argument, NULL, SEARCH_OPT_VAL},
       {"center", required_argument, NULL, CENTER_OPT_VAL},
       {"exemplars", required_argument, NULL, EXEMPLARS_OPT_VAL},
+      {"seed", required_argument, NULL, SEED_OPT_VAL},
       {0, 0, 0, 0},
   };
 
@@ -427,6 +435,18 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
         return false;
       }
       break;
+    case SEED_OPT_VAL: {
+      char *end = NULL;
+      errno = 0;
+      unsigned long long parsed = strtoull(optarg, &end, 0);
+      if (errno != 0 || end == optarg || *end != '\0') {
+        fprintf(stderr, "Invalid seed: '%s'\n", optarg);
+        return false;
+      }
+      options->seed = (uint64_t)parsed;
+      options->has_seed = true;
+      break;
+    }
     default:
       print_usage(argv[0]);
       return false;
@@ -694,6 +714,13 @@ int main(int argc, char *argv[]) {
 
   if (!parse_cli_options(argc, argv, &options)) {
     return 1;
+  }
+
+  // Seed the reservoir sampler before any tile gets created so the very
+  // first observe is deterministic. Without --seed the sampler self-seeds
+  // entropically on first use (preserving prior behavior).
+  if (options.has_seed) {
+    Tile_set_random_seed(options.seed);
   }
 
   sm = SpatialMemory_new(options.h3_resolution, options.capacity,
