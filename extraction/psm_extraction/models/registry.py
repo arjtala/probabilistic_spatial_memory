@@ -20,7 +20,7 @@ def _is_apple_silicon() -> bool:
 
 def _has_mlx() -> bool:
     try:
-        import mlx.core  # noqa: F401
+        import mlx.core  # type: ignore[import-not-found]  # noqa: F401
     except ImportError:
         return False
     # The runner itself is currently a stub; the auto-pick should not surface

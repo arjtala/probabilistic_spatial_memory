@@ -11,6 +11,7 @@ import pytest
 from psm_extraction import schema
 from psm_extraction.extract import ExtractOptions, extract
 from psm_extraction.models import ModelRunner
+from psm_extraction.models.base import EmbedResult
 
 
 class StubRunner(ModelRunner):
@@ -29,7 +30,7 @@ class StubRunner(ModelRunner):
         batch_size: int = 16,
         *,
         progress=None,
-    ) -> np.ndarray:
+    ) -> EmbedResult:
         rng = np.random.default_rng(0)
         feats = rng.standard_normal((len(paths), self.embedding_dim)).astype(
             np.float32
@@ -225,7 +226,7 @@ def test_extract_writes_multiple_model_groups(tmp_path: Path) -> None:
             batch_size: int = 16,
             *,
             progress=None,
-        ) -> tuple[np.ndarray, np.ndarray | None]:
+        ) -> EmbedResult:
             embeddings = np.zeros((len(paths), self.embedding_dim), dtype=np.float32)
             attention = np.zeros((len(paths), 2, 2), dtype=np.float32)
             return embeddings, attention

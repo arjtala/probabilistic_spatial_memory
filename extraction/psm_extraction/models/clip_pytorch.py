@@ -9,10 +9,14 @@ package.
 import os
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .base import ModelRunner
+from .base import EmbedResult, ModelRunner
+
+if TYPE_CHECKING:
+    import torch  # noqa: F401
 
 DEFAULT_CHECKPOINT = "openai/clip-vit-base-patch32"
 
@@ -93,11 +97,20 @@ class CLIPPyTorchRunner(ModelRunner):
         self._torch = __import__("torch")
         self.checkpoint = checkpoint
         self.model_id = "openai/clip"
-        self._device = _resolve_device(device)
-        self.backend = f"pytorch-{self._device.type}"
-        self._processor = AutoProcessor.from_pretrained(checkpoint, use_fast=False)
-        self._model = CLIPModel.from_pretrained(checkpoint).eval().to(self._device)
-        self.embedding_dim = int(self._model.config.projection_dim)
+        device_obj: "torch.device" = _resolve_device(device)
+        self._device = device_obj
+        self.backend = f"pytorch-{device_obj.type}"
+        processor = AutoProcessor.from_pretrained(checkpoint, use_fast=False)
+        if processor is None:
+            raise RuntimeError(f"AutoProcessor returned None for {checkpoint!r}")
+        self._processor = processor
+        self._model = CLIPModel.from_pretrained(checkpoint).eval().to(device_obj)
+        proj_dim = self._model.config.projection_dim
+        if proj_dim is None:
+            raise RuntimeError(
+                f"CLIPModel {checkpoint!r} has no projection_dim in its config"
+            )
+        self.embedding_dim = int(proj_dim)
         self.normalized = True
         self.preprocess = "clip_default(resize=224,center_crop=224,normalize=clip)"
         self.patch_grid = None

@@ -24,11 +24,15 @@ the encoder-only path. Tracked as a Phase 4 follow-up.
 import os
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .base import ModelRunner
+from .base import EmbedResult, ModelRunner
 from .clip_pytorch import _resolve_device
+
+if TYPE_CHECKING:
+    import torch  # noqa: F401
 
 DEFAULT_CHECKPOINT = "facebook/vjepa2-vitl-fpc64-256"
 FALLBACK_FPC = 16
@@ -75,13 +79,19 @@ class VJEPAPyTorchRunner(ModelRunner):
         self._torch = __import__("torch")
         self.checkpoint = checkpoint
         self.model_id = "facebookresearch/v-jepa-2"
-        self._device = _resolve_device(device)
-        self.backend = f"pytorch-{self._device.type}"
+        device_obj: "torch.device" = _resolve_device(device)
+        self._device = device_obj
+        self.backend = f"pytorch-{device_obj.type}"
 
         try:
-            self._processor = AutoVideoProcessor.from_pretrained(checkpoint)
+            processor = AutoVideoProcessor.from_pretrained(checkpoint)
+            if processor is None:
+                raise RuntimeError(
+                    f"AutoVideoProcessor returned None for {checkpoint!r}"
+                )
+            self._processor = processor
             self._model = (
-                AutoModel.from_pretrained(checkpoint).eval().to(self._device)
+                AutoModel.from_pretrained(checkpoint).eval().to(device_obj)
             )
         except Exception as exc:  # noqa: BLE001
             raise RuntimeError(

@@ -1,0 +1,15 @@
+# Pyrefly configuration for the whole repo.
+#
+# `psm_extraction` is the in-tree Python package under `extraction/`. When
+# pyrefly checks files outside that subtree (notably `scripts/`), it can't
+# resolve the import via heuristics — `extraction` isn't a sibling of
+# `scripts`. Adding it explicitly to the search path lets static checks
+# work end-to-end without `pip install -e extraction[*]` having to be done
+# inside the same Python pyrefly is querying.
+
+search_path = ["extraction"]
+
+# `mlx.core` is intentionally optional (the [mlx] extra). Don't fail the
+# whole check just because it isn't installed.
+[errors]
+missing-import = "ignore"

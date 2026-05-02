@@ -215,13 +215,20 @@ def _embedding_cache_path(opts: "ExtractOptions", group_name: str, runner: Model
 
 def _save_embeddings_cache(path: Path, embeddings: np.ndarray, maps: np.ndarray | None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload: dict[str, np.ndarray] = {"embeddings": embeddings.astype(np.float32, copy=False)}
+    embeddings_f32 = embeddings.astype(np.float32, copy=False)
     if maps is not None:
-        payload["maps"] = maps.astype(np.float32, copy=False)
-        payload["has_maps"] = np.array([1], dtype=np.uint8)
+        np.savez(
+            path,
+            embeddings=embeddings_f32,
+            maps=maps.astype(np.float32, copy=False),
+            has_maps=np.array([1], dtype=np.uint8),
+        )
     else:
-        payload["has_maps"] = np.array([0], dtype=np.uint8)
-    np.savez(path, **payload)
+        np.savez(
+            path,
+            embeddings=embeddings_f32,
+            has_maps=np.array([0], dtype=np.uint8),
+        )
 
 
 def _load_embeddings_cache(path: Path) -> tuple[np.ndarray, np.ndarray | None]:

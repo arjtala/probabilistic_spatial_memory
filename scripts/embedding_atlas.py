@@ -63,7 +63,9 @@ def project(emb: np.ndarray, method: str, seed: int = 0) -> np.ndarray:
             min_dist=0.1,
             metric="cosine",
         )
-        return reducer.fit_transform(emb).astype(np.float32)
+        # umap-learn's fit_transform returns ndarray; the type stub claims
+        # tuple, hence the np.asarray() coerce before .astype().
+        return np.asarray(reducer.fit_transform(emb)).astype(np.float32)
     raise SystemExit(f"unknown method: {method}")
 
 
