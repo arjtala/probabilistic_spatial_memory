@@ -423,7 +423,13 @@ int main(int argc, char *argv[]) {
       video_path = alloc_video;
     }
     if (!h5_path) {
+      // Prefer the canonical `features.h5`; fall back to any `*features.h5`
+      // in the directory so a session with only `clip_l_features.h5` (etc.)
+      // still resolves automatically.
       alloc_h5 = find_file_in_dir(dir_path, NULL, "features.h5");
+      if (!alloc_h5) {
+        alloc_h5 = find_file_in_dir(dir_path, "features.h5", NULL);
+      }
       if (alloc_h5) h5_path = alloc_h5;
       // features.h5 is optional — no error if missing
     }
