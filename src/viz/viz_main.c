@@ -579,11 +579,12 @@ int main(int argc, char *argv[]) {
     if (h5_file < 0) {
       fprintf(stderr, "Failed to open HDF5: %s\n", h5_path);
     } else {
-      // Always use DINO embeddings for spatial memory
-      app.reader = IngestReader_open(h5_file, DINO);
+      // Use the user-selected group for spatial memory ingest. Defaults to
+      // DINO via VizConfig_init; -g / config `group` overrides.
+      app.reader = IngestReader_open(h5_file, group);
       if (app.reader) {
         printf("HDF5: %zu records, %zu-d embeddings, group='%s'\n",
-               app.reader->n_records, app.reader->emb_dimension, DINO);
+               app.reader->n_records, app.reader->emb_dimension, group);
       }
 
       // When -g jepa, load JEPA prediction maps for overlay interpolation
