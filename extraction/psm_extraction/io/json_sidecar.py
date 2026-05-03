@@ -27,6 +27,12 @@ class GPSSidecar:
     lat: np.ndarray         # float64 degrees, WGS84
     lng: np.ndarray         # float64 degrees, WGS84
     stream_id: str          # e.g. "281-1"
+    # True when timestamps were derived from `utc_time_ms` (absolute Unix
+    # seconds); False when they came from `timestamp` (a session-clock /
+    # device-monotonic value the orchestrator must add capture_time_epoch
+    # to). Defaults to False for back-compat with sidecars that only carry
+    # the relative form.
+    timestamps_absolute: bool = False
 
 
 @dataclass(frozen=True)
@@ -35,12 +41,33 @@ class IMUSidecar:
     accel: np.ndarray       # float32 (N, 3), m/s^2 in device frame
     gyro: np.ndarray        # float32 (N, 3), rad/s in device frame
     stream_id: str          # e.g. "1202-1"
+    timestamps_absolute: bool = False
 
 
 def _largest_stream(streams: list[dict]) -> dict:
     if not streams:
         raise RuntimeError("JSON sidecar has zero streams")
     return max(streams, key=lambda s: len(s.get("samples") or []))
+
+
+def _utc_seconds(sample: dict) -> float | None:
+    """Aria sidecars sometimes carry both a session-clock `timestamp` and
+    an absolute `utc_time_ms`. Prefer the latter when present and non-zero
+    because it's unambiguously Unix epoch (sub-second precision via the
+    millisecond integer is sufficient for our purposes — the
+    embedding-side timestamps are coarser than 1 ms anyway). Returns None
+    when the field is absent, zero, or non-finite.
+    """
+    raw = sample.get("utc_time_ms")
+    if raw is None:
+        return None
+    try:
+        ms = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(ms) or ms <= 0:
+        return None
+    return ms / 1000.0
 
 
 def _valid_gps_sample(sample: dict) -> bool:
@@ -82,7 +109,12 @@ def read_gps_json(path: Path, *, stream_id: str | None = None) -> GPSSidecar:
     if not valid:
         raise RuntimeError(f"{path}: stream has no valid GPS fixes")
 
-    ts = np.fromiter((float(s["timestamp"]) for s in valid), dtype=np.float64)
+    utc = [_utc_seconds(s) for s in valid]
+    use_utc = all(u is not None for u in utc)
+    if use_utc:
+        ts = np.fromiter((u for u in utc), dtype=np.float64)
+    else:
+        ts = np.fromiter((float(s["timestamp"]) for s in valid), dtype=np.float64)
     lat = np.fromiter((float(s["latitude"]) for s in valid), dtype=np.float64)
     lng = np.fromiter((float(s["longitude"]) for s in valid), dtype=np.float64)
 
@@ -92,6 +124,7 @@ def read_gps_json(path: Path, *, stream_id: str | None = None) -> GPSSidecar:
         lat=lat[order],
         lng=lng[order],
         stream_id=str(stream.get("stream_id", "unknown")),
+        timestamps_absolute=use_utc,
     )
 
 
@@ -134,8 +167,13 @@ def read_imu_json(path: Path, *, stream_id: str | None = None) -> IMUSidecar:
     ts = np.empty(n, dtype=np.float64)
     accel = np.empty((n, 3), dtype=np.float32)
     gyro = np.empty((n, 3), dtype=np.float32)
+    utc_seconds = [_utc_seconds(s) for s in valid]
+    use_utc = all(u is not None for u in utc_seconds)
     for idx, sample in enumerate(valid):
-        ts[idx] = float(sample["timestamp"])
+        if use_utc:
+            ts[idx] = utc_seconds[idx]  # type: ignore[assignment]
+        else:
+            ts[idx] = float(sample["timestamp"])
         accel[idx] = sample["accel"]
         gyro[idx] = sample["gyro"]
 
@@ -145,6 +183,7 @@ def read_imu_json(path: Path, *, stream_id: str | None = None) -> IMUSidecar:
         accel=accel[order],
         gyro=gyro[order],
         stream_id=str(stream.get("stream_id", "unknown")),
+        timestamps_absolute=use_utc,
     )
 
 

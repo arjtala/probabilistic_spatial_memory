@@ -378,7 +378,9 @@ def extract(opts: ExtractOptions) -> ExtractResult:
     ) as writer:
         if gps_sidecar is not None:
             gps_ts = gps_sidecar.timestamps
-            if epoch_offset:
+            # Only shift relative session-clock timestamps by capture_time_epoch.
+            # Sidecars that carry `utc_time_ms` are already in absolute Unix.
+            if epoch_offset and not gps_sidecar.timestamps_absolute:
                 gps_ts = gps_ts + epoch_offset
             writer.write_gps_group(
                 timestamps=gps_ts,
@@ -389,7 +391,7 @@ def extract(opts: ExtractOptions) -> ExtractResult:
             sensor_groups_written.append("gps")
         if imu_sidecar is not None:
             imu_ts = imu_sidecar.timestamps
-            if epoch_offset:
+            if epoch_offset and not imu_sidecar.timestamps_absolute:
                 imu_ts = imu_ts + epoch_offset
             writer.write_imu_group(
                 timestamps=imu_ts,
