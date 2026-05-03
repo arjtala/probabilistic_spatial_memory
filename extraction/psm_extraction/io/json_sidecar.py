@@ -33,6 +33,11 @@ class GPSSidecar:
     # to). Defaults to False for back-compat with sidecars that only carry
     # the relative form.
     timestamps_absolute: bool = False
+    # Device-clock-to-Unix offset, when at least one sample carries both
+    # `timestamp` and `utc_time_ms`: `unix = timestamp + clock_offset_to_unix`.
+    # Useful for aligning sibling sidecars (e.g. IMU) that only carry the
+    # device-clock form. None when not determinable.
+    clock_offset_to_unix: float | None = None
 
 
 @dataclass(frozen=True)
@@ -42,6 +47,7 @@ class IMUSidecar:
     gyro: np.ndarray        # float32 (N, 3), rad/s in device frame
     stream_id: str          # e.g. "1202-1"
     timestamps_absolute: bool = False
+    clock_offset_to_unix: float | None = None
 
 
 def _largest_stream(streams: list[dict]) -> dict:
@@ -118,6 +124,22 @@ def read_gps_json(path: Path, *, stream_id: str | None = None) -> GPSSidecar:
     lat = np.fromiter((float(s["latitude"]) for s in valid), dtype=np.float64)
     lng = np.fromiter((float(s["longitude"]) for s in valid), dtype=np.float64)
 
+    # Derive a device-clock-to-Unix offset from the first sample that has
+    # both forms. Even when use_utc=True (timestamps already absolute), we
+    # expose this so IMU (which often lacks utc_time_ms on the same
+    # recording) can be aligned to the same Unix epoch.
+    clock_offset: float | None = None
+    for s, u in zip(valid, utc):
+        if u is None:
+            continue
+        try:
+            relative = float(s["timestamp"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if math.isfinite(relative):
+            clock_offset = float(u) - relative
+            break
+
     order = np.argsort(ts)
     return GPSSidecar(
         timestamps=ts[order],
@@ -125,6 +147,7 @@ def read_gps_json(path: Path, *, stream_id: str | None = None) -> GPSSidecar:
         lng=lng[order],
         stream_id=str(stream.get("stream_id", "unknown")),
         timestamps_absolute=use_utc,
+        clock_offset_to_unix=clock_offset,
     )
 
 
@@ -177,6 +200,18 @@ def read_imu_json(path: Path, *, stream_id: str | None = None) -> IMUSidecar:
         accel[idx] = sample["accel"]
         gyro[idx] = sample["gyro"]
 
+    clock_offset: float | None = None
+    for sample, u in zip(valid, utc_seconds):
+        if u is None:
+            continue
+        try:
+            relative = float(sample["timestamp"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if math.isfinite(relative):
+            clock_offset = float(u) - relative
+            break
+
     order = np.argsort(ts)
     return IMUSidecar(
         timestamps=ts[order],
@@ -184,6 +219,7 @@ def read_imu_json(path: Path, *, stream_id: str | None = None) -> IMUSidecar:
         gyro=gyro[order],
         stream_id=str(stream.get("stream_id", "unknown")),
         timestamps_absolute=use_utc,
+        clock_offset_to_unix=clock_offset,
     )
 
 

@@ -376,12 +376,26 @@ def extract(opts: ExtractOptions) -> ExtractResult:
         source_video=source_video_attr,
         session_id=opts.session_id,
     ) as writer:
+        # When a sidecar's `timestamp` field is a device-clock value
+        # rather than seconds-from-capture-start, capture_time_epoch alone
+        # is the wrong offset. Prefer a GPS-derived clock offset (when the
+        # GPS sidecar carries both timestamp + utc_time_ms) before falling
+        # back to capture_time_epoch.
+        gps_clock_offset = (
+            gps_sidecar.clock_offset_to_unix if gps_sidecar is not None else None
+        )
+
+        def _resolve_offset(sidecar) -> float:
+            if sidecar.timestamps_absolute:
+                return 0.0
+            if sidecar.clock_offset_to_unix is not None:
+                return float(sidecar.clock_offset_to_unix)
+            if gps_clock_offset is not None:
+                return float(gps_clock_offset)
+            return float(epoch_offset) if epoch_offset else 0.0
+
         if gps_sidecar is not None:
-            gps_ts = gps_sidecar.timestamps
-            # Only shift relative session-clock timestamps by capture_time_epoch.
-            # Sidecars that carry `utc_time_ms` are already in absolute Unix.
-            if epoch_offset and not gps_sidecar.timestamps_absolute:
-                gps_ts = gps_ts + epoch_offset
+            gps_ts = gps_sidecar.timestamps + _resolve_offset(gps_sidecar)
             writer.write_gps_group(
                 timestamps=gps_ts,
                 lat=gps_sidecar.lat,
@@ -390,9 +404,7 @@ def extract(opts: ExtractOptions) -> ExtractResult:
             )
             sensor_groups_written.append("gps")
         if imu_sidecar is not None:
-            imu_ts = imu_sidecar.timestamps
-            if epoch_offset and not imu_sidecar.timestamps_absolute:
-                imu_ts = imu_ts + epoch_offset
+            imu_ts = imu_sidecar.timestamps + _resolve_offset(imu_sidecar)
             writer.write_imu_group(
                 timestamps=imu_ts,
                 accel=imu_sidecar.accel,
