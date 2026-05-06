@@ -310,6 +310,44 @@ Primary readout:
 Decision rule:
 - If cell overlap @5 stays above 0.6 on the cue queries while a `--last-seen`-only baseline is at chance, the embedding-driven retrieval is providing genuine place-identity beyond raw geographic prior — that is the structural claim worth defending in the paper's evaluation.
 
+### E9. TurboQuant-Compressed Exemplar Reservoirs
+
+Question:
+- Can PSM store per-tile exemplar embeddings in a TurboQuant-style 2-4 bit representation while preserving `--search` retrieval quality?
+
+Motivation:
+- PSM's bounded memory story is currently strongest for the HLL counting layer. The semantic retrieval layer still keeps reservoir-sampled exemplar embeddings as raw float32 bytes, so exemplar memory scales as `tiles x exemplars x embedding_dim x 4B`.
+- TurboQuant's rotation-plus-scalar-quantization recipe is a direct fit for high-dimensional CLIP/DINO/JEPA embeddings. If it preserves nearest-neighbor ranking inside PSM, the exemplar layer can become bounded and compact for hour-scale egocentric memory without giving up text/image look-back queries.
+
+Current capability:
+- `TileExemplar` stores opaque bytes today, and `SpatialMemory_query_similar(...)` assumes those bytes are `float32` vectors with the same dimensionality as the query.
+- This makes the experiment easy to stage behind a codec boundary: keep the HLL/ring-buffer path unchanged, add an alternate exemplar encoding path, and decode or score compressed exemplars only inside `query_similar`.
+
+Implementation sketch:
+1. Add an `ExemplarCodec` mode with at least `raw_f32` and `turboquant_{2,3,4}b`.
+2. During `SpatialMemory_observe`, quantize only the reservoir exemplar payload; continue hashing the original embedding bytes into HLL so count semantics do not change.
+3. During `SpatialMemory_query_similar`, compare the float32 query against the compressed exemplar either by dequantizing into a scratch buffer or by using TurboQuant's inner-product estimator directly.
+4. Record codec metadata in JSON output and benchmark logs: bits per coordinate, side-info bytes per exemplar, and effective bytes per tile.
+
+Protocol:
+1. Pick one or more sessions with CLIP and DINO groups.
+2. For each group, ingest the same `features.h5` with `--exemplars {4,8,16}` under raw float32 and TurboQuant bit budgets `{2,3,4}`.
+3. Run the same query bank used by E5/E8 through `psm --search -j`.
+4. Compare each compressed run against the raw-float32 run:
+   - top-k cell overlap for `k = 1, 5, 10`
+   - rank correlation on shared cells
+   - winning-exemplar cosine error
+   - bytes per retained exemplar and bytes per tile
+   - query latency, including any dequantization/scoring cost
+
+Readout:
+- Memory compression ratio for the exemplar reservoir, separate from HLL memory.
+- Retrieval quality as top-k overlap and rank stability vs. raw float32.
+- Whether 2-bit is enough for place-level recall, or whether 3-4 bit is the practical floor for PSM.
+
+Decision rule:
+- Promote TurboQuant from experiment to implementation if a 4x or better exemplar-memory reduction keeps top-5 cell overlap above 0.9 and median `query_similar` latency below 10 ms on representative sessions.
+
 ## Reproducible Benchmark Sweeps
 
 These sweeps use the existing benchmark binaries directly and emit CSV to stdout.

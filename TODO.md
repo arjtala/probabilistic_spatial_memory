@@ -166,6 +166,9 @@ Context: a forthcoming NeurIPS 2026 streaming egocentric memory benchmark (the "
 - [x] `psm --last-seen lat,lng --k-ring N --top N` CLI surface + JSON output (`"mode": "last_seen"` discriminator; `schema_version` unchanged at 1)
 - [x] Benchmark scenario in `benchmarks/benchmark_spatial_memory.c`: "location-trace query latency" over a populated session — first-class measurement for E7
 - [x] `SpatialMemory_query_similar(query, dim, k_ring, center, out)` — rank tiles by cosine similarity of the best exemplar; `psm --search <bin>` / `--center LAT,LNG` / `--exemplars N` CLI; benchmark scenario `query_similar` (E5's text-query adapter now has a concrete backend to target)
+- [ ] TurboQuant->PSM experiment (E9): compare raw float32 exemplar reservoirs against 2/3/4-bit TurboQuant-style compressed exemplars for `psm --search`, reporting top-k cell overlap, rank stability, cosine error, bytes/tile, and query latency.
+- [ ] Add an exemplar codec boundary (`raw_f32` first, then TurboQuant-style bitpacked payloads) so `TileExemplar` can store compressed embeddings without changing the HLL counting path.
+- [ ] Extend `benchmarks/benchmark_spatial_memory.c` or add a small query-bank script to sweep exemplar codec, bit budget, and reservoir size against the raw-float32 baseline.
 
 ## Extraction Pipeline
 
