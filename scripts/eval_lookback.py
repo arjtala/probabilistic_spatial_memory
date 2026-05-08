@@ -45,6 +45,33 @@ cognitive taxonomy: `visual_detail_recall`, `sequential_action`,
 `time_duration`, `counting`, `temporal_ordering`, `object_comparison`,
 `location_trace`, `spatial_awareness`. Anything missing the field is
 grouped under `(uncategorized)`.
+
+Two optional fields beyond `intervals` for richer place-aware scoring:
+
+  - `count: <int>` — expected number of distinct events/places. Predicted
+    as the number of distinct H3 cells in the top-k results (one cell per
+    "place"). Emits count_predicted / count_abs_error / count_correct.
+  - `expected: <string>` — categorical answer for spatial-reasoning
+    questions (e.g. "river" vs "railway"). Pass-through only; the harness
+    records the top-k (cell, lat, lng) for downstream manual or annotated
+    grading. Not auto-scored — explicit by design, since the categorical
+    answer usually requires session-specific geographic annotation.
+
+Both fields are optional and orthogonal to `intervals` IoU scoring. A
+question with `intervals` + `count` + `expected` produces all three
+streams; a question with only `count` skips IoU.
+
+A question can also opt into a non-text query mode:
+
+  - `query_mode: last_seen` (default: similarity_search) — call
+    `psm --last-seen LAT,LNG --k-ring N` instead of embedding the text
+    `query` and calling `--search`. This is the right mode for true
+    location_trace questions whose answer is a *place* the wearer revisited
+    rather than a *visual category*. The CLIP encoder is bypassed entirely
+    for this question, isolating PSM's spatial substrate. Required extra
+    fields: `query_lat: <float>`, `query_lng: <float>`. Optional:
+    `query_k_ring: <int>` (default 1). The text `query` field becomes a
+    description for human readers and is not embedded.
 """
 from __future__ import annotations
 
@@ -159,6 +186,55 @@ def run_psm_search(
     return json.loads(proc.stdout)
 
 
+def run_psm_last_seen(
+    psm_binary: Path,
+    features_h5: Path,
+    group: str,
+    *,
+    lat: float,
+    lng: float,
+    k_ring: int,
+    top: int,
+    time_window: float,
+    capacity: int,
+    h3_resolution: int,
+    precision: int,
+    seed: int | None,
+    verbose: bool,
+) -> dict:
+    """Call `psm --last-seen LAT,LNG --k-ring N` and return parsed JSON.
+
+    The output schema mirrors --search except per-result entries lack
+    `similarity` and `exemplar_t` fields (last-seen is a spatial query, not
+    an embedding query). Callers synthesize those fields downstream when
+    scoring against the standard exemplar/bucket IoU pipeline.
+    """
+    cmd = [
+        str(psm_binary),
+        "-f", str(features_h5),
+        "-g", group,
+        "-t", f"{time_window:.6f}",
+        "-r", str(h3_resolution),
+        "-C", str(capacity),
+        "-p", str(precision),
+        "--top", str(top),
+        "--last-seen", f"{lat:.6f},{lng:.6f}",
+        "--k-ring", str(k_ring),
+        "-j",
+    ]
+    if seed is not None:
+        cmd.extend(["--seed", str(seed)])
+    if verbose:
+        print("+ " + " ".join(cmd), file=sys.stderr)
+    proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"psm failed ({proc.returncode}): {' '.join(cmd)}\n"
+            f"stderr:\n{proc.stderr}"
+        )
+    return json.loads(proc.stdout)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     ap.add_argument("features", type=Path, help="HDF5 features file (must contain --group)")
@@ -231,28 +307,64 @@ def main() -> int:
                 (float(iv[0]), float(iv[1])) for iv in q.get("intervals", [])
             ]
 
-            qvec = runner.embed_text(text).astype(np.float32)
-            qpath = tmp_dir / f"{qid}.f32"
-            qpath.write_bytes(qvec.tobytes())
+            query_mode = q.get("query_mode", "similarity_search")
+            if query_mode not in {"similarity_search", "last_seen"}:
+                raise SystemExit(
+                    f"question {qid!r}: unknown query_mode {query_mode!r}; "
+                    "expected similarity_search or last_seen"
+                )
 
-            payload = run_psm_search(
-                args.psm_binary, args.features, args.group, qpath,
-                top=args.top,
-                time_window=args.time_window,
-                capacity=args.capacity,
-                h3_resolution=args.h3_resolution,
-                precision=args.precision,
-                exemplars=args.exemplars,
-                seed=(None if args.seed < 0 else args.seed),
-                verbose=args.verbose,
-            )
+            if query_mode == "last_seen":
+                if "query_lat" not in q or "query_lng" not in q:
+                    raise SystemExit(
+                        f"question {qid!r} uses query_mode=last_seen but is "
+                        "missing query_lat / query_lng"
+                    )
+                payload = run_psm_last_seen(
+                    args.psm_binary, args.features, args.group,
+                    lat=float(q["query_lat"]),
+                    lng=float(q["query_lng"]),
+                    k_ring=int(q.get("query_k_ring", 1)),
+                    top=args.top,
+                    time_window=args.time_window,
+                    capacity=args.capacity,
+                    h3_resolution=args.h3_resolution,
+                    precision=args.precision,
+                    seed=(None if args.seed < 0 else args.seed),
+                    verbose=args.verbose,
+                )
+            else:
+                qvec = runner.embed_text(text).astype(np.float32)
+                qpath = tmp_dir / f"{qid}.f32"
+                qpath.write_bytes(qvec.tobytes())
+                payload = run_psm_search(
+                    args.psm_binary, args.features, args.group, qpath,
+                    top=args.top,
+                    time_window=args.time_window,
+                    capacity=args.capacity,
+                    h3_resolution=args.h3_resolution,
+                    precision=args.precision,
+                    exemplars=args.exemplars,
+                    seed=(None if args.seed < 0 else args.seed),
+                    verbose=args.verbose,
+                )
 
             results = payload.get("results", [])
             preds = []
             for r in results:
                 t_min = float(r["t_min"]) - session_start
                 t_max = float(r["t_max"]) - session_start
-                exemplar_t = float(r["exemplar_t"]) - session_start
+                # last_seen results have no exemplar_t — synthesize the
+                # bucket midpoint so the existing exemplar IoU math still
+                # works. The "exemplar window" then equals the bucket window
+                # widened by ±tol, so for last-seen questions exemplar IoU
+                # is essentially bucket IoU; that's the right semantics
+                # since last-seen asks "did the cell window overlap the GT
+                # interval?", not "did a specific frame land inside it".
+                if "exemplar_t" in r:
+                    exemplar_t = float(r["exemplar_t"]) - session_start
+                else:
+                    exemplar_t = (t_min + t_max) / 2.0
                 bucket_iou, gt_idx_b = best_iou((t_min, t_max), gts_rel)
                 tol = args.exemplar_tolerance
                 exemplar_iou, gt_idx_e = best_iou(
@@ -263,7 +375,7 @@ def main() -> int:
                     "cell": r["cell"],
                     "lat": r.get("lat"),
                     "lng": r.get("lng"),
-                    "similarity": r["similarity"],
+                    "similarity": r.get("similarity"),
                     "exemplar_t": exemplar_t,
                     "t_min": t_min,
                     "t_max": t_max,
@@ -282,12 +394,35 @@ def main() -> int:
             exemplar_at_k = max((p["exemplar_iou"] for p in preds), default=0.0)
             any_exemplar_hit = any(p["exemplar_hits_gt"] for p in preds)
 
+            # Place-aware optional fields. Both are independent of IoU.
+            #   count: expected number of distinct cells/places. Predicted =
+            #     number of distinct cells in the top-k results.
+            #   expected: categorical free-text answer; recorded but not
+            #     auto-scored (would need session-specific geographic
+            #     annotation, which we keep out of the harness).
+            count_gt = q.get("count")
+            count_predicted = len({p["cell"] for p in preds}) if preds else 0
+            if count_gt is not None:
+                count_gt = int(count_gt)
+                count_abs_error = abs(count_predicted - count_gt)
+                count_correct = count_predicted == count_gt
+            else:
+                count_abs_error = None
+                count_correct = None
+            expected_str = q.get("expected")
+
             records.append({
                 "id": qid,
                 "query": text,
+                "query_mode": query_mode,
                 "category": q.get("category", "(uncategorized)") or "(uncategorized)",
                 "notes": q.get("notes", ""),
                 "intervals_gt": gts_rel,
+                "count_gt": count_gt,
+                "count_predicted": count_predicted,
+                "count_abs_error": count_abs_error,
+                "count_correct": count_correct,
+                "expected": expected_str,
                 "preds": preds,
                 "bucket_iou_top1": bucket_top1,
                 "bucket_iou_at_k": bucket_at_k,
@@ -312,7 +447,9 @@ def main() -> int:
     # questions with intervals: [] are reported separately as false-positive
     # tests rather than dragging mIoU down to 0 by definition).
     scored = [r for r in records if r["intervals_gt"]]
-    negative = [r for r in records if not r["intervals_gt"]]
+    negative = [r for r in records if not r["intervals_gt"] and not (r.get("count_gt") is not None or r.get("expected"))]
+    counting = [r for r in records if r.get("count_gt") is not None]
+    spatial = [r for r in records if r.get("expected")]
     n = max(len(scored), 1)
 
     miou_bucket_top1 = sum(r["bucket_iou_top1"] for r in scored) / n
@@ -377,6 +514,40 @@ def main() -> int:
                 f"| `{r['id']}` | {r['query']} | n/a (no GT to violate; top-1 exemplar at {ex_t}) |"
             )
 
+    if counting:
+        n_correct = sum(1 for r in counting if r["count_correct"])
+        mae = sum(r["count_abs_error"] for r in counting) / len(counting)
+        print()
+        print("### Counting questions (predicted = distinct cells in top-k)")
+        print()
+        print("| id | query | gt count | predicted | abs error | correct |")
+        print("|---|---|---|---|---|---|")
+        for r in counting:
+            print(
+                f"| `{r['id']}` | {r['query']} | {r['count_gt']} | "
+                f"{r['count_predicted']} | {r['count_abs_error']} | "
+                f"{'✓' if r['count_correct'] else '✗'} |"
+            )
+        print()
+        print(
+            f"_count exact-match: {n_correct}/{len(counting)}, "
+            f"MAE = {mae:.2f}._"
+        )
+
+    if spatial:
+        print()
+        print("### Spatial-reasoning questions (top-k cells; not auto-scored)")
+        print()
+        print("| id | query | expected | top-1 cell | top-1 (lat, lng) |")
+        print("|---|---|---|---|---|")
+        for r in spatial:
+            top1 = r["preds"][0] if r["preds"] else None
+            cell = top1["cell"] if top1 else ""
+            ll = f"({top1['lat']:.5f}, {top1['lng']:.5f})" if top1 and top1.get("lat") is not None else "—"
+            print(
+                f"| `{r['id']}` | {r['query']} | {r['expected']} | `{cell}` | {ll} |"
+            )
+
     # ---- Per-category breakdown ----
     # Group scored records by category. Skips negative controls because
     # mIoU is undefined when there's no GT.
@@ -424,12 +595,22 @@ def main() -> int:
                 "n_questions": len(records),
                 "n_scored": len(scored),
                 "n_negative_controls": len(negative),
+                "n_counting": len(counting),
+                "n_spatial": len(spatial),
                 "bucket_miou_top1": miou_bucket_top1,
                 f"bucket_miou_at_{args.top}": miou_bucket_at_k,
                 f"bucket_hit_rate_at_{args.top}": bucket_hit_rate,
                 "exemplar_miou_top1": miou_exemplar_top1,
                 f"exemplar_miou_at_{args.top}": miou_exemplar_at_k,
                 f"exemplar_hit_rate_at_{args.top}": exemplar_hit_rate,
+                "count_exact_match_rate": (
+                    sum(1 for r in counting if r["count_correct"]) / len(counting)
+                    if counting else None
+                ),
+                "count_mae": (
+                    sum(r["count_abs_error"] for r in counting) / len(counting)
+                    if counting else None
+                ),
             },
             "by_category": {
                 cat: {
