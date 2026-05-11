@@ -552,6 +552,8 @@ The previous open questions are now mapped to explicit experiments in [EXPERIMEN
 - `E4. Novelty definition comparison`
   Compare `total`, `current`, and `current / total` from `psm -j`, then visually cross-check against the JEPA prediction-error overlay in `psm-viz`.
 
+For the localization-paradox-aligned experiments (E5–E9), the first set of results lives in `datasets/localization_paradox.md` (initial demo, 12 questions × 5 seeds across 3 sessions, 68% Hit@5) and `datasets/localization_paradox2.md` (follow-up with encoder ablation, 12 new place-aware questions, encoder-bypass query mode — 83% Hit@5 on the full 22-question set, 100% on the place-aware subset).
+
 For pure performance regressions, the reproducible benchmark sweep entry points are:
 
 - `benchmarks/sweep_spatial_memory.sh`

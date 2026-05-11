@@ -186,6 +186,8 @@ Two further pipeline components are external to this repo and are described per-
 - **Text-query adapter** (E5, E7): embed a benchmark question via a vision-language text tower (CLIP / SigLIP / DINO) and match against per-tile exemplar embeddings to produce the semantic cue. Sits outside `libpsm`.
 - **Grounded response stage** (E5): forward PSM's top-k `(cell, t_start, t_end)` intervals plus the corresponding evidence frames to an MLLM as explicit grounding context. This is an MLLM API call, not engine code.
 
+**Status:** First-pass results for E5/E6/E7 are in `datasets/localization_paradox.md` (initial demo) and `datasets/localization_paradox2.md` (follow-up: encoder ablation, place-aware question extension, encoder-bypass query mode). Headline: 83% Hit@5 on a 22-question set across 3 sessions × 5 seeds × 2 encoders, 100% on the 8 place-aware questions. Benchmark integration (Gemini 3 Pro / GPT-5 in the loop) is still pending; the local query-only results are the foundation.
+
 ### E5. PSM as Retrieval Prefilter for MLLM Temporal Grounding
 
 Question:
@@ -194,8 +196,10 @@ Question:
 Current capability:
 - `SpatialMemory_query_similar(...)` / `psm --search` provide the retrieval backend for the text-query adapter.
 - `scripts/e5_clip_demo.py` is a minimal local demo over a plain video using CLIP image/text embeddings and a synthetic track.
+- `scripts/eval_lookback.py` is the production text-query harness: embeds a question via CLIP, calls `psm --search`, and reports per-question IoU + Hit@k. Now supports `query_mode: last_seen` for encoder-free location_trace queries.
+- `scripts/eval_bigg_all.sh` runs a paired encoder × seed sweep across multiple sessions.
 - The in-tree extraction pipeline (`python -m psm_extraction extract --models clip,dino[,jepa]`) reproduces the Aria pipeline's `features.h5` shape end-to-end on Apple Silicon — verified on a 15-min Fulham session with DINOv3 attention-distribution parity to the original. So a benchmark session that ships `data.mp4 + gps.json + imu.json + metadata.json` can be ingested entirely in-house, no external pipeline required.
-- Full benchmark evaluation is still external to this repo: it needs a benchmark subset and one MLLM inference endpoint.
+- Local query-only first pass: see `datasets/localization_paradox2.md` for 22-question × 5-seed × 2-encoder results. Full benchmark evaluation (with an MLLM in the loop) is still external to this repo.
 
 Inputs:
 - A benchmark subset with usable spatial context (GPS or coarse scene localization)
@@ -225,6 +229,7 @@ Question:
 Current capability:
 - `RingBuffer_merge_window` already returns cardinality estimates; `precision` in `[10, 18]` controls error.
 - The benchmark's diagnostic analysis shows Counting is the weakest category across all MLLMs — a gap PSM is structurally well-placed to fill.
+- `scripts/eval_lookback.py` accepts a `count: <int>` field on questions and reports `count_predicted` (currently `len(distinct cells in top-k)`), `count_abs_error`, `count_correct`. **Known issue:** this prediction is `--top`-cap-bound, not HLL-cardinality-bound — at top-5 it under-predicts, at top-20 it saturates at the cap. See `datasets/localization_paradox2.md` § "Counting limitation" for a sketch of the two ways to fix this (similarity-threshold cell counting, or an `psm --cardinality "<text>" --threshold τ` flag wired to `RingBuffer_merge_window`).
 
 Protocol:
 1. Select benchmark sessions containing Counting questions.
@@ -242,8 +247,10 @@ Question:
 - How much faster is a PSM look-back than an MLLM's full-video scan for "where did I last have [object]?" queries, and at what retrieval accuracy?
 
 Current capability:
-- Blocked on exemplar embedding retention (see TODO "Localization Paradox Alignment").
-- Once unblocked, answers should run in `O(matching_tiles × capacity)` — typically sub-millisecond on session-scale memories.
+- Exemplar embedding retention landed (see TODO "Localization Paradox Alignment"); E7 is no longer blocked.
+- `psm --search` and `psm --last-seen` are both wired through `scripts/eval_lookback.py`. The `query_mode: last_seen` path is the encoder-free version of E7 — it answers location-trace questions purely from H3 cell membership, with no embedding model in the loop.
+- First-pass result: Palo Alto's "where did I drive in reverse" question hits bucket Hit @5 = 100% across all 5 reservoir seeds × both encoders, fully deterministic. See `datasets/localization_paradox2.md` § 3 for detail.
+- Per-query latency typically `O(matching_tiles × capacity)` — sub-millisecond on session-scale memories.
 
 Protocol:
 1. Ingest a benchmark session into PSM.

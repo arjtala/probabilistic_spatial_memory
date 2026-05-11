@@ -166,9 +166,15 @@ Context: a forthcoming NeurIPS 2026 streaming egocentric memory benchmark (the "
 - [x] `psm --last-seen lat,lng --k-ring N --top N` CLI surface + JSON output (`"mode": "last_seen"` discriminator; `schema_version` unchanged at 1)
 - [x] Benchmark scenario in `benchmarks/benchmark_spatial_memory.c`: "location-trace query latency" over a populated session — first-class measurement for E7
 - [x] `SpatialMemory_query_similar(query, dim, k_ring, center, out)` — rank tiles by cosine similarity of the best exemplar; `psm --search <bin>` / `--center LAT,LNG` / `--exemplars N` CLI; benchmark scenario `query_similar` (E5's text-query adapter now has a concrete backend to target)
+- [x] `scripts/eval_lookback.py` `query_mode: last_seen` field — routes through `psm --last-seen` for true location_trace questions, bypassing CLIP entirely. Demonstrated bucket Hit@5 = 100% deterministic on Palo Alto q9.
+- [x] `scripts/eval_lookback.py` `count: <int>` and `expected: <string>` fields — counting and categorical answers, recorded per-record (counting flagged diagnostic-only pending a real cardinality scorer).
+- [x] `scripts/extract_bigg_all.sh` + `scripts/eval_bigg_all.sh` — paired encoder seed sweeps (CLIP-L vs OpenCLIP-bigG), powering the v2 follow-up writeup.
 - [ ] TurboQuant->PSM experiment (E9): compare raw float32 exemplar reservoirs against 2/3/4-bit TurboQuant-style compressed exemplars for `psm --search`, reporting top-k cell overlap, rank stability, cosine error, bytes/tile, and query latency.
 - [ ] Add an exemplar codec boundary (`raw_f32` first, then TurboQuant-style bitpacked payloads) so `TileExemplar` can store compressed embeddings without changing the HLL counting path.
 - [ ] Extend `benchmarks/benchmark_spatial_memory.c` or add a small query-bank script to sweep exemplar codec, bit budget, and reservoir size against the raw-float32 baseline.
+- [ ] **Real counting scorer for E6.** The current `count_predicted = len(distinct cells in top-k)` is `--top`-cap-bound (under-predicts at top-5, saturates at top-20). Two options: a similarity-threshold cell counter in `eval_lookback.py`, or a `psm --cardinality "<text>" --threshold τ` CLI surface that reads `RingBuffer_merge_window` directly. Latter is cleaner and lands counting numbers in the engine itself.
+- [ ] **Per-question retention overrides** in `scripts/eval_lookback.py`. Today every question shares the same `--time-window × --capacity` retention. A `psm_overrides:` YAML field would let location_trace questions (whose answer is a *moment* inside a long bucket) score the event interval directly without degrading the rest of the corpus.
+- [ ] **Categorical / spatial answer grading.** Three follow-up questions (Fulham q7 river vs railway, Tucson q9 bridge under/over, Palo Alto q7 palms+truck ordering) return deterministic top-1 cells but can't be auto-scored without an OSM-overlay annotation tool. Stand-alone helper outside `libpsm`.
 
 ## Extraction Pipeline
 
