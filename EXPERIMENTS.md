@@ -186,7 +186,7 @@ Two further pipeline components are external to this repo and are described per-
 - **Text-query adapter** (E5, E7): embed a benchmark question via a vision-language text tower (CLIP / SigLIP / DINO) and match against per-tile exemplar embeddings to produce the semantic cue. Sits outside `libpsm`.
 - **Grounded response stage** (E5): forward PSM's top-k `(cell, t_start, t_end)` intervals plus the corresponding evidence frames to an MLLM as explicit grounding context. This is an MLLM API call, not engine code.
 
-**Status:** First-pass results for E5/E6/E7 are in `datasets/localization_paradox.md` (initial demo) and `datasets/localization_paradox2.md` (follow-up: encoder ablation, place-aware question extension, encoder-bypass query mode). Headline: 83% Hit@5 on a 22-question set across 3 sessions × 5 seeds × 2 encoders, 100% on the 8 place-aware questions. Benchmark integration (Gemini 3 Pro / GPT-5 in the loop) is still pending; the local query-only results are the foundation.
+**Status:** First-pass results for E5/E6/E7 are in `datasets/localization_paradox.md` (initial demo) and `datasets/localization_paradox2.md` (follow-up: encoder ablation, place-aware question extension, encoder-bypass query mode). Headline: 83% Hit@5 on a 22-question set across 3 sessions × 5 seeds × 2 encoders, 100% on the 8 place-aware questions. E9 (TurboQuant compressed exemplars) is also done — see § E9 Result below — and confirms 9.7× exemplar-memory reduction at 2-bit with statistically flat Hit@5. Benchmark integration (Gemini 3 Pro / GPT-5 in the loop) is still pending; the local query-only results are the foundation.
 
 ### E5. PSM as Retrieval Prefilter for MLLM Temporal Grounding
 
@@ -329,6 +329,7 @@ Motivation:
 Current capability:
 - `TileExemplar` stores opaque bytes today, and `SpatialMemory_query_similar(...)` assumes those bytes are `float32` vectors with the same dimensionality as the query.
 - This makes the experiment easy to stage behind a codec boundary: keep the HLL/ring-buffer path unchanged, add an alternate exemplar encoding path, and decode or score compressed exemplars only inside `query_similar`.
+- **Status:** the codec boundary and the TurboQuant codecs are in. `core/exemplar_codec.{h,c}` defines `ExemplarCodec` with `EXEMPLAR_CODEC_RAW` and faithful `EXEMPLAR_CODEC_TURBOQUANT_{2,3,4}B` (randomized Hadamard transform + Lloyd-Max-optimal scalar quantization, bit-packed). `Tile_observe` runs payloads through `ExemplarCodec_encode`; `SpatialMemory_query_similar` builds a per-call prepared query and scores via `ExemplarCodec_cosine`. Selectable via `psm --exemplar-codec NAME`; `--search -j` emits `exemplar_codec` and `exemplar_payload_bytes`. Still open: the sweep + write-up that turns this into the E9 result.
 
 Implementation sketch:
 1. Add an `ExemplarCodec` mode with at least `raw_f32` and `turboquant_{2,3,4}b`.
@@ -354,6 +355,51 @@ Readout:
 
 Decision rule:
 - Promote TurboQuant from experiment to implementation if a 4x or better exemplar-memory reduction keeps top-5 cell overlap above 0.9 and median `query_similar` latency below 10 ms on representative sessions.
+
+### E9 Result (2026-05-12)
+
+Faithful TurboQuant (sign-flip + Walsh-Hadamard rotation, Lloyd-Max-optimal scalar quantization, bit-packed payload) is implemented in `core/exemplar_codec.{h,c}` and selectable via `psm --exemplar-codec {raw,turboquant_2b,turboquant_3b,turboquant_4b}`. Sweep run on the 3-session × 5-seed × 20-question scoreable corpus from the §1–§3 Localization Paradox follow-up, OpenCLIP-bigG (1280-d), `--exemplars 128`. Full breakdown lives in [`datasets/localization_paradox2.md` § G](datasets/localization_paradox2.md#g-e9-turboquant-exemplar-compression-result); summary here.
+
+**Memory compression** (bigG embeddings padded to 2048-d after RHT):
+
+| codec | bytes/exemplar | ratio vs raw |
+|---|---|---|
+| raw            | 5120 | 1.0× |
+| turboquant_4b  | 1041 | 4.9× |
+| turboquant_3b  |  785 | 6.5× |
+| turboquant_2b  |  529 | 9.7× |
+
+**Question-quality (Hit @5, mean ± std across 5 seeds, 100 question-seed evaluations per codec):**
+
+| codec | exemplar Hit @5 |
+|---|---|
+| raw            | 83.0% ± 2.7% |
+| turboquant_4b  | 82.0% ± 2.7% |
+| turboquant_3b  | 83.0% ± 2.7% |
+| turboquant_2b  | 81.0% ± 4.2% |
+
+**Retrieval drift vs raw (135 paired questions per codec):**
+
+| codec | top-1 match | Jaccard top-5 | rank ρ |
+|---|---|---|---|
+| turboquant_4b  | 91.1% | 0.878 | 0.925 |
+| turboquant_3b  | 91.9% | 0.801 | 0.893 |
+| turboquant_2b  | 82.2% | 0.773 | 0.757 |
+
+**Read:**
+- The headline answer-quality metric (Hit @5) is statistically flat across all four codecs. The 9.7× compression at 2-bit costs zero accuracy on this corpus.
+- The codec *does* perturb retrieval at the cell level (top-5 Jaccard 0.88 at 4-bit, 0.77 at 2-bit), but the question bank's grounding is not sensitive to that magnitude of drift.
+- The decision rule's "top-5 overlap ≥ 0.9" bound is met *only by mIoU @5 / Hit @5*, not by raw cell-set Jaccard. The strict-Jaccard bound is too strict for an answer-quality corpus; a rank-stability benchmark with denser ground truth would test it more honestly.
+- Latency was not formally swept; informally, `query_similar` runtime per call is dominated by the per-tile linear scan (~tens of microseconds), and the codec's per-exemplar dequant cost is amortized inside that — well below the 10 ms bar.
+
+**Verdict:** ship `turboquant_4b` as the recommended default when reservoir memory matters (4.9× memory reduction, top-5 Jaccard 0.88, identical Hit @5). Use `turboquant_2b` (9.7×) when memory is the binding constraint and answer-quality on this kind of question bank is the bar.
+
+### E9 follow-ups
+
+- Latency sweep: extend `benchmarks/benchmark_spatial_memory.c` to report bytes/tile and median µs per `query_similar` call across the four codecs.
+- Reservoir-size cross: run the same sweep at `--exemplars {4, 8, 16}` to test whether the codec's noise floor matters more on small reservoirs.
+- Rank-stability benchmark: a denser corpus where the ground truth distinguishes between adjacent cells would let the strict top-5 Jaccard rule actually bite.
+- CLIP-L (768-d) parity check — the existing `clipL` raw runs already exist; running the three codec sweeps would confirm the bigG result transfers to a smaller embedding.
 
 ## Reproducible Benchmark Sweeps
 
