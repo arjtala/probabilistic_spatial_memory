@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include "core/tile_table.h"
+#include "core/exemplar_codec.h"
 
 // SpatialMemory maps H3 cells to per-tile ring buffers of HLL counters.
 // Observations are bucketed by location and queried approximately over recent
@@ -17,6 +18,7 @@ typedef struct {
   size_t capacity;           // ring buffer capacity (shared across tiles)
   size_t precision;          // HLL precision (shared across tiles)
   size_t exemplar_capacity;  // per-tile reservoir capacity (0 = disabled)
+  ExemplarCodec exemplar_codec;  // payload encoding for stored exemplars
 } SpatialMemory;
 
 typedef bool (*SpatialMemoryTileVisitor)(H3Index cell_id, Tile *tile,
@@ -24,10 +26,13 @@ typedef bool (*SpatialMemoryTileVisitor)(H3Index cell_id, Tile *tile,
 
 // Construct a new SpatialMemory. Pass 0 for exemplar_capacity to disable
 // per-tile reservoir sampling (no allocation, no sampling work during
-// observe). Larger values create a fixed-size reservoir per tile.
+// observe). Larger values create a fixed-size reservoir per tile. The codec
+// chooses how exemplar payloads are stored; EXEMPLAR_CODEC_RAW preserves the
+// pre-codec behavior of memcpy-ing source bytes verbatim.
 SpatialMemory *SpatialMemory_new(const int resolution, const size_t capacity,
                                  const size_t precision,
-                                 const size_t exemplar_capacity);
+                                 const size_t exemplar_capacity,
+                                 ExemplarCodec exemplar_codec);
 // Record an observation at timestamp t. Widens the per-slot [t_min, t_max]
 // interval and feeds the per-tile exemplar reservoir (when configured).
 bool SpatialMemory_observe(SpatialMemory *sm, double t, const double lat,

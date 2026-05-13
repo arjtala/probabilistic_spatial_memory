@@ -139,7 +139,8 @@ static bool apply_pending_seek(VizApp *app, double now) {
   SpatialMemory *replacement_sm = NULL;
   if (seek_backward && app->sm) {
     replacement_sm = SpatialMemory_new(app->h3_resolution, DEFAULT_CAPACITY,
-                                       DEFAULT_PRECISION, 0);
+                                       DEFAULT_PRECISION, 0,
+                                       EXEMPLAR_CODEC_RAW);
     if (!replacement_sm) {
       fprintf(stderr, "Failed to reset spatial memory after seek\n");
       app->seek_pending = false;
@@ -571,7 +572,7 @@ int main(int argc, char *argv[]) {
   hid_t h5_file = -1;
 
   if (h5_path) {
-    app.sm = SpatialMemory_new(app.h3_resolution, DEFAULT_CAPACITY, DEFAULT_PRECISION, 0);
+    app.sm = SpatialMemory_new(app.h3_resolution, DEFAULT_CAPACITY, DEFAULT_PRECISION, 0, EXEMPLAR_CODEC_RAW);
     if (!app.sm) {
       fprintf(stderr, "Failed to initialize spatial memory\n");
     }

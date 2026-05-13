@@ -96,7 +96,7 @@ bool Tile_coords_to_cell(double lat, double lng, int resolution,
 
 Tile *Tile_new(const double lat, const double lng, const int resolution,
                const size_t capacity, const size_t precision,
-               const size_t exemplar_capacity) {
+               const size_t exemplar_capacity, ExemplarCodec exemplar_codec) {
   H3Index cellId;
   if (!Tile_coords_to_cell(lat, lng, resolution, &cellId, "Tile_new")) {
     return NULL;
@@ -120,6 +120,7 @@ Tile *Tile_new(const double lat, const double lng, const int resolution,
   tile->exemplar_capacity = exemplar_capacity;
   tile->exemplar_count = 0;
   tile->exemplar_seen = 0;
+  tile->exemplar_codec = exemplar_codec;
   if (exemplar_capacity > 0) {
     tile->exemplars =
         (TileExemplar *)calloc(exemplar_capacity, sizeof(TileExemplar));
@@ -162,32 +163,34 @@ static void tile_exemplars_sample(Tile *tile, double t, const void *data,
   // subsequent candidate evicts a uniformly chosen slot with probability
   // capacity / seen.
   if (tile->exemplar_count < tile->exemplar_capacity) {
-    void *copy = malloc(size);
-    if (!copy) {
-      fprintf(stderr, "Tile: failed to copy exemplar bytes (size=%zu)\n", size);
+    void *encoded = NULL;
+    size_t encoded_size = 0;
+    if (!ExemplarCodec_encode(tile->exemplar_codec, data, size, &encoded,
+                              &encoded_size)) {
+      fprintf(stderr, "Tile: failed to encode exemplar (size=%zu)\n", size);
       return;
     }
-    memcpy(copy, data, size);
     TileExemplar *slot = &tile->exemplars[tile->exemplar_count++];
     slot->t = t;
-    slot->data = copy;
-    slot->size = size;
+    slot->data = encoded;
+    slot->size = encoded_size;
     return;
   }
 
   uint64_t idx = tile_rand_uint64() % tile->exemplar_seen;
   if (idx < tile->exemplar_capacity) {
-    void *copy = malloc(size);
-    if (!copy) {
-      fprintf(stderr, "Tile: failed to copy exemplar bytes (size=%zu)\n", size);
+    void *encoded = NULL;
+    size_t encoded_size = 0;
+    if (!ExemplarCodec_encode(tile->exemplar_codec, data, size, &encoded,
+                              &encoded_size)) {
+      fprintf(stderr, "Tile: failed to encode exemplar (size=%zu)\n", size);
       return;
     }
-    memcpy(copy, data, size);
     TileExemplar *slot = &tile->exemplars[(size_t)idx];
     free(slot->data);
     slot->t = t;
-    slot->data = copy;
-    slot->size = size;
+    slot->data = encoded;
+    slot->size = encoded_size;
   }
 }
 

@@ -16,7 +16,7 @@
 #define CELLID_RS10 0x8a194aca6907fffULL
 
 void test_tile_new(void) {
-  Tile *tile = Tile_new(LAT, LNG, RESOLUTION, CAPACITY, PRECISION, 0);
+  Tile *tile = Tile_new(LAT, LNG, RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   ASSERT(NULL != tile, 1, NULL != tile);
   ASSERT(CELLID_RS10 == tile->cellId, 1, CELLID_RS10 == tile->cellId);
   ASSERT(CAPACITY == tile->rb->capacity, CAPACITY, (int)tile->rb->capacity);
@@ -29,10 +29,11 @@ void test_tile_new(void) {
 }
 
 void test_tile_new_invalid_input(void) {
-  Tile *bad_resolution = Tile_new(LAT, LNG, 16, CAPACITY, PRECISION, 0);
-  Tile *bad_lat = Tile_new(100.0, LNG, RESOLUTION, CAPACITY, PRECISION, 0);
+  Tile *bad_resolution = Tile_new(LAT, LNG, 16, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
+  Tile *bad_lat = Tile_new(100.0, LNG, RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   Tile *bad_precision = Tile_new(LAT, LNG, RESOLUTION, CAPACITY,
-                                 RingBuffer_precision_min() - 1, 0);
+                                 RingBuffer_precision_min() - 1, 0,
+                                 EXEMPLAR_CODEC_RAW);
   ASSERT(NULL == bad_resolution, 1, NULL == bad_resolution);
   ASSERT(NULL == bad_lat, 1, NULL == bad_lat);
   ASSERT(NULL == bad_precision, 1, NULL == bad_precision);
@@ -49,7 +50,7 @@ void test_tile_coords_to_cell(void) {
 
 void test_tile_observe(void) {
   const char *pb = "peanut butter";
-  Tile *tile = Tile_new(0.0, 0.0, RESOLUTION, CAPACITY, PRECISION, 0);
+  Tile *tile = Tile_new(0.0, 0.0, RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   Tile_observe(tile, 0.0, pb, strlen(pb));
   RingBufferHLL *current = RingBuffer_current(tile->rb);
   int count = (int)RingBufferHLL_count(current);
@@ -60,7 +61,7 @@ void test_tile_observe(void) {
 
 void test_tile_advance(void) {
   const char *pb = "peanut butter";
-  Tile *tile = Tile_new(0.0, 0.0, RESOLUTION, CAPACITY, PRECISION, 0);
+  Tile *tile = Tile_new(0.0, 0.0, RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   Tile_observe(tile, 0.0, pb, strlen(pb));
   Tile_advance(tile);
   RingBufferHLL *current = RingBuffer_current(tile->rb);
@@ -73,7 +74,7 @@ void test_tile_advance(void) {
 void test_tile_query(void) {
   const char *pb = "peanut butter";
   const char *j = "jelly";
-  Tile *tile = Tile_new(LAT, LNG, RESOLUTION, CAPACITY, PRECISION, 0);
+  Tile *tile = Tile_new(LAT, LNG, RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   Tile_observe(tile, 0.0, pb, strlen(pb));
   Tile_advance(tile);
   Tile_observe(tile, 1.0, j, strlen(j));
@@ -85,15 +86,15 @@ void test_tile_query(void) {
 void test_tile_same_cell(void) {
   const double lat2 = 51.379778;
   const double lng2 = -0.311022;
-  Tile *tile = Tile_new(LAT, LNG, RESOLUTION, CAPACITY, PRECISION, 0);
-  Tile *tile2 = Tile_new(lat2, lng2, RESOLUTION, CAPACITY, PRECISION, 0);
+  Tile *tile = Tile_new(LAT, LNG, RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
+  Tile *tile2 = Tile_new(lat2, lng2, RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   ASSERT(tile2->cellId == tile->cellId, 1, tile2->cellId == tile->cellId);
   Tile_free(tile);
   Tile_free(tile2);
 }
 
 void test_tile_exemplars_disabled(void) {
-  Tile *tile = Tile_new(LAT, LNG, RESOLUTION, CAPACITY, PRECISION, 0);
+  Tile *tile = Tile_new(LAT, LNG, RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   const char *pb = "peanut butter";
   for (int i = 0; i < 100; ++i) {
     Tile_observe(tile, (double)i, pb, strlen(pb));
@@ -105,7 +106,7 @@ void test_tile_exemplars_disabled(void) {
 
 void test_tile_exemplars_under_capacity_retains_all(void) {
   const size_t cap = 4;
-  Tile *tile = Tile_new(LAT, LNG, RESOLUTION, CAPACITY, PRECISION, cap);
+  Tile *tile = Tile_new(LAT, LNG, RESOLUTION, CAPACITY, PRECISION, cap, EXEMPLAR_CODEC_RAW);
   ASSERT(NULL != tile, 1, NULL != tile);
   ASSERT(NULL != tile->exemplars, 1, NULL != tile->exemplars);
 
@@ -128,7 +129,7 @@ void test_tile_exemplars_under_capacity_retains_all(void) {
 
 void test_tile_exemplars_over_capacity_bounds_count(void) {
   const size_t cap = 5;
-  Tile *tile = Tile_new(LAT, LNG, RESOLUTION, CAPACITY, PRECISION, cap);
+  Tile *tile = Tile_new(LAT, LNG, RESOLUTION, CAPACITY, PRECISION, cap, EXEMPLAR_CODEC_RAW);
   ASSERT(NULL != tile, 1, NULL != tile);
 
   char buf[16];
@@ -163,7 +164,7 @@ void test_tile_exemplars_statistical_sanity(void) {
 
   size_t retained = 0;
   for (size_t trial = 0; trial < trials; ++trial) {
-    Tile *tile = Tile_new(LAT, LNG, RESOLUTION, CAPACITY, PRECISION, cap);
+    Tile *tile = Tile_new(LAT, LNG, RESOLUTION, CAPACITY, PRECISION, cap, EXEMPLAR_CODEC_RAW);
     if (!tile) {
       fprintf(stderr, "failed to create tile for exemplar stats\n");
       exit(EXIT_FAILURE);
@@ -199,7 +200,7 @@ void test_tile_exemplars_freed_on_tile_free(void) {
   // Exercise the malloc/free pattern under sanitize. Observing twice as many
   // items as capacity guarantees at least one eviction path runs.
   const size_t cap = 4;
-  Tile *tile = Tile_new(LAT, LNG, RESOLUTION, CAPACITY, PRECISION, cap);
+  Tile *tile = Tile_new(LAT, LNG, RESOLUTION, CAPACITY, PRECISION, cap, EXEMPLAR_CODEC_RAW);
   char buf[16];
   for (size_t i = 0; i < 64; ++i) {
     snprintf(buf, sizeof(buf), "x-%zu", i);

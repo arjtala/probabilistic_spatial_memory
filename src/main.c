@@ -724,7 +724,8 @@ int main(int argc, char *argv[]) {
   }
 
   sm = SpatialMemory_new(options.h3_resolution, options.capacity,
-                         options.precision, options.exemplar_capacity);
+                         options.precision, options.exemplar_capacity,
+                         EXEMPLAR_CODEC_RAW);
   if (!sm) {
     fprintf(stderr, "Failed to initialize spatial memory\n");
     return 1;

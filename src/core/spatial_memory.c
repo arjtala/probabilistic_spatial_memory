@@ -14,7 +14,8 @@ static bool spatial_memory_coords_to_cell(const SpatialMemory *sm, double lat,
 
 SpatialMemory *SpatialMemory_new(const int resolution, const size_t capacity,
                                  const size_t precision,
-                                 const size_t exemplar_capacity) {
+                                 const size_t exemplar_capacity,
+                                 ExemplarCodec exemplar_codec) {
   if (resolution < 0 || resolution > 15) {
     fprintf(stderr, "SpatialMemory_new: H3 resolution must be in [0, 15], got %d\n",
             resolution);
@@ -46,6 +47,7 @@ SpatialMemory *SpatialMemory_new(const int resolution, const size_t capacity,
   sm->capacity = capacity;
   sm->precision = precision;
   sm->exemplar_capacity = exemplar_capacity;
+  sm->exemplar_codec = exemplar_codec;
   return sm;
 }
 
@@ -61,7 +63,7 @@ bool SpatialMemory_observe(SpatialMemory *sm, double t, const double lat,
   Tile *tile = TileTable_get(sm->tiles, cell_id);
   if (NULL == tile) {
     tile = Tile_new(lat, lng, sm->resolution, sm->capacity, sm->precision,
-                    sm->exemplar_capacity);
+                    sm->exemplar_capacity, sm->exemplar_codec);
     if (!tile) {
       return false;
     }
@@ -239,24 +241,18 @@ static bool score_tile_similar(Tile *tile, const float *query, size_t dim,
   size_t n_ex = Tile_exemplar_count(tile);
   if (n_ex == 0) return false;
 
-  const size_t want_bytes = dim * sizeof(float);
   double best_sim = -2.0;  // any valid cosine in [-1, 1] beats this sentinel.
   double best_t = 0.0;
   bool found = false;
 
   for (size_t i = 0; i < n_ex; ++i) {
     const TileExemplar *ex = Tile_exemplar_at(tile, i);
-    if (!ex || !ex->data || ex->size != want_bytes) continue;
-    const float *v = (const float *)ex->data;
-    double dot = 0.0, v_norm_sq = 0.0;
-    for (size_t d = 0; d < dim; ++d) {
-      double qi = (double)query[d];
-      double vi = (double)v[d];
-      dot += qi * vi;
-      v_norm_sq += vi * vi;
+    if (!ex || !ex->data) continue;
+    double sim = 0.0;
+    if (!ExemplarCodec_cosine(tile->exemplar_codec, query, dim, q_norm,
+                              ex->data, ex->size, &sim)) {
+      continue;
     }
-    if (v_norm_sq <= 0.0) continue;
-    double sim = dot / (q_norm * sqrt(v_norm_sq));
     if (sim > best_sim) {
       best_sim = sim;
       best_t = ex->t;

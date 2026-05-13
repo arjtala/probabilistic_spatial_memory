@@ -4,10 +4,13 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "core/ring_buffer.h"
+#include "core/exemplar_codec.h"
 #include <h3/h3api.h>
 
-// Per-tile reservoir-sampled exemplar. Owns a malloc'd copy of the embedding
-// bytes so the caller's buffer can be freed after Tile_observe returns.
+// Per-tile reservoir-sampled exemplar. Owns a malloc'd codec-encoded payload
+// so the caller's source buffer can be freed after Tile_observe returns. The
+// payload's interpretation (raw float32, TurboQuant bitpack, ...) is decided
+// by the tile's ExemplarCodec.
 typedef struct {
   double t;
   void *data;
@@ -26,13 +29,14 @@ typedef struct {
   size_t exemplar_capacity;
   size_t exemplar_count;
   uint64_t exemplar_seen;
+  ExemplarCodec exemplar_codec;
 } Tile;
 
 bool Tile_coords_to_cell(double lat, double lng, int resolution,
                          H3Index *out_cell_id, const char *context);
 Tile *Tile_new(const double lat, const double lng, const int resolution,
                const size_t capacity, const size_t precision,
-               const size_t exemplar_capacity);
+               const size_t exemplar_capacity, ExemplarCodec exemplar_codec);
 void Tile_free(Tile *tile);
 // Record an observation at timestamp t. Updates the current ring-buffer slot's
 // HLL + [t_min, t_max] interval and feeds the reservoir sampler. The data

@@ -313,7 +313,8 @@ void test_ingest_run_preserves_empty_windows(void) {
   hid_t file = H5Fopen(path, H5F_ACC_RDONLY, H5P_DEFAULT);
   IngestReader *reader = IngestReader_open(file, DINO);
   SpatialMemory *sm = SpatialMemory_new(TEST_RESOLUTION, TEST_CAPACITY,
-                                        TEST_PRECISION, 0);
+                                        TEST_PRECISION, 0,
+                                        EXEMPLAR_CODEC_RAW);
 
   ASSERT(NULL != reader, 1, NULL != reader);
   ASSERT(NULL != sm, 1, NULL != sm);

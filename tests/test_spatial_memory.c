@@ -52,7 +52,7 @@ static Tile *find_tile_for_cell(SpatialMemory *sm, H3Index cell_id) {
 }
 
 void test_sm_new(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   ASSERT(NULL != sm, 1, NULL != sm);
   ASSERT(RESOLUTION == sm->resolution, RESOLUTION, sm->resolution);
   ASSERT(CAPACITY == sm->capacity, CAPACITY, (int)sm->capacity);
@@ -64,18 +64,19 @@ void test_sm_new(void) {
 }
 
 void test_sm_new_invalid_resolution(void) {
-  SpatialMemory *sm = SpatialMemory_new(16, CAPACITY, PRECISION, 0);
+  SpatialMemory *sm = SpatialMemory_new(16, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   ASSERT(NULL == sm, 1, NULL == sm);
 }
 
 void test_sm_new_invalid_precision(void) {
   SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY,
-                                        RingBuffer_precision_max() + 1, 0);
+                                        RingBuffer_precision_max() + 1, 0,
+                                        EXEMPLAR_CODEC_RAW);
   ASSERT(NULL == sm, 1, NULL == sm);
 }
 
 void test_sm_observe(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   const char *pb = "peanut butter";
   bool ok = SpatialMemory_observe(sm, 0.0, LAT, LNG, pb, strlen(pb));
   ASSERT(ok, 1, ok);
@@ -97,7 +98,7 @@ void test_sm_observe(void) {
 }
 
 void test_sm_query(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   const char *pb = "peanut butter";
   double query_count = 0.0;
   bool ok = SpatialMemory_observe(sm, 0.0, LAT, LNG, pb, strlen(pb));
@@ -110,7 +111,7 @@ void test_sm_query(void) {
 }
 
 void test_sm_advance_all(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   const char *pb = "peanut butter";
   LatLng loc;
   loc.lat = degsToRads(LAT);
@@ -136,7 +137,7 @@ void test_sm_multi_tile(void) {
   const char *sushi = "sushi";
   const double tokyo_lat = 35.68;
   const double tokyo_lng = 139.68;
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   double count_lon = 0.0;
   double count_tok = 0.0;
   bool ok = SpatialMemory_observe(sm, 0.0, LAT, LNG, pb, strlen(pb));
@@ -155,7 +156,7 @@ void test_sm_multi_tile(void) {
 }
 
 void test_sm_invalid_observe_does_not_crash(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   const char *pb = "peanut butter";
   bool ok = SpatialMemory_observe(sm, 0.0, 100.0, LNG, pb, strlen(pb));
   ASSERT(!ok, 0, ok);
@@ -164,7 +165,7 @@ void test_sm_invalid_observe_does_not_crash(void) {
 }
 
 void test_sm_invalid_query_returns_false(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   double count = 123.0;
   bool ok = SpatialMemory_query(sm, 100.0, LNG, 0, &count);
   ASSERT(!ok, 0, ok);
@@ -173,7 +174,7 @@ void test_sm_invalid_query_returns_false(void) {
 }
 
 void test_sm_same_cell_deduplicates_observations(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   const char *pb = "peanut butter";
   double first_count = 0.0;
   double second_count = 0.0;
@@ -194,7 +195,7 @@ void test_sm_same_cell_deduplicates_observations(void) {
 }
 
 void test_sm_for_each_tile_enumerates_entries(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   const char *pb = "peanut butter";
   TileVisitState state = {0};
 
@@ -210,7 +211,7 @@ void test_sm_for_each_tile_enumerates_entries(void) {
 void test_sm_exemplar_capacity_propagates_to_tile(void) {
   const size_t cap = 4;
   SpatialMemory *sm =
-      SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, cap);
+      SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, cap, EXEMPLAR_CODEC_RAW);
   ASSERT(NULL != sm, 1, NULL != sm);
   ASSERT(cap == sm->exemplar_capacity, (int)cap, (int)sm->exemplar_capacity);
 
@@ -239,7 +240,7 @@ void test_sm_exemplar_capacity_propagates_to_tile(void) {
 }
 
 void test_sm_query_intervals_empty(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   SpatialMemoryInterval out[4];
   size_t n = SpatialMemory_query_intervals(sm, LAT, LNG, 0, out, 4);
   ASSERT(0 == (int)n, 0, (int)n);
@@ -247,7 +248,7 @@ void test_sm_query_intervals_empty(void) {
 }
 
 void test_sm_query_intervals_single_hit(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   const char *pb = "peanut butter";
   SpatialMemory_observe(sm, 123.5, LAT, LNG, pb, strlen(pb));
 
@@ -262,7 +263,7 @@ void test_sm_query_intervals_single_hit(void) {
 }
 
 void test_sm_query_intervals_sorted_by_tmax_desc(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   const char *pb = "peanut butter";
   // Offsets of 0.01 deg (~1.1 km at LAT=51) are ~17 hops apart at res 10, so
   // k_ring=30 is needed to cover all three from the middle point.
@@ -280,7 +281,7 @@ void test_sm_query_intervals_sorted_by_tmax_desc(void) {
 }
 
 void test_sm_query_intervals_truncation_returns_total(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   const char *pb = "peanut butter";
   SpatialMemory_observe(sm, 100.0, LAT, LNG, pb, strlen(pb));
   SpatialMemory_observe(sm, 200.0, LAT + 0.01, LNG, pb, strlen(pb));
@@ -294,7 +295,7 @@ void test_sm_query_intervals_truncation_returns_total(void) {
 }
 
 void test_sm_query_intervals_probe_mode(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 0, EXEMPLAR_CODEC_RAW);
   const char *pb = "peanut butter";
   SpatialMemory_observe(sm, 100.0, LAT, LNG, pb, strlen(pb));
   SpatialMemory_observe(sm, 200.0, LAT + 0.01, LNG, pb, strlen(pb));
@@ -309,7 +310,7 @@ void test_sm_query_intervals_probe_mode(void) {
 }
 
 void test_sm_query_similar_empty(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 4);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 4, EXEMPLAR_CODEC_RAW);
   float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};
   SpatialMemorySimilar out[4];
   size_t n = SpatialMemory_query_similar(sm, q, 4, 0.0, 0.0, -1, out, 4);
@@ -318,7 +319,7 @@ void test_sm_query_similar_empty(void) {
 }
 
 void test_sm_query_similar_exact_match(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 2);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 2, EXEMPLAR_CODEC_RAW);
   float v[4] = {1.0f, 2.0f, 3.0f, 4.0f};
   SpatialMemory_observe(sm, 1.0, LAT, LNG, v, sizeof(v));
 
@@ -333,7 +334,7 @@ void test_sm_query_similar_exact_match(void) {
 }
 
 void test_sm_query_similar_picks_closer_exemplar(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 4);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 4, EXEMPLAR_CODEC_RAW);
   float near[4] = {1.0f, 0.0f, 0.0f, 0.0f};
   float far_[4] = {0.0f, 1.0f, 0.0f, 0.0f};
   SpatialMemory_observe(sm, 10.0, LAT, LNG, far_, sizeof(far_));
@@ -350,7 +351,7 @@ void test_sm_query_similar_picks_closer_exemplar(void) {
 }
 
 void test_sm_query_similar_ranks_tiles(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 2);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 2, EXEMPLAR_CODEC_RAW);
   float v_a[4] = {1.0f, 0.1f, 0.0f, 0.0f};  // very close to q
   float v_b[4] = {0.3f, 1.0f, 0.0f, 0.0f};  // less close to q
   SpatialMemory_observe(sm, 5.0, LAT, LNG, v_a, sizeof(v_a));
@@ -368,7 +369,7 @@ void test_sm_query_similar_ranks_tiles(void) {
 }
 
 void test_sm_query_similar_mismatched_dim_skipped(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 2);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 2, EXEMPLAR_CODEC_RAW);
   // Observe 5-float vectors; query with 4-float. Should skip cleanly.
   float v5[5] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
   SpatialMemory_observe(sm, 1.0, LAT, LNG, v5, sizeof(v5));
@@ -381,7 +382,7 @@ void test_sm_query_similar_mismatched_dim_skipped(void) {
 }
 
 void test_sm_query_similar_k_ring_restricts_scan(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 2);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 2, EXEMPLAR_CODEC_RAW);
   float v[4] = {1.0f, 0.0f, 0.0f, 0.0f};
   // Two observations in distinct cells, one near LAT/LNG, one in Tokyo.
   SpatialMemory_observe(sm, 1.0, LAT, LNG, v, sizeof(v));
@@ -396,7 +397,7 @@ void test_sm_query_similar_k_ring_restricts_scan(void) {
 }
 
 void test_sm_query_similar_probe_mode(void) {
-  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 2);
+  SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 2, EXEMPLAR_CODEC_RAW);
   float v[4] = {1.0f, 0.0f, 0.0f, 0.0f};
   SpatialMemory_observe(sm, 1.0, LAT, LNG, v, sizeof(v));
   SpatialMemory_observe(sm, 2.0, LAT + 0.01, LNG, v, sizeof(v));
