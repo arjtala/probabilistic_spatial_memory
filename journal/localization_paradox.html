@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+<title>localization_paradox.html</title>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+
+</head>
+
+<body>
+
+<h1 id="localizationparadoxdemo">Localization Paradox Demo</h1>
+
+<p>A standalone walk-through showing how <code>psm</code> behaves as the memory backbone for the look-back queries described in recent work on the <strong>localization paradox</strong> in streaming egocentric memory — the gap between an MLLM&#8217;s <em>semantic</em> answer (&#8220;you saw a yellow bus&#8221;) and its near-zero <em>temporal grounding</em> (the <code>[t_start, t_end]</code> interval that proves it).</p>
+
+<p>The premise of that line of work: when you ask a frontier MLLM a &#8220;where/when did I last see X?&#8221; question over hours of unscripted Ray-Ban-style video, it can usually generate a plausible-sounding answer, but its <code>mIoU</code> against a human-annotated visual proof interval is often ≈ 0. The model guesses from context and linguistic priors instead of pointing at an actual moment in the stream.</p>
+
+<p><code>psm</code> is structurally a candidate for closing that gap. Each H3 cell holds a ring buffer of HLL sketches with <code>(t_min, t_max)</code> retained per bucket and a per-tile reservoir of exemplar embeddings. That gives us, in O(matching_tiles × capacity):</p>
+
+<ul>
+<li><strong><code>--last-seen LAT,LNG</code></strong> — the most recent intervals where <em>any</em> observation landed in this neighborhood.</li>
+<li><strong><code>--search query.f32</code></strong> — top-k tiles ranked by cosine similarity of their best stored exemplar against a CLIP text query embedding, each returning <code>(cell, t_start, t_end, exemplar_t, similarity, count)</code>.</li>
+</ul>
+
+<p>This document is a runnable end-to-end walk-through of those two query surfaces on the included Aria session.</p>
+
+<hr />
+
+<h2 id="whatthedemoshows">What the demo shows</h2>
+
+<p>A single Aria session (one wearer, <sub>15</sub>-min walk in Fulham/Sands End, GPS + IMU + 30 fps egocentric video subsampled to 3 fps for embeddings). For two natural-language cues — &#8220;a red bus&#8221;, &#8220;a zebra crossing&#8221; — <code>psm --search</code> returns ranked <code>(H3 cell, t_start, t_end)</code> tuples in well under a millisecond. Those intervals are then visually verified against the timeline by scrubbing <code>psm-viz</code> to each <code>exemplar_t</code>.</p>
+
+<p>The point is not absolute retrieval accuracy on a benchmark. The point is the <strong>shape</strong> of the answer: PSM emits the kind of grounded interval the localization paradox literature explicitly says frontier MLLMs fail to produce on their own. PSM is best read as a <em>prefilter</em> — a candidate-interval generator that an MLLM consumes as grounding context, rather than a competitor to the MLLM.</p>
+
+<hr />
+
+<h2 id="inputs">Inputs</h2>
+
+<p>The session lives flat under <code>datasets/1501677363692556/</code> with the Aria sidecar layout plus two HDF5 files:</p>
+
+<pre><code>datasets/1501677363692556/
+├── data.mp4              # ~15 min, 30 fps egocentric video
+├── gps.json              # 1 Hz GPS fixes
+├── imu.json              # 100 Hz accel + gyro
+├── metadata.json         # capture_time_epoch + session metadata
+├── features.h5           # dino + jepa + gps + imu  (used by psm-viz)
+└── clip_features.h5      # clip + gps + imu        (used by psm --search)
+</code></pre>
+
+<p>Pre-computed CLIP text-query embeddings live in the parent <code>datasets/</code> directory:</p>
+
+<ul>
+<li><code>datasets/q-bus.bin</code> — CLIP text embedding for &#8220;a red bus&#8221;, <code>float32</code> LE.</li>
+<li><code>datasets/q-zebra.bin</code> — CLIP text embedding for &#8220;a zebra crossing&#8221;, <code>float32</code> LE.</li>
+</ul>
+
+<p>These are exactly the format <code>psm --search &lt;path&gt;</code> expects.</p>
+
+<blockquote>
+<p><strong>Why two HDF5 files?</strong> The original Aria pipeline produced <code>features.h5</code> with <code>dino</code> + <code>jepa</code> groups (used by <code>psm-viz</code> for attention/prediction overlays). <code>clip</code> is needed for the text-query path, but the in-tree extraction writes one group set per output file rather than appending. So we keep <code>features.h5</code> as-is for the visualizer and write <code>clip_features.h5</code> alongside it for the search path. A future <code>add-group</code> subcommand (TODO Phase 4) will let both groups live in one file.</p>
+</blockquote>
+
+<hr />
+
+<h2 id="step1—extractclip_features.h5">Step 1 — Extract <code>clip_features.h5</code></h2>
+
+<p><code>features.h5</code> ships with the session. <code>clip_features.h5</code> does not — it must be extracted once. The in-tree extraction pipeline auto-detects the GPS/IMU sidecars next to the video, so the resulting file has real H3 cells along the captured route.</p>
+
+<pre><code class="bash">conda activate psm
+
+# First-time only: install the optional CLIP runner.
+pip install -e extraction[clip]
+
+python -m psm_extraction extract \
+  --video    datasets/1501677363692556/data.mp4 \
+  --output   datasets/1501677363692556/clip_features.h5 \
+  --models   clip \
+  --sample-fps 3 --segment-sec 1 \
+  --session-id 1501677363692556
+</code></pre>
+
+<p>Notes:</p>
+
+<ul>
+<li><sub>25</sub> seconds on M4 MPS for the included session (2707 frames × 512-d CLIP).</li>
+<li>The <code>--sample-fps 3</code> matches the existing <code>dino</code> group&#8217;s frame rate so timestamps line up across the two files.</li>
+<li>A <code>.clip_features.clip.&lt;hash&gt;.npz</code> cache lands next to the output. Re-running picks up the cache; pass <code>--force-reembed</code> to skip it.</li>
+<li>A future full re-extraction (<code>--models clip,dino,jepa --sample-fps 30</code>) takes <sub>22</sub> minutes on the same hardware and produces a single combined <code>features.h5</code>.</li>
+</ul>
+
+<hr />
+
+<h2 id="step2—clilook-backqueries">Step 2 — CLI look-back queries</h2>
+
+<p>Two retrieval surfaces matter for the localization paradox. Both already land in <code>psm -j</code>.</p>
+
+<p>The defaults (<code>-t 5.0 -C 12</code>) only retain <sub>60</sub> s of memory per cell, which truncates everything outside the recent window in a 15-min session. For session-scale demos use <code>-t 75 -C 12</code> (<sub>15</sub> min) so older cells still report meaningful counts.</p>
+
+<pre><code class="bash">FEATURES=datasets/1501677363692556/clip_features.h5
+</code></pre>
+
+<h3 id="2a.visual-detaillook-back:wheredidilastseex">2a. Visual-detail look-back: &#8220;where did I last see X?&#8221;</h3>
+
+<p>This is the closest analogue to the <strong>Location Trace</strong> and <strong>Visual Detail Recall</strong> categories in the benchmark.</p>
+
+<pre><code class="bash"># &quot;a red bus&quot;
+targets/psm -f &quot;$FEATURES&quot; -g clip -t 75 -C 12 \
+  --search datasets/q-bus.bin \
+  --top 5 --exemplars 8 -j &gt; /tmp/hits-bus.json
+
+# &quot;a zebra crossing&quot;
+targets/psm -f &quot;$FEATURES&quot; -g clip -t 75 -C 12 \
+  --search datasets/q-zebra.bin \
+  --top 5 --exemplars 8 -j &gt; /tmp/hits-zebra.json
+
+jq '.results[] | {cell, lat, lng, similarity, exemplar_t, t_min, t_max, count}' /tmp/hits-bus.json
+</code></pre>
+
+<p>Each entry in <code>.results[]</code> has <code>similarity</code> (cosine), <code>exemplar_t</code> (timestamp of the matching exemplar inside that tile), the bucket interval <code>(t_min, t_max)</code>, and the HLL distinct-observation <code>count</code> over the active retention horizon. That set <strong>is</strong> the visual-proof grounding the localization paradox highlights as missing from raw MLLM responses.</p>
+
+<p>Sample output from the included session (top-3 per query):</p>
+
+<table>
+<colgroup>
+<col />
+<col />
+<col />
+<col />
+<col />
+<col />
+<col />
+</colgroup>
+
+<thead>
+<tr>
+	<th> Query </th>
+	<th> Cell </th>
+	<th> (lat, lng) </th>
+	<th> similarity </th>
+	<th> exemplar_t (s) </th>
+	<th> interval (s) </th>
+	<th> count </th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+	<td> <code>q-bus.bin</code> </td>
+	<td> <code>8a194ada1a17fff</code> </td>
+	<td> (51.468216, -0.187567) </td>
+	<td> 0.265 </td>
+	<td> +258 </td>
+	<td> [+251, +268] </td>
+	<td> 55 </td>
+</tr>
+<tr>
+	<td> <code>q-bus.bin</code> </td>
+	<td> <code>8a194ada1a37fff</code> </td>
+	<td> (51.469027, -0.186435) </td>
+	<td> 0.251 </td>
+	<td> +321 </td>
+	<td> [+269, +382] </td>
+	<td> 342 </td>
+</tr>
+<tr>
+	<td> <code>q-bus.bin</code> </td>
+	<td> <code>8a194ada1baffff</code> </td>
+	<td> (51.470135, -0.187045) </td>
+	<td> 0.248 </td>
+	<td> +404 </td>
+	<td> [+382, +467] </td>
+	<td> 268 </td>
+</tr>
+<tr>
+	<td> <code>q-zebra.bin</code> </td>
+	<td> <code>8a194ada1a07fff</code> </td>
+	<td> (51.467918, -0.185826) </td>
+	<td> 0.272 </td>
+	<td> +242 </td>
+	<td> [+161, +250] </td>
+	<td> 268 </td>
+</tr>
+<tr>
+	<td> <code>q-zebra.bin</code> </td>
+	<td> <code>8a194ada1a37fff</code> </td>
+	<td> (51.469027, -0.186435) </td>
+	<td> 0.264 </td>
+	<td> +320 </td>
+	<td> [+269, +382] </td>
+	<td> 342 </td>
+</tr>
+<tr>
+	<td> <code>q-zebra.bin</code> </td>
+	<td> <code>8a194ada18c7fff</code> </td>
+	<td> (51.472945, -0.191748) </td>
+	<td> 0.257 </td>
+	<td> +781 </td>
+	<td> [+705, +902] </td>
+	<td> 598 </td>
+</tr>
+</tbody>
+</table>
+
+<p>Times are seconds-from-start (start ≈ Unix <code>1678365188.0</code>). Cosine scores around 0.25–0.28 are typical for CLIP text↔image at base scale; the ranking matters more than the absolute number. The <code>cell</code>, <code>(lat, lng)</code>, <code>interval</code>, and <code>count</code> columns are deterministic per-session; <code>similarity</code> and <code>exemplar_t</code> will drift slightly across runs because the per-tile exemplar reservoir is a sampler — different runs pick a different &#8220;best frame&#8221; inside the same cell.</p>
+
+<h3 id="2b.place-anchoredlook-back:whathappenedaroundhere">2b. Place-anchored look-back: &#8220;what happened around here?&#8221;</h3>
+
+<p>Given a coordinate on the captured route, return recent intervals that touched it:</p>
+
+<pre><code class="bash"># Mid-route
+targets/psm -f &quot;$FEATURES&quot; -g clip -t 75 -C 12 \
+  --last-seen 51.470600,-0.188199 \
+  --k-ring 1 --top 5 -j
+</code></pre>
+
+<p>Sample output:</p>
+
+<pre><code class="json">{
+  &quot;results&quot;: [
+    {&quot;cell&quot;:&quot;8a194ada1bb7fff&quot;,&quot;lat&quot;:51.471540,&quot;lng&quot;:-0.189396,&quot;t_min&quot;:1678365725.667,&quot;t_max&quot;:1678365829.333,&quot;count&quot;:309.359},
+    {&quot;cell&quot;:&quot;8a194ada1b87fff&quot;,&quot;lat&quot;:51.470432,&quot;lng&quot;:-0.188787,&quot;t_min&quot;:1678365655.667,&quot;t_max&quot;:1678365725.333,&quot;count&quot;:215.087},
+    {&quot;cell&quot;:&quot;8a194ada1baffff&quot;,&quot;lat&quot;:51.470135,&quot;lng&quot;:-0.187045,&quot;t_min&quot;:1678365570.000,&quot;t_max&quot;:1678365655.333,&quot;count&quot;:268.261}
+  ]
+}
+</code></pre>
+
+<p>Each result carries the H3 cell ID plus its center <code>lat</code>/<code>lng</code> so a human (or a script) can drop the coordinate into a map link without going back through H3.</p>
+
+<p><code>--last-seen</code> drops the embedding step entirely; it only needs the geographic prior. It is the spatial-side ablation that makes the embedding-driven retrieval in 2a meaningful: 2a should beat 2b on cue-driven queries (the cue narrows <em>which</em> cell among many that touch a coordinate); 2b alone can&#8217;t disambiguate &#8220;bus&#8221; from &#8220;crossing&#8221;.</p>
+
+<blockquote>
+<p><strong>Coordinates must be on the captured route.</strong> The session traces lat ∈ [51.4666, 51.4731], lng ∈ [-0.1925, -0.1855]. A coordinate outside that bounding box returns an empty <code>results</code> array (no H3 cells observed), not an error.</p>
+</blockquote>
+
+<h3 id="2c.newtextqueries">2c. New text queries</h3>
+
+<p>Generating a fresh <code>query.f32</code> for an arbitrary phrase reuses <code>scripts/e5_clip_demo.py</code>, which embeds the text with the same CLIP head used for <code>clip</code>-group ingest:</p>
+
+<pre><code class="bash">python scripts/e5_clip_demo.py \
+  datasets/1501677363692556/data.mp4 \
+  &quot;walking by the river&quot; \
+  --output-dir /tmp/psm-e5/river
+# -&gt; /tmp/psm-e5/river/query.f32 + psm_results.json
+</code></pre>
+
+<p>Drop <code>query.f32</code> into Step 2a in place of <code>q-bus.bin</code> / <code>q-zebra.bin</code> and re-run.</p>
+
+<hr />
+
+<h2 id="step3—visualproofinpsm-viz">Step 3 — Visual proof in <code>psm-viz</code></h2>
+
+<p>For each top hit, scrub the visualizer to <code>exemplar_t</code> and confirm the cell is the right place at the right moment. This is the manual analogue of the benchmark&#8217;s &#8220;visual proof&#8221; interval requirement — the demo&#8217;s correctness check, not its evaluation harness.</p>
+
+<pre><code class="bash">targets/psm-viz -d datasets/1501677363692556 -g dino -m total
+</code></pre>
+
+<p><code>psm-viz</code> reads <code>features.h5</code> (with <code>dino</code> + <code>jepa</code> for overlays). The <code>clip</code> group used by <code>--search</code> lives in the separate <code>clip_features.h5</code> and is not consumed by the visualizer.</p>
+
+<p>For each <code>(cell, exemplar_t)</code> returned by Step 2a:</p>
+
+<ol>
+<li>Press <code>Space</code> to start playback (or scrub directly without playing).</li>
+<li>Scroll horizontally on the video pane to scrub to <code>exemplar_t</code>.</li>
+<li>Press <code>M</code> to cycle through <code>total</code> → <code>current</code> → <code>recency</code> heatmap modes — the cell should light up around <code>exemplar_t</code> and fade by <code>t_max</code>.</li>
+<li>Press <code>E</code> to toggle 3D hex extrusion if dominant cells are hard to read in the flat view.</li>
+<li>Press <code>P</code> to capture a screenshot into <code>datasets/1501677363692556/captures/</code> for the demo writeup.</li>
+</ol>
+
+<p>What to look for:</p>
+
+<ul>
+<li>Under <code>current</code>, the queried cell visibly heats up only inside <code>[t_min, t_max]</code>.</li>
+<li>Under <code>recency</code>, the same cell stands out <em>because</em> the rest of the map has been visited more — i.e., the query landed somewhere genuinely novel for that route.</li>
+<li>DINO attention overlay (inferno) on the video pane confirms the model was actually attending to the cued object at <code>exemplar_t</code>, not a confounder.</li>
+</ul>
+
+<hr />
+
+<h2 id="step3.5—embeddingatlascompanionfigure">Step 3.5 — Embedding atlas (companion figure)</h2>
+
+<p>A geographic heatmap (Step 3) shows <em>where</em> memory landed. The <code>scripts/embedding_atlas.py</code> companion shows <em>what</em> memory contains — a 2D projection of the per-frame CLIP embeddings via UMAP (or PCA), with each cued query overlaid as a similarity gradient.</p>
+
+<pre><code class="bash">python scripts/embedding_atlas.py \
+  datasets/1501677363692556/clip_features.h5 \
+  --method umap \
+  --query bus=datasets/q-bus.bin \
+  --query zebra=datasets/q-zebra.bin \
+  --query river=/tmp/psm-e5/river/query.f32 \
+  --out captures/embedding_atlas_grid.png
+</code></pre>
+
+<figure>
+<img src="../captures/embedding_atlas_grid.png" alt="embedding_atlas_grid.png" />
+<figcaption>embedding_atlas_grid.png</figcaption>
+</figure>
+
+<p>How to read it:</p>
+
+<ul>
+<li><strong>Each dot is one video frame</strong>, positioned at the UMAP-projected coordinates of its 512-d CLIP embedding. Dots that are close in this view had visually similar content, regardless of when or where they were captured.</li>
+<li><strong>Color</strong> is cosine similarity between that frame and the panel&#8217;s text query. Computed in the original 512-d space, not the projected 2D.</li>
+<li><strong>White-edged circles</strong> mark the top-30 frames <code>psm --search</code> would return.</li>
+</ul>
+
+<p>What the included session shows: all three queries (<code>bus</code>, <code>zebra</code>, <code>river</code>) light up roughly the same central blob; max similarities cluster around 0.27–0.29 within <sub>0</sub>.01 of each other. That is <strong>negative evidence for the encoder, not for PSM</strong>. CLIP-base does not strongly discriminate fine-grained urban semantics on this footage; PSM faithfully retrieves whatever the encoder ranks highest. A stronger image encoder (CLIP-large, OpenCLIP-bigG, SigLIP-2) would tighten the panels visibly without any change to the engine.</p>
+
+<p>The script also has a paired mode (<code>--mode paired</code>) that renders geographic and embedding panels side-by-side, both colored by the same H3 cell, to show the correspondence between spatial and semantic neighborhoods directly. See <code>scripts/embedding_atlas.py --help</code>.</p>
+
+<hr />
+
+<h2 id="step4—whythismattersrelativetothelocalizationparadox">Step 4 — Why this matters relative to the localization paradox</h2>
+
+<p>Spelled out plainly, ignoring metric numbers (which depend on the specific benchmark subset):</p>
+
+<ul>
+<li>An MLLM asked &#8220;where did I last see the red bus?&#8221; and given only the live frame today <strong>cannot</strong> point at the historical interval — that is the paradox. The semantic head is fine; the temporal grounding head is not.</li>
+<li><code>psm --search q-bus.bin</code> returns <code>(cell, t_start, t_end, exemplar_t)</code> tuples in O(matching_tiles × capacity). On a session-scale memory that is sub-millisecond.</li>
+<li>Forwarding those tuples plus the corresponding evidence frames to the MLLM as explicit grounding context turns &#8220;guess from priors&#8221; into &#8220;answer from a small set of candidate intervals.&#8221; That is a structural rebuttal to the paper&#8217;s discussion section, which calls for &#8220;adaptive temporal indexing… and hierarchical memory buffers that can compress hours of video without losing the granular detail of momentary &#8216;needle&#8217; events.&#8221; <code>psm</code>&#8217;s H3-indexed ring-buffered HLL sketches plus per-tile exemplar reservoir are exactly that shape of data structure.</li>
+</ul>
+
+<p>The demo is intentionally one session, two queries, one screenshot per hit. The full benchmark protocol — <code>mIoU</code>, <code>R@1</code>, <code>GQ@0.5</code> over the eight cognitive categories — is documented in <code>EXPERIMENTS.md</code> (E5 / E6 / E7) and stays out of scope here.</p>
+
+<hr />
+
+<h2 id="reproducibilitychecklist">Reproducibility checklist</h2>
+
+<p>Record alongside any captured artifacts:</p>
+
+<ul>
+<li><code>git rev-parse HEAD</code></li>
+<li>Build profile (<code>local</code> / <code>portable</code> / <code>debug</code> / <code>sanitize</code>)</li>
+<li>Extraction command line and CLIP checkpoint string (default <code>openai/clip-vit-base-patch32</code>)</li>
+<li><code>psm</code> flags: <code>--top</code>, <code>--exemplars</code>, <code>--k-ring</code>, <code>-r</code>, <code>-t</code>, <code>-C</code>, <code>-p</code>, <code>-g</code></li>
+<li>For each top hit: query path, <code>cell</code>, <code>similarity</code>, <code>exemplar_t</code>, <code>(t_min, t_max)</code>, screenshot filename</li>
+</ul>
+
+<p>This lets a second pass (different checkpoint, different <code>h3_resolution</code>, different <code>time_window_sec</code>) be compared apples-to-apples against the original.</p>
+
+</body>
+</html>
