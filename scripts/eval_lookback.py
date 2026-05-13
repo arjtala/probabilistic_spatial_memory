@@ -158,6 +158,7 @@ def run_psm_search(
     precision: int,
     exemplars: int,
     seed: int | None,
+    exemplar_codec: str,
     verbose: bool,
 ) -> dict:
     cmd = [
@@ -170,6 +171,7 @@ def run_psm_search(
         "-p", str(precision),
         "--top", str(top),
         "--exemplars", str(exemplars),
+        "--exemplar-codec", exemplar_codec,
         "--search", str(query_path),
         "-j",
     ]
@@ -246,6 +248,11 @@ def main() -> int:
     ap.add_argument("--h3-resolution", type=int, default=10)
     ap.add_argument("--precision", type=int, default=10)
     ap.add_argument("--exemplars", type=int, default=8)
+    ap.add_argument(
+        "--exemplar-codec", default="raw",
+        choices=["raw", "turboquant_2b", "turboquant_3b", "turboquant_4b"],
+        help="exemplar payload codec passed to psm --exemplar-codec (default: raw)",
+    )
     ap.add_argument("--psm-binary", type=Path, default=REPO_ROOT / "targets" / "psm")
     ap.add_argument("--clip-checkpoint", default="openai/clip-vit-base-patch32")
     ap.add_argument("--clip-device", default="auto")
@@ -346,6 +353,7 @@ def main() -> int:
                     precision=args.precision,
                     exemplars=args.exemplars,
                     seed=(None if args.seed < 0 else args.seed),
+                    exemplar_codec=args.exemplar_codec,
                     verbose=args.verbose,
                 )
 
@@ -585,6 +593,7 @@ def main() -> int:
             "h3_resolution": args.h3_resolution,
             "precision": args.precision,
             "exemplars": args.exemplars,
+            "exemplar_codec": args.exemplar_codec,
             "iou_threshold": iou_threshold,
             "exemplar_tolerance_sec": args.exemplar_tolerance,
             "psm_seed": (None if args.seed < 0 else args.seed),

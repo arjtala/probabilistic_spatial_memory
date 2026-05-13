@@ -41,14 +41,18 @@ def _summary_field(summary: dict, name: str) -> float:
     return 0.0
 
 
-def _session_label(record: dict, label_from_features: bool) -> str:
+def _session_label(record: dict, label_from_features: bool,
+                   include_codec: bool = False) -> str:
     if label_from_features:
         path = Path(str(record.get("features") or ""))
-        if path.parent.name:
-            return path.parent.name
-        return path.stem
-    raw = record.get("questions_file") or record.get("features") or "?"
-    return Path(str(raw)).stem
+        base = path.parent.name or path.stem
+    else:
+        raw = record.get("questions_file") or record.get("features") or "?"
+        base = Path(str(raw)).stem
+    if include_codec:
+        codec = record.get("exemplar_codec") or "raw"
+        return f"{base}@{codec}"
+    return base
 
 
 def _categorize(records: Iterable[dict]) -> dict[str, list[dict]]:
@@ -114,32 +118,55 @@ def _print_seed_summary(
             f"{summary['bucket_miou_at_k_mean']:.3f} ± {summary['bucket_miou_at_k_std']:.3f} |"
         )
 
-    # Combined: aggregate per-seed across sessions, then mean ± std.
-    seeds_set: set = set()
-    for runs in by_session.values():
-        for r in runs:
-            seeds_set.add(r.get("psm_seed"))
-    combined_per_seed: list[dict] = []
-    for seed in sorted(s for s in seeds_set if s is not None):
-        scored: list[dict] = []
-        for label, runs in by_session.items():
-            for run in runs:
-                if run.get("psm_seed") != seed:
-                    continue
-                scored.extend(
-                    [r for r in run.get("records", []) if r.get("intervals_gt")]
-                )
-        n = max(len(scored), 1)
-        combined_per_seed.append({
-            "seed": seed,
-            "n_scored": len(scored),
-            "exemplar_miou_top1": sum(r["exemplar_iou_top1"] for r in scored) / n,
-            "exemplar_miou_at_k": sum(r["exemplar_iou_at_k"] for r in scored) / n,
-            "exemplar_hit_rate_at_k": sum(1 for r in scored if r["exemplar_hit_at_k"]) / n,
-            "bucket_miou_at_k": sum(r["bucket_iou_at_k"] for r in scored) / n,
-        })
+    # Group sessions by codec so the combined row reflects only same-codec
+    # runs. When a single codec is present the loop runs once; when raw / tq4 /
+    # tq2 share an aggregate call, each gets its own combined row.
+    codec_to_sessions: dict[str, dict[str, list[dict]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
+    for label, runs in by_session.items():
+        for run in runs:
+            codec = run.get("exemplar_codec") or "raw"
+            codec_to_sessions[codec][label].append(run)
 
-    if combined_per_seed:
+    combined_blocks: list[dict] = []
+    for codec in sorted(codec_to_sessions):
+        codec_sessions = codec_to_sessions[codec]
+        seeds_set: set = set()
+        for runs in codec_sessions.values():
+            for r in runs:
+                seeds_set.add(r.get("psm_seed"))
+        combined_per_seed: list[dict] = []
+        for seed in sorted(s for s in seeds_set if s is not None):
+            scored: list[dict] = []
+            for label, runs in codec_sessions.items():
+                for run in runs:
+                    if run.get("psm_seed") != seed:
+                        continue
+                    scored.extend(
+                        [r for r in run.get("records", []) if r.get("intervals_gt")]
+                    )
+            n = max(len(scored), 1)
+            combined_per_seed.append({
+                "seed": seed,
+                "n_scored": len(scored),
+                "exemplar_miou_top1": sum(r["exemplar_iou_top1"] for r in scored) / n,
+                "exemplar_miou_at_k": sum(r["exemplar_iou_at_k"] for r in scored) / n,
+                "exemplar_hit_rate_at_k": sum(1 for r in scored if r["exemplar_hit_at_k"]) / n,
+                "bucket_miou_at_k": sum(r["bucket_iou_at_k"] for r in scored) / n,
+            })
+        combined_blocks.append({"codec": codec, "per_seed": combined_per_seed})
+
+    def _mean_std(values):
+        return statistics.fmean(values), (
+            statistics.stdev(values) if len(values) > 1 else 0.0
+        )
+
+    multi_codec = len(codec_to_sessions) > 1
+    for block in combined_blocks:
+        combined_per_seed = block["per_seed"]
+        if not combined_per_seed:
+            continue
         n_total = combined_per_seed[0]["n_scored"]
         seeds_str = ",".join(str(s["seed"]) for s in combined_per_seed)
         m_top1 = [s["exemplar_miou_top1"] for s in combined_per_seed]
@@ -148,44 +175,80 @@ def _print_seed_summary(
         m_bucket = [s["bucket_miou_at_k"] for s in combined_per_seed]
         n_seeds = len(combined_per_seed)
 
-        def _mean_std(values):
-            return statistics.fmean(values), (
-                statistics.stdev(values) if len(values) > 1 else 0.0
-            )
-
         miou1_m, miou1_s = _mean_std(m_top1)
         miouk_m, miouk_s = _mean_std(m_at_k)
         hit_m, hit_s = _mean_std(m_hit)
         bucket_m, bucket_s = _mean_std(m_bucket)
+        label = f"combined@{block['codec']}" if multi_codec else "combined"
         print(
-            f"| **combined** | **{n_total}** | **{seeds_str}** | "
+            f"| **{label}** | **{n_total}** | **{seeds_str}** | "
             f"**{miou1_m:.3f} ± {miou1_s:.3f}** | "
             f"**{miouk_m:.3f} ± {miouk_s:.3f}** | "
             f"**{hit_m:.1%} ± {hit_s:.1%}** | "
             f"**{bucket_m:.3f} ± {bucket_s:.3f}** |"
         )
-        print()
-        print(
-            f"_combined: {n_total} scored question(s) per seed × "
-            f"{n_seeds} seed(s) = {n_total * n_seeds} question-seed evaluations._"
-        )
+        block["mean_std"] = {
+            "n_scored_per_seed": n_total,
+            "n_seeds": n_seeds,
+            "exemplar_miou_top1_mean": miou1_m,
+            "exemplar_miou_top1_std": miou1_s,
+            "exemplar_miou_at_k_mean": miouk_m,
+            "exemplar_miou_at_k_std": miouk_s,
+            "exemplar_hit_rate_at_k_mean": hit_m,
+            "exemplar_hit_rate_at_k_std": hit_s,
+            "bucket_miou_at_k_mean": bucket_m,
+            "bucket_miou_at_k_std": bucket_s,
+        }
 
-        # Per-seed sub-table for the appendix.
+    if combined_blocks and combined_blocks[0]["per_seed"]:
+        first = combined_blocks[0]
+        n_total = first["per_seed"][0]["n_scored"]
+        n_seeds = len(first["per_seed"])
+        print()
+        if multi_codec:
+            print(
+                f"_combined: {n_total} scored question(s) per seed × "
+                f"{n_seeds} seed(s) per codec; "
+                f"{len(combined_blocks)} codec(s) reported._"
+            )
+        else:
+            print(
+                f"_combined: {n_total} scored question(s) per seed × "
+                f"{n_seeds} seed(s) = {n_total * n_seeds} question-seed evaluations._"
+            )
+
+        # Per-seed sub-table for the appendix. With multiple codecs we add a
+        # codec column so the breakdown stays unambiguous.
         print()
         print("### Per-seed combined breakdown")
         print()
-        print(
-            "| seed | n | exemplar mIoU @1 | exemplar mIoU @k | "
-            "exemplar Hit @k |"
-        )
-        print("|---|---|---|---|---|")
-        for s in combined_per_seed:
+        if multi_codec:
             print(
-                f"| {s['seed']} | {s['n_scored']} | "
-                f"{s['exemplar_miou_top1']:.3f} | "
-                f"{s['exemplar_miou_at_k']:.3f} | "
-                f"{s['exemplar_hit_rate_at_k']:.1%} |"
+                "| codec | seed | n | exemplar mIoU @1 | exemplar mIoU @k | "
+                "exemplar Hit @k |"
             )
+            print("|---|---|---|---|---|---|")
+            for block in combined_blocks:
+                for s in block["per_seed"]:
+                    print(
+                        f"| `{block['codec']}` | {s['seed']} | {s['n_scored']} | "
+                        f"{s['exemplar_miou_top1']:.3f} | "
+                        f"{s['exemplar_miou_at_k']:.3f} | "
+                        f"{s['exemplar_hit_rate_at_k']:.1%} |"
+                    )
+        else:
+            print(
+                "| seed | n | exemplar mIoU @1 | exemplar mIoU @k | "
+                "exemplar Hit @k |"
+            )
+            print("|---|---|---|---|---|")
+            for s in combined_blocks[0]["per_seed"]:
+                print(
+                    f"| {s['seed']} | {s['n_scored']} | "
+                    f"{s['exemplar_miou_top1']:.3f} | "
+                    f"{s['exemplar_miou_at_k']:.3f} | "
+                    f"{s['exemplar_hit_rate_at_k']:.1%} |"
+                )
 
     if out_path:
         out_data = {
@@ -199,9 +262,14 @@ def _print_seed_summary(
             "sessions": {
                 label: per_session_summaries[label] for label in sorted(per_session_summaries)
             },
-            "combined": {
-                "per_seed": combined_per_seed,
-            },
+            "combined": [
+                {
+                    "codec": block["codec"],
+                    "per_seed": block["per_seed"],
+                    "mean_std": block.get("mean_std"),
+                }
+                for block in combined_blocks
+            ],
         }
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(json.dumps(out_data, indent=2))
@@ -286,14 +354,26 @@ def main() -> int:
 
     by_session_seed: dict[str, list[dict]] = defaultdict(list)
 
+    # First pass: load all inputs and detect whether the codec varies. When it
+    # does, we suffix the session label with @<codec> so raw vs turboquant_4b
+    # vs turboquant_2b runs over the same features file land in distinct rows
+    # rather than getting silently averaged together.
+    loaded: list[tuple[Path, dict]] = []
+    codecs_seen: set[str] = set()
     for path in args.inputs:
         if not path.exists():
             raise SystemExit(f"missing input: {path}")
         data = json.loads(path.read_text())
+        loaded.append((path, data))
+        codecs_seen.add(data.get("exemplar_codec") or "raw")
+    include_codec_in_label = len(codecs_seen) > 1
+
+    for path, data in loaded:
         records = data.get("records", [])
         scored = [r for r in records if r.get("intervals_gt")]
         negative = [r for r in records if not r.get("intervals_gt")]
-        label = _session_label(data, args.label_from_features)
+        label = _session_label(data, args.label_from_features,
+                               include_codec=include_codec_in_label)
         sessions.append({
             "label": label,
             "source_path": str(path),

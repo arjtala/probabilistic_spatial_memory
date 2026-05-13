@@ -20,6 +20,8 @@
 #   SESSIONS      space-separated session ids (default the 3 demo sessions)
 #   TOP           --top value for psm --search (default 5; raise for counting)
 #   TAG_TOP_SUFFIX  if "1", auto-suffix TAG with _top<TOP> (e.g. clipL_top20)
+#   CODEC         --exemplar-codec passed to eval (default raw); when not raw,
+#                 TAG is auto-suffixed _<codec> so outputs don't clobber raw runs.
 
 set -euo pipefail
 
@@ -32,13 +34,17 @@ SEEDS="${SEEDS:-0 1 2 3 4}"
 SESSIONS="${SESSIONS:-1501677363692556 287142033569927 201703061033}"
 TOP="${TOP:-5}"
 TAG_TOP_SUFFIX="${TAG_TOP_SUFFIX:-0}"
+CODEC="${CODEC:-raw}"
 if [[ "$TAG_TOP_SUFFIX" == "1" && "$TOP" != "5" ]]; then
   TAG="${TAG}_top${TOP}"
+fi
+if [[ "$CODEC" != "raw" ]]; then
+  TAG="${TAG}_${CODEC}"
 fi
 
 mkdir -p "$CAPTURES"
 
-echo "[eval] checkpoint=$CHECKPOINT features=$FEATURES tag=$TAG top=$TOP"
+echo "[eval] checkpoint=$CHECKPOINT features=$FEATURES tag=$TAG top=$TOP codec=$CODEC"
 echo "[eval] sessions: $SESSIONS"
 echo "[eval] seeds: $SEEDS"
 
@@ -61,6 +67,7 @@ for sid in $SESSIONS; do
       --top "$TOP" --time-window 75 --capacity 12 --exemplars 128 \
       --clip-checkpoint "$CHECKPOINT" \
       --seed "$seed" \
+      --exemplar-codec "$CODEC" \
       --out "$out"
   done
 done
