@@ -30,6 +30,7 @@ enum {
   CENTER_OPT_VAL,
   EXEMPLARS_OPT_VAL,
   SEED_OPT_VAL,
+  EXEMPLAR_CODEC_OPT_VAL,
 };
 
 typedef enum {
@@ -58,6 +59,7 @@ typedef struct {
   size_t exemplar_capacity;
   bool has_seed;
   uint64_t seed;
+  ExemplarCodec exemplar_codec;
 } CliOptions;
 
 typedef struct {
@@ -222,6 +224,7 @@ static void print_usage(const char *program) {
   fprintf(stderr, "  --center LAT,LNG        Optional geographic center for --search\n");
   fprintf(stderr, "  --exemplars N           Per-tile reservoir size (auto-set to 8 with --search)\n");
   fprintf(stderr, "  --seed N                Reservoir-sampler seed (uint64, decimal or 0x...) for reproducible runs\n");
+  fprintf(stderr, "  --exemplar-codec NAME   Exemplar payload codec: raw | turboquant_2b | turboquant_3b | turboquant_4b (default: raw)\n");
   fprintf(stderr, "\nRetention window = capacity * time-window (default: 12 * 5.0s = 60s).\n");
   fprintf(stderr, "Observations older than this age out of each tile's ring buffer.\n");
   fprintf(stderr, "For multi-minute sessions, widen with e.g. -C 30 -t 60 (30-min window).\n");
@@ -249,6 +252,7 @@ static void cli_options_init(CliOptions *options) {
   options->exemplar_capacity = 0;
   options->has_seed = false;
   options->seed = 0;
+  options->exemplar_codec = EXEMPLAR_CODEC_RAW;
 }
 
 static bool load_float_vector_file(const char *path, float **out_data,
@@ -350,6 +354,7 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
       {"center", required_argument, NULL, CENTER_OPT_VAL},
       {"exemplars", required_argument, NULL, EXEMPLARS_OPT_VAL},
       {"seed", required_argument, NULL, SEED_OPT_VAL},
+      {"exemplar-codec", required_argument, NULL, EXEMPLAR_CODEC_OPT_VAL},
       {0, 0, 0, 0},
   };
 
@@ -447,6 +452,15 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
       options->has_seed = true;
       break;
     }
+    case EXEMPLAR_CODEC_OPT_VAL:
+      if (!ExemplarCodec_from_string(optarg, &options->exemplar_codec)) {
+        fprintf(stderr,
+                "Invalid --exemplar-codec '%s' (expected raw, turboquant_2b, "
+                "turboquant_3b, or turboquant_4b)\n",
+                optarg);
+        return false;
+      }
+      break;
     default:
       print_usage(argv[0]);
       return false;
@@ -579,6 +593,9 @@ static void print_similar_text(const SpatialMemorySimilar *results, size_t n,
   printf("Records: %zu\n", reader->n_records);
   printf("Embedding dim: %zu\n", reader->emb_dimension);
   printf("Tiles created: %zu\n", tile_count);
+  printf("Exemplar codec: %s (payload=%zu B/exemplar)\n",
+         ExemplarCodec_name(opts->exemplar_codec),
+         ExemplarCodec_payload_size(opts->exemplar_codec, dim));
   printf("Query: dim=%zu top=%zu", dim, opts->last_seen_top);
   if (opts->has_center) {
     printf(" center=%.6f,%.6f k_ring=%d", opts->center_lat, opts->center_lng,
@@ -616,6 +633,11 @@ static void print_similar_json(const SpatialMemorySimilar *results, size_t n,
   printf("  \"record_count\": %zu,\n", reader->n_records);
   printf("  \"embedding_dim\": %zu,\n", reader->emb_dimension);
   printf("  \"tile_count\": %zu,\n", tile_count);
+  fputs("  \"exemplar_codec\": ", stdout);
+  print_json_string(stdout, ExemplarCodec_name(opts->exemplar_codec));
+  fputs(",\n", stdout);
+  printf("  \"exemplar_payload_bytes\": %zu,\n",
+         ExemplarCodec_payload_size(opts->exemplar_codec, dim));
   printf("  \"query\": {\"dim\": %zu, \"top\": %zu", dim, opts->last_seen_top);
   if (opts->has_center) {
     printf(", \"center_lat\": %.6f, \"center_lng\": %.6f, \"k_ring\": %d",
@@ -725,7 +747,7 @@ int main(int argc, char *argv[]) {
 
   sm = SpatialMemory_new(options.h3_resolution, options.capacity,
                          options.precision, options.exemplar_capacity,
-                         EXEMPLAR_CODEC_RAW);
+                         options.exemplar_codec);
   if (!sm) {
     fprintf(stderr, "Failed to initialize spatial memory\n");
     return 1;

@@ -128,6 +128,7 @@ TEST_RING_BUFFER = $(BUILD_DIR)/test_ring_buffer
 TEST_TILE = $(BUILD_DIR)/test_tile
 TEST_TILE_TABLE = $(BUILD_DIR)/test_tile_table
 TEST_SPATIAL = $(BUILD_DIR)/test_spatial_memory
+TEST_EXEMPLAR_CODEC = $(BUILD_DIR)/test_exemplar_codec
 TEST_INGEST = $(BUILD_DIR)/test_ingest
 TEST_JEPA_CACHE = $(BUILD_DIR)/test_jepa_cache
 TEST_VIZ_MATH = $(BUILD_DIR)/test_viz_math
@@ -233,7 +234,7 @@ $(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(TOOLCHAIN_INFO)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
 # Test targets
-test: test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud test-screenshot test-ui-overlay
+test: test-ring-buffer test-tile test-tile-table test-spatial test-exemplar-codec test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud test-screenshot test-ui-overlay
 
 test-ring-buffer: $(TEST_RING_BUFFER)
 	./$(TEST_RING_BUFFER)
@@ -263,6 +264,13 @@ test-spatial: $(TEST_SPATIAL)
 $(TEST_SPATIAL): tests/test_spatial_memory.c $(OBJ) $(VENDOR_OBJ)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_spatial_memory.c $(OBJ) $(VENDOR_OBJ) -o $@ -lm
+
+test-exemplar-codec: $(TEST_EXEMPLAR_CODEC)
+	./$(TEST_EXEMPLAR_CODEC)
+
+$(TEST_EXEMPLAR_CODEC): tests/test_exemplar_codec.c $(OBJ) $(VENDOR_OBJ)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_exemplar_codec.c $(OBJ) $(VENDOR_OBJ) -o $@ -lm
 
 test-ingest: $(TEST_INGEST)
 	./$(TEST_INGEST)
@@ -357,7 +365,7 @@ check-format:
 	clang-format --dry-run --Werror $$files
 
 # Phony targets
-.PHONY: all debug portable sanitize viz bench-spatial-memory bench-tile-decode test test-debug test-portable test-sanitize test-ring-buffer test-tile test-tile-table test-spatial test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud test-screenshot test-ui-overlay check-format clean rebuild show run FORCE
+.PHONY: all debug portable sanitize viz bench-spatial-memory bench-tile-decode test test-debug test-portable test-sanitize test-ring-buffer test-tile test-tile-table test-spatial test-exemplar-codec test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud test-screenshot test-ui-overlay check-format clean rebuild show run FORCE
 
 # Show detected files
 show:

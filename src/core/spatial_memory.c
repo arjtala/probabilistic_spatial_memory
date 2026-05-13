@@ -1,4 +1,3 @@
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -235,8 +234,8 @@ static int compare_similar_desc(const void *a, const void *b) {
 // Score a single tile by finding its highest-similarity exemplar against the
 // query. Populates *out and returns true on success, or false when the tile
 // has no usable exemplars (wrong byte size, zero-norm, or empty reservoir).
-static bool score_tile_similar(Tile *tile, const float *query, size_t dim,
-                               double q_norm, size_t rb_capacity,
+static bool score_tile_similar(Tile *tile, const ExemplarCodecQuery *prepared,
+                               size_t rb_capacity,
                                SpatialMemorySimilar *out) {
   size_t n_ex = Tile_exemplar_count(tile);
   if (n_ex == 0) return false;
@@ -249,8 +248,7 @@ static bool score_tile_similar(Tile *tile, const float *query, size_t dim,
     const TileExemplar *ex = Tile_exemplar_at(tile, i);
     if (!ex || !ex->data) continue;
     double sim = 0.0;
-    if (!ExemplarCodec_cosine(tile->exemplar_codec, query, dim, q_norm,
-                              ex->data, ex->size, &sim)) {
+    if (!ExemplarCodec_cosine(prepared, ex->data, ex->size, &sim)) {
       continue;
     }
     if (sim > best_sim) {
@@ -289,13 +287,9 @@ size_t SpatialMemory_query_similar(SpatialMemory *sm, const float *query,
                                    SpatialMemorySimilar *out, size_t max_out) {
   if (!sm || !query || dim == 0) return 0;
 
-  double q_norm_sq = 0.0;
-  for (size_t i = 0; i < dim; ++i) {
-    double qi = (double)query[i];
-    q_norm_sq += qi * qi;
-  }
-  if (q_norm_sq <= 0.0) return 0;
-  double q_norm = sqrt(q_norm_sq);
+  ExemplarCodecQuery *prepared =
+      ExemplarCodecQuery_new(sm->exemplar_codec, dim, query);
+  if (!prepared) return 0;
 
   H3Index *cells = NULL;
   int64_t n_cells = 0;
@@ -303,15 +297,21 @@ size_t SpatialMemory_query_similar(SpatialMemory *sm, const float *query,
   if (use_neighborhood) {
     H3Index center;
     if (!spatial_memory_coords_to_cell(sm, center_lat, center_lng, &center)) {
+      ExemplarCodecQuery_free(prepared);
       return 0;
     }
     if (maxGridDiskSize(k_ring, &n_cells) || n_cells <= 0) {
+      ExemplarCodecQuery_free(prepared);
       return 0;
     }
     cells = (H3Index *)calloc((size_t)n_cells, sizeof(H3Index));
-    if (!cells) return 0;
+    if (!cells) {
+      ExemplarCodecQuery_free(prepared);
+      return 0;
+    }
     if (gridDisk(center, k_ring, cells)) {
       free(cells);
+      ExemplarCodecQuery_free(prepared);
       return 0;
     }
   }
@@ -324,6 +324,7 @@ size_t SpatialMemory_query_similar(SpatialMemory *sm, const float *query,
   }
   if (max_scratch == 0) {
     free(cells);
+    ExemplarCodecQuery_free(prepared);
     return 0;
   }
 
@@ -331,6 +332,7 @@ size_t SpatialMemory_query_similar(SpatialMemory *sm, const float *query,
       max_scratch * sizeof(SpatialMemorySimilar));
   if (!scratch) {
     free(cells);
+    ExemplarCodecQuery_free(prepared);
     return 0;
   }
 
@@ -341,21 +343,21 @@ size_t SpatialMemory_query_similar(SpatialMemory *sm, const float *query,
       if (cell == H3_NULL) continue;
       Tile *tile = TileTable_get(sm->tiles, cell);
       if (!tile) continue;
-      if (score_tile_similar(tile, query, dim, q_norm, sm->capacity,
-                             &scratch[nfound])) {
+      if (score_tile_similar(tile, prepared, sm->capacity, &scratch[nfound])) {
         nfound++;
       }
     }
   } else {
     TileTableIterator it = TileTable_iterator(sm->tiles);
     while (TileTable_next(&it)) {
-      if (score_tile_similar(it.value, query, dim, q_norm, sm->capacity,
+      if (score_tile_similar(it.value, prepared, sm->capacity,
                              &scratch[nfound])) {
         nfound++;
       }
     }
   }
   free(cells);
+  ExemplarCodecQuery_free(prepared);
 
   qsort(scratch, nfound, sizeof(SpatialMemorySimilar), compare_similar_desc);
 
