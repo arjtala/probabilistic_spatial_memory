@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420" font-family="Helvetica, Arial, sans-serif">
+  <!-- Title -->
+  <text x="360" y="28" text-anchor="middle" font-size="16" font-weight="600" fill="#1a1a1a">Compression vs answer quality (OpenCLIP-bigG)</text>
+  <text x="360" y="48" text-anchor="middle" font-size="12" fill="#555">3 sessions × 5 seeds × 20 questions per codec; error bars are across-seed std</text>
+
+  <!-- Plot area: x in [80, 660], y in [80, 340] -->
+  <!-- x-axis (log): bytes 400 → 6000 -->
+  <!-- y-axis: Hit@5 70 → 90 -->
+
+  <!-- Y gridlines -->
+  <g stroke="#e5e5e5" stroke-width="1">
+    <line x1="80" y1="80" x2="660" y2="80"/>
+    <line x1="80" y1="145" x2="660" y2="145"/>
+    <line x1="80" y1="210" x2="660" y2="210"/>
+    <line x1="80" y1="275" x2="660" y2="275"/>
+    <line x1="80" y1="340" x2="660" y2="340"/>
+  </g>
+
+  <!-- raw band (Hit@5 ± std around 83.0 ± 2.7) -->
+  <!-- y(83) = 340 - (83-70)/(90-70)*260 = 340 - 169 = 171 -->
+  <!-- y(80.3) = 340 - 10.3/20*260 = 340 - 133.9 = 206.1 -->
+  <!-- y(85.7) = 340 - 15.7/20*260 = 340 - 204.1 = 135.9 -->
+  <rect x="80" y="135.9" width="580" height="70.2" fill="#a8c5e8" opacity="0.25"/>
+  <!-- Legend in the gap between TQ-4-bit annotation (right edge ~315) and the
+       "raw f32 / baseline" annotation cluster (left edge ~575). The vertical
+       slot y=92-103 is above all data markers (highest marker top at y=135.9). -->
+  <g>
+    <rect x="345" y="92" width="14" height="10" fill="#a8c5e8" opacity="0.4" stroke="#7ba9d6" stroke-width="0.5"/>
+    <text x="365" y="101" font-size="11" fill="#1f4e79" font-style="italic">raw Hit@5 mean ± std</text>
+  </g>
+
+  <!-- Y axis -->
+  <line x1="80" y1="80" x2="80" y2="340" stroke="#333" stroke-width="1.2"/>
+  <g font-size="11" fill="#333" text-anchor="end">
+    <text x="73" y="84">90%</text>
+    <text x="73" y="149">85%</text>
+    <text x="73" y="214">80%</text>
+    <text x="73" y="279">75%</text>
+    <text x="73" y="344">70%</text>
+  </g>
+  <text x="30" y="210" text-anchor="middle" font-size="12" fill="#333" transform="rotate(-90 30 210)">exemplar Hit @5</text>
+
+  <!-- X axis -->
+  <line x1="80" y1="340" x2="660" y2="340" stroke="#333" stroke-width="1.2"/>
+
+  <!-- Log x mapping. Domain log10(400)≈2.602 to log10(6000)≈3.778, map to [80, 660]. -->
+  <!-- raw 5120: log=3.7093, x = 80 + (3.7093-2.602)/(3.778-2.602)*580 = 80 + 0.9416*580 = 80 + 546.1 = 626.1 -->
+  <!-- tq4 1041: log=3.0175, x = 80 + (3.0175-2.602)/1.176*580 = 80 + 0.3535*580 = 80 + 205.0 = 285.0 -->
+  <!-- tq3 785:  log=2.8949, x = 80 + (2.8949-2.602)/1.176*580 = 80 + 0.2492*580 = 80 + 144.5 = 224.5 -->
+  <!-- tq2 529:  log=2.7235, x = 80 + (2.7235-2.602)/1.176*580 = 80 + 0.1034*580 = 80 + 60.0 = 140.0 -->
+
+  <!-- X tick labels (matching log scale, at 500, 1000, 2000, 5000) -->
+  <g font-size="10" fill="#666" text-anchor="middle">
+    <!-- 500: log=2.699, x = 80 + 0.0824*580 = 127.8 -->
+    <line x1="127.8" y1="340" x2="127.8" y2="345" stroke="#666"/>
+    <text x="127.8" y="358">500</text>
+    <!-- 1000: log=3, x = 80 + 0.3384*580 = 276.3 -->
+    <line x1="276.3" y1="340" x2="276.3" y2="345" stroke="#666"/>
+    <text x="276.3" y="358">1000</text>
+    <!-- 2000: log=3.301, x = 80 + 0.5944*580 = 424.7 -->
+    <line x1="424.7" y1="340" x2="424.7" y2="345" stroke="#666"/>
+    <text x="424.7" y="358">2000</text>
+    <!-- 5000: log=3.699, x = 80 + 0.9329*580 = 621.1 -->
+    <line x1="621.1" y1="340" x2="621.1" y2="345" stroke="#666"/>
+    <text x="621.1" y="358">5000</text>
+  </g>
+  <text x="370" y="385" text-anchor="middle" font-size="12" fill="#333">bytes per exemplar (log scale)</text>
+
+  <!-- Error bars (std), then markers, in compression order (small to large bytes) -->
+  <!-- y(81) = 340 - 11/20*260 = 340 - 143 = 197 -->
+  <!-- y(82) = 340 - 12/20*260 = 340 - 156 = 184 -->
+  <!-- y(83) = 340 - 13/20*260 = 340 - 169 = 171 -->
+  <!-- std bars: ±2.7 = ±35.1 px; ±4.2 = ±54.6 px -->
+
+  <!-- Connecting line through means -->
+  <polyline points="140,197 224.5,171 285,184 626.1,171" fill="none" stroke="#1f4e79" stroke-width="2" opacity="0.85"/>
+
+  <!-- tq2 at (140, 197) ± 54.6 -->
+  <line x1="140" y1="142.4" x2="140" y2="251.6" stroke="#1f4e79" stroke-width="1.5"/>
+  <line x1="135" y1="142.4" x2="145" y2="142.4" stroke="#1f4e79" stroke-width="1.5"/>
+  <line x1="135" y1="251.6" x2="145" y2="251.6" stroke="#1f4e79" stroke-width="1.5"/>
+  <circle cx="140" cy="197" r="6" fill="#1f4e79"/>
+
+  <!-- tq3 at (224.5, 171) ± 35.1 -->
+  <line x1="224.5" y1="135.9" x2="224.5" y2="206.1" stroke="#1f4e79" stroke-width="1.5"/>
+  <line x1="219.5" y1="135.9" x2="229.5" y2="135.9" stroke="#1f4e79" stroke-width="1.5"/>
+  <line x1="219.5" y1="206.1" x2="229.5" y2="206.1" stroke="#1f4e79" stroke-width="1.5"/>
+  <circle cx="224.5" cy="171" r="6" fill="#1f4e79"/>
+
+  <!-- tq4 at (285, 184) ± 35.1 -->
+  <line x1="285" y1="148.9" x2="285" y2="219.1" stroke="#1f4e79" stroke-width="1.5"/>
+  <line x1="280" y1="148.9" x2="290" y2="148.9" stroke="#1f4e79" stroke-width="1.5"/>
+  <line x1="280" y1="219.1" x2="290" y2="219.1" stroke="#1f4e79" stroke-width="1.5"/>
+  <circle cx="285" cy="184" r="6" fill="#1f4e79"/>
+
+  <!-- raw at (626.1, 171) ± 35.1 -->
+  <line x1="626.1" y1="135.9" x2="626.1" y2="206.1" stroke="#1f4e79" stroke-width="1.5"/>
+  <line x1="621.1" y1="135.9" x2="631.1" y2="135.9" stroke="#1f4e79" stroke-width="1.5"/>
+  <line x1="621.1" y1="206.1" x2="631.1" y2="206.1" stroke="#1f4e79" stroke-width="1.5"/>
+  <circle cx="626.1" cy="171" r="6" fill="#1f4e79"/>
+
+  <!-- Codec labels positioned to avoid the line -->
+  <g font-size="11" fill="#1a1a1a" text-anchor="middle">
+    <!-- tq2 label below -->
+    <text x="140" y="280" font-weight="600">TQ 2-bit</text>
+    <text x="140" y="294" font-size="10" fill="#666">9.7× smaller</text>
+    <text x="140" y="306" font-size="10" fill="#666">529 B</text>
+    <!-- tq3 label above -->
+    <text x="224.5" y="118" font-weight="600">TQ 3-bit</text>
+    <text x="224.5" y="105" font-size="10" fill="#666">6.5× smaller</text>
+    <!-- tq4 label below -->
+    <text x="285" y="245" font-weight="600">TQ 4-bit</text>
+    <text x="285" y="259" font-size="10" fill="#666">4.9× smaller</text>
+    <!-- raw label above -->
+    <text x="626.1" y="118" font-weight="600">raw f32</text>
+    <text x="626.1" y="105" font-size="10" fill="#666">baseline · 5120 B</text>
+  </g>
+</svg>

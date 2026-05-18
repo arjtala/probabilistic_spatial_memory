@@ -3,8 +3,24 @@
 Follow-up to [`localization_paradox.md`](./localization_paradox.md).
 Previously it was shown that PSM, a bounded spatial-memory engine, can answer
 "where/when did I see X?" questions over a 15-minute egocentric video at
-~68% top-5 accuracy. This follow-up tests four things on the same
-sessions:
+~68% top-5 accuracy.
+
+**One-paragraph recap of v1.** PSM tiles the world into H3 hex cells.
+Each cell holds two things: a HyperLogLog *sketch* counting how many
+distinct things were observed there in each time *bucket* (~75 s wide),
+and a small reservoir of *exemplar* embeddings — actual image-encoder
+vectors sampled from the frames that landed in that cell. A text query
+("a red bus") is encoded by the same image-text model and ranked by
+cosine against every cell's exemplars. The top-k cells become candidate
+intervals for downstream grounding. Throughout this doc, **Hit @5**
+means "the right place appeared in the top-5 returned cells," and
+**mIoU @5** measures how well the returned interval overlaps the
+ground-truth one. Two flavors: **bucket** uses the cell's whole ~75 s
+window (place-precise but loose); **exemplar** uses the matching
+frame's timestamp ±1.5 s (frame-precise but stricter). See v1 for the
+full glossary.
+
+This follow-up tests four things on the same sessions:
 
 1. Does a much larger image-text model help? **Barely.**
 2. Do better-framed questions help? **A lot.**
@@ -20,8 +36,7 @@ compressed without moving the headline.
 
 ## Glossary delta
 
-The previous write-up defined `exemplar`, `bucket`, `Hit @k`, and
-`mIoU @k`. Three new terms for v2:
+Three new terms beyond v1's:
 
 - **Place-aware question** — a question whose answer is a *location*
   ("where did I leave the building?") rather than a recurring object
@@ -33,10 +48,6 @@ The previous write-up defined `exemplar`, `bucket`, `Hit @k`, and
   text model and asks PSM directly for the most recently visited cells
   near a given (lat, lng).
 
-Metrics come in two flavors: *bucket* uses the cell's broad time window
-(~60–90 s); *exemplar* uses a single frame's timestamp ±1.5 s. Higher is
-better throughout.
-
 ## TL;DR
 
 | metric | Prev (12 object-recall questions, CLIP-L) | follow-up (22-question full set, OpenCLIP-bigG) |
@@ -44,6 +55,8 @@ better throughout.
 | Hit @5 | 68.3% ± 7.0% | **83.0% ± 2.7%** |
 | bucket mIoU @5 | 0.182 | **0.311** |
 | false-positive rate | 0% | 0% |
+
+![Per-session and combined Hit @5: v1 baseline (12 object-recall questions, CLIP-L) vs v2 follow-up (full 20-question set, OpenCLIP-bigG). Tucson was already saturated; the lift comes from Palo Alto (50% → 83%, driven by the new place-aware questions) and Fulham (55% → 71%). Combined error bar tightens from ±7.0% to ±2.7%.](./figures/v1_v2_lift.pdf){width=100%}
 
 Four findings:
 
@@ -104,7 +117,7 @@ Per-question, three notable shifts:
   cyclist out cleanly but CLIP's text-similarity doesn't — a modality
   disagreement, not a model-size problem.
 
-The full per-question diff lives in the [Appendix](#appendix-per-question-diffs).
+The full per-question diff lives in [Appendix § A](#per-question-diffs).
 
 ## 2. Better questions, big lift
 
@@ -138,6 +151,8 @@ on Tucson's "a red car" question. Place-aware questions don't depend on
 which exemplar happened to land in the reservoir — they depend on
 whether the wearer visited the cell, which is a GPS fact, not an
 embedding fact.
+
+![Same dot per frame, two views. Left: real `(lng, lat)`. Right: UMAP of the per-frame CLIP embedding. Color is the H3 cell. Geographic neighborhoods land as compact regions in the encoder's semantic space — that's why place-aware questions are robust across reservoir seeds (the wearer being in a cell is a GPS fact; the exemplar reservoir doesn't have to "win" for the cell to surface).](../captures/embedding_atlas_paired.png){width=100%}
 
 ## 3. Encoder bypass: one question, no image-text model
 
@@ -199,6 +214,8 @@ for the algorithmic spec.
 spread is half a single codec's across-seed std. mIoU @5 and bucket
 mIoU @5 are also flat. mIoU @1 (top-rank precision) drops slightly under
 heavier compression, within a standard deviation of seed noise.
+
+![Compression vs answer quality on OpenCLIP-bigG. Each point is one codec at the bytes/exemplar it produces (1280-d → 2048-d after RHT padding), evaluated across 3 sessions × 5 seeds × 20 questions. Error bars are across-seed std. The blue band marks raw's Hit @5 ± std; every codec's mean lands inside it, so the headline answer-quality metric is statistically flat over a 10× compression range.](./figures/codec_tradeoff.pdf){width=100%}
 
 ### Retrieval drift vs raw (135 paired questions per codec)
 
@@ -271,7 +288,7 @@ several-fold — and §4 confirms it.
    bounded by the underlying HLL cardinality. A real counting scorer
    needs either a similarity-threshold cell counter or an HLL-native
    cardinality query (sketched in
-   [Appendix § E](#e-counting-limitation)).
+   [Appendix § E](#counting-limitation)).
 3. **Three categorical/spatial questions need external grading.** The
    harness records the top-k cells and (lat, lng) but cannot auto-judge
    answers like "river vs. railway" or "under vs. over a bridge"; an
@@ -281,43 +298,45 @@ several-fold — and §4 confirms it.
 
 # Appendix
 
-## A. Per-question diffs
+## A. Per-question diffs {#per-question-diffs}
 
 `L` = CLIP-L, `B` = OpenCLIP-bigG. Each cell is a per-seed hit pattern
-across 5 seeds. `↑`/`↓` flag a hit count change between encoders; `+`
-marks questions added in this follow-up; `++` marks the encoder-bypass
-question.
+across 5 seeds (`✓` = hit, `✗` = miss). `↑`/`↓` flag a hit count change
+between encoders; `+` marks questions added in this follow-up; `++`
+marks the encoder-bypass question. Rows where both encoders show `--`
+mean the question isn't IoU-scoreable (categorical, count-only, or
+pending GT).
 
 ```
 === Fulham (A) ===
    q1 a red bus                                  L ✓✓✓✓✓  B ✓✓✓✓✓
 ↑  q2 a zebra crossing                           L ✓✓✗✓✓  B ✓✓✓✓✓
-   q3 a person riding a bicycle                  L ✗✗✗✗✗  B ✗✗✗✗✗   (CLIP↔DINO failure)
-↓  q4 elevator                                   L ✗✗✗✓✓  B ✗✗✗✗✗   (stochastic-marginal collapse)
+   q3 a person riding a bicycle                  L ✗✗✗✗✗  B ✗✗✗✗✗   (CLIP/DINO failure)
+↓  q4 elevator                                   L ✗✗✗✓✓  B ✗✗✗✗✗   (stochastic)
 +  q6 a row of mailboxes [PLACE-AWARE]           L ✓✓✓✓✓  B ✓✓✓✓✓
-+  q7 the river Thames embankment [SPATIAL]      L —      B —        (categorical only)
++  q7 the river Thames embankment [SPATIAL]      L  --    B  --     (categorical)
 ↑+ q8 a large lorry on a busy high street        L ✓✓✓✓✗  B ✓✓✓✓✓
 +  q9 a motorcycle on a high street              L ✓✓✓✓✓  B ✓✓✓✓✓
 
 === Palo Alto (C) ===
    q1 a stop sign                                L ✓✓✓✓✓  B ✓✓✓✓✓
-↑↑ q2 a semi-truck                               L ✗✗✗✗✗  B ✗✓✗✓✓   (encoder-recovery)
+↑↑ q2 a semi-truck                               L ✗✗✗✗✗  B ✗✓✗✓✓   (encoder lift)
    q3 tall palm trees                            L ✓✓✓✓✓  B ✓✓✓✓✓
-   q4 a person walking                           L ✗✗✗✗✗  B ✗✗✗✗✗   (encoder failure)
+   q4 a person walking                           L ✗✗✗✗✗  B ✗✗✗✗✗   (encoder fail)
 +  q6 a stop sign [COUNTING]                     L ✓✓✓✓✓  B ✓✓✓✓✓
 +  q7 palms + truck [TEMPORAL ORDERING]          L ✓✓✓✓✓  B ✓✓✓✓✓
 +  q8 a Speed Limit 25 sign                      L ✓✓✓✓✓  B ✓✓✓✓✓
-++ q9 where did I drive in reverse [LAST-SEEN]   L ✓✓✓✓✓  B ✓✓✓✓✓   (encoder bypassed)
+++ q9 where did I drive in reverse [LAST-SEEN]   L ✓✓✓✓✓  B ✓✓✓✓✓   (encoder off)
 
 === Tucson (B) ===
    q1 a person wearing blue clothes              L ✓✓✓✓✓  B ✓✓✓✓✓
    q2 a bicyclist                                L ✓✓✓✓✓  B ✓✓✓✓✓
    q3 a bridge                                   L ✓✓✓✓✓  B ✓✓✓✓✓
    q4 a white van                                L ✓✓✓✓✓  B ✓✓✓✓✓
-   q6 bike-path turn-back [PENDING]              L —      B —        (no GT yet)
+   q6 bike-path turn-back [PENDING]              L  --    B  --     (no GT yet)
 ↑  q7 a red car                                  L ✓✓✓✗✓  B ✓✓✓✓✓
-+  q8 all the bridges I cycled across [COUNT]    L —      B —        (count-only)
-+  q9 a bridge from below [SPATIAL]              L —      B —        (categorical only)
++  q8 all the bridges I cycled across [COUNT]    L  --    B  --     (count-only)
++  q9 a bridge from below [SPATIAL]              L  --    B  --     (categorical)
 ```
 
 Five questions are unscoreable in this view — three are categorical or
@@ -399,7 +418,7 @@ compatible:
   scored. Harness prints a "Spatial-reasoning questions" table with
   top-1 cell and (lat, lng) for downstream grading.
 
-## E. Counting limitation
+## E. Counting limitation {#counting-limitation}
 
 Two questions exercise PSM as a counting backend: Palo Alto q6 (stop
 signs, GT = 6) and Tucson q8 (bridges, GT = 10). At top-5, both predict
