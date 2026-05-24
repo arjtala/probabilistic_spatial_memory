@@ -240,3 +240,48 @@ After losing ~18 minutes of DINOv3 inference to a poorly-timed `pkill`, shipped 
 - [ ] Optional gzip/lzf compression on `attention_maps` / `prediction_maps`
 - [ ] Drop or make optional the redundant per-group IMU snapshots (`dino/accel`, `dino/gyro`, etc.); the canonical `imu/` group is enough for downstream consumers
 - [ ] Incremental embedding checkpoint (mid-batch) — the per-model `.npz` cache saves only after a runner finishes. Saving every N batches would protect against kills *during* a 22-minute DINOv3 inference, not just between runners.
+
+## Paper Workstream (ECCV 2026)
+
+Engineering tasks needed for the workshop paper. Research direction +
+status live in [journal/PAPER.md](journal/PAPER.md); the experiment
+specs live in `EXPERIMENTS.md` E10/E11/E12 (plus existing E5/E7/E8).
+This section is just for the harness/glue code those experiments need.
+
+### Baselines + sweeps
+
+- [ ] `scripts/eval_brute_force_clip.py` — for E11. Embed every frame of a session, rank all frames by cosine against the query, take top-k. Use the same scorer as `eval_lookback.py` so numbers are directly comparable.
+- [ ] `scripts/eval_sliding_window.py` — for E11. Slide 5-second windows, mean-pool frame embeddings inside each window, rank windows. Same scorer.
+- [ ] `scripts/eval_uniform_sample.py` — for E11. 1-frame-per-time-window sampling, no learned aggregation. Lower-bound baseline.
+- [ ] Hyperparameter sweep loop on top of `eval_bigg_all.sh` — for E12. Adds `H3_RESOLUTION`, `RETENTION` (as `TIME_WINDOW × CAPACITY`), and `EXEMPLARS` env knobs; auto-suffixes the TAG so outputs don't clobber the v2 raw runs.
+- [ ] `scripts/eval_hyperparam_aggregate.py` — small extension to the aggregator that pools across hyperparameter axis and plots single-axis sensitivity curves. The plot is paper Figure F3.
+
+### MLLM in the loop
+
+- [ ] `scripts/mllm_client.py` — uniform interface over Gemini 3 Pro API, GPT-5 API, and a locally-served vLLM endpoint (for Llama-3.2-90B-Vision or InternVL3.5). Returns predicted `[t_start, t_end]` intervals from (video_path, question). Hides the API-vs-local-serving difference from the caller.
+- [ ] `scripts/eval_mllm_baseline.py` — for E10. Run `mllm_client` over the (session, question) grid, parse intervals, score with the same IoU scorer.
+- [ ] Frozen prompting protocol (text + 2-shot exemplars) for interval elicitation. Store as `prompts/grounding_v1.txt`; pin the protocol in PAPER.md once it's frozen so reviewers can audit.
+- [ ] `scripts/eval_psm_mllm_pipeline.py` — for E5. Run PSM, take top-k `(cell, t_start, t_end)`, sample N evidence frames per candidate, feed (question, evidence frames) to the MLLM, return predicted interval. Score with the same scorer.
+
+### Question bank expansion
+
+- [ ] Add 30-60 new questions across the 3 existing sessions, biased toward the under-represented categories (Time Duration, Sequential Action, Spatial Awareness). Target: 50-80 IoU-scoreable questions total. Annotation labor; no scripts needed beyond the existing YAML schema.
+- [ ] Encoder-bypass stress test: 5-10 new `query_mode: last_seen` questions in cells the wearer revisited ambiguously. Strengthens v2 §3 if Hit @5 holds; reveals a real limitation if it crashes.
+- [ ] One longer session (30-60 min) ingested + annotated. Stresses the bounded-memory claim. Probably the Tucson cycling session if we have a longer take.
+
+### Paper figures
+
+- [ ] F1 architecture diagram (PSM as prefilter). Hand-drawn or draw.io export.
+- [ ] F2 retrieval method ablation bar chart. Hand-authored SVG from E11 outputs (matches existing journal/figures style).
+- [ ] F3 hyperparameter sensitivity 3-panel plot. From E12.
+- [ ] F4 MLLM baseline vs PSM bar chart. From E10.
+- [ ] F5 PSM + MLLM reranker results. From E5.
+- [ ] F6 memory footprint vs session length. From an existing or new benchmark.
+- [ ] F7 qualitative top-5 candidates over a query. Screenshot from psm-viz + annotation.
+
+### Submission housekeeping
+
+- [ ] Anonymize for double-blind: scrub author from journal markdown + PDF metadata; investigate whether commit history needs scrubbing.
+- [ ] Pin `requirements.txt` for the paper-time scripts (separate from `extraction/pyproject.toml` which is for the extraction package).
+- [ ] `scripts/reproduce_paper.sh` — one-shot script that runs every paper experiment end-to-end from a fresh clone. Required by most workshops' artifact tracks.
+- [ ] Tag the submission commit: `git tag eccv2026-submission` once frozen.

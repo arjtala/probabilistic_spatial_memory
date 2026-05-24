@@ -1,0 +1,24 @@
+% Unicode fallback chain for special glyphs (used by journal/*.md → PDF builds).
+% Charter and DejaVu Mono lack a few symbols (e.g. → ρ ✓ ✗); routing the misses
+% through Arial Unicode MS keeps them rendering without sprinkling \texttt or
+% \texorpdfstring through the markdown.
+\usepackage{newunicodechar}
+\newfontfamily{\fallbackfont}{Arial Unicode MS}
+\DeclareTextFontCommand{\textfallback}{\fallbackfont}
+\newunicodechar{→}{\textfallback{→}}
+\newunicodechar{↑}{\textfallback{↑}}
+\newunicodechar{↓}{\textfallback{↓}}
+\newunicodechar{↔}{\textfallback{↔}}
+\newunicodechar{✓}{\textfallback{✓}}
+\newunicodechar{✗}{\textfallback{✗}}
+\newunicodechar{≈}{\textfallback{≈}}
+\newunicodechar{≥}{\textfallback{≥}}
+\newunicodechar{ρ}{\textfallback{ρ}}
+\newunicodechar{τ}{\textfallback{τ}}
+\newunicodechar{Δ}{\textfallback{Δ}}
+\newunicodechar{§}{\textfallback{§}}
+\newunicodechar{±}{\textfallback{±}}
+\newunicodechar{×}{\textfallback{×}}
+\newunicodechar{–}{\textfallback{–}}
+\newunicodechar{—}{\textfallback{—}}
+\newunicodechar{…}{\textfallback{…}}

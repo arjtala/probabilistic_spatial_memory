@@ -2,6 +2,8 @@
 
 This file turns the README's open questions into explicit, repeatable experiments using the tooling that already exists in this repo.
 
+A subset of these experiments (E5, E7, E10, E11, E12) is on the critical path for the ECCV 2026 workshop paper plan; see [`journal/PAPER.md`](journal/PAPER.md) for that workstream's status, ordering, and reviewer-anticipation notes.
+
 ## Repro Baseline
 
 For every run, record:
@@ -400,6 +402,89 @@ Faithful TurboQuant (sign-flip + Walsh-Hadamard rotation, Lloyd-Max-optimal scal
 - Reservoir-size cross: run the same sweep at `--exemplars {4, 8, 16}` to test whether the codec's noise floor matters more on small reservoirs.
 - Rank-stability benchmark: a denser corpus where the ground truth distinguishes between adjacent cells would let the strict top-5 Jaccard rule actually bite.
 - CLIP-L (768-d) parity check — the existing `clipL` raw runs already exist; running the three codec sweeps would confirm the bigG result transfers to a smaller embedding.
+
+### E10. Reproducing the Localization Paradox on PSM's corpus
+
+Question:
+- Does the temporal-grounding collapse documented for frontier MLLMs at benchmark scale also appear on our 3-session, 20-question corpus? Without this, every comparison in the v2 writeup is against a *cited* number, not a *measured* one.
+
+Current capability:
+- The corpus exists with hand-annotated `[t_start, t_end]` intervals for 20 IoU-scoreable questions across 3 sessions.
+- The grounding metric (`mIoU` against ground-truth intervals) is already implemented in `scripts/eval_lookback.py`.
+- What's missing: an MLLM client that takes (full session video, question) and returns a predicted interval.
+
+Inputs:
+- One frontier MLLM (target: Gemini 3 Pro via API; backup: a locally-served Llama-3.2-90B-Vision on H200s for unlimited rate).
+- A frozen prompting protocol that elicits `[t_start, t_end]` intervals consistently. Reviewer-credible options: (a) chain-of-thought with explicit "name the seconds-since-start when the event happens" suffix, (b) two-shot exemplars of the desired output shape, (c) a two-stage protocol where the MLLM answers semantically first and a separate grounding pass localizes the answer.
+
+Protocol:
+1. For each (session, question), call the MLLM with the full session video and the question text.
+2. Parse the response into a single `[t_start, t_end]` interval (or report a parse failure as mIoU=0).
+3. Compute mIoU and Hit @5 against ground truth using the same scorer as PSM.
+4. Report per-category numbers and the overall mean.
+5. Repeat the *same* questions through PSM (already done in v2) to establish the direct comparison.
+
+Readout:
+- The headline number this experiment must produce: "vanilla MLLM mIoU = X.XX on our corpus" vs PSM's 0.21 bucket-mIoU @5 from v2.
+- Per-category MLLM mIoU (Location Trace, Object Recall, Spatial Awareness, Counting if scoreable).
+- Failure-mode breakdown: parse failures vs hallucinated intervals vs wrong-interval-with-right-semantics.
+
+Decision rule:
+- If MLLM mIoU < 0.10 on Location Trace, the v2 cited paradox is real on our corpus and the paper has a baseline to beat.
+- If MLLM mIoU ≥ 0.40, the cited paradox doesn't transfer to small-scale carefully-annotated corpora and the framing has to change (e.g., "the paradox is a benchmark-scale phenomenon; PSM is a memory architecture that scales without requiring frontier-MLLM-scale compute").
+
+### E11. Retrieval-Method Ablation
+
+Question:
+- Does PSM's spatial decomposition (H3 + ring buffer + reservoir) actually help, or does any retrieval method get our headline numbers on this corpus?
+
+Current capability:
+- The CLIP-L and OpenCLIP-bigG feature extractors already produce per-frame embeddings (`features.h5::<group>/embeddings`).
+- The IoU scoring harness in `scripts/eval_lookback.py` accepts pre-computed `(t_min, t_max)` candidates from any source — only the retrieval call needs to be swapped out.
+- What's missing: a `retrieval_method: ...` field in the question YAML that routes through one of: PSM (status quo), brute_force_clip (rank every frame), sliding_window_clip (~5s windows, mean-pool embeddings, rank windows), uniform_sample_clip (1-frame-per-window).
+
+Protocol:
+1. Hold corpus, encoder, and question bank fixed.
+2. For each retrieval method, return top-5 candidates as `[t_start, t_end]` intervals (the frame timestamp ±1.5s for frame-level methods; the window for sliding/uniform).
+3. Score with the same exemplar-IoU and Hit @5 scorer.
+4. Compare against PSM's numbers from v2.
+
+Readout:
+- Headline table: Hit @5 by retrieval method × encoder.
+- Specifically: brute-force-CLIP Hit @5 — if it equals PSM's, the H3+ring-buffer structure is doing no work for accuracy and the paper has to lead with the *bounded-memory* argument instead of the *accuracy* one.
+- Memory footprint comparison: brute-force needs to keep all N frame embeddings in RAM; PSM's ring buffer ages them out.
+
+Decision rule:
+- If PSM Hit @5 ≥ brute-force Hit @5 + 5pp, the spatial decomposition helps directly.
+- If PSM Hit @5 ≈ brute-force Hit @5 (within 2pp), reposition the paper around "PSM matches brute-force quality at O(matching_tiles) query cost instead of O(N_frames)."
+- If PSM Hit @5 < brute-force Hit @5, the corpus is too small to need spatial structure and we should either scale up or change the headline claim.
+
+### E12. PSM Hyperparameter Sensitivity
+
+Question:
+- How robust is the v2 result to the three knobs we never swept: H3 resolution, retention window, reservoir size? A reviewer will assume we tuned on the test set unless we show otherwise.
+
+Current capability:
+- All three knobs are CLI flags on `psm --search`: `-r` (H3 res), `-t` × `-C` (retention = time_window × capacity), `--exemplars`.
+- `scripts/eval_bigg_all.sh` already runs the 3-session × 5-seed × N-question matrix; adding a hyperparameter axis is one more bash loop.
+- The `eval_aggregate.py` --by-seed reporting already pools across (session, seed); pooling across (hyperparameter point) is a small extension.
+
+Protocol:
+1. Fixed: OpenCLIP-bigG, raw float32 codec, 5 seeds, 20 questions.
+2. Vary one knob at a time, keep the other two at the v2 defaults (`-r 10`, `-t 75 -C 12`, `--exemplars 128`):
+   - H3 resolution: {8, 9, 10, 11, 12}
+   - Retention: {30s × 24, 45s × 16, 75s × 12, 150s × 6, 300s × 3} (all hold ~12-15 min total horizon)
+   - Reservoir: {16, 32, 64, 128, 256}
+3. Report Hit @5 with across-seed std at each point.
+
+Readout:
+- Three single-axis plots (one per knob) with the v2 default marked. Ideally Hit @5 is flat across a wide plateau and only drops at extreme values.
+- The "operating range" — knob values for which Hit @5 stays within ±2pp of the default.
+- Any surprising interaction (e.g., does small reservoir matter more at higher H3 resolution?).
+
+Decision rule:
+- If Hit @5 swings by >5pp across reasonable knob ranges, the v2 result was lucky and needs re-tuning before any baseline comparison.
+- If Hit @5 stays within ±2pp across a 2x knob range, the result is robust and the paper can claim "PSM is insensitive to its hyperparameters in the operating regime."
 
 ## Reproducible Benchmark Sweeps
 
