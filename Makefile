@@ -1,4 +1,10 @@
-CC = clang
+# Compiler: pick clang if present, otherwise gcc, otherwise let make's
+# built-in `cc` fail loudly. Override with `make CC=...` on the command
+# line. macOS dev boxes typically have clang (Xcode CLT); FAIR-style
+# Linux clusters typically have gcc.
+ifeq ($(origin CC),default)
+  CC := $(shell command -v clang 2>/dev/null || command -v gcc 2>/dev/null || echo cc)
+endif
 UNAME_S := $(shell uname -s)
 BREW ?= brew
 PKG_CONFIG ?= pkg-config

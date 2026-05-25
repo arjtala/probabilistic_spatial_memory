@@ -12,18 +12,28 @@ The sbatch scripts assume the `psm` conda env exists with the project's
 extraction package installed editable + CLIP deps. From a fresh clone:
 
 ```bash
-# 1. Create + activate the env (or reuse an existing one):
+# 1. Initialize the vendored probabilistic_data_structures submodule.
+#    Without this, `make all` will fail with "vendor/.../hll.h: No
+#    such file or directory" because the directory is empty.
+git submodule update --init --recursive
+
+# 2. Build the C engine. The Makefile autodetects clang/gcc; cluster
+#    typically has gcc.
+make all
+test -x targets/psm && echo "psm built"
+
+# 3. Create + activate the env (or reuse an existing one):
 conda create -n psm python=3.12 -y
 conda activate psm
 
-# 2. Install the project, CLIP deps, and the YAML loader scripts need:
+# 4. Install the project, CLIP deps, and the YAML loader scripts need:
 cd /storage/home/$USER/src/probabilistic_spatial_memory
 pip install -e "./extraction[clip]"
 
-# 3. Confirm the imports the baselines need actually resolve:
+# 5. Confirm the imports the baselines need actually resolve:
 python -c "import h5py, numpy, yaml; from psm_extraction.models import make_runner"
 
-# 4. Warm the HuggingFace cache for the CLIP checkpoints (compute nodes
+# 6. Warm the HuggingFace cache for the CLIP checkpoints (compute nodes
 #    typically have no internet access; the sbatch jobs run in offline
 #    mode and will fail if a model isn't cached).
 python -c "
@@ -40,11 +50,11 @@ print('[hf-warm] done')
 "
 ```
 
-If step 3 raises `ModuleNotFoundError`, the install didn't take — most
+If step 5 raises `ModuleNotFoundError`, the install didn't take — most
 commonly because `pip install` ran against system Python instead of the
 conda env's. Verify with `which pip` (should be inside the env dir).
 
-Step 4 downloads ~5.5 GB total (bigG dominates) into
+Step 6 downloads ~5.5 GB total (bigG dominates) into
 `~/.cache/huggingface/hub/`. Cached weights are shared between the
 login and compute nodes, so once is enough.
 
