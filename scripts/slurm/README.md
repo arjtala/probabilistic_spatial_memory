@@ -91,6 +91,21 @@ sessions, not just 2 of 3.
 - Expected wall-time on H200: ~10-15 minutes
 - Submit: `sbatch scripts/slurm/extract_clipL_fulham.sbatch`
 
+### `eval_psm_sweep.sbatch`
+
+GPU job that runs the PSM evaluation seed sweep (`scripts/eval_bigg_all.sh`
+internally) for one or more encoders. Per encoder: 3 sessions × 5 seeds
+× ~20 questions = 300 PSM queries per encoder. Produces JSONs at
+`$CAPTURES/eval_<sid>_<TAG>_e128_s<seed>.json`. These are the PSM half
+of the E11 baselines-vs-PSM comparison.
+
+- Account/QoS: `dream` / `h200_comm_shared` (1× H200)
+- Resources: 8 CPUs, 64 GB, 2 hour wall-time cap
+- Expected wall-time: ~15 min for 2 encoders, longer if HF cache cold
+- Submit: `sbatch scripts/slurm/eval_psm_sweep.sbatch`
+- **Prerequisite**: `targets/psm` must be compiled (`make all`). The
+  script exits early with a clear error if the binary is missing.
+
 ### `eval_baselines.sbatch`
 
 CPU-only sweep that runs the three E11 retrieval baselines (brute-force
@@ -106,19 +121,26 @@ encoders. Forwards to `scripts/eval_baselines_all.sh`.
 ## Workflow for the first paper-grade E11 pass
 
 ```bash
-# 1. Backfill the missing CLIP-L extraction (GPU, ~15 min)
+# 0. One-time setup (see top of README): conda env + pip install + HF cache warm.
+
+# 1. Compile the C engine (one-time):
+make all
+test -x targets/psm && echo "psm built"
+
+# 2. Backfill the missing CLIP-L extraction (GPU, ~15 min)
 sbatch scripts/slurm/extract_clipL_fulham.sbatch
 
-# 2. Wait for it to finish (check with `squeue -u $USER` or
-#    `tail -f logs/extract_clipl_fulham_*.out`).
+# 3. Run the PSM seed sweep (GPU, ~15 min)
+sbatch scripts/slurm/eval_psm_sweep.sbatch
 
-# 3. Run the baseline sweep (CPU, ~10 min)
+# 4. Run the baseline sweep (CPU, ~10 min). Can run in parallel with #3
+#    since they don't conflict on output paths.
 sbatch scripts/slurm/eval_baselines.sbatch
 
-# 4. Inspect the output JSONs once the job lands
-ls captures/baselines/
+# 5. Wait for both to finish (check with `squeue -u $USER` or
+#    `tail -f logs/*_*.out`).
 
-# 5. Aggregate baselines + PSM side-by-side
+# 6. Aggregate baselines + PSM side-by-side
 python scripts/eval_aggregate.py --by-seed --label-from-features \
   captures/eval_*_clipBigG_e128_s*.json \
   captures/baselines/*.json
