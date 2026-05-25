@@ -11,9 +11,10 @@ layout.
 - **Log destination**: `logs/<job-name>_<jobid>.{out,err}` in the
   submission directory. The scripts `mkdir -p logs` so this works from
   any cwd.
-- **Conda env**: every script activates `$CONDA_ENV` (default `psm`)
-  via `conda activate` after sourcing `conda.sh`. Override with
-  `--export=CONDA_ENV=myenv` if needed.
+- **Conda env**: every script does `source activate $CONDA_ENV`
+  (default `psm`). Override with `--export=CONDA_ENV=myenv`. This is
+  the cluster-standard pattern — works in non-interactive batch shells
+  without needing conda init.
 - **Data root**: `$ROOT` (default `/checkpoint/dream/arjangt/video_retrieval/aria`).
   Override for local runs with `--export=ROOT=$PWD/datasets`.
 - **Account / QoS**: scripts default to `--account=dream`. Partition is
@@ -83,21 +84,10 @@ python scripts/eval_aggregate.py --by-seed --label-from-features \
 
 ## Troubleshooting
 
-- **`Run 'conda init' before 'conda activate'`** or **`could not find
-  conda.sh`** in the .err log. Means the script couldn't locate your
-  conda install in the search path. Fix: find your conda's base dir
-  (`echo $CONDA_PREFIX` from an activated shell, then strip the
-  trailing `/envs/<env>` if any), and submit with `--export`:
-
-  ```bash
-  sbatch --export=ALL,CONDA_BASE=$HOME/miniforge3 \
-    scripts/slurm/eval_baselines.sbatch
-  ```
-
-  The `ALL,` prefix preserves your other env vars while adding
-  CONDA_BASE. If you find yourself overriding it on every submit,
-  add a permanent entry to the candidate list inside `activate_conda`
-  at the top of each sbatch script.
+- **Job activation fails because of conda.** The scripts use the
+  cluster-standard `source activate <env>` pattern. If the env doesn't
+  exist or the name is wrong, the error is immediate. Check with
+  `conda env list` on the login node.
 - **`features.h5` not found**. The baseline sweep skips missing files
   with a WARN; it doesn't fail. If you see WARN lines for a session,
   either the extraction never ran or the path/basename is wrong. Check
