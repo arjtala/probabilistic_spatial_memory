@@ -83,12 +83,21 @@ python scripts/eval_aggregate.py --by-seed --label-from-features \
 
 ## Troubleshooting
 
-- **`conda: command not found` in the log**. The script tries to source
-  `conda.sh` from `$(conda info --base)`, but if `conda` isn't on the
-  batch shell's PATH, sourcing fails before activation. Fix: prepend
-  your conda's bin to `PATH` in `~/.bashrc`, or hardcode the source
-  line at the top of the sbatch script to your conda install (e.g.
-  `source /private/home/$USER/miniconda3/etc/profile.d/conda.sh`).
+- **`Run 'conda init' before 'conda activate'`** or **`could not find
+  conda.sh`** in the .err log. Means the script couldn't locate your
+  conda install in the search path. Fix: find your conda's base dir
+  (`echo $CONDA_PREFIX` from an activated shell, then strip the
+  trailing `/envs/<env>` if any), and submit with `--export`:
+
+  ```bash
+  sbatch --export=ALL,CONDA_BASE=$HOME/miniforge3 \
+    scripts/slurm/eval_baselines.sbatch
+  ```
+
+  The `ALL,` prefix preserves your other env vars while adding
+  CONDA_BASE. If you find yourself overriding it on every submit,
+  add a permanent entry to the candidate list inside `activate_conda`
+  at the top of each sbatch script.
 - **`features.h5` not found**. The baseline sweep skips missing files
   with a WARN; it doesn't fail. If you see WARN lines for a session,
   either the extraction never ran or the path/basename is wrong. Check

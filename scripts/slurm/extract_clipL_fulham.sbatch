@@ -46,12 +46,41 @@ CHECKPOINT="laion/CLIP-ViT-L-14-laion2B-s32B-b82K"
 OUT_BASENAME="clip_l_features.h5"
 
 # --- Activate conda env ---
-# Source the conda machinery; works on FAIR clusters where conda is in
-# the user's PATH but not pre-activated in batch shells.
-if [[ -z "${CONDA_SHLVL:-}" ]]; then
-  source "$(conda info --base)/etc/profile.d/conda.sh"
-fi
-conda activate "$CONDA_ENV"
+# Batch shells don't source ~/.bashrc, so conda's wrapper functions aren't
+# defined. We hunt for conda.sh in the usual locations and source it
+# explicitly. If $CONDA_BASE is exported at submit time, use that first.
+activate_conda() {
+  local base=""
+  if [[ -n "${CONDA_BASE:-}" && -f "$CONDA_BASE/etc/profile.d/conda.sh" ]]; then
+    base="$CONDA_BASE"
+  else
+    for candidate in \
+      "$HOME/miniforge3" \
+      "$HOME/miniconda3" \
+      "$HOME/anaconda3" \
+      "/private/home/$USER/miniforge3" \
+      "/private/home/$USER/miniconda3" \
+      "/private/home/$USER/anaconda3" \
+      "/opt/conda" \
+      "/opt/homebrew/Caskroom/miniconda/base"; do
+      if [[ -f "$candidate/etc/profile.d/conda.sh" ]]; then
+        base="$candidate"
+        break
+      fi
+    done
+  fi
+  if [[ -z "$base" ]]; then
+    echo "[slurm] ERR: could not find conda.sh; set CONDA_BASE explicitly" >&2
+    echo "        e.g. sbatch --export=CONDA_BASE=$HOME/miniforge3 ..." >&2
+    exit 1
+  fi
+  echo "[slurm] sourcing $base/etc/profile.d/conda.sh"
+  # shellcheck disable=SC1090,SC1091
+  source "$base/etc/profile.d/conda.sh"
+  conda activate "$CONDA_ENV"
+}
+
+activate_conda
 
 cd "${SLURM_SUBMIT_DIR:-$(pwd)}"
 mkdir -p logs
