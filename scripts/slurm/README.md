@@ -16,10 +16,22 @@ layout.
   `--export=CONDA_ENV=myenv` if needed.
 - **Data root**: `$ROOT` (default `/checkpoint/dream/arjangt/video_retrieval/aria`).
   Override for local runs with `--export=ROOT=$PWD/datasets`.
-- **Partition / QoS**: defaults to `learnfair`. If your cluster uses a
-  different partition (`fairaws`, `devlab`, etc.), edit the `#SBATCH
-  --partition=` line at the top or override at submit time:
-  `sbatch --partition=fairaws --export=... <script>`.
+- **Account / QoS**: scripts default to `--account=dream`. Partition is
+  *inferred from the QoS prefix* on this cluster (cpu_* -> cpu,
+  h200_* -> h200, h100_* -> h100); passing `--partition` explicitly
+  triggers a warning and is ignored. The QoS choices per script:
+  - **`cpu_lowest`** (priority 10) — CPU-only jobs. Lowest priority is
+    fine for routine work.
+  - **`h200_comm_shared`** (priority 5) — shared H200 jobs. Good
+    default for one-shot extraction.
+  - **`h200_dream_high`** (priority 100) — dedicated dream-team H200.
+    Reserve for long-running, time-sensitive work (E10 MLLM serving,
+    E5 reranker batches).
+  - **`h200_dev`** (priority 100, DenyOnLimit) — strict dev QoS for
+    debugging sbatch scripts. Don't use for actual work.
+
+  To check the QoS list for your user/account: `sacctmgr show
+  associations user=$USER format=Account,QOS`.
 
 ## Available jobs
 
@@ -31,7 +43,8 @@ have CLIP-L extractions; running this closes the encoder-coverage gap
 so the E11 baseline sweep can compare bigG vs CLIP-L across all 3
 sessions, not just 2 of 3.
 
-- Resources: 1 GPU, 8 CPUs, 64 GB, 1 hour wall-time cap
+- Account/QoS: `dream` / `h200_comm_shared` (1× H200)
+- Resources: 8 CPUs, 64 GB, 1 hour wall-time cap
 - Expected wall-time on H200: ~10-15 minutes
 - Submit: `sbatch scripts/slurm/extract_clipL_fulham.sbatch`
 
@@ -41,6 +54,7 @@ CPU-only sweep that runs the three E11 retrieval baselines (brute-force
 CLIP, sliding-window CLIP, uniform-sample CLIP) across all sessions ×
 encoders. Forwards to `scripts/eval_baselines_all.sh`.
 
+- Account/QoS: `dream` / `cpu_lowest` (CPU-only)
 - Resources: 4 CPUs, 16 GB, 30 min wall-time cap (overkill — the sweep
   finishes in 5-10 min on a single core, the headroom is for first-run
   HuggingFace text-encoder downloads)
@@ -85,6 +99,16 @@ python scripts/eval_aggregate.py --by-seed --label-from-features \
   `extraction/psm_extraction/models/clip_pytorch.py` (default is 16).
   H200 has 141 GB so this shouldn't bite, but if it does on a smaller
   GPU, the symptom is a CUDA OOM ~15s into the run.
-- **Job pending in queue**. `squeue -u $USER` to see the state, `sinfo`
-  for partition health. `learnfair` typically schedules within minutes;
-  if it's been > 15 min check the partition is up.
+- **`Invalid qos specified`** or similar. Means the QoS doesn't exist
+  for your user/account. Run `sacctmgr show associations user=$USER
+  format=Account,QOS` to see what's valid, then either edit the
+  `#SBATCH --qos=` line or submit with `--qos=<right_qos>`.
+- **`sbatch: WARNING: Partition is inferred from QOS prefix so
+  --partition flag is ignored`**. Cosmetic — the scripts don't pass
+  `--partition` precisely to avoid this warning. If you see it, you've
+  probably added `--partition=...` at submit time; drop it.
+- **Job pending in queue**. `squeue -u $USER` to see state, `sinfo
+  --partition=cpu` (or `h200`) for partition health. The
+  `cpu_lowest` / `h200_comm_shared` QoS are intentionally low priority;
+  bump to `h200_dream_high` (priority 100) if a job sits longer than
+  acceptable.

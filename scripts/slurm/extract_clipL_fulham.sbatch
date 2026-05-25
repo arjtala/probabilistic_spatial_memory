@@ -1,12 +1,17 @@
 #!/bin/bash
 #SBATCH --job-name=psm-extract-clipl-fulham
-#SBATCH --partition=learnfair
-#SBATCH --gres=gpu:1
+#SBATCH --account=dream
+#SBATCH --qos=h200_comm_shared
+#SBATCH --gpus=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
 #SBATCH --time=01:00:00
 #SBATCH --output=logs/extract_clipl_fulham_%j.out
 #SBATCH --error=logs/extract_clipl_fulham_%j.err
+#
+# Partition is auto-inferred from the QoS prefix on this cluster
+# (h200_* -> h200 partition). Don't add --partition or sbatch will
+# warn and ignore it.
 #
 # One-shot GPU job to fill the missing clip_l_features.h5 for session
 # 1501677363692556 (Fulham). The other two sessions already have CLIP-L

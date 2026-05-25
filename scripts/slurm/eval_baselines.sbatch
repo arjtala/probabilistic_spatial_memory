@@ -1,11 +1,16 @@
 #!/bin/bash
 #SBATCH --job-name=psm-eval-baselines
-#SBATCH --partition=learnfair
+#SBATCH --account=dream
+#SBATCH --qos=cpu_lowest
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=00:30:00
 #SBATCH --output=logs/eval_baselines_%j.out
 #SBATCH --error=logs/eval_baselines_%j.err
+#
+# Partition is auto-inferred from the QoS prefix on this cluster
+# (cpu_lowest -> cpu partition). Don't add --partition or sbatch will
+# warn and ignore it.
 #
 # Run the three E11 retrieval baselines (brute-force CLIP, sliding-window
 # CLIP, uniform-sample CLIP) across all sessions × encoders. CPU-only —
