@@ -6,6 +6,28 @@ all knobs come from `sbatch --export=KEY=VAL`, with sensible defaults
 baked in for the FAIR `/checkpoint/dream/arjangt/video_retrieval/aria`
 layout.
 
+## One-time setup on a fresh cluster checkout
+
+The sbatch scripts assume the `psm` conda env exists with the project's
+extraction package installed editable + CLIP deps. From a fresh clone:
+
+```bash
+# 1. Create + activate the env (or reuse an existing one):
+conda create -n psm python=3.12 -y
+conda activate psm
+
+# 2. Install the project, CLIP deps, and the YAML loader scripts need:
+cd /storage/home/$USER/src/probabilistic_spatial_memory
+pip install -e "./extraction[clip]"
+
+# 3. Confirm the imports the baselines need actually resolve:
+python -c "import h5py, numpy, yaml; from psm_extraction.models import make_runner"
+```
+
+If step 3 raises `ModuleNotFoundError`, the install didn't take — most
+commonly because `pip install` ran against system Python instead of the
+conda env's. Verify with `which pip` (should be inside the env dir).
+
 ## Conventions
 
 - **Log destination**: `logs/<job-name>_<jobid>.{out,err}` in the
