@@ -41,17 +41,33 @@ def _summary_field(summary: dict, name: str) -> float:
     return 0.0
 
 
+def _method_label(record: dict) -> str:
+    """Identify what produced this JSON.
+
+    PSM runs from eval_lookback.py don't carry a `baseline_method` field,
+    so we synthesize "psm" for those. E11 baseline runs explicitly set
+    `baseline_method` to "brute_force_clip", "sliding_window_5s",
+    "uniform_sample_75s", etc.
+    """
+    return record.get("baseline_method") or "psm"
+
+
 def _session_label(record: dict, label_from_features: bool,
-                   include_codec: bool = False) -> str:
+                   include_codec: bool = False,
+                   include_method: bool = False) -> str:
     if label_from_features:
         path = Path(str(record.get("features") or ""))
         base = path.parent.name or path.stem
     else:
         raw = record.get("questions_file") or record.get("features") or "?"
         base = Path(str(raw)).stem
+    suffix_parts = []
     if include_codec:
-        codec = record.get("exemplar_codec") or "raw"
-        return f"{base}@{codec}"
+        suffix_parts.append(record.get("exemplar_codec") or "raw")
+    if include_method:
+        suffix_parts.append(_method_label(record))
+    if suffix_parts:
+        return f"{base}@{'+'.join(suffix_parts)}"
     return base
 
 
@@ -109,8 +125,10 @@ def _print_seed_summary(
         seeds_str = ",".join(
             str(s["seed"]) for s in summary["per_seed"] if s["seed"] is not None
         )
+        if not seeds_str:
+            seeds_str = "n/a"  # baselines have no psm_seed
         print(
-            f"| `{label}` | {summary['n_scored']} | {seeds_str or '?'} | "
+            f"| `{label}` | {summary['n_scored']} | {seeds_str} | "
             f"{summary['exemplar_miou_top1_mean']:.3f} ± {summary['exemplar_miou_top1_std']:.3f} | "
             f"{summary['exemplar_miou_at_k_mean']:.3f} ± {summary['exemplar_miou_at_k_std']:.3f} | "
             f"{summary['exemplar_hit_rate_at_k_mean']:.1%} ± "
@@ -118,28 +136,36 @@ def _print_seed_summary(
             f"{summary['bucket_miou_at_k_mean']:.3f} ± {summary['bucket_miou_at_k_std']:.3f} |"
         )
 
-    # Group sessions by codec so the combined row reflects only same-codec
-    # runs. When a single codec is present the loop runs once; when raw / tq4 /
-    # tq2 share an aggregate call, each gets its own combined row.
-    codec_to_sessions: dict[str, dict[str, list[dict]]] = defaultdict(
+    # Group sessions by (codec, method) so the combined row reflects only
+    # same-axis runs. When neither varies the loop runs once; when codecs
+    # OR methods vary, each combo gets its own combined row.
+    axis_to_sessions: dict[tuple[str, str], dict[str, list[dict]]] = defaultdict(
         lambda: defaultdict(list)
     )
     for label, runs in by_session.items():
         for run in runs:
             codec = run.get("exemplar_codec") or "raw"
-            codec_to_sessions[codec][label].append(run)
+            method = _method_label(run)
+            axis_to_sessions[(codec, method)][label].append(run)
 
     combined_blocks: list[dict] = []
-    for codec in sorted(codec_to_sessions):
-        codec_sessions = codec_to_sessions[codec]
+    for axis_key in sorted(axis_to_sessions):
+        codec, method = axis_key
+        axis_sessions = axis_to_sessions[axis_key]
         seeds_set: set = set()
-        for runs in codec_sessions.values():
+        for runs in axis_sessions.values():
             for r in runs:
                 seeds_set.add(r.get("psm_seed"))
+        # Baselines have psm_seed=None — treat the single None as one
+        # "seed" so the combined block still produces a row.
+        if seeds_set == {None}:
+            seed_iter: list = [None]
+        else:
+            seed_iter = sorted(s for s in seeds_set if s is not None)
         combined_per_seed: list[dict] = []
-        for seed in sorted(s for s in seeds_set if s is not None):
+        for seed in seed_iter:
             scored: list[dict] = []
-            for label, runs in codec_sessions.items():
+            for label, runs in axis_sessions.items():
                 for run in runs:
                     if run.get("psm_seed") != seed:
                         continue
@@ -155,20 +181,35 @@ def _print_seed_summary(
                 "exemplar_hit_rate_at_k": sum(1 for r in scored if r["exemplar_hit_at_k"]) / n,
                 "bucket_miou_at_k": sum(r["bucket_iou_at_k"] for r in scored) / n,
             })
-        combined_blocks.append({"codec": codec, "per_seed": combined_per_seed})
+        combined_blocks.append({
+            "codec": codec, "method": method, "per_seed": combined_per_seed,
+        })
 
     def _mean_std(values):
         return statistics.fmean(values), (
             statistics.stdev(values) if len(values) > 1 else 0.0
         )
 
-    multi_codec = len(codec_to_sessions) > 1
+    multi_codec = len({k[0] for k in axis_to_sessions}) > 1
+    multi_method = len({k[1] for k in axis_to_sessions}) > 1
+
+    def _combined_label(block: dict) -> str:
+        parts = []
+        if multi_codec:
+            parts.append(block["codec"])
+        if multi_method:
+            parts.append(block["method"])
+        return f"combined@{'+'.join(parts)}" if parts else "combined"
+
     for block in combined_blocks:
         combined_per_seed = block["per_seed"]
         if not combined_per_seed:
             continue
         n_total = combined_per_seed[0]["n_scored"]
-        seeds_str = ",".join(str(s["seed"]) for s in combined_per_seed)
+        seeds_str = ",".join(
+            "-" if s["seed"] is None else str(s["seed"])
+            for s in combined_per_seed
+        )
         m_top1 = [s["exemplar_miou_top1"] for s in combined_per_seed]
         m_at_k = [s["exemplar_miou_at_k"] for s in combined_per_seed]
         m_hit = [s["exemplar_hit_rate_at_k"] for s in combined_per_seed]
@@ -179,7 +220,7 @@ def _print_seed_summary(
         miouk_m, miouk_s = _mean_std(m_at_k)
         hit_m, hit_s = _mean_std(m_hit)
         bucket_m, bucket_s = _mean_std(m_bucket)
-        label = f"combined@{block['codec']}" if multi_codec else "combined"
+        label = _combined_label(block)
         print(
             f"| **{label}** | **{n_total}** | **{seeds_str}** | "
             f"**{miou1_m:.3f} ± {miou1_s:.3f}** | "
@@ -205,11 +246,14 @@ def _print_seed_summary(
         n_total = first["per_seed"][0]["n_scored"]
         n_seeds = len(first["per_seed"])
         print()
-        if multi_codec:
+        if multi_codec or multi_method:
+            axis_name = "codec/method" if multi_codec and multi_method else (
+                "codec" if multi_codec else "method"
+            )
             print(
                 f"_combined: {n_total} scored question(s) per seed × "
-                f"{n_seeds} seed(s) per codec; "
-                f"{len(combined_blocks)} codec(s) reported._"
+                f"{n_seeds} seed(s) per {axis_name}; "
+                f"{len(combined_blocks)} {axis_name}(s) reported._"
             )
         else:
             print(
@@ -217,25 +261,38 @@ def _print_seed_summary(
                 f"{n_seeds} seed(s) = {n_total * n_seeds} question-seed evaluations._"
             )
 
-        # Per-seed sub-table for the appendix. With multiple codecs we add a
-        # codec column so the breakdown stays unambiguous.
+        # Per-seed sub-table for the appendix. With multiple axes we add
+        # explicit columns so the breakdown stays unambiguous.
         print()
         print("### Per-seed combined breakdown")
         print()
+        extra_cols = []
+        if multi_method:
+            extra_cols.append("method")
         if multi_codec:
-            print(
-                "| codec | seed | n | exemplar mIoU @1 | exemplar mIoU @k | "
-                "exemplar Hit @k |"
+            extra_cols.append("codec")
+        if extra_cols:
+            header = "| " + " | ".join(extra_cols) + (
+                " | seed | n | exemplar mIoU @1 | exemplar mIoU @k | exemplar Hit @k |"
             )
-            print("|---|---|---|---|---|---|")
+            print(header)
+            print("|" + "---|" * (len(extra_cols) + 5))
             for block in combined_blocks:
                 for s in block["per_seed"]:
-                    print(
-                        f"| `{block['codec']}` | {s['seed']} | {s['n_scored']} | "
-                        f"{s['exemplar_miou_top1']:.3f} | "
-                        f"{s['exemplar_miou_at_k']:.3f} | "
-                        f"{s['exemplar_hit_rate_at_k']:.1%} |"
-                    )
+                    cells = []
+                    if multi_method:
+                        cells.append(f"`{block['method']}`")
+                    if multi_codec:
+                        cells.append(f"`{block['codec']}`")
+                    seed_cell = "-" if s["seed"] is None else str(s["seed"])
+                    cells.extend([
+                        seed_cell,
+                        str(s["n_scored"]),
+                        f"{s['exemplar_miou_top1']:.3f}",
+                        f"{s['exemplar_miou_at_k']:.3f}",
+                        f"{s['exemplar_hit_rate_at_k']:.1%}",
+                    ])
+                    print("| " + " | ".join(cells) + " |")
         else:
             print(
                 "| seed | n | exemplar mIoU @1 | exemplar mIoU @k | "
@@ -243,8 +300,9 @@ def _print_seed_summary(
             )
             print("|---|---|---|---|---|")
             for s in combined_blocks[0]["per_seed"]:
+                seed_cell = "-" if s["seed"] is None else str(s["seed"])
                 print(
-                    f"| {s['seed']} | {s['n_scored']} | "
+                    f"| {seed_cell} | {s['n_scored']} | "
                     f"{s['exemplar_miou_top1']:.3f} | "
                     f"{s['exemplar_miou_at_k']:.3f} | "
                     f"{s['exemplar_hit_rate_at_k']:.1%} |"
@@ -265,6 +323,7 @@ def _print_seed_summary(
             "combined": [
                 {
                     "codec": block["codec"],
+                    "method": block["method"],
                     "per_seed": block["per_seed"],
                     "mean_std": block.get("mean_std"),
                 }
@@ -354,26 +413,30 @@ def main() -> int:
 
     by_session_seed: dict[str, list[dict]] = defaultdict(list)
 
-    # First pass: load all inputs and detect whether the codec varies. When it
-    # does, we suffix the session label with @<codec> so raw vs turboquant_4b
-    # vs turboquant_2b runs over the same features file land in distinct rows
+    # First pass: load all inputs and detect whether the codec or method
+    # varies. When either does, we suffix the session label so different
+    # codecs / methods over the same features file land in distinct rows
     # rather than getting silently averaged together.
     loaded: list[tuple[Path, dict]] = []
     codecs_seen: set[str] = set()
+    methods_seen: set[str] = set()
     for path in args.inputs:
         if not path.exists():
             raise SystemExit(f"missing input: {path}")
         data = json.loads(path.read_text())
         loaded.append((path, data))
         codecs_seen.add(data.get("exemplar_codec") or "raw")
+        methods_seen.add(_method_label(data))
     include_codec_in_label = len(codecs_seen) > 1
+    include_method_in_label = len(methods_seen) > 1
 
     for path, data in loaded:
         records = data.get("records", [])
         scored = [r for r in records if r.get("intervals_gt")]
         negative = [r for r in records if not r.get("intervals_gt")]
         label = _session_label(data, args.label_from_features,
-                               include_codec=include_codec_in_label)
+                               include_codec=include_codec_in_label,
+                               include_method=include_method_in_label)
         sessions.append({
             "label": label,
             "source_path": str(path),
