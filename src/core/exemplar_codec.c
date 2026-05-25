@@ -376,7 +376,7 @@ static bool tq_cosine(const ExemplarCodecQuery *prepared, const void *payload,
                   ((uint32_t)bytes[14] << 16) | ((uint32_t)bytes[15] << 24);
   size_t dim_pad = (size_t)dp32;
   if (dim_pad != prepared->dim_pad) return false;
-  if (scale <= 0.0f || !isfinite(scale)) return false;
+  if (!(scale > 0.0f)) return false;  // NaN/Inf-safe: false if 0, negative, or NaN.
 
   int bits = tq_bits_for(prepared->codec);
   const float *levels = tq_levels_for(prepared->codec);
