@@ -22,11 +22,31 @@ pip install -e "./extraction[clip]"
 
 # 3. Confirm the imports the baselines need actually resolve:
 python -c "import h5py, numpy, yaml; from psm_extraction.models import make_runner"
+
+# 4. Warm the HuggingFace cache for the CLIP checkpoints (compute nodes
+#    typically have no internet access; the sbatch jobs run in offline
+#    mode and will fail if a model isn't cached).
+python -c "
+from transformers import CLIPModel, CLIPProcessor
+for ckpt in [
+    'openai/clip-vit-base-patch32',
+    'laion/CLIP-ViT-L-14-laion2B-s32B-b82K',
+    'laion/CLIP-ViT-bigG-14-laion2B-39B-b160k',
+]:
+    print(f'[hf-warm] {ckpt}')
+    CLIPProcessor.from_pretrained(ckpt)
+    CLIPModel.from_pretrained(ckpt)
+print('[hf-warm] done')
+"
 ```
 
 If step 3 raises `ModuleNotFoundError`, the install didn't take — most
 commonly because `pip install` ran against system Python instead of the
 conda env's. Verify with `which pip` (should be inside the env dir).
+
+Step 4 downloads ~5.5 GB total (bigG dominates) into
+`~/.cache/huggingface/hub/`. Cached weights are shared between the
+login and compute nodes, so once is enough.
 
 ## Conventions
 
@@ -110,6 +130,16 @@ python scripts/eval_aggregate.py --by-seed --label-from-features \
   cluster-standard `source activate <env>` pattern. If the env doesn't
   exist or the name is wrong, the error is immediate. Check with
   `conda env list` on the login node.
+
+- **`httpx.ConnectError` / `Connection reset by peer` mid-run.** The
+  compute node has no internet access and a CLIP checkpoint isn't in
+  the local HF cache. The sbatch scripts set `HF_HUB_OFFLINE=1` and
+  `TRANSFORMERS_OFFLINE=1` so this should now fail with a clearer
+  `OSError: ... is not a local folder` instead of a network timeout.
+  Fix: warm the cache from a login node (see "One-time setup" step 4
+  above), then resubmit. If you genuinely need to hit the hub from a
+  job, submit with `--export=HF_HUB_OFFLINE=0,TRANSFORMERS_OFFLINE=0`
+  — but most compute nodes can't reach huggingface.co anyway.
 - **`features.h5` not found**. The baseline sweep skips missing files
   with a WARN; it doesn't fail. If you see WARN lines for a session,
   either the extraction never ran or the path/basename is wrong. Check

@@ -50,6 +50,13 @@ OUT_BASENAME="clip_l_features.h5"
 source activate "$CONDA_ENV"
 export PYTHONUNBUFFERED=1
 
+# Compute nodes typically have no internet access. Force HF transformers
+# to use the local cache only — fail loudly if a model isn't cached
+# instead of hanging on a connection that will time out. Warm the cache
+# from a login node first (see scripts/slurm/README.md).
+export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
+export TRANSFORMERS_OFFLINE="${TRANSFORMERS_OFFLINE:-1}"
+
 cd "${SLURM_SUBMIT_DIR:-$(pwd)}"
 mkdir -p logs
 
