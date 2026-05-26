@@ -234,8 +234,15 @@ static int compare_similar_desc(const void *a, const void *b) {
 // Score a single tile by finding its highest-similarity exemplar against the
 // query. Populates *out and returns true on success, or false when the tile
 // has no usable exemplars (wrong byte size, zero-norm, or empty reservoir).
+//
+// Performance: this is on the per-query hot path and runs once per tile in
+// the candidate set (potentially every tile in the SpatialMemory when k_ring
+// is -1). It deliberately does NOT call RingBuffer_merge_window — that's the
+// most expensive op in the system (HLL clone + per-slot merge + free) and we
+// only need it for the top-k tiles that survive sorting. The caller fills in
+// t_min/t_max/count for the surviving rows after qsort; see
+// `fill_window_for_top_k` below.
 static bool score_tile_similar(Tile *tile, const ExemplarCodecQuery *prepared,
-                               size_t rb_capacity,
                                SpatialMemorySimilar *out) {
   size_t n_ex = Tile_exemplar_count(tile);
   if (n_ex == 0) return false;
@@ -259,26 +266,32 @@ static bool score_tile_similar(Tile *tile, const ExemplarCodecQuery *prepared,
   }
   if (!found) return false;
 
-  double t_min = best_t;
-  double t_max = best_t;
-  double count = 0.0;
-  RingBufferWindow win = RingBuffer_merge_window(tile->rb, rb_capacity - 1);
-  if (win.sketch) {
-    if (!win.is_empty) {
-      t_min = win.t_min;
-      t_max = win.t_max;
-      count = RingBufferHLL_count(win.sketch);
-    }
-    RingBufferHLL_release(win.sketch);
-  }
-
+  // Provisional t_min/t_max/count — populated for real only for the top-k
+  // survivors after sorting. Default to the winning exemplar's timestamp +
+  // zero count so a caller that ignores the merge-window pass still gets
+  // sensible values rather than uninitialized garbage.
   out->cell = tile->cellId;
   out->similarity = best_sim;
   out->exemplar_t = best_t;
-  out->t_min = t_min;
-  out->t_max = t_max;
-  out->count = count;
+  out->t_min = best_t;
+  out->t_max = best_t;
+  out->count = 0.0;
   return true;
+}
+
+// Fill in t_min / t_max / count for one already-scored row by merging that
+// tile's ring buffer. Called only for the top-k survivors. Splits out of
+// score_tile_similar so the per-tile scoring loop stays malloc-free.
+static void fill_window_for_top_k(SpatialMemorySimilar *row, Tile *tile,
+                                  size_t rb_capacity) {
+  RingBufferWindow win = RingBuffer_merge_window(tile->rb, rb_capacity - 1);
+  if (!win.sketch) return;
+  if (!win.is_empty) {
+    row->t_min = win.t_min;
+    row->t_max = win.t_max;
+    row->count = RingBufferHLL_count(win.sketch);
+  }
+  RingBufferHLL_release(win.sketch);
 }
 
 size_t SpatialMemory_query_similar(SpatialMemory *sm, const float *query,
@@ -343,15 +356,14 @@ size_t SpatialMemory_query_similar(SpatialMemory *sm, const float *query,
       if (cell == H3_NULL) continue;
       Tile *tile = TileTable_get(sm->tiles, cell);
       if (!tile) continue;
-      if (score_tile_similar(tile, prepared, sm->capacity, &scratch[nfound])) {
+      if (score_tile_similar(tile, prepared, &scratch[nfound])) {
         nfound++;
       }
     }
   } else {
     TileTableIterator it = TileTable_iterator(sm->tiles);
     while (TileTable_next(&it)) {
-      if (score_tile_similar(it.value, prepared, sm->capacity,
-                             &scratch[nfound])) {
+      if (score_tile_similar(it.value, prepared, &scratch[nfound])) {
         nfound++;
       }
     }
@@ -361,8 +373,20 @@ size_t SpatialMemory_query_similar(SpatialMemory *sm, const float *query,
 
   qsort(scratch, nfound, sizeof(SpatialMemorySimilar), compare_similar_desc);
 
+  // Now that we know the top-k survivors, run the expensive
+  // RingBuffer_merge_window pass on those rows only. This is the
+  // load-bearing optimization: at k_ring=-1 we score O(n_tiles) tiles per
+  // query, but only return O(max_out) of them. Calling merge_window only
+  // on the survivors collapses ~1000x of HLL allocations per query into
+  // ~10x at the default top-10.
   if (out && max_out > 0) {
     size_t to_copy = (nfound < max_out) ? nfound : max_out;
+    for (size_t i = 0; i < to_copy; ++i) {
+      Tile *tile = TileTable_get(sm->tiles, scratch[i].cell);
+      if (tile) {
+        fill_window_for_top_k(&scratch[i], tile, sm->capacity);
+      }
+    }
     memcpy(out, scratch, to_copy * sizeof(SpatialMemorySimilar));
   }
   free(scratch);
