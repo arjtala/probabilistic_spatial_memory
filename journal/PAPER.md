@@ -57,7 +57,7 @@ if missing; items 4-6 strengthen but aren't deal-breakers.
 | 4 | End-to-end PSM → MLLM reranker | EXPERIMENTS.md E5 | spec only | depends on #3 (same protocol) |
 | 5 | Question-bank expansion to 50-80 q | TODO.md, this file | not started | annotation labor + maybe one new session |
 | 6 | Encoder-bypass stress test | this file | not started | needs 5-10 more `query_mode: last_seen` questions |
-| 7 | Memory + latency vs session length | this file | not started | brute-force latency benchmark + plot script |
+| 7 | Memory + latency vs session length | this file | **done** (2026-05-26) | — |
 
 ## Critical-path order
 
@@ -177,3 +177,11 @@ Add dated entries here as work lands; mirror to the EXPERIMENTS.md experiment wh
 
 - 2026-05-24 — Plan opened. Items 1-6 not started.
 - 2026-05-26 — **E11 (item 1) done.** Full cluster sweep: PSM 83.0% ± 2.7% Hit @5 on bigG, brute-force CLIP 80.0%, sliding-window 67-75%, uniform-sample 15-42%. Confirmed on CLIP-L (PSM 79.0%, brute-force 80.0%). PSM matches brute-force on accuracy, beats it on bucket mIoU @5 (0.31 vs 0.20). Headline framing pivoted from "PSM is more accurate" to "PSM achieves brute-force accuracy at bounded memory." New item 7 added: memory + latency vs session length, now the load-bearing experiment for the new framing.
+- 2026-05-26 — **Item 7 (memory + latency) done.** Three new data sources locked in:
+  1. **Brute-force-CLIP latency benchmark** (`scripts/bench_brute_force_clip.py`) on all 3 sessions × 2 encoders: median **37-53 µs/query** (linear in N × dim). Memory: **2.3-13.3 MiB** (linear in N).
+  2. **PSM `query_similar` latency** (`targets/benchmark_spatial_memory`): **697 µs/query** on the cluster at the 1024-tile / 4-exemplar / 128-d synthetic workload. Independent of session length by design (function of matching tile count, not total frames).
+  3. **PSM perf fix** (commit `ab3dc90`): deferred `RingBuffer_merge_window` from per-tile-during-scoring to per-top-k-after-sort. **22.7× speedup on the cluster** (15,825 µs → 697 µs); 81× on M-series with `-flto`. Real cosine work was always sub-millisecond; the 15ms before was malloc-bound from per-tile HLL clones that were thrown away after sorting.
+
+  **F6 message**: at session-relevant scale (~3k frames), both methods are sub-millisecond per query. The asymptotic crossover is the load-bearing claim — brute-force grows linearly, PSM is flat. At 100k frames brute-force ~2 ms / query; PSM still ~700 µs. At 1M frames (Nymeria-scale): brute-force ~20 ms, PSM unchanged. Memory crossover happens earlier and is more dramatic (linear vs bounded).
+
+  **Caveats to flag in paper**: PSM's 697 µs is a synthetic-workload number (1024 tiles, dim=128, 4 exemplars). Real session has ~10 tiles at dim=1280 with 128 exemplars; per-call work shape differs but asymptotic-in-N independence holds. A real-session PSM latency micro-benchmark would tighten the comparison; deferred.
