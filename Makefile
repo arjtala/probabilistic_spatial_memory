@@ -234,10 +234,19 @@ $(BENCH_TILE_DECODE): benchmarks/benchmark_tile_decode.c $(STB_OBJ)
 	@mkdir -p $(TARGET_DIR)
 	$(CC) $(CFLAGS) $(PTHREAD_FLAGS) -Ivendor benchmarks/benchmark_tile_decode.c $(STB_OBJ) -o $@ -lz -lm
 
-# Build vendor object files
+# Build vendor object files. Vendored sources can't pass our strict
+# COMMON_WARNINGS unmodified — they rely on POSIX strdup (which glibc
+# gates behind _POSIX_C_SOURCE) and use intentional case-statement
+# fallthrough in MurmurHash. Apple's libc + clang are lenient enough
+# that this didn't bite on the original macOS development host. For
+# cross-platform builds (notably gcc on Linux), enable POSIX features
+# and downgrade the two specific warnings rather than dropping -Werror
+# wholesale — keep the rest of the strict surface in place.
+VENDOR_CFLAGS = $(filter-out -Werror,$(CFLAGS)) -D_POSIX_C_SOURCE=200809L \
+                -Wno-implicit-fallthrough
 $(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(TOOLCHAIN_INFO)
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
+	$(CC) $(VENDOR_CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
 # Test targets
 test: test-ring-buffer test-tile test-tile-table test-spatial test-exemplar-codec test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud test-screenshot test-ui-overlay

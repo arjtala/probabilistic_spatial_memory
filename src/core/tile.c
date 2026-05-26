@@ -78,8 +78,11 @@ bool Tile_coords_to_cell(double lat, double lng, int resolution,
             context, resolution);
     return false;
   }
-  if (!isfinite(lat) || !isfinite(lng) || lat < -90.0 || lat > 90.0 ||
-      lng < -180.0 || lng > 180.0) {
+  // NaN/Inf-safe via the NaN-comparison-is-always-false property: a NaN
+  // lat fails both `lat >= -90.0` and `lat <= 90.0`, so the negated form
+  // below rejects it. Avoids isfinite() which conflicts with -ffast-math
+  // under modern clang (-Werror,-Wnan-infinity-disabled).
+  if (!(lat >= -90.0 && lat <= 90.0) || !(lng >= -180.0 && lng <= 180.0)) {
     fprintf(stderr, "%s: invalid lat/lng\n", context);
     return false;
   }
