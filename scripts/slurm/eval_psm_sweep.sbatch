@@ -74,8 +74,9 @@ echo "[slurm] ROOT=$ROOT CAPTURES=$CAPTURES ENCODERS=$ENCODERS"
 # $REPO/targets/psm; if missing, the sweep will fail at the first psm
 # --search call.
 if [[ ! -x "$REPO/targets/psm" ]]; then
-  echo "[slurm] ERR: $REPO/targets/psm not found. Run 'make all' first." >&2
-  echo "        On this cluster: 'module load gcc' if needed, then 'make all'." >&2
+  echo "[slurm] ERR: $REPO/targets/psm not found. Build first with:" >&2
+  echo "        make cluster H3_PREFIX=\$CONDA_PREFIX HDF5_PREFIX=\$CONDA_PREFIX" >&2
+  echo "        (cluster profile skips -flto, which conda's compilers don't wire up)." >&2
   exit 1
 fi
 

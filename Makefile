@@ -61,6 +61,14 @@ PROFILE_LDFLAGS = -flto
 else ifeq ($(PROFILE),portable)
 PROFILE_CFLAGS = -O3 -flto
 PROFILE_LDFLAGS = -flto
+else ifeq ($(PROFILE),cluster)
+# Same -O3 -march=native as local, but skips -flto. Conda's gcc/clang
+# typically don't ship the gold-plugin / gcc-ar wiring that -flto needs;
+# `ar: plugin needed to handle lto object` and `LLVMgold.so: cannot
+# open shared object file` both go away when LTO is off. The runtime
+# loss is small (~1-5% on PSM's hot paths).
+PROFILE_CFLAGS = -O3 -march=native -mtune=native -ffast-math
+PROFILE_LDFLAGS =
 else ifeq ($(PROFILE),debug)
 PROFILE_CFLAGS = -O0 -g3
 PROFILE_LDFLAGS =
@@ -68,7 +76,7 @@ else ifeq ($(PROFILE),sanitize)
 PROFILE_CFLAGS = -O1 -g3 -fno-omit-frame-pointer -fsanitize=address,undefined
 PROFILE_LDFLAGS = -fsanitize=address,undefined
 else
-$(error Unsupported PROFILE '$(PROFILE)'. Use local, portable, debug, or sanitize)
+$(error Unsupported PROFILE '$(PROFILE)'. Use local, portable, cluster, debug, or sanitize)
 endif
 
 CFLAGS = $(COMMON_CFLAGS) $(PROFILE_CFLAGS)
@@ -86,6 +94,14 @@ VIZ_LDFLAGS = $(PTHREAD_FLAGS) \
               $(OPENGL_LDFLAGS)
 ifeq ($(PROFILE),local)
 BUILD_DIR = build
+TARGET_DIR = targets
+else ifeq ($(PROFILE),cluster)
+# Keep BUILD_DIR isolated so cluster objects don't collide with local
+# objects on shared dev machines, but write the binary to the canonical
+# targets/ location so eval_lookback.py's `--psm-binary` default (and
+# eval_bigg_all.sh which doesn't pass --psm-binary) find it without
+# extra flags.
+BUILD_DIR = build/$(PROFILE)
 TARGET_DIR = targets
 else
 BUILD_DIR = build/$(PROFILE)
@@ -156,6 +172,9 @@ debug:
 portable:
 	$(MAKE) PROFILE=portable all
 
+cluster:
+	$(MAKE) PROFILE=cluster all
+
 sanitize:
 	$(MAKE) PROFILE=sanitize all
 
@@ -164,6 +183,9 @@ test-debug:
 
 test-portable:
 	$(MAKE) PROFILE=portable test
+
+test-cluster:
+	$(MAKE) PROFILE=cluster test
 
 test-sanitize:
 	$(MAKE) PROFILE=sanitize test
@@ -380,7 +402,7 @@ check-format:
 	clang-format --dry-run --Werror $$files
 
 # Phony targets
-.PHONY: all debug portable sanitize viz bench-spatial-memory bench-tile-decode test test-debug test-portable test-sanitize test-ring-buffer test-tile test-tile-table test-spatial test-exemplar-codec test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud test-screenshot test-ui-overlay check-format clean rebuild show run FORCE
+.PHONY: all debug portable cluster sanitize viz bench-spatial-memory bench-tile-decode test test-debug test-portable test-cluster test-sanitize test-ring-buffer test-tile test-tile-table test-spatial test-exemplar-codec test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud test-screenshot test-ui-overlay check-format clean rebuild show run FORCE
 
 # Show detected files
 show:

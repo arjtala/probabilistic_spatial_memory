@@ -17,9 +17,10 @@ extraction package installed editable + CLIP deps. From a fresh clone:
 #    such file or directory" because the directory is empty.
 git submodule update --init --recursive
 
-# 2. Build the C engine. The Makefile autodetects clang/gcc; cluster
-#    typically has gcc.
-make all
+# 2. Build the C engine. Use the `cluster` profile (-O3 without -flto)
+#    because conda's compilers typically lack the gold-plugin / gcc-ar
+#    wiring that link-time optimization needs.
+make cluster H3_PREFIX=$CONDA_PREFIX HDF5_PREFIX=$CONDA_PREFIX
 test -x targets/psm && echo "psm built"
 
 # 3. Create + activate the env (or reuse an existing one):
@@ -134,7 +135,7 @@ encoders. Forwards to `scripts/eval_baselines_all.sh`.
 # 0. One-time setup (see top of README): conda env + pip install + HF cache warm.
 
 # 1. Compile the C engine (one-time):
-make all
+make cluster H3_PREFIX=$CONDA_PREFIX HDF5_PREFIX=$CONDA_PREFIX
 test -x targets/psm && echo "psm built"
 
 # 2. Backfill the missing CLIP-L extraction (GPU, ~15 min)
