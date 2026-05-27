@@ -7,10 +7,27 @@ writeups remain the source of truth for *results*.
 
 ## Target
 
-- **Venue**: ECCV 2026 workshops (specific workshops not announced as of 2026-05-24).
+- **Venue**: ECCV 2026 **Wearables AI Workshop** (primary). Organized by
+  Seungwhan Moon; focus is real-time multimodal contextual assistants
+  for wearable devices. PSM's whole story (bounded-memory streaming
+  spatial memory for egocentric video, MLLM prefilter for grounded
+  look-back QA over Ray-Ban-style Aria captures) lands inside the
+  workshop scope without framing contortion. Audience knows the
+  egocentric + Aria space — the bar for novelty is higher than a
+  generic CV workshop, but the framing requires zero translation.
+- **Fallback if Wearables rejects**: MUSTCV (Spatial Intelligence
+  through Time). Same paper, slight reframing to lead with the
+  "spatial reasoning over time" axis instead of "wearable assistant."
+- **Workshops dropped from consideration**: NeuSLAM / ViLMa (PSM ≠
+  SLAM or visual localization); Embodied Multimodal Reasoning (needs
+  actuation we don't have); Perception Test / OpenSUN3D (wrong scale).
 - **Format**: 4-6 page workshop paper, with supplementary if useful.
-- **Hard deadline**: TBD (track once announced; expect ~May/June 2026).
-- **Soft milestone**: have items 1-3 below complete + draft Section 1-3 by the end of June so we're not deadline-shopping.
+- **Hard deadline**: TBD (CFPs not yet posted as of 2026-05-27; expect
+  late June / July given Sep 8-9 in Malmö). Plan working backward
+  from a July 1 internal submission-ready milestone.
+- **Soft milestone**: have items 1-4 below complete + draft Section
+  1-3 by Jun 17 so the deadline doesn't catch us with an MLLM
+  experiment in flight.
 
 ## Headline claim
 
@@ -53,7 +70,7 @@ if missing; items 4-6 strengthen but aren't deal-breakers.
 |---|---|---|---|---|
 | 1 | Naive retrieval baselines (no H3) | EXPERIMENTS.md E11 | **done** (2026-05-26) | — |
 | 2 | PSM hyperparameter sensitivity | EXPERIMENTS.md E12 | not started | needs hyperparam sweep loop on top of `eval_bigg_all.sh` |
-| 3 | MLLM baseline (paradox on our corpus) | EXPERIMENTS.md E10 | not started | needs MLLM client + frozen prompting protocol |
+| 3 | MLLM baselines: Llama-3.2-90B-Vision (vLLM) + Gemini 3 Pro (API) | EXPERIMENTS.md E10 | not started | needs MLLM client + frozen prompting protocol |
 | 4 | End-to-end PSM → MLLM reranker | EXPERIMENTS.md E5 | spec only | depends on #3 (same protocol) |
 | 5 | Question-bank expansion to 50-80 q | TODO.md, this file | not started | annotation labor + maybe one new session |
 | 6 | Encoder-bypass stress test | this file | not started | needs 5-10 more `query_mode: last_seen` questions |
@@ -81,10 +98,20 @@ the bounded-memory framing above. The new critical path:
    the paper rides on a memory claim rather than an accuracy one.
 4. **E10 (MLLM baseline)** still gating for the prefilter half of the
    story. Without showing the MLLM gap exists on our corpus, we can't
-   pitch PSM as a prefilter for anything. Requires GPU serving on
-   H200s. 1-2 days. The new framing means E10 also benefits from item 7
-   — "vanilla MLLM scans 613 hours; PSM grounds it in O(matching
-   tiles)" is a stronger pitch than the original accuracy framing.
+   pitch PSM as a prefilter for anything. The plan reports **two
+   MLLMs**, both in the final paper:
+   - **Llama-3.2-90B-Vision** via vLLM on the H200 dream allocation —
+     the open-weights reproducibility baseline. Unlimited rate, free
+     per call. Iterate the prompting protocol here (~days 1-3 of E10
+     work) while the question bank is also expanding.
+   - **Gemini 3 Pro** via API — the frontier-ceiling baseline. Run
+     once with the frozen protocol after Llama validates the harness.
+     Budget ~$50-100 in API calls. This is the apples-to-apples
+     comparison against the Localization Paradox paper's own measurements.
+   The two-baseline structure pre-empts "you picked a weak baseline"
+   and supports the headline framing: *"both open (Llama-3.2-90B) and
+   frontier (Gemini 3 Pro) MLLMs collapse on temporal grounding; the
+   gap is architectural, not a matter of model scale."*
 5. **E5 (PSM → MLLM reranker)** is still the punchline. Now needs to
    show: PSM + MLLM reranker > vanilla MLLM on *grounding* metrics
    (mIoU), regardless of who wins on raw question-answering accuracy.
@@ -185,3 +212,6 @@ Add dated entries here as work lands; mirror to the EXPERIMENTS.md experiment wh
   **F6 message**: at session-relevant scale (~3k frames), both methods are sub-millisecond per query. The asymptotic crossover is the load-bearing claim — brute-force grows linearly, PSM is flat. At 100k frames brute-force ~2 ms / query; PSM still ~700 µs. At 1M frames (Nymeria-scale): brute-force ~20 ms, PSM unchanged. Memory crossover happens earlier and is more dramatic (linear vs bounded).
 
   **Caveats to flag in paper**: PSM's 697 µs is a synthetic-workload number (1024 tiles, dim=128, 4 exemplars). Real session has ~10 tiles at dim=1280 with 128 exemplars; per-call work shape differs but asymptotic-in-N independence holds. A real-session PSM latency micro-benchmark would tighten the comparison; deferred.
+- 2026-05-27 — **Venue chosen: Wearables AI Workshop (ECCV 2026)**, MUSTCV as fallback. CFPs not yet posted; expect late June / July deadlines (workshops Sep 8-9 Malmö). Plan now keyed to a July 1 submission-ready milestone, with items 1-4 done + draft §1-§3 by Jun 17.
+- 2026-05-27 — **E10 stack decided**: Llama-3.2-90B-Vision via vLLM on H200 (open-weights reproducibility baseline, protocol iteration), plus Gemini 3 Pro via API (frontier-ceiling baseline, single validation pass). Both reported in the final paper. Reasoning: pre-empts "you picked a weak baseline" and supports the "gap is architectural, not a matter of model scale" framing.
+- 2026-05-27 — **E12 (item 2) sweep + plot wired up** (commit `397b00f`). Three artifacts: `eval_hyperparam_sweep.sh`, `slurm/eval_hyperparam.sbatch`, `eval_hyperparam_plot.py`. Smoke-tested locally; cluster run pending. Expected ~30-60 min when HF cache is warm.
