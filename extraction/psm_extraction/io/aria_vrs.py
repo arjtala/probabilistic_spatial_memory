@@ -54,6 +54,11 @@ _METERS_PER_DEG_LAT = 111_132.0  # average; varies by latitude but room-scale do
 # Aria's principal RGB camera stream — same on Gen 1 and Gen 2.
 _RGB_STREAM_ID = "214-1"
 
+# Aria's GPS streams. `281-2` is the raw GPS (populated when outdoors with
+# sky visibility); `281-1` is an app-level processed variant that's empty in
+# practice on Gen 2 Pilot sessions. Prefer the raw stream.
+_GPS_STREAM_ID = "281-2"
+
 # Per-frame JPEG quality; matches what `extract_frames` produces with ffmpeg's
 # defaults. Higher is wasted because CLIP/DINO preprocessing downsamples to 224.
 _JPEG_QUALITY = 90
@@ -73,10 +78,11 @@ class VrsExtractResult:
     """
     frame_paths: list[Path]
     timestamps_s: np.ndarray            # (N,) device-clock seconds, monotonic
-    lats: np.ndarray | None             # (N,) fake degrees (SLAM-projected) or None
+    lats: np.ndarray | None             # (N,) degrees — real (GPS) or fake (SLAM-projected); None if neither
     lngs: np.ndarray | None
     source_vrs: Path
-    trajectory_origin: tuple[float, float] | None  # (lat0, lng0) used for projection
+    trajectory_origin: tuple[float, float] | None  # (lat0, lng0) used for SLAM projection; None for GPS
+    spatial_source: str | None          # "gps" | "slam" | None — which path produced lats/lngs
 
 
 def _locate_vrs_file(session_dir: Path) -> Path:
@@ -237,6 +243,86 @@ def _read_slam_trajectory(
     )
 
 
+def _read_vrs_gps(provider) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    """Read GPS samples from VRS stream `281-2` → (ts_s, lat_deg, lng_deg).
+
+    Aria Gen 2 records raw GPS at ~1 Hz when outdoors with sky visibility.
+    Indoor sessions still expose the stream but it's empty (the device
+    writes the stream header but never produces samples without a fix).
+
+    Returns None when the stream is missing, empty, or all samples are
+    invalid (NaN lat/lng, which happens during fix acquisition). On a
+    successful read, the caller should interpolate onto frame timestamps
+    via the same edge-clamping policy used for SLAM.
+    """
+    try:
+        from projectaria_tools.core.stream_id import StreamId
+    except ImportError:
+        return None
+
+    gps_stream = StreamId(_GPS_STREAM_ID)
+    try:
+        n_gps = provider.get_num_data(gps_stream)
+    except Exception:
+        # Stream not present on this VRS file (older recordings, custom profiles).
+        return None
+    if n_gps == 0:
+        return None
+
+    t_s: list[float] = []
+    lat: list[float] = []
+    lng: list[float] = []
+    for i in range(n_gps):
+        try:
+            sample = provider.get_gps_data_by_index(gps_stream, i)
+        except Exception:
+            continue
+        # Aria GPS schema: `capture_timestamp_ns`, `latitude`, `longitude`,
+        # plus altitude/accuracy fields we don't need. Skip samples where
+        # the receiver hadn't acquired a fix (lat/lng are NaN or wildly
+        # out-of-range during cold start).
+        try:
+            ts_ns = sample.capture_timestamp_ns
+            la = float(sample.latitude)
+            ln = float(sample.longitude)
+        except AttributeError:
+            continue
+        if not (la >= -90.0 and la <= 90.0 and ln >= -180.0 and ln <= 180.0):
+            continue
+        t_s.append(ts_ns / 1e9)
+        lat.append(la)
+        lng.append(ln)
+
+    if not t_s:
+        return None
+    return (
+        np.array(t_s, dtype=np.float64),
+        np.array(lat, dtype=np.float64),
+        np.array(lng, dtype=np.float64),
+    )
+
+
+def _interpolate_latlng_to_frames(
+    frame_ts_s: np.ndarray,
+    gps_ts_s: np.ndarray,
+    gps_lat: np.ndarray,
+    gps_lng: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Linearly interpolate (lat, lng) onto frame timestamps; clamp at edges.
+
+    Same policy as `_interpolate_track_to_frames` for SLAM (xy meters):
+    GPS at ~1 Hz vs frames at 10-30 Hz means most frames fall between
+    two GPS samples, so linear interpolation is appropriate at the
+    sub-meter scale we care about for H3 res 10-12 cells.
+    """
+    if gps_ts_s.size == 0:
+        nan = np.full_like(frame_ts_s, np.nan)
+        return nan, nan
+    lats = np.interp(frame_ts_s, gps_ts_s, gps_lat)
+    lngs = np.interp(frame_ts_s, gps_ts_s, gps_lng)
+    return lats, lngs
+
+
 def _project_xy_to_latlng(
     tx_world: np.ndarray,
     ty_world: np.ndarray,
@@ -344,8 +430,12 @@ def read_vrs_session(
                 timestamps_s = np.array(
                     existing.get("timestamps_s", []), dtype=np.float64
                 )
-                lats, lngs, origin = _load_slam_optional(
-                    session_dir, timestamps_s,
+                # Re-open the provider just for GPS lookup; cheap relative to
+                # the per-frame decode the cache hit avoids. If projectaria-tools
+                # isn't importable on this machine, fall back to SLAM-only.
+                provider = _try_open_provider(vrs_path)
+                lats, lngs, origin, spatial_source = _load_spatial_optional(
+                    provider, session_dir, timestamps_s,
                     origin_lat=origin_lat, origin_lng=origin_lng,
                     verbose=verbose,
                 )
@@ -356,6 +446,7 @@ def read_vrs_session(
                     lngs=lngs,
                     source_vrs=vrs_path,
                     trajectory_origin=origin,
+                    spatial_source=spatial_source,
                 )
 
     # Cold path: decode VRS, write JPEGs.
@@ -441,8 +532,8 @@ def read_vrs_session(
         timestamps_s=timestamps_s,
     )
 
-    lats, lngs, origin = _load_slam_optional(
-        session_dir, timestamps_s,
+    lats, lngs, origin, spatial_source = _load_spatial_optional(
+        provider, session_dir, timestamps_s,
         origin_lat=origin_lat, origin_lng=origin_lng,
         verbose=verbose,
     )
@@ -454,38 +545,96 @@ def read_vrs_session(
         lngs=lngs,
         source_vrs=vrs_path,
         trajectory_origin=origin,
+        spatial_source=spatial_source,
     )
 
 
-def _load_slam_optional(
+def _try_open_provider(vrs_path: Path):
+    """Open a VRS provider on the cache-hit path; return None if unavailable.
+
+    Used so cache hits still upgrade indoor-SLAM cached results to real
+    GPS when an outdoor session's JPEG cache is reused. Falls through
+    silently to SLAM-only if projectaria-tools isn't installed or open
+    fails — the cache hit is still valid.
+    """
+    try:
+        from projectaria_tools.core import data_provider
+    except ImportError:
+        return None
+    try:
+        return data_provider.create_vrs_data_provider(str(vrs_path))
+    except Exception:
+        return None
+
+
+def _load_spatial_optional(
+    provider,
     session_dir: Path,
     timestamps_s: np.ndarray,
     *,
     origin_lat: float,
     origin_lng: float,
     verbose: bool,
-) -> tuple[np.ndarray | None, np.ndarray | None, tuple[float, float] | None]:
-    """Try to load + project SLAM trajectory; return (None, None, None) if absent."""
+) -> tuple[np.ndarray | None, np.ndarray | None, tuple[float, float] | None, str | None]:
+    """Resolve per-frame (lat, lng) using the best available source.
+
+    Precedence:
+      1. VRS GPS stream `281-2` if non-empty — real lat/lng, interpolated
+         onto frame timestamps. Outdoor Aria Gen 2 sessions land here.
+      2. MPS SLAM `closed_loop_trajectory.csv` if present — fake lat/lng
+         from a flat-earth projection of `(tx, ty)` world coords at
+         `(origin_lat, origin_lng)`. Indoor sessions land here.
+      3. None — caller falls back to GPS sidecars or synthetic snake
+         tracks (the existing MP4 code path in `extract.py`).
+
+    Returns `(lats, lngs, projection_origin, spatial_source)`.
+    `projection_origin` is the `(lat0, lng0)` used for SLAM projection
+    or `None` when GPS produced real coordinates (no projection needed).
+    `spatial_source` is `"gps"`, `"slam"`, or `None`.
+
+    The `provider` is the already-opened VRS data provider (avoids
+    re-opening the multi-GB VRS file just to read the small GPS stream).
+    Pass `None` on cache-hit paths where we don't want to re-open VRS;
+    in that case GPS is skipped and we fall back to SLAM.
+    """
+    if provider is not None:
+        gps = _read_vrs_gps(provider)
+        if gps is not None:
+            gps_ts_s, gps_lat, gps_lng = gps
+            if verbose:
+                print(
+                    f"[vrs] using VRS GPS stream: {gps_ts_s.size} fixes spanning "
+                    f"{gps_ts_s[-1] - gps_ts_s[0]:.1f}s "
+                    f"(lat≈{gps_lat.mean():.4f}, lng≈{gps_lng.mean():.4f})",
+                    file=sys.stderr,
+                )
+            lats, lngs = _interpolate_latlng_to_frames(
+                timestamps_s, gps_ts_s, gps_lat, gps_lng,
+            )
+            return lats, lngs, None, "gps"
+
     traj_csv = _locate_slam_trajectory(session_dir)
     if traj_csv is None:
         if verbose:
             print(
-                f"[vrs] no MPS SLAM trajectory at {session_dir}; (lat, lng) will be None",
+                f"[vrs] no GPS and no MPS SLAM trajectory at {session_dir}; "
+                "(lat, lng) will be None",
                 file=sys.stderr,
             )
-        return None, None, None
+        return None, None, None, None
 
     parsed = _read_slam_trajectory(traj_csv)
     if parsed is None:
-        return None, None, None
+        return None, None, None, None
     track_ts_s, track_tx, track_ty = parsed
     if verbose:
         print(
-            f"[vrs] loaded SLAM trajectory: {track_ts_s.size} samples spanning "
-            f"{track_ts_s[-1] - track_ts_s[0]:.1f}s",
+            f"[vrs] using MPS SLAM trajectory: {track_ts_s.size} samples spanning "
+            f"{track_ts_s[-1] - track_ts_s[0]:.1f}s "
+            f"(projected at origin {origin_lat:.4f}, {origin_lng:.4f})",
             file=sys.stderr,
         )
 
     tx, ty = _interpolate_track_to_frames(timestamps_s, track_ts_s, track_tx, track_ty)
     lats, lngs = _project_xy_to_latlng(tx, ty, origin_lat=origin_lat, origin_lng=origin_lng)
-    return lats, lngs, (origin_lat, origin_lng)
+    return lats, lngs, (origin_lat, origin_lng), "slam"
