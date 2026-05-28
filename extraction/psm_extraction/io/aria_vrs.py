@@ -82,29 +82,36 @@ class VrsExtractResult:
 def _locate_vrs_file(session_dir: Path) -> Path:
     """Pick the primary RGB VRS file for an Aria session directory.
 
-    Handles both layouts:
-      - Nymeria / AEA: <session_dir>/recording_head/data/data.vrs
-      - Aria Gen 2 Pilot: <session_dir>/main.vrs (or <sequence>.vrs)
+    Handles the three layouts we've encountered:
+      - Aria Gen 2 Pilot (downloaded via aria_dataset_downloader):
+          <session_dir>/video.vrs
+      - Nymeria / AEA:
+          <session_dir>/recording_head/data/data.vrs
+      - Self-organized:
+          <session_dir>/main.vrs
     """
     candidates = [
+        session_dir / "video.vrs",
         session_dir / "recording_head" / "data" / "data.vrs",
         session_dir / "main.vrs",
     ]
-    # Aria Gen 2 sometimes names the main VRS after the sequence — fall
-    # back to "any .vrs file at session root that isn't an aux stream."
     for p in candidates:
         if p.exists():
             return p
+    # Last resort: any top-level .vrs file that isn't a known auxiliary
+    # stream. Aux streams in the Nymeria/AEA bundles are named et.vrs
+    # (eye tracking) and motion.vrs (body motion ground truth) — both
+    # contain non-image data.
     root_vrs = [
         p for p in session_dir.glob("*.vrs")
-        if p.name not in {"et.vrs", "motion.vrs"}  # eye-tracking / body-motion aux
+        if p.name not in {"et.vrs", "motion.vrs"}
     ]
     if len(root_vrs) == 1:
         return root_vrs[0]
     if not root_vrs:
         raise FileNotFoundError(
-            f"no VRS file found under {session_dir} (looked at recording_head/data/data.vrs, "
-            f"main.vrs, and any top-level *.vrs excluding et/motion)"
+            f"no VRS file found under {session_dir} (checked video.vrs, "
+            "recording_head/data/data.vrs, main.vrs, and top-level *.vrs)"
         )
     raise FileNotFoundError(
         f"multiple top-level VRS files under {session_dir}; specify one explicitly: "
@@ -115,14 +122,21 @@ def _locate_vrs_file(session_dir: Path) -> Path:
 def _locate_slam_trajectory(session_dir: Path) -> Path | None:
     """Find the MPS closed-loop trajectory CSV if present.
 
-    Layout:
-      - Nymeria / AEA: <session_dir>/recording_head/mps/slam/closed_loop_trajectory.csv
-      - Aria Gen 2 Pilot: <session_dir>/mps/slam/closed_loop_trajectory.csv
+    Layout candidates we've seen:
+      - Aria Gen 2 Pilot (downloaded + auto-extracted):
+          <session_dir>/mps_slam_trajectories/closed_loop_trajectory.csv
+      - Nymeria / AEA:
+          <session_dir>/recording_head/mps/slam/closed_loop_trajectory.csv
+      - Self-organized:
+          <session_dir>/mps/slam/closed_loop_trajectory.csv
 
-    Returns None when no trajectory is on disk; callers should fall back to
-    the GPS sidecar path or synthetic geometry.
+    Returns None when no trajectory is on disk; callers should fall back
+    to the GPS sidecar path or synthetic geometry. If the downloader
+    left the trajectory as an unextracted zip, the file won't be found
+    and this returns None — extract the zip first.
     """
     candidates = [
+        session_dir / "mps_slam_trajectories" / "closed_loop_trajectory.csv",
         session_dir / "recording_head" / "mps" / "slam" / "closed_loop_trajectory.csv",
         session_dir / "mps" / "slam" / "closed_loop_trajectory.csv",
     ]
