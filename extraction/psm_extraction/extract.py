@@ -26,6 +26,7 @@ from .io import (
     read_gps_json,
     read_imu_json,
     read_metadata_json,
+    read_vrs_session,
     video_duration,
 )
 from .models import ModelRunner
@@ -177,6 +178,30 @@ def _validate_opts(opts: ExtractOptions) -> None:
         seen.add(group_name)
 
 
+def _is_aria_session_dir(path: Path) -> bool:
+    """True when `path` is an Aria session directory (VRS bundle).
+
+    Detection is by directory + presence of any of the layout-specific
+    VRS file paths the reader recognizes. Anything else (regular files,
+    directories without a recognizable VRS) is treated as a normal video
+    input by the orchestrator and routed through the MP4 path.
+    """
+    if not path.is_dir():
+        return False
+    candidates = [
+        path / "video.vrs",
+        path / "recording_head" / "data" / "data.vrs",
+        path / "main.vrs",
+    ]
+    if any(p.exists() for p in candidates):
+        return True
+    # Last-resort: any top-level .vrs that isn't a known auxiliary stream.
+    return any(
+        p.name not in {"et.vrs", "motion.vrs"}
+        for p in path.glob("*.vrs")
+    )
+
+
 def _embed_with_optional_maps(runner: ModelRunner, paths, batch_size, *, progress=None):
     """Call runner.embed_images and normalize its return shape.
 
@@ -242,52 +267,104 @@ def _load_embeddings_cache(path: Path) -> tuple[np.ndarray, np.ndarray | None]:
 def extract(opts: ExtractOptions) -> ExtractResult:
     """Run the full pipeline. Side effect: writes opts.output."""
     _validate_opts(opts)
+    is_vrs = _is_aria_session_dir(opts.video)
     stage_banner(
         "extract",
-        f"video={opts.video.name} sample_fps={opts.sample_fps} "
+        f"{'session' if is_vrs else 'video'}={opts.video.name} sample_fps={opts.sample_fps} "
         f"models={[name for name, _ in opts.runners]} output={opts.output.name}",
     )
-    duration = video_duration(opts.video, verbose=opts.verbose)
 
     frames_dir = _resolve_frames_dir(opts)
-    stage_banner("frames", f"sampling at {opts.sample_fps} fps into {frames_dir}")
-    frame_paths = extract_frames(
-        opts.video,
-        opts.sample_fps,
-        frames_dir,
-        verbose=opts.verbose,
-        force=opts.force_reextract,
-    )
-    stage_banner(
-        "frames",
-        f"{len(frame_paths)} JPEGs ready"
-        + (f" (duration={duration:.1f}s)" if duration is not None else ""),
-    )
-    timestamps = np.arange(len(frame_paths), dtype=np.float64) / opts.sample_fps
-
-    track, track_source = _resolve_track(opts)
-    if track is not None:
-        lats, lngs = map_frames_to_gps(timestamps, track)
-        track_mode = "real_gps"
-        track_source_group = track.source_group
-        interpolation = "linear,clipped_at_edges,from=session_track"
-    else:
-        lats, lngs, _segments = synthetic_snake_grid(
-            timestamps,
-            segment_sec=opts.segment_sec,
-            grid_columns=opts.grid_columns,
-            cell_step_deg=opts.cell_step_deg,
+    vrs_result = None
+    if is_vrs:
+        stage_banner("frames", f"reading VRS session at {opts.video}")
+        vrs_result = read_vrs_session(
+            opts.video,
+            sample_fps=opts.sample_fps,
+            output_dir=frames_dir,
+            verbose=opts.verbose,
+            force=opts.force_reextract,
         )
-        track_mode = "synthetic_snake_grid"
-        track_source_group = None
-        interpolation = None
+        frame_paths = vrs_result.frame_paths
+        # Re-base device-clock timestamps so the model group starts at t=0,
+        # matching the existing MP4 convention (and the downstream eval
+        # scripts that assume timestamps[0] ≈ 0).
+        device_ts = vrs_result.timestamps_s
+        timestamps = device_ts - device_ts[0] if device_ts.size else device_ts
+        duration = float(device_ts[-1] - device_ts[0]) if device_ts.size else None
+        stage_banner(
+            "frames",
+            f"{len(frame_paths)} JPEGs from {vrs_result.source_vrs.name}"
+            + (f" (duration={duration:.1f}s)" if duration is not None else "")
+            + (f" spatial={vrs_result.spatial_source}" if vrs_result.spatial_source else ""),
+        )
+    else:
+        duration = video_duration(opts.video, verbose=opts.verbose)
+        stage_banner("frames", f"sampling at {opts.sample_fps} fps into {frames_dir}")
+        frame_paths = extract_frames(
+            opts.video,
+            opts.sample_fps,
+            frames_dir,
+            verbose=opts.verbose,
+            force=opts.force_reextract,
+        )
+        stage_banner(
+            "frames",
+            f"{len(frame_paths)} JPEGs ready"
+            + (f" (duration={duration:.1f}s)" if duration is not None else ""),
+        )
+        timestamps = np.arange(len(frame_paths), dtype=np.float64) / opts.sample_fps
 
-    imu_sidecar, imu_source = _load_imu(opts)
-    gps_sidecar, gps_sidecar_source = _load_gps_sidecar(opts)
+    # Resolve per-frame (lat, lng). VRS sessions: prefer the reader's output
+    # (real GPS or SLAM-projected). MP4 / VRS-without-spatial: fall through
+    # to the existing sidecar + synthetic-grid logic.
+    track_source: Path | None = None
+    track_source_group: str | None = None
+    interpolation: str | None = None
+    lats: np.ndarray
+    lngs: np.ndarray
+    if vrs_result is not None and vrs_result.lats is not None and vrs_result.lngs is not None and opts.use_gps:
+        lats = vrs_result.lats
+        lngs = vrs_result.lngs
+        track_mode = f"vrs_{vrs_result.spatial_source}"  # vrs_gps | vrs_slam
+        track_source = vrs_result.source_vrs
+        track_source_group = f"vrs:{vrs_result.spatial_source}"
+        interpolation = "linear,clipped_at_edges,from=vrs_stream"
+    else:
+        track, track_source = _resolve_track(opts)
+        if track is not None:
+            lats, lngs = map_frames_to_gps(timestamps, track)
+            track_mode = "real_gps"
+            track_source_group = track.source_group
+            interpolation = "linear,clipped_at_edges,from=session_track"
+        else:
+            lats, lngs, _segments = synthetic_snake_grid(
+                timestamps,
+                segment_sec=opts.segment_sec,
+                grid_columns=opts.grid_columns,
+                cell_step_deg=opts.cell_step_deg,
+            )
+            track_mode = "synthetic_snake_grid"
+            track_source_group = None
+            interpolation = None
+
+    # Sidecar lookups only make sense for MP4 inputs — Aria session dirs
+    # carry GPS/IMU inside the VRS bundle, and `opts.video.parent` for a
+    # session dir is the dataset root (wrong place to autodetect json
+    # sidecars). Respect explicit `--gps-json` / `--imu-json` flags either
+    # way; only skip the auto-discovery.
+    if is_vrs:
+        imu_sidecar = read_imu_json(opts.imu_json) if opts.imu_json else None
+        imu_source = opts.imu_json if opts.imu_json else None
+        gps_sidecar = read_gps_json(opts.gps_json) if opts.gps_json else None
+        gps_sidecar_source = opts.gps_json if opts.gps_json else None
+    else:
+        imu_sidecar, imu_source = _load_imu(opts)
+        gps_sidecar, gps_sidecar_source = _load_gps_sidecar(opts)
     metadata = None
     if opts.metadata_json is not None:
         metadata = read_metadata_json(opts.metadata_json)
-    elif (auto_meta := opts.video.parent / "metadata.json").exists():
+    elif not is_vrs and (auto_meta := opts.video.parent / "metadata.json").exists():
         try:
             metadata = read_metadata_json(auto_meta)
         except (OSError, ValueError):

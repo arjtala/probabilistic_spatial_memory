@@ -54,7 +54,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "extract",
         help="Run a model over a video and write a v2 features.h5.",
     )
-    extract.add_argument("--video", type=Path, required=True, help="Source video.")
+    extract.add_argument(
+        "--video", type=Path, required=True,
+        help="Source video file, or an Aria session directory containing a VRS bundle.",
+    )
     extract.add_argument(
         "--output", type=Path, required=True, help="features.h5 to write."
     )
