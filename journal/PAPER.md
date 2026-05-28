@@ -9,12 +9,14 @@ writeups remain the source of truth for *results*.
 
 - **Venue**: ECCV 2026 **Wearables AI Workshop** (primary). Organized by
   Seungwhan Moon; focus is real-time multimodal contextual assistants
-  for wearable devices. PSM's whole story (bounded-memory streaming
-  spatial memory for egocentric video, MLLM prefilter for grounded
-  look-back QA over Ray-Ban-style Aria captures) lands inside the
-  workshop scope without framing contortion. Audience knows the
-  egocentric + Aria space — the bar for novelty is higher than a
-  generic CV workshop, but the framing requires zero translation.
+  for wearable devices.
+- **Corpus** (locked 2026-05-28): **public Nymeria dataset only.** The
+  3-session Aria corpus used for v1/v2/E11/E12 was internal-only and
+  cannot appear in a published paper. All result numbers prior to
+  2026-05-28 are now "internal preliminary validation" — the engine,
+  scripts, codec, perf fix, and prompting protocols all transfer
+  as-is, but every published table must be re-run on Nymeria
+  sessions. Aria work stops immediately.
 - **Fallback if Wearables rejects**: MUSTCV (Spatial Intelligence
   through Time). Same paper, slight reframing to lead with the
   "spatial reasoning over time" axis instead of "wearable assistant."
@@ -25,9 +27,9 @@ writeups remain the source of truth for *results*.
 - **Hard deadline**: TBD (CFPs not yet posted as of 2026-05-27; expect
   late June / July given Sep 8-9 in Malmö). Plan working backward
   from a July 1 internal submission-ready milestone.
-- **Soft milestone**: have items 1-4 below complete + draft Section
-  1-3 by Jun 17 so the deadline doesn't catch us with an MLLM
-  experiment in flight.
+- **Soft milestone**: have items 1-4 below complete (re-run on Nymeria)
+  + draft Section 1-3 by Jun 17 so the deadline doesn't catch us with
+  an MLLM experiment in flight.
 
 ## Headline claim
 
@@ -63,18 +65,24 @@ same accuracy without the buffer.
 
 ## Required experiments
 
-Six experiments, ordered by criticality. Items 1-3 are reviewer-fatal
-if missing; items 4-6 strengthen but aren't deal-breakers.
+Seven experiments, ordered by criticality. Items 1-4 are reviewer-fatal
+if missing; items 5-7 strengthen but aren't deal-breakers.
+
+**Corpus pivot 2026-05-28**: all status notes below preserve the Aria
+internal-validation results as proof the pipeline works end-to-end,
+but the published numbers come from Nymeria reruns. Item 0 is the
+load-bearing prerequisite for everything else.
 
 | # | Experiment | Tracked in | Status | Blocker |
 |---|---|---|---|---|
-| 1 | Naive retrieval baselines (no H3) | EXPERIMENTS.md E11 | **done** (2026-05-26) | — |
-| 2 | PSM hyperparameter sensitivity | EXPERIMENTS.md E12 | not started | needs hyperparam sweep loop on top of `eval_bigg_all.sh` |
-| 3 | MLLM baselines: Llama-3.2-90B-Vision (vLLM) + Gemini 3 Pro (API) | EXPERIMENTS.md E10 | not started | needs MLLM client + frozen prompting protocol |
+| 0 | Nymeria pipeline: download + VRS parser + extraction subset | EXPERIMENTS.md (new section needed) | not started | hard prerequisite for items 1-6 |
+| 1 | Naive retrieval baselines (no H3) | EXPERIMENTS.md E11 | Aria-internal done (2026-05-26); **Nymeria rerun pending** | item 0 |
+| 2 | PSM hyperparameter sensitivity | EXPERIMENTS.md E12 | Aria-internal done (2026-05-28); **Nymeria rerun pending** | item 0 |
+| 3 | MLLM baselines: Llama-3.2-90B-Vision (SGLang) + Gemini 3 Pro (API) | EXPERIMENTS.md E10 | not started | needs MLLM client + frozen prompting protocol |
 | 4 | End-to-end PSM → MLLM reranker | EXPERIMENTS.md E5 | spec only | depends on #3 (same protocol) |
-| 5 | Question-bank expansion to 50-80 q | TODO.md, this file | not started | annotation labor + maybe one new session |
-| 6 | Encoder-bypass stress test | this file | not started | needs 5-10 more `query_mode: last_seen` questions |
-| 7 | Memory + latency vs session length | this file | **done** (2026-05-26) | — |
+| 5 | Question-bank for Nymeria sessions (target 50-80 q) | TODO.md, this file | not started | annotation labor on Nymeria narrations |
+| 6 | Encoder-bypass stress test on Nymeria | this file | not started | needs `query_mode: last_seen` questions with Nymeria GPS |
+| 7 | Memory + latency vs session length | this file | Aria-internal done (2026-05-26); **Nymeria rerun pending** | item 0 |
 
 ## Critical-path order
 
@@ -215,15 +223,11 @@ Add dated entries here as work lands; mirror to the EXPERIMENTS.md experiment wh
 - 2026-05-27 — **Venue chosen: Wearables AI Workshop (ECCV 2026)**, MUSTCV as fallback. CFPs not yet posted; expect late June / July deadlines (workshops Sep 8-9 Malmö). Plan now keyed to a July 1 submission-ready milestone, with items 1-4 done + draft §1-§3 by Jun 17.
 - 2026-05-27 — **E10 stack decided**: Llama-3.2-90B-Vision via vLLM on H200 (open-weights reproducibility baseline, protocol iteration), plus Gemini 3 Pro via API (frontier-ceiling baseline, single validation pass). Both reported in the final paper. Reasoning: pre-empts "you picked a weak baseline" and supports the "gap is architectural, not a matter of model scale" framing.
 - 2026-05-27 — **E12 (item 2) sweep + plot wired up** (commit `397b00f`). Three artifacts: `eval_hyperparam_sweep.sh`, `slurm/eval_hyperparam.sbatch`, `eval_hyperparam_plot.py`. Smoke-tested locally; cluster run pending. Expected ~30-60 min when HF cache is warm.
-- 2026-05-28 — **E12 (item 2) cluster run done.** Three axes swept, 225 runs total. Honest read of each:
+- 2026-05-28 — **E12 (item 2) Aria-internal cluster run done.** Three axes swept, 225 runs total. Honest read of each (now classified internal-preliminary; Nymeria rerun pending):
 
   - **H3 resolution** (range 8-12): monotone improvement, **v2 default of 10 is not at the peak**. Res 11 / 12 give 85.0% ± 0.0% Hit @5 vs res 10's 83.0% ± 2.7%. Res 8 collapses to 67%. The 2pp lift at finer resolutions is small (within 1σ) but the direction is consistent. The ±0% std at res 11-12 is plausible — finer cells are place-specific enough that all 5 reservoir seeds sample the same exemplar.
-  - **Retention horizon** (range 720-900s, configured as `time_window × capacity`): **perfectly flat across all 5 settings** (83.0% ± 2.7% identical). Not actually "robust" — corpus-limited. Our shortest session is 4.4 min and longest 15 min, so every retention horizon ≥ session length means the ring buffer never wraps and bucket aging is unreachable. **Honest scope statement for §5**: retention sensitivity requires longer sessions (Nymeria-scale future work).
+  - **Retention horizon** (range 720-900s, configured as `time_window × capacity`): **perfectly flat across all 5 settings** (83.0% ± 2.7% identical). Not actually "robust" — corpus-limited. Our shortest session is 4.4 min and longest 15 min, so every retention horizon ≥ session length means the ring buffer never wraps and bucket aging is unreachable. **Honest scope statement for §5**: retention sensitivity requires longer sessions — Nymeria multi-day captures will actually exercise this axis.
   - **Reservoir size** (range 16-256): clear monotone improvement, v2 default of 128 is just-below-peak. 256 gives 85.0% ± 0.0%; 16 collapses to 68.0% (worse than brute-force). This is a *principled accuracy/memory tradeoff*: 256 × 1280-d × 4B = 1.3 MB / cell × 10 tiles = 13 MB, comparable to brute-force's 13 MB embedding bank for Fulham — the bounded-memory advantage erodes at large reservoirs. **128 is the right operating point for the bounded-memory claim**; the paper should say so explicitly.
 
-  **Action items:**
-  1. **Re-run E11 at H3 res=11** to report the tuned operating point. `eval_bigg_all.sh` patched in this commit to expose `H3_RES` + `EXEMPLARS` env knobs and auto-suffix the TAG so the res=11 outputs don't clobber the v2 reference. New baseline number expected: ~85% Hit @5 (vs the previously-reported 83%). Cheap, one cluster sbatch.
-  2. **Update §1-§3 (when drafting) to use res=11 as the operating point**, with res=10 retained as the v2 reference.
-  3. **F3 figure data is final.** SVG at `journal/figures/hyperparam_sensitivity.svg`. Render to PDF via `rsvg-convert -f pdf -o journal/figures/hyperparam_sensitivity.pdf journal/figures/hyperparam_sensitivity.svg`.
-
-  **Reviewer-anticipation log update**: the "you tuned hyperparameters on the test set" flag is now *defensible* (not avoided): v2 numbers are at res=10 because that was the v1 default, and the sensitivity sweep is in the paper. The honest finding is "PSM's optimum is at res=11; we report both numbers." That's the right shape for a workshop paper.
+  **Pre-pivot action items (preserved here as the playbook for the Nymeria rerun):** re-run at H3 res=11 to report tuned operating point; update §1-§3 drafts to use res=11; F3 figure SVG at `journal/figures/hyperparam_sensitivity.svg`. `eval_bigg_all.sh` now exposes H3_RES + EXEMPLARS + TIME_WINDOW + CAPACITY env knobs (commit `e8922a6`) so the Nymeria rerun lands at the tuned operating point in one flag.
+- 2026-05-28 — **Corpus pivot: Nymeria-only from now on.** The 3-session Aria corpus used through this date is internal-only and cannot appear in a published paper. All Aria result numbers (E11 83% Hit @5, E12 hyperparameter curves, item 7 latency benchmarks, v1/v2 writeups) are now classified "internal preliminary validation" — they confirm the pipeline works end-to-end but cannot be cited. Engine, scripts, codec, perf fix, eval harness all transfer to Nymeria unchanged. New item 0 added to the experiments table: **Nymeria pipeline** (download + VRS reader + extraction subset + question annotation). Hard prerequisite for items 1-7. Aria experiments stop immediately; all cluster cycles redirect to Nymeria from here. Wearables AI Jul 1 milestone preserved — no scope cuts to the paper (E10/E5 still in), but timeline pressure intensifies because items 1, 2, 7 need to re-land on Nymeria before being publishable.
