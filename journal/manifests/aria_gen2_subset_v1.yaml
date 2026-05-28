@@ -1,0 +1,124 @@
+# Aria Gen 2 Pilot Dataset — paper subset (v1).
+#
+# All 12 public sequences (~1.1h total recording). This is one half of
+# the Wearables AI 2026 corpus (the other half is Ego4D NLQ val for
+# scale + pre-annotated questions; see EXPERIMENTS.md E0).
+#
+# Activity grouping is derived from sequence-name prefix. The
+# indoor/outdoor + GPS-availability columns are best-effort guesses;
+# extraction will overwrite them from each session's actual
+# `track_mode` in features.h5 (vrs_gps vs vrs_slam). Re-derive after
+# the cluster sweep finishes by reading features.h5 attrs, not by
+# hand-editing this file.
+#
+# Source listing: parsed from
+#   datasets/AriaGen2PilotDataset_download_urls.json
+# (committed in repo; do not lose). Verified 2026-05-28.
+
+dataset_root: /checkpoint/dream/arjangt/video_retrieval/aria_gen2_pilot
+source_urls_json: datasets/AriaGen2PilotDataset_download_urls.json
+release: v1.0
+
+# Per-sequence data groups requested from the downloader. `main_vrs`
+# carries RGB + GPS streams; `mps_slam_trajectories` carries the
+# closed_loop_trajectory.csv we fall back to when GPS is empty.
+# Other groups (depth, scene, hand_object_interaction, heart_rate,
+# diarization) are *not* requested for v1 — PSM doesn't consume them.
+downloader_data_groups:
+  - main_vrs                    # RGB + GPS streams (~2.3-3.4 GB each)
+  - mps_slam_trajectories       # closed_loop_trajectory.csv (~30-42 MB each)
+
+# Downloader integer indices into the menu order. Capture once so
+# the sbatch loop doesn't have to re-parse the menu every run.
+# Verified by running `aria_dataset_downloader -h` against the URLs
+# file: indices are 0=main_vrs, 9=mps_slam_trajectories.
+downloader_indices: [0, 9]
+
+sessions:
+  - name: walk_0
+    activity: walk
+    likely_environment: outdoor
+    expected_spatial_source: gps    # confirmed: 299 GPS fixes in stream 281-2
+    main_vrs_gb: 2.78
+    mps_traj_mb: 35.67
+
+  - name: walk_1
+    activity: walk
+    likely_environment: outdoor
+    expected_spatial_source: gps    # unverified until extracted
+    main_vrs_gb: 2.83
+    mps_traj_mb: 36.55
+
+  - name: cook_0
+    activity: cook
+    likely_environment: indoor
+    expected_spatial_source: slam
+    main_vrs_gb: 2.26
+    mps_traj_mb: 42.36
+
+  - name: clean_0
+    activity: clean
+    likely_environment: indoor
+    expected_spatial_source: slam
+    main_vrs_gb: 3.38
+    mps_traj_mb: 42.97
+
+  - name: eat_0
+    activity: eat
+    likely_environment: indoor
+    expected_spatial_source: slam
+    main_vrs_gb: 2.28
+    mps_traj_mb: 28.43
+
+  - name: eat_1
+    activity: eat
+    likely_environment: indoor
+    expected_spatial_source: slam
+    main_vrs_gb: 2.53
+    mps_traj_mb: 28.60
+
+  - name: eat_2
+    activity: eat
+    likely_environment: indoor
+    expected_spatial_source: slam
+    main_vrs_gb: 2.80
+    mps_traj_mb: 30.21
+
+  - name: eat_3
+    activity: eat
+    likely_environment: indoor
+    expected_spatial_source: slam
+    main_vrs_gb: 2.66
+    mps_traj_mb: 29.69
+
+  - name: play_0
+    activity: play
+    likely_environment: indoor
+    expected_spatial_source: slam
+    main_vrs_gb: 3.18
+    mps_traj_mb: 31.00
+
+  - name: play_1
+    activity: play
+    likely_environment: indoor
+    expected_spatial_source: slam
+    main_vrs_gb: 3.43
+    mps_traj_mb: 30.09
+
+  - name: play_2
+    activity: play
+    likely_environment: indoor
+    expected_spatial_source: slam
+    main_vrs_gb: 3.34
+    mps_traj_mb: 30.63
+
+  - name: play_3
+    activity: play
+    likely_environment: indoor
+    expected_spatial_source: slam
+    main_vrs_gb: 3.39
+    mps_traj_mb: 31.20
+
+# Totals: ~34 GB main_vrs + ~400 MB mps_slam_trajectories per full
+# corpus download. The cluster scratch path above has well over 1 TB
+# free; no need to stagger or stream.
