@@ -35,8 +35,26 @@ SESSIONS="${SESSIONS:-1501677363692556 287142033569927 201703061033}"
 TOP="${TOP:-5}"
 TAG_TOP_SUFFIX="${TAG_TOP_SUFFIX:-0}"
 CODEC="${CODEC:-raw}"
+# E12 surfaced that v2's H3 res=10 + 128 exemplars is near (but not at) the
+# operating-point sweet spot. Exposing both as env knobs lets us re-run E11
+# at the tuned point (e.g. H3_RES=11) without editing the script. TAG is
+# auto-suffixed when either knob diverges from the v2 defaults so outputs
+# don't clobber the v2 reference run.
+H3_RES="${H3_RES:-10}"
+EXEMPLARS="${EXEMPLARS:-128}"
+TIME_WINDOW="${TIME_WINDOW:-75}"
+CAPACITY="${CAPACITY:-12}"
 if [[ "$TAG_TOP_SUFFIX" == "1" && "$TOP" != "5" ]]; then
   TAG="${TAG}_top${TOP}"
+fi
+if [[ "$H3_RES" != "10" ]]; then
+  TAG="${TAG}_r${H3_RES}"
+fi
+if [[ "$EXEMPLARS" != "128" ]]; then
+  TAG="${TAG}_e${EXEMPLARS}"
+fi
+if [[ "$TIME_WINDOW" != "75" || "$CAPACITY" != "12" ]]; then
+  TAG="${TAG}_t${TIME_WINDOW}x${CAPACITY}"
 fi
 if [[ "$CODEC" != "raw" ]]; then
   TAG="${TAG}_${CODEC}"
@@ -60,11 +78,14 @@ for sid in $SESSIONS; do
     exit 1
   fi
   for seed in $SEEDS; do
-    out="$CAPTURES/eval_${sid}_${TAG}_e128_s${seed}.json"
+    out="$CAPTURES/eval_${sid}_${TAG}_e${EXEMPLARS}_s${seed}.json"
     echo "[eval] === $sid seed=$seed -> $out ==="
     python scripts/eval_lookback.py \
       "$feat" "$qs" \
-      --top "$TOP" --time-window 75 --capacity 12 --exemplars 128 \
+      --top "$TOP" \
+      --h3-resolution "$H3_RES" \
+      --time-window "$TIME_WINDOW" --capacity "$CAPACITY" \
+      --exemplars "$EXEMPLARS" \
       --clip-checkpoint "$CHECKPOINT" \
       --seed "$seed" \
       --exemplar-codec "$CODEC" \
