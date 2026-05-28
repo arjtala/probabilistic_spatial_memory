@@ -1,0 +1,118 @@
+# Nymeria session subset for the Wearables AI 2026 paper (v1).
+#
+# 20 sessions = 5 paired dates × 2 wearer slots × 2 activity variants.
+# Designed so we get:
+#   - 5 same-date wearer pairs (s0 + s1) for the federated-memory
+#     experiment (HLL union across two wearers in the same physical
+#     space at the same time).
+#   - 2 contrasting activities per wearer (act0 + act2) to probe
+#     cross-activity retrieval and same-place / different-activity
+#     revisitation.
+#   - Diversity across capture dates spanning June-July 2023.
+#
+# This is the version-controlled source of truth for which sessions
+# are in v1 of the paper. If we add/drop sessions, edit this file +
+# regenerate extractions; don't silently re-glob.
+#
+# Source listing: `ls /checkpoint/dream/arjangt/video_retrieval/nymeria`
+# (the full release is ~430 sessions; this is a deliberate subset).
+
+dataset_root: /checkpoint/dream/arjangt/video_retrieval/nymeria
+
+# Selection criteria: every date listed below must have BOTH s0 and s1
+# present, and BOTH act0 and act2 for each wearer slot. Verified by
+# eyeballing the directory listing on 2026-05-28.
+pairs:
+  - date: "20230607"
+    wearers:
+      s0:
+        name: james_johnson
+        sessions:
+          act0: 20230607_s0_james_johnson_act0_e72nhq
+          act2: 20230607_s0_james_johnson_act2_yhbvpa
+      s1:
+        name: barbara_wheeler
+        sessions:
+          act0: 20230607_s1_barbara_wheeler_act0_cvxtsi
+          act2: 20230607_s1_barbara_wheeler_act2_ig1oym
+
+  - date: "20230612"
+    wearers:
+      s0:
+        name: jason_smith
+        sessions:
+          act0: 20230612_s0_jason_smith_act0_perjr7
+          act2: 20230612_s0_jason_smith_act2_yf5id3
+      s1:
+        name: christina_jones
+        sessions:
+          act0: 20230612_s1_christina_jones_act0_u2r0z8
+          act2: 20230612_s1_christina_jones_act2_cfnfjl
+
+  - date: "20230621"
+    wearers:
+      s0:
+        name: sergio_howard
+        sessions:
+          # Sergio only has act1-act4 (no act0); using act1 as the
+          # earlier-activity slot and act2 as the contrasting slot.
+          act1: 20230621_s0_sergio_howard_act1_b6l7nx
+          act2: 20230621_s0_sergio_howard_act2_y6jpzi
+      s1:
+        name: kevin_davis
+        sessions:
+          act0: 20230621_s1_kevin_davis_act0_b3fcsx
+          act2: 20230621_s1_kevin_davis_act2_1aywrw
+
+  - date: "20230628"
+    wearers:
+      s0:
+        name: adriana_gonzalez
+        sessions:
+          # Adriana has act0, act1, act4 only; using act0 and act4.
+          act0: 20230628_s0_adriana_gonzalez_act0_e587mn
+          act4: 20230628_s0_adriana_gonzalez_act4_rzxlmo
+      s1:
+        name: hayley_little
+        sessions:
+          act0: 20230628_s1_hayley_little_act0_z038r0
+          act2: 20230628_s1_hayley_little_act2_95pn9m
+
+  - date: "20230711"
+    wearers:
+      s0:
+        name: frederick_young
+        sessions:
+          # Frederick has act1-act4 only; using act1 and act2.
+          act1: 20230711_s0_frederick_young_act1_2imlal
+          act2: 20230711_s0_frederick_young_act2_t45o7e
+      s1:
+        name: maria_duran
+        sessions:
+          # Maria has act1-act4 only; using act1 and act2.
+          act1: 20230711_s1_maria_duran_act1_8ighm1
+          act2: 20230711_s1_maria_duran_act2_xjgg2h
+
+# Flat list of all session directories for easier scripting. The script
+# layer should prefer this list over re-walking the `pairs` tree.
+sessions:
+  - 20230607_s0_james_johnson_act0_e72nhq
+  - 20230607_s0_james_johnson_act2_yhbvpa
+  - 20230607_s1_barbara_wheeler_act0_cvxtsi
+  - 20230607_s1_barbara_wheeler_act2_ig1oym
+  - 20230612_s0_jason_smith_act0_perjr7
+  - 20230612_s0_jason_smith_act2_yf5id3
+  - 20230612_s1_christina_jones_act0_u2r0z8
+  - 20230612_s1_christina_jones_act2_cfnfjl
+  - 20230621_s0_sergio_howard_act1_b6l7nx
+  - 20230621_s0_sergio_howard_act2_y6jpzi
+  - 20230621_s1_kevin_davis_act0_b3fcsx
+  - 20230621_s1_kevin_davis_act2_1aywrw
+  - 20230628_s0_adriana_gonzalez_act0_e587mn
+  - 20230628_s0_adriana_gonzalez_act4_rzxlmo
+  - 20230628_s1_hayley_little_act0_z038r0
+  - 20230628_s1_hayley_little_act2_95pn9m
+  - 20230711_s0_frederick_young_act1_2imlal
+  - 20230711_s0_frederick_young_act2_t45o7e
+  - 20230711_s1_maria_duran_act1_8ighm1
+  - 20230711_s1_maria_duran_act2_xjgg2h

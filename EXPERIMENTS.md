@@ -175,7 +175,7 @@ Review:
 
 ## Localization Paradox Alignment
 
-A forthcoming NeurIPS 2026 streaming egocentric memory benchmark — referred to below as the **Localization Paradox benchmark** after its headline finding — evaluates multimodal LLMs on 20K+ "look-back" QA pairs over 613 hours of unscripted Ray-Ban Meta egocentric video. Frontier MLLMs (Gemini 3 Pro, GPT-5, InternVL 3.5) achieve 27-50% semantic accuracy but near-zero temporal grounding (`mIoU` often ≈0). The paper's discussion section explicitly calls for "adaptive temporal indexing… and hierarchical memory buffers that can compress hours of video without losing the granular detail of momentary 'needle' events." PSM's H3-indexed ring buffer of HLL sketches is a candidate substrate for exactly that architectural gap.
+A forthcoming streaming egocentric memory benchmark (the "Localization Paradox benchmark" after its headline finding) evaluates multimodal LLMs on 20K+ "look-back" QA pairs over 613 hours of unscripted Ray-Ban Meta egocentric video. Frontier MLLMs (Gemini 3 Pro, GPT-5, InternVL 3.5) achieve 27-50% semantic accuracy but near-zero temporal grounding (`mIoU` often ≈0). The paper's discussion section explicitly calls for "adaptive temporal indexing… and hierarchical memory buffers that can compress hours of video without losing the granular detail of momentary 'needle' events." PSM's H3-indexed ring buffer of HLL sketches is a candidate substrate for exactly that architectural gap.
 
 Prerequisites for E5-E7 are tracked in `TODO.md` under the "Localization Paradox Alignment" section:
 
@@ -537,3 +537,69 @@ CSV columns:
 - `elapsed_sec`
 - `decodes_per_sec`
 - `megapixels_per_sec`
+
+## E0. Nymeria Pipeline (corpus prerequisite)
+
+Hard prerequisite for every experiment going into the Wearables AI
+2026 paper. The 3-session Aria corpus used through 2026-05-28 is
+internal-only and cannot appear in a published paper; all published
+numbers must come from the public Nymeria dataset. This section
+specifies the pipeline that gets Nymeria sessions through
+`features.h5` so the existing E11/E12/item-7 scripts work unchanged.
+
+### Subset selection
+
+20 sessions, version-controlled in
+[`journal/manifests/nymeria_subset_v1.yaml`](journal/manifests/nymeria_subset_v1.yaml).
+Selection design: 5 paired-wearer dates × 2 wearer slots (s0/s1) × 2
+contrasting activity variants per wearer = 20 sessions. This shape
+gives:
+
+- **5 same-date wearer pairs** (s0 + s1) for the federated-memory
+  experiment. The Nymeria capture protocol records two wearers in the
+  same physical space at the same time; HLL union across the two
+  wearers' PSMs is a free experiment that the Aria corpus couldn't
+  support.
+- **2 activities per wearer** (act0 + act2 where available) for cross-
+  activity retrieval probes and same-place / different-activity
+  revisitation.
+- **Dates spanning June-July 2023** for environmental diversity.
+
+Sessions live at `/checkpoint/dream/arjangt/video_retrieval/nymeria/<sid>`
+on the cluster. Each session ships VRS (camera + IMU) plus narration
+JSON, motion JSON, and metadata.
+
+### Pipeline scope
+
+1. **`extraction/psm_extraction/io/aria_vrs.py`** — VRS reader.
+   `projectaria-tools` exposes a Python API for VRS playback that
+   yields (frame, timestamp_ns, lat/lng if GPS available, IMU
+   samples). Slots into the existing `ExtractOptions.frame_source`
+   abstraction so the rest of the extraction pipeline (CLIP/DINO/JEPA
+   runners, HDF5 writer, schema-v2 metadata) is unchanged.
+2. **`scripts/extract_nymeria_all.sh`** — env-knobbed sweep over the
+   manifest sessions. One encoder at a time (bigG by default).
+3. **`scripts/slurm/extract_nymeria.sbatch`** — GPU job wrapper.
+   Probably needs `h200_comm_shared` × 1 GPU per session and an array
+   job to parallelize the 20 sessions.
+4. **Question annotation** for the 20 sessions. Nymeria's narration
+   JSON helps but doesn't pre-form IoU-scoreable QA. Hand-annotate
+   ~3-5 questions per session = 60-100 total. Format:
+   `journal/manifests/nymeria_questions_v1.yaml`.
+
+### Acceptance criteria
+
+- All 20 sessions produce a `clip_bigg_features.h5` parseable by
+  `psm --search` (sanity check: `psm -f <h5> -g clip` ingests
+  without error, prints non-zero tile count).
+- Question manifest committed and at least 50 questions have
+  ground-truth `[t_start, t_end]` intervals.
+- `eval_baselines_all.sh` + `eval_bigg_all.sh` + `eval_hyperparam_sweep.sh`
+  all accept Nymeria features files unchanged (item 0 ends the
+  moment these run green on Nymeria).
+
+### Downstream consumers
+
+E11 (item 1), E12 (item 2), item 7 (latency on Nymeria session sizes),
+plus the new federated-memory + cross-activity probes that the Aria
+corpus couldn't support.

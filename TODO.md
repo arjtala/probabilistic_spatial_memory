@@ -158,7 +158,7 @@ Total realistic effort: 5–6 focused days for a baseline; weeks to match a poli
 
 ## Localization Paradox Alignment
 
-Context: a forthcoming NeurIPS 2026 streaming egocentric memory benchmark (the "Localization Paradox benchmark" after its headline finding) exposes models' failure to return supporting `[t_start, t_end]` intervals for look-back questions — frontier MLLMs score near-zero `mIoU` despite respectable semantic accuracy. PSM's H3-indexed ring-buffered memory is a natural substrate for closing that gap. These items add the minimum primitives needed to emit intervals and retrieve exemplars; experiments E5-E7 in `EXPERIMENTS.md` consume them.
+Context: a forthcoming streaming egocentric memory benchmark (the "Localization Paradox benchmark" after its headline finding) exposes models' failure to return supporting `[t_start, t_end]` intervals for look-back questions — frontier MLLMs score near-zero `mIoU` despite respectable semantic accuracy. PSM's H3-indexed ring-buffered memory is a natural substrate for closing that gap. These items add the minimum primitives needed to emit intervals and retrieve exemplars; experiments E5-E7 in `EXPERIMENTS.md` consume them.
 
 - [x] Retain `(t_min, t_max)` per ring-buffer bucket alongside the HLL sketch — enables returning `[t_start, t_end]` candidate intervals; cost ~`16B × capacity × tile_count`
 - [x] Reservoir-sampled per-tile exemplar embeddings (configurable `N` per tile) — enables k-NN retrieval against past observations for "visual detail recall" and "last seen" queries
