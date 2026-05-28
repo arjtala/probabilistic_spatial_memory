@@ -10,13 +10,22 @@ writeups remain the source of truth for *results*.
 - **Venue**: ECCV 2026 **Wearables AI Workshop** (primary). Organized by
   Seungwhan Moon; focus is real-time multimodal contextual assistants
   for wearable devices.
-- **Corpus** (locked 2026-05-28): **public Nymeria dataset only.** The
-  3-session Aria corpus used for v1/v2/E11/E12 was internal-only and
-  cannot appear in a published paper. All result numbers prior to
-  2026-05-28 are now "internal preliminary validation" — the engine,
-  scripts, codec, perf fix, and prompting protocols all transfer
-  as-is, but every published table must be re-run on Nymeria
-  sessions. Aria work stops immediately.
+- **Corpus** (locked 2026-05-28, revised same day): **public Aria Gen 2 Pilot Dataset.**
+  Initial Nymeria pivot revealed that Nymeria is primarily indoor + no
+  GPS — projecting SLAM trajectories to fake lat/lng works for
+  retrieval metrics but kills the spatial visualization story (every
+  session would land at the same fake origin somewhere in the ocean).
+  Aria Gen 2 Pilot (https://www.projectaria.com/datasets/gen2pilot/,
+  released Feb 2026) has real GPS on outdoor sessions, SLAM
+  trajectories on indoor sessions, and is what the Wearables AI
+  organizers (Meta) are actively pushing as the canonical Aria-native
+  research corpus. Native fit, no framing contortion. The Nymeria
+  download and the in-progress VRS reader code transfer to Aria Gen 2
+  unchanged (same VRS format, same MPS layout).
+  The 3-session Aria corpus used through 2026-05-28 was internal-only
+  and cannot appear in a published paper. All Aria result numbers
+  prior to the Aria Gen 2 reruns are classified "internal preliminary
+  validation."
 - **Fallback if Wearables rejects**: MUSTCV (Spatial Intelligence
   through Time). Same paper, slight reframing to lead with the
   "spatial reasoning over time" axis instead of "wearable assistant."
@@ -231,3 +240,4 @@ Add dated entries here as work lands; mirror to the EXPERIMENTS.md experiment wh
 
   **Pre-pivot action items (preserved here as the playbook for the Nymeria rerun):** re-run at H3 res=11 to report tuned operating point; update §1-§3 drafts to use res=11; F3 figure SVG at `journal/figures/hyperparam_sensitivity.svg`. `eval_bigg_all.sh` now exposes H3_RES + EXEMPLARS + TIME_WINDOW + CAPACITY env knobs (commit `e8922a6`) so the Nymeria rerun lands at the tuned operating point in one flag.
 - 2026-05-28 — **Corpus pivot: Nymeria-only from now on.** The 3-session Aria corpus used through this date is internal-only and cannot appear in a published paper. All Aria result numbers (E11 83% Hit @5, E12 hyperparameter curves, item 7 latency benchmarks, v1/v2 writeups) are now classified "internal preliminary validation" — they confirm the pipeline works end-to-end but cannot be cited. Engine, scripts, codec, perf fix, eval harness all transfer to Nymeria unchanged. New item 0 added to the experiments table: **Nymeria pipeline** (download + VRS reader + extraction subset + question annotation). Hard prerequisite for items 1-7. Aria experiments stop immediately; all cluster cycles redirect to Nymeria from here. Wearables AI Jul 1 milestone preserved — no scope cuts to the paper (E10/E5 still in), but timeline pressure intensifies because items 1, 2, 7 need to re-land on Nymeria before being publishable.
+- 2026-05-28 — **Corpus pivot revised: Aria Gen 2 Pilot Dataset.** Nymeria download arrived; inspection showed it's primarily indoor with no GPS, only Aria MPS SLAM trajectories. Projecting SLAM (tx, ty) to fake lat/lng would work for retrieval metrics but break the spatial visualization story (all sessions land at the same fake origin). Aria Gen 2 Pilot Dataset (released Feb 2026 at projectaria.com/datasets/gen2pilot) has real GPS on outdoor sessions + MPS SLAM on indoor sessions, plus better Wearables-AI fit (Meta is actively pushing it as the canonical Aria-native research corpus). Engineering scope unchanged — the VRS reader works on both, the manifest just points elsewhere. Nymeria subset manifest preserved at `journal/manifests/nymeria_subset_v1.yaml` for the v3 paper's federated-memory two-wearer story, but not in scope for Wearables AI v1.
