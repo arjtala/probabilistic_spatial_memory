@@ -37,8 +37,11 @@ type-checking / docstring tooling).
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import math
+import os
 import shutil
 import sys
 from dataclasses import dataclass
@@ -254,6 +257,12 @@ def _read_vrs_gps(provider) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     invalid (NaN lat/lng, which happens during fix acquisition). On a
     successful read, the caller should interpolate onto frame timestamps
     via the same edge-clamping policy used for SLAM.
+
+    projectaria-tools prints `WARNING: GPS data quality is not yet fully
+    validated in Aria Gen2.` once per `get_gps_data_by_index` call —
+    hundreds of dupes per session. We suppress C-level stderr only for
+    the duration of the read loop (not the surrounding session code, so
+    real errors elsewhere still surface).
     """
     try:
         from projectaria_tools.core.stream_id import StreamId
@@ -272,26 +281,27 @@ def _read_vrs_gps(provider) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     t_s: list[float] = []
     lat: list[float] = []
     lng: list[float] = []
-    for i in range(n_gps):
-        try:
-            sample = provider.get_gps_data_by_index(gps_stream, i)
-        except Exception:
-            continue
-        # Aria GPS schema: `capture_timestamp_ns`, `latitude`, `longitude`,
-        # plus altitude/accuracy fields we don't need. Skip samples where
-        # the receiver hadn't acquired a fix (lat/lng are NaN or wildly
-        # out-of-range during cold start).
-        try:
-            ts_ns = sample.capture_timestamp_ns
-            la = float(sample.latitude)
-            ln = float(sample.longitude)
-        except AttributeError:
-            continue
-        if not (la >= -90.0 and la <= 90.0 and ln >= -180.0 and ln <= 180.0):
-            continue
-        t_s.append(ts_ns / 1e9)
-        lat.append(la)
-        lng.append(ln)
+    with _suppress_c_stderr():
+        for i in range(n_gps):
+            try:
+                sample = provider.get_gps_data_by_index(gps_stream, i)
+            except Exception:
+                continue
+            # Aria GPS schema: `capture_timestamp_ns`, `latitude`, `longitude`,
+            # plus altitude/accuracy fields we don't need. Skip samples where
+            # the receiver hadn't acquired a fix (lat/lng are NaN or wildly
+            # out-of-range during cold start).
+            try:
+                ts_ns = sample.capture_timestamp_ns
+                la = float(sample.latitude)
+                ln = float(sample.longitude)
+            except AttributeError:
+                continue
+            if not (la >= -90.0 and la <= 90.0 and ln >= -180.0 and ln <= 180.0):
+                continue
+            t_s.append(ts_ns / 1e9)
+            lat.append(la)
+            lng.append(ln)
 
     if not t_s:
         return None
@@ -300,6 +310,34 @@ def _read_vrs_gps(provider) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
         np.array(lat, dtype=np.float64),
         np.array(lng, dtype=np.float64),
     )
+
+
+@contextlib.contextmanager
+def _suppress_c_stderr():
+    """Silence stderr from native code (e.g. projectaria-tools' GPS warning).
+
+    Python-level redirect (`sys.stderr = ...`) doesn't catch writes from
+    a C extension that go to fd 2 directly. Dup the real fd over /dev/null
+    for the duration of the block, then restore. Falls through silently
+    on Windows where `os.dup2`-based stderr swapping is brittle.
+    """
+    try:
+        fd = sys.stderr.fileno()
+    except (AttributeError, OSError, io.UnsupportedOperation):
+        # No real stderr fd (e.g. pytest captures); nothing to suppress.
+        yield
+        return
+    saved = os.dup(fd)
+    try:
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, fd)
+        os.close(devnull)
+        try:
+            yield
+        finally:
+            os.dup2(saved, fd)
+    finally:
+        os.close(saved)
 
 
 def _interpolate_latlng_to_frames(
