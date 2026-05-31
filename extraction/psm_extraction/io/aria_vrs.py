@@ -269,19 +269,24 @@ def _read_vrs_gps(provider) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     except ImportError:
         return None
 
+    # The native code fires the GPS quality warning from get_num_data,
+    # get_gps_data_by_index, and (on some builds) just from touching the
+    # stream metadata. Wrap *all* GPS API contact in the stderr suppressor
+    # so indoor sessions (which return early with zero fixes) don't still
+    # emit one warning per probe.
     gps_stream = StreamId(_GPS_STREAM_ID)
-    try:
-        n_gps = provider.get_num_data(gps_stream)
-    except Exception:
-        # Stream not present on this VRS file (older recordings, custom profiles).
-        return None
-    if n_gps == 0:
-        return None
-
-    t_s: list[float] = []
-    lat: list[float] = []
-    lng: list[float] = []
     with _suppress_c_stderr():
+        try:
+            n_gps = provider.get_num_data(gps_stream)
+        except Exception:
+            # Stream not present on this VRS file (older recordings, custom profiles).
+            return None
+        if n_gps == 0:
+            return None
+
+        t_s: list[float] = []
+        lat: list[float] = []
+        lng: list[float] = []
         for i in range(n_gps):
             try:
                 sample = provider.get_gps_data_by_index(gps_stream, i)
