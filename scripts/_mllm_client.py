@@ -177,11 +177,18 @@ def smoke_test(model: Mllm, *, api_base: str = DEFAULT_API_BASE) -> str:
 
     Used by the eval harness on startup so a misconfigured key / proxy
     fails fast at second 0 rather than per-question.
+
+    Token budget has to clear the model's hidden-thinking floor:
+    Gemini-3.1-pro routinely spends 200-500 thinking tokens before
+    its first visible output, so we ask for `DEFAULT_MAX_TOKENS`
+    (1024) instead of a tight 16 — the failure mode of a tight budget
+    is `finish_reason=length` with empty content, which looks like a
+    real outage instead of a config mistake.
     """
     return call_mllm(
         model=model,
         frames_b64=[],
         prompt="Say OK.",
         api_base=api_base,
-        max_tokens=16,
+        max_tokens=DEFAULT_MAX_TOKENS,
     )
