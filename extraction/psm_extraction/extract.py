@@ -62,6 +62,12 @@ class ExtractOptions:
     """If True, ignore cached embeddings and re-run model inference."""
     cache_dir: Path | None = None
     """Where per-model embedding caches go; defaults to opts.output.parent."""
+    track_mode_override: str | None = None
+    """Stamp this track_mode onto the model group instead of the auto-detected
+    value. Use for corpora where the auto-detected mode would be misleading
+    (e.g. Ego4D NLQ runs through the MP4 path and would otherwise be labeled
+    'synthetic_snake_grid' — passing 'synthetic_ego4d' tells eval/viz that
+    spatial metrics are intentionally meaningless for these files)."""
 
 
 @dataclasses.dataclass
@@ -347,6 +353,14 @@ def extract(opts: ExtractOptions) -> ExtractResult:
             track_mode = "synthetic_snake_grid"
             track_source_group = None
             interpolation = None
+
+    # Override the auto-detected track_mode for corpora where the autodetect
+    # would be misleading (Ego4D NLQ runs through the MP4 path and would land
+    # at "synthetic_snake_grid", which makes spatial metrics look real). The
+    # override doesn't change the underlying lat/lng arrays — same fake snake
+    # grid — only the label that downstream eval/viz keys off.
+    if opts.track_mode_override is not None:
+        track_mode = opts.track_mode_override
 
     # Sidecar lookups only make sense for MP4 inputs — Aria session dirs
     # carry GPS/IMU inside the VRS bundle, and `opts.video.parent` for a

@@ -137,6 +137,13 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Where per-model embedding caches go; defaults to <output>.parent.",
     )
+    extract.add_argument(
+        "--track-mode-override",
+        choices=("synthetic_ego4d",),
+        help="Stamp this track_mode on the model group instead of the auto-"
+             "detected value. Use 'synthetic_ego4d' when extracting Ego4D NLQ "
+             "videos so eval scripts know spatial metrics are not meaningful.",
+    )
 
     return parser
 
@@ -220,6 +227,7 @@ def _handle_extract(args: argparse.Namespace) -> int:
                 force_reextract=args.force_reextract,
                 force_reembed=args.force_reembed,
                 cache_dir=args.cache_dir,
+                track_mode_override=args.track_mode_override,
             )
         )
     finally:
