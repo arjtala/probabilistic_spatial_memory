@@ -29,6 +29,7 @@ from .io import (
     read_vrs_session,
     video_duration,
 )
+from .io.egoexo4d_take import ego_rgb_mp4, is_egoexo4d_take, load_egoexo4d_trajectory
 from .models import ModelRunner
 from .progress import make_progress_logger, stage_banner
 from .writer import FeaturesWriter
@@ -273,16 +274,45 @@ def _load_embeddings_cache(path: Path) -> tuple[np.ndarray, np.ndarray | None]:
 def extract(opts: ExtractOptions) -> ExtractResult:
     """Run the full pipeline. Side effect: writes opts.output."""
     _validate_opts(opts)
-    is_vrs = _is_aria_session_dir(opts.video)
+    # Ego-Exo4D wins over the VRS auto-detect: a take directory contains
+    # both `aria01.vrs` (would match the VRS branch) and the much faster
+    # pre-extracted ego MP4 + frame-aligned SLAM CSV. Prefer the latter so
+    # 696 takes don't each pay full VRS decode cost.
+    is_egoexo = is_egoexo4d_take(opts.video)
+    is_vrs = (not is_egoexo) and _is_aria_session_dir(opts.video)
+    if is_egoexo:
+        kind = "egoexo4d-take"
+    elif is_vrs:
+        kind = "session"
+    else:
+        kind = "video"
     stage_banner(
         "extract",
-        f"{'session' if is_vrs else 'video'}={opts.video.name} sample_fps={opts.sample_fps} "
+        f"{kind}={opts.video.name} sample_fps={opts.sample_fps} "
         f"models={[name for name, _ in opts.runners]} output={opts.output.name}",
     )
 
     frames_dir = _resolve_frames_dir(opts)
     vrs_result = None
-    if is_vrs:
+    egoexo_mp4: Path | None = None
+    if is_egoexo:
+        egoexo_mp4 = ego_rgb_mp4(opts.video)
+        duration = video_duration(egoexo_mp4, verbose=opts.verbose)
+        stage_banner("frames", f"sampling Ego-Exo4D ego stream {egoexo_mp4.name} at {opts.sample_fps} fps")
+        frame_paths = extract_frames(
+            egoexo_mp4,
+            opts.sample_fps,
+            frames_dir,
+            verbose=opts.verbose,
+            force=opts.force_reextract,
+        )
+        stage_banner(
+            "frames",
+            f"{len(frame_paths)} JPEGs ready"
+            + (f" (duration={duration:.1f}s)" if duration is not None else ""),
+        )
+        timestamps = np.arange(len(frame_paths), dtype=np.float64) / opts.sample_fps
+    elif is_vrs:
         stage_banner("frames", f"reading VRS session at {opts.video}")
         vrs_result = read_vrs_session(
             opts.video,
@@ -321,15 +351,33 @@ def extract(opts: ExtractOptions) -> ExtractResult:
         )
         timestamps = np.arange(len(frame_paths), dtype=np.float64) / opts.sample_fps
 
-    # Resolve per-frame (lat, lng). VRS sessions: prefer the reader's output
-    # (real GPS or SLAM-projected). MP4 / VRS-without-spatial: fall through
-    # to the existing sidecar + synthetic-grid logic.
+    # Resolve per-frame (lat, lng).
+    #   - Ego-Exo4D takes: project closed-loop SLAM trajectory at fake origin.
+    #   - VRS sessions: prefer the reader's output (GPS or SLAM-projected).
+    #   - MP4 / VRS-without-spatial: fall through to sidecar + synthetic grid.
     track_source: Path | None = None
     track_source_group: str | None = None
     interpolation: str | None = None
     lats: np.ndarray
     lngs: np.ndarray
-    if vrs_result is not None and vrs_result.lats is not None and vrs_result.lngs is not None and opts.use_gps:
+    if is_egoexo and opts.use_gps:
+        ee_lats, ee_lngs = load_egoexo4d_trajectory(opts.video, timestamps)
+        if ee_lats is not None and ee_lngs is not None:
+            lats, lngs = ee_lats, ee_lngs
+            track_mode = "egoexo4d_slam"
+            track_source = opts.video / "trajectory" / "closed_loop_trajectory.csv"
+            track_source_group = "egoexo4d:slam"
+            interpolation = "linear,clipped_at_edges,from=egoexo4d_trajectory"
+        else:
+            # CSV missing/malformed — fall back to synthetic grid.
+            lats, lngs, _segments = synthetic_snake_grid(
+                timestamps,
+                segment_sec=opts.segment_sec,
+                grid_columns=opts.grid_columns,
+                cell_step_deg=opts.cell_step_deg,
+            )
+            track_mode = "synthetic_snake_grid"
+    elif vrs_result is not None and vrs_result.lats is not None and vrs_result.lngs is not None and opts.use_gps:
         lats = vrs_result.lats
         lngs = vrs_result.lngs
         track_mode = f"vrs_{vrs_result.spatial_source}"  # vrs_gps | vrs_slam
@@ -362,12 +410,14 @@ def extract(opts: ExtractOptions) -> ExtractResult:
     if opts.track_mode_override is not None:
         track_mode = opts.track_mode_override
 
-    # Sidecar lookups only make sense for MP4 inputs — Aria session dirs
-    # carry GPS/IMU inside the VRS bundle, and `opts.video.parent` for a
-    # session dir is the dataset root (wrong place to autodetect json
-    # sidecars). Respect explicit `--gps-json` / `--imu-json` flags either
-    # way; only skip the auto-discovery.
-    if is_vrs:
+    # Sidecar lookups only make sense for MP4 inputs whose parent dir
+    # holds the JSON sidecars. Aria session dirs carry GPS/IMU inside
+    # the VRS bundle; Ego-Exo4D take dirs sit under the read-only
+    # /datasets/egoexo4d root, where there are no sidecars and
+    # `opts.video.parent` would be the dataset root anyway. Respect
+    # explicit --gps-json / --imu-json flags either way; only skip the
+    # auto-discovery in these cases.
+    if is_vrs or is_egoexo:
         imu_sidecar = read_imu_json(opts.imu_json) if opts.imu_json else None
         imu_source = opts.imu_json if opts.imu_json else None
         gps_sidecar = read_gps_json(opts.gps_json) if opts.gps_json else None
@@ -378,7 +428,7 @@ def extract(opts: ExtractOptions) -> ExtractResult:
     metadata = None
     if opts.metadata_json is not None:
         metadata = read_metadata_json(opts.metadata_json)
-    elif not is_vrs and (auto_meta := opts.video.parent / "metadata.json").exists():
+    elif not (is_vrs or is_egoexo) and (auto_meta := opts.video.parent / "metadata.json").exists():
         try:
             metadata = read_metadata_json(auto_meta)
         except (OSError, ValueError):

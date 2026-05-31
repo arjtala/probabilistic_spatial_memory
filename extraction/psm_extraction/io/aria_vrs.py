@@ -91,17 +91,18 @@ class VrsExtractResult:
 def _locate_vrs_file(session_dir: Path) -> Path:
     """Pick the primary RGB VRS file for an Aria session directory.
 
-    Handles the three layouts we've encountered:
-      - Aria Gen 2 Pilot (downloaded via aria_dataset_downloader):
-          <session_dir>/video.vrs
-      - Nymeria / AEA:
-          <session_dir>/recording_head/data/data.vrs
-      - Self-organized:
-          <session_dir>/main.vrs
+    Handles the layouts we've encountered:
+      - Aria Gen 2 Pilot (aria_dataset_downloader): <session_dir>/video.vrs
+      - Nymeria / AEA: <session_dir>/recording_head/data/data.vrs
+      - Ego-Exo4D takes (per-take dir on /datasets):
+          <session_dir>/aria01.vrs  (also has aria01_noimagestreams.vrs
+          alongside, which is the image-stripped twin — explicitly skip)
+      - Self-organized: <session_dir>/main.vrs
     """
     candidates = [
         session_dir / "video.vrs",
         session_dir / "recording_head" / "data" / "data.vrs",
+        session_dir / "aria01.vrs",
         session_dir / "main.vrs",
     ]
     for p in candidates:
@@ -109,18 +110,21 @@ def _locate_vrs_file(session_dir: Path) -> Path:
             return p
     # Last resort: any top-level .vrs file that isn't a known auxiliary
     # stream. Aux streams in the Nymeria/AEA bundles are named et.vrs
-    # (eye tracking) and motion.vrs (body motion ground truth) — both
-    # contain non-image data.
+    # (eye tracking) and motion.vrs (body motion ground truth). Ego-Exo4D
+    # ships <name>_noimagestreams.vrs alongside the real recording —
+    # same data minus the image streams, so explicitly skip those.
     root_vrs = [
         p for p in session_dir.glob("*.vrs")
         if p.name not in {"et.vrs", "motion.vrs"}
+        and not p.name.endswith("_noimagestreams.vrs")
     ]
     if len(root_vrs) == 1:
         return root_vrs[0]
     if not root_vrs:
         raise FileNotFoundError(
             f"no VRS file found under {session_dir} (checked video.vrs, "
-            "recording_head/data/data.vrs, main.vrs, and top-level *.vrs)"
+            "recording_head/data/data.vrs, aria01.vrs, main.vrs, and "
+            "top-level *.vrs)"
         )
     raise FileNotFoundError(
         f"multiple top-level VRS files under {session_dir}; specify one explicitly: "
