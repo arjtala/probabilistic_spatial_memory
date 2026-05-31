@@ -40,16 +40,17 @@ def _yaml_escape(s: str) -> str:
 
 def write_questions_yaml(out_path: Path, take, *, iou_threshold: float, half_window_sec: float) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    session_label = take.take_name or take.take_uid
     lines: list[str] = [
         "# Auto-generated from Ego-Exo4D atomic_descriptions.",
         "# Source: ego-exo4d-data.org v2 release; ego_visible+not-unsure filter.",
-        f"# {len(take.descriptions)} questions for take_uid={take.take_uid}",
-        f"# (intervals are timestamp +/- {half_window_sec}s).",
+        f"# {len(take.descriptions)} questions for take_name={session_label}",
+        f"# (take_uid={take.take_uid}; intervals are timestamp +/- {half_window_sec}s).",
         "#",
         "# Re-generate via scripts/egoexo4d_atomic_to_questions.py; do not edit",
         "# by hand (edits will be lost on next conversion run).",
         "",
-        f"session_id: {take.take_uid}",
+        f"session_id: {session_label}",
         "session_start_unix: 0.0",
         f"iou_threshold: {iou_threshold}",
         "",
@@ -79,8 +80,17 @@ def main() -> int:
         help="Path to atomic_descriptions_val.json or _train.json.",
     )
     parser.add_argument(
+        "--takes-json", type=Path,
+        default=Path("/datasets/egoexo4d/v2/takes.json"),
+        help="Path to takes.json — used to map take_uid (the key in "
+             "atomic_descriptions) to take_name (the on-disk directory "
+             "name under /datasets/egoexo4d/v2/takes/). Default is the "
+             "FAIR cluster mirror path.",
+    )
+    parser.add_argument(
         "--out-root", type=Path, default=Path("datasets/egoexo4d_atomic"),
-        help="Output root; one subdirectory created per take_uid.",
+        help="Output root; one subdirectory created per take_name "
+             "(falling back to take_uid when takes.json doesn't have it).",
     )
     parser.add_argument(
         "--half-window-sec", type=float, default=1.5,
@@ -110,7 +120,16 @@ def main() -> int:
         args.atomic_json,
         half_window_sec=args.half_window_sec,
         require_ego_visible=not args.include_non_ego_visible,
+        takes_json_path=args.takes_json if args.takes_json.exists() else None,
     )
+    if not args.takes_json.exists():
+        print(
+            f"[atomic] WARN: --takes-json {args.takes_json} not found; output "
+            "dirs will be named by take_uid (UUID). Pass an explicit "
+            "--takes-json to get human-readable take_name dirs that match "
+            "/datasets/egoexo4d/v2/takes/<take_name>/.",
+            file=sys.stderr,
+        )
     stats = summarize_atomic_split(takes)
     print(
         f"[atomic] loaded {stats['n_takes']} takes, "
@@ -130,7 +149,10 @@ def main() -> int:
 
     args.out_root.mkdir(parents=True, exist_ok=True)
     for take in takes:
-        out_path = args.out_root / take.take_uid / "questions.yaml"
+        # Prefer take_name (matches /datasets/egoexo4d/v2/takes/<take_name>/);
+        # fall back to take_uid when takes.json wasn't supplied.
+        dir_name = take.take_name or take.take_uid
+        out_path = args.out_root / dir_name / "questions.yaml"
         write_questions_yaml(
             out_path, take,
             iou_threshold=args.iou_threshold,

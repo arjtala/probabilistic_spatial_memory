@@ -5,6 +5,7 @@ from .ego4d_nlq import NlqQuery, NlqVideo, read_nlq_annotations, summarize_nlq_s
 from .egoexo4d_atomic import (
     AtomicDescription,
     AtomicTake,
+    load_take_uid_to_name,
     read_atomic_descriptions,
     summarize_atomic_split,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "VrsExtractResult",
     "capture_time_epoch",
     "extract_frames",
+    "load_take_uid_to_name",
     "read_atomic_descriptions",
     "read_gps_json",
     "read_imu_json",

@@ -89,9 +89,47 @@ class AtomicTake:
     `descriptions` are deduplicated by (text, timestamp_sec) within
     a take — different annotators sometimes write the same text at
     the same moment; keeping one is enough.
+
+    `take_name` is the human-readable name (e.g. `cmu_bike01_2`) that
+    also matches the directory under `/datasets/egoexo4d/v2/takes/`.
+    The atomic-descriptions JSON only carries `take_uid` (a UUID), so
+    we resolve to `take_name` via `takes.json` — see
+    `load_take_uid_to_name`. When the mapping file isn't supplied,
+    `take_name` falls back to `take_uid` (and downstream extraction
+    will fail to find the take dir, surfacing the missing mapping).
     """
     take_uid: str
     descriptions: list[AtomicDescription] = field(default_factory=list)
+    take_name: str = ""
+
+
+def load_take_uid_to_name(takes_json_path: Path) -> dict[str, str]:
+    """Build a {take_uid: take_name} map from /datasets/egoexo4d/v2/takes.json.
+
+    The atomic_descriptions JSON keys by UUID (`take_uid`), but the
+    actual take directory on disk (and conventionally what we'd want
+    to name an output features.h5 dir) uses the human-readable
+    `take_name`. Resolve both in one place so callers don't have to.
+
+    Takes with `is_dropped=True` are excluded — the dataset authors
+    have flagged them as unusable, no point keeping them in the
+    questions output either.
+    """
+    raw = json.loads(takes_json_path.read_text())
+    if not isinstance(raw, list):
+        raise ValueError(
+            f"{takes_json_path}: expected a top-level list, got {type(raw).__name__}"
+        )
+    mapping: dict[str, str] = {}
+    for t in raw:
+        uid = t.get("take_uid")
+        name = t.get("take_name")
+        if not uid or not name:
+            continue
+        if t.get("is_dropped"):
+            continue
+        mapping[uid] = name
+    return mapping
 
 
 def read_atomic_descriptions(
@@ -100,11 +138,18 @@ def read_atomic_descriptions(
     half_window_sec: float = _DEFAULT_HALF_WINDOW_SEC,
     require_ego_visible: bool = True,
     drop_unsure: bool = True,
+    takes_json_path: Path | None = None,
 ) -> list[AtomicTake]:
     """Load atomic_descriptions_val.json -> per-take description lists.
 
-    Returns takes sorted by uid for deterministic output. Takes with
-    zero usable descriptions (after filtering) are dropped.
+    Returns takes sorted by `take_name` (or `take_uid` when no
+    `takes_json_path` is supplied) for deterministic output. Takes
+    with zero usable descriptions (after filtering) are dropped.
+
+    Pass `takes_json_path=/datasets/egoexo4d/v2/takes.json` to
+    populate `take_name` on each returned AtomicTake. Without it,
+    `take_name` is left empty and downstream code that needs the
+    on-disk directory name will need its own resolver.
 
     The default filter (`require_ego_visible=True`, `drop_unsure=True`)
     is the right one for PSM look-back retrieval against ego CLIP
@@ -119,6 +164,10 @@ def read_atomic_descriptions(
             f"{json_path}: missing top-level 'annotations' key — "
             "is this an Ego-Exo4D atomic_descriptions file?"
         )
+
+    uid_to_name: dict[str, str] = {}
+    if takes_json_path is not None:
+        uid_to_name = load_take_uid_to_name(takes_json_path)
 
     by_take: dict[str, list[AtomicDescription]] = defaultdict(list)
     seen: dict[str, set[tuple[str, float]]] = defaultdict(set)
@@ -157,11 +206,19 @@ def read_atomic_descriptions(
                     )
                 )
 
+    # Sort by take_name when available so on-disk output is grouped
+    # by university/activity prefix (e.g. cmu_*, iiith_*) instead of
+    # arbitrary UUID order — useful when scanning manifests by eye.
     takes = [
-        AtomicTake(take_uid=uid, descriptions=by_take[uid])
-        for uid in sorted(by_take)
+        AtomicTake(
+            take_uid=uid,
+            descriptions=by_take[uid],
+            take_name=uid_to_name.get(uid, ""),
+        )
+        for uid in by_take
         if by_take[uid]  # drop takes with zero usable descriptions
     ]
+    takes.sort(key=lambda t: (t.take_name or t.take_uid))
     return takes
 
 
