@@ -181,6 +181,49 @@ class Mp4FrameSource(FrameSource):
         shutil.rmtree(self._scratch, ignore_errors=True)
 
 
+def _read_source_video_attr(features_h5: Path) -> Path | None:
+    """Return the `source_video` root attr from a features.h5, or None.
+
+    Both extractors record where the source came from in this attr.
+    Path may be a file (MP4) or a directory (Aria/Ego-Exo4D session).
+    """
+    try:
+        import h5py
+    except ImportError:
+        return None
+    try:
+        with h5py.File(features_h5, "r") as f:
+            v = f.attrs.get("source_video")
+    except (OSError, KeyError):
+        return None
+    if v is None:
+        return None
+    s = v.decode() if isinstance(v, bytes) else str(v)
+    return Path(s)
+
+
+def _resolve_video_from_source_attr(source: Path) -> Path | None:
+    """Map `source_video` attr -> a usable MP4 path, or None if no good option.
+
+    The attr might be:
+      - An MP4 file (legacy MP4 extractions): return as-is.
+      - An Ego-Exo4D take directory: pick frame_aligned_videos/aria*_214-1.mp4.
+      - An Aria session directory (has video.vrs): return None; on-the-fly
+        VRS decode is too slow, caller will surface the right error.
+    """
+    if source.is_file() and source.suffix == ".mp4":
+        return source
+    if source.is_dir():
+        # Ego-Exo4D layout.
+        ee_mp4 = next(source.glob("frame_aligned_videos/aria*_214-1.mp4"), None)
+        if ee_mp4 is not None:
+            return ee_mp4
+        # Aria session — not handled here. Return None so caller falls
+        # through to the VRS-too-slow SystemExit path.
+        return None
+    return None
+
+
 def make_frame_source(
     features_h5: Path,
     *,
@@ -194,12 +237,18 @@ def make_frame_source(
       1. `--frames-dir` explicitly set + exists  -> CachedFramesSource.
       2. `--video` explicitly set                -> Mp4FrameSource on that file.
       3. Default `<features>/../frames/` exists  -> CachedFramesSource.
-      4. Auto-detect from <features>/.. layout:
+      4. h5 root attr `source_video` points at an existing directory
+         (Ego-Exo4D take, Aria session) or MP4 file. The extractor
+         always records this — handles the common case where
+         features.h5 lives under /checkpoint/.../<name>/ but the
+         source video lives under /datasets/.../takes/<name>/.
+      5. Auto-detect from <features>/.. layout (legacy single-tree
+         setups like Aria Gen 2 Pilot):
            - Ego-Exo4D take dir (frame_aligned_videos/aria*_214-1.mp4) -> Mp4FrameSource.
            - Aria session dir with video.vrs                            -> SystemExit
              (VRS-on-the-fly is too slow; tell user to re-run with --keep-frames).
            - sibling *.mp4                                              -> Mp4FrameSource.
-      5. Otherwise: SystemExit telling the user how to fix it.
+      6. Otherwise: SystemExit telling the user how to fix it.
 
     The auto-detect deliberately doesn't fall through to a global glob
     -- silent picks of the wrong video file are exactly the kind of
@@ -218,6 +267,15 @@ def make_frame_source(
     default_frames = features_h5.parent / "frames"
     if default_frames.exists() and any(default_frames.glob("frame_*.jpg")):
         return CachedFramesSource(default_frames, sample_fps)
+
+    # Cross-tree resolution via the h5's source_video attr. This is the
+    # common Ego-Exo4D case: features.h5 lives under /checkpoint/..., but
+    # the source MP4 is under /datasets/egoexo4d/v2/takes/<name>/.
+    source_attr = _read_source_video_attr(features_h5)
+    if source_attr is not None:
+        recovered = _resolve_video_from_source_attr(source_attr)
+        if recovered is not None:
+            return Mp4FrameSource(recovered)
 
     # Auto-detect from session-dir layout.
     session_dir = features_h5.parent
