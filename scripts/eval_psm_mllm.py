@@ -84,29 +84,6 @@ class _Candidate:
     frame_path: Path      # the JPEG nearest exemplar_t
 
 
-def _find_cached_frame(frames_dir: Path, target_t_s: float, sample_fps: float) -> Path:
-    """Return the cached frame_<idx>.jpg closest to target_t_s.
-
-    Extractor writes frames at uniform 1/sample_fps spacing, starting at
-    t=0 (or device-clock-rebased to t=0 for VRS). The nearest-frame index
-    is therefore round(target_t / dt). Out-of-range targets are clamped
-    to the first/last frame so MLLM gets *something* even when PSM
-    returns a candidate exemplar that overshoots the recording boundary
-    (rare, but possible at session start/end).
-    """
-    dt = 1.0 / sample_fps
-    idx = int(round(max(0.0, target_t_s) / dt))
-    # Glob-validate: depending on the extractor's sampling-gate logic the
-    # frame count can be slightly less than target_t / dt at the tail.
-    all_frames = sorted(frames_dir.glob("frame_*.jpg"))
-    if not all_frames:
-        raise SystemExit(
-            f"no frames under {frames_dir}; did the extractor run with --keep-frames?"
-        )
-    idx = min(idx, len(all_frames) - 1)
-    return all_frames[idx]
-
-
 def _parse_index(text: str, k: int) -> int | None:
     """Parse '1'..'k' out of the MLLM response. None on garbage."""
     # The frozen prompt asks for a bare number, but reasoning models sometimes
@@ -120,15 +97,154 @@ def _parse_index(text: str, k: int) -> int | None:
     return None
 
 
-def _resolve_features_to_frames_dir(features_h5: Path, override: Path | None) -> Path:
-    """Default to <features_h5.parent>/frames/ unless explicitly overridden.
+class FrameSource:
+    """Resolve a target timestamp -> JPEG file the MLLM can ingest.
 
-    Matches extract.py's default frames_dir layout when --keep-frames is
-    set. Lets the eval harness usually be invoked with no extra flags.
+    Three concrete sources, picked by `make_frame_source` at startup:
+      - CachedFramesSource: the extractor's frames/ dir already exists
+        (--keep-frames was set). Cheapest path; lookup is an index
+        into the sorted glob.
+      - Mp4FrameSource: ffmpeg one-shot per timestamp into a temp dir.
+        Slow per query (one ffmpeg invocation each), but no extractor
+        re-run needed. Default for non-VRS sessions.
+      - EgoExo4dFrameSource: Mp4FrameSource variant pointing at the
+        take's `frame_aligned_videos/aria*_214-1.mp4`. Same code path
+        underneath; broken out so detection stays explicit.
     """
-    if override is not None:
-        return override
-    return features_h5.parent / "frames"
+    def fetch(self, t_s: float) -> Path:
+        raise NotImplementedError
+
+    def cleanup(self) -> None:
+        """Release any temp resources; safe to call multiple times."""
+
+
+class CachedFramesSource(FrameSource):
+    def __init__(self, frames_dir: Path, sample_fps: float):
+        self.frames_dir = frames_dir
+        self.sample_fps = sample_fps
+        self._all = sorted(frames_dir.glob("frame_*.jpg"))
+        if not self._all:
+            raise SystemExit(
+                f"no frames under {frames_dir}; did the extractor run with --keep-frames?"
+            )
+
+    def fetch(self, t_s: float) -> Path:
+        dt = 1.0 / self.sample_fps
+        idx = int(round(max(0.0, t_s) / dt))
+        return self._all[min(idx, len(self._all) - 1)]
+
+
+class Mp4FrameSource(FrameSource):
+    """Pull a single JPEG via ffmpeg seek+select. ~0.5-1s per fetch.
+
+    ffmpeg's `-ss <t> -i <mp4> -frames:v 1` is fast because seek is
+    keyframe-aligned (we don't need exact-frame accuracy — the MLLM
+    only cares about the approximate moment, and PSM's exemplar_t is
+    itself approximate). Caches by integer-second so two top-k
+    candidates within the same second don't pay twice.
+    """
+    def __init__(self, mp4: Path, scratch_root: Path | None = None):
+        self.mp4 = mp4
+        self._scratch = Path(tempfile.mkdtemp(prefix="psm-mllm-frames-",
+                                              dir=str(scratch_root) if scratch_root else None))
+        self._cache: dict[int, Path] = {}
+
+    def fetch(self, t_s: float) -> Path:
+        # Quantize to whole seconds for caching — keyframe seek is coarse
+        # anyway, so sub-second precision doesn't survive ffmpeg's -ss.
+        bucket = int(round(max(0.0, t_s)))
+        if bucket in self._cache:
+            return self._cache[bucket]
+        out = self._scratch / f"frame_t{bucket:06d}.jpg"
+        import subprocess
+        # -ss BEFORE -i = fast keyframe seek; accuracy is ~2s at worst,
+        # which is fine since PSM exemplar_t is itself ~time_window
+        # bucketed. Quality q=2 (high JPEG) so we don't double-degrade
+        # before sending to the MLLM at max_size=768.
+        cmd = [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-ss", f"{bucket}", "-i", str(self.mp4),
+            "-frames:v", "1", "-q:v", "2",
+            str(out),
+        ]
+        proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
+        if proc.returncode != 0 or not out.exists():
+            raise RuntimeError(
+                f"ffmpeg failed extracting t={bucket}s from {self.mp4.name}: "
+                f"{proc.stderr.strip()[:200]}"
+            )
+        self._cache[bucket] = out
+        return out
+
+    def cleanup(self) -> None:
+        import shutil
+        shutil.rmtree(self._scratch, ignore_errors=True)
+
+
+def make_frame_source(
+    features_h5: Path,
+    *,
+    override_frames_dir: Path | None,
+    override_video: Path | None,
+    sample_fps: float,
+) -> FrameSource:
+    """Pick the frame-fetch strategy for this features.h5.
+
+    Precedence:
+      1. `--frames-dir` explicitly set + exists  -> CachedFramesSource.
+      2. `--video` explicitly set                -> Mp4FrameSource on that file.
+      3. Default `<features>/../frames/` exists  -> CachedFramesSource.
+      4. Auto-detect from <features>/.. layout:
+           - Ego-Exo4D take dir (frame_aligned_videos/aria*_214-1.mp4) -> Mp4FrameSource.
+           - Aria session dir with video.vrs                            -> SystemExit
+             (VRS-on-the-fly is too slow; tell user to re-run with --keep-frames).
+           - sibling *.mp4                                              -> Mp4FrameSource.
+      5. Otherwise: SystemExit telling the user how to fix it.
+
+    The auto-detect deliberately doesn't fall through to a global glob
+    -- silent picks of the wrong video file are exactly the kind of
+    bug that wastes a paper-deadline afternoon.
+    """
+    if override_frames_dir is not None:
+        if not override_frames_dir.exists():
+            raise SystemExit(f"--frames-dir {override_frames_dir} does not exist")
+        return CachedFramesSource(override_frames_dir, sample_fps)
+
+    if override_video is not None:
+        if not override_video.exists():
+            raise SystemExit(f"--video {override_video} does not exist")
+        return Mp4FrameSource(override_video)
+
+    default_frames = features_h5.parent / "frames"
+    if default_frames.exists() and any(default_frames.glob("frame_*.jpg")):
+        return CachedFramesSource(default_frames, sample_fps)
+
+    # Auto-detect from session-dir layout.
+    session_dir = features_h5.parent
+    egoexo_mp4 = next(session_dir.glob("frame_aligned_videos/aria*_214-1.mp4"), None)
+    if egoexo_mp4 is not None:
+        return Mp4FrameSource(egoexo_mp4)
+
+    if (session_dir / "video.vrs").exists():
+        raise SystemExit(
+            f"{features_h5} appears to be from a VRS session ({session_dir/'video.vrs'}); "
+            "on-the-fly VRS decode is too slow. Re-run extractor with --keep-frames, "
+            "or pass --frames-dir / --video explicitly."
+        )
+
+    sibling_mp4s = sorted(session_dir.glob("*.mp4"))
+    if len(sibling_mp4s) == 1:
+        return Mp4FrameSource(sibling_mp4s[0])
+    if len(sibling_mp4s) > 1:
+        raise SystemExit(
+            f"multiple *.mp4 next to {features_h5}; specify one with --video: "
+            f"{[p.name for p in sibling_mp4s]}"
+        )
+
+    raise SystemExit(
+        f"no frame source found for {features_h5}. Pass --frames-dir or --video, "
+        "or re-run extraction with --keep-frames."
+    )
 
 
 def _make_record(
@@ -225,7 +341,13 @@ def main() -> int:
     ap.add_argument("--group", default="clip")
     ap.add_argument("--mllm", choices=("gemini", "claude"), default="gemini")
     ap.add_argument("--frames-dir", type=Path, default=None,
-                    help="JPEG cache from extractor (default: <features>/../frames)")
+                    help="JPEG cache from extractor (default: auto-detect; "
+                         "see make_frame_source docstring for precedence)")
+    ap.add_argument("--video", type=Path, default=None,
+                    help="Source MP4 for on-the-fly frame extraction via "
+                         "ffmpeg (alternative to --frames-dir).")
+    ap.add_argument("--limit", type=int, default=None,
+                    help="Process only the first N questions (smoke-test mode).")
     ap.add_argument("--top", type=int, default=5)
     ap.add_argument("--time-window", type=float, default=75.0)
     ap.add_argument("--capacity", type=int, default=12)
@@ -262,15 +384,21 @@ def main() -> int:
         return 1
     print(f"[eval] {mllm.name} OK: {ok!r}", file=sys.stderr)
 
-    frames_dir = _resolve_features_to_frames_dir(args.features, args.frames_dir)
-    if not frames_dir.exists():
-        print(f"[eval] FATAL: frames dir {frames_dir} does not exist. "
-              "Re-run extractor with --keep-frames.", file=sys.stderr)
-        return 1
+    frame_source = make_frame_source(
+        args.features,
+        override_frames_dir=args.frames_dir,
+        override_video=args.video,
+        sample_fps=args.sample_fps,
+    )
+    print(f"[eval] frame source: {type(frame_source).__name__}", file=sys.stderr)
 
     with args.questions.open() as f:
         spec = yaml.safe_load(f)
     questions = spec.get("questions") or []
+    if args.limit is not None:
+        questions = questions[: args.limit]
+        print(f"[eval] --limit applied: processing {len(questions)} questions",
+              file=sys.stderr)
     session_start = float(spec.get("session_start_unix", 0.0))
     if "session_start_unix" not in spec:
         session_start = auto_session_start(args.features, args.group)
@@ -334,7 +462,7 @@ def main() -> int:
                 t_min = float(r["t_min"]) - session_start
                 t_max = float(r["t_max"]) - session_start
                 exemplar_t = float(r.get("exemplar_t", (t_min + t_max) / 2.0)) - session_start
-                frame_path = _find_cached_frame(frames_dir, exemplar_t, args.sample_fps)
+                frame_path = frame_source.fetch(exemplar_t)
                 candidates.append(_Candidate(
                     t_min=t_min, t_max=t_max, exemplar_t=exemplar_t,
                     cell=r.get("cell"), lat=r.get("lat"), lng=r.get("lng"),
@@ -401,6 +529,7 @@ def main() -> int:
                 p.unlink()
             tmp_dir.rmdir()
         runner.close()
+        frame_source.cleanup()
 
     # Final output. Same shape as eval_lookback so eval_aggregate pools it.
     scored = [r for r in records if r["intervals_gt"]]
