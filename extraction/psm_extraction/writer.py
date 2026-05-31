@@ -187,6 +187,8 @@ class FeaturesWriter:
             group.attrs["patch_grid"] = list(spec.patch_grid)
         if spec.interpolation is not None:
             group.attrs["interpolation"] = spec.interpolation
+        if spec.track_mode is not None:
+            group.attrs["track_mode"] = spec.track_mode
 
     def close(self) -> None:
         # Local-variable narrowing pattern: pyrefly does not narrow

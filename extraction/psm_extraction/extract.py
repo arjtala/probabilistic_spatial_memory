@@ -501,6 +501,7 @@ def extract(opts: ExtractOptions) -> ExtractResult:
                 normalized=runner.normalized,
                 patch_grid=runner.patch_grid,
                 interpolation=interpolation,
+                track_mode=track_mode,
             )
             attention_maps = maps if (
                 runner.patch_grid is not None and maps is not None and maps.ndim == 3

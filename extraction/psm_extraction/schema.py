@@ -84,3 +84,12 @@ class ModelGroupSpec:
     # per-frame lat/lng/imu derived from the canonical sensor streams.
     patch_grid: tuple[int, int] | None = None
     interpolation: str | None = None
+    # How the per-frame lat/lng were produced. One of:
+    #   "real_gps"             — interpolated from an external GPS track
+    #   "vrs_gps"              — read from VRS stream 281-2 (Aria Gen 2 outdoor)
+    #   "vrs_slam"             — projected from MPS SLAM trajectory (Aria indoor)
+    #   "synthetic_snake_grid" — fabricated grid (MP4 input, no sidecar)
+    #   "synthetic_ego4d"      — fabricated grid for Ego4D NLQ (no spatial)
+    # Downstream eval/viz reads this to decide whether spatial metrics
+    # are meaningful for the group.
+    track_mode: str | None = None
