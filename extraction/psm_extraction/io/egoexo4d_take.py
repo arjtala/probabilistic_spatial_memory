@@ -16,17 +16,18 @@ Ego-Exo4D ships each "take" as a directory with:
       ...
 
 For PSM look-back retrieval against the ego perspective, we use:
-  - frame_aligned_videos/aria01_214-1.mp4  as the source video (much
-    faster to decode than the full VRS, and time-aligned to the
-    trajectory CSV by construction).
-  - trajectory/closed_loop_trajectory.csv  for SLAM-projected
+  - `frame_aligned_videos/aria*_214-1.mp4` as the source video.
+    Stream ID `214-1` is Aria's primary RGB camera (same on Gen 1 and
+    Gen 2); the `aria*` prefix varies because different captures use
+    different aria devices (aria01..aria06+ seen across the val set).
+  - `trajectory/closed_loop_trajectory.csv` for SLAM-projected
     (lat, lng) — Ego-Exo4D is all indoor so there's no GPS to prefer.
 
-This module's only public surface is `is_egoexo4d_take(dir)` and
-`load_egoexo4d_trajectory(dir)`. The orchestrator detects + dispatches;
-the trajectory parsing reuses `_read_slam_trajectory` and
-`_project_xy_to_latlng` from `aria_vrs` so there's no second copy of
-the schema knowledge.
+This module's only public surface is `is_egoexo4d_take(dir)`,
+`ego_rgb_mp4(dir)`, and `load_egoexo4d_trajectory(dir)`. The
+orchestrator detects + dispatches; the trajectory parsing reuses
+`_read_slam_trajectory` and `_project_xy_to_latlng` from `aria_vrs`
+so there's no second copy of the schema knowledge.
 """
 from __future__ import annotations
 
@@ -40,25 +41,50 @@ from .aria_vrs import (
     _read_slam_trajectory,
 )
 
-_EGO_RGB_MP4 = "frame_aligned_videos/aria01_214-1.mp4"
+_EGO_RGB_GLOB = "frame_aligned_videos/aria*_214-1.mp4"
 _TRAJ_CSV = "trajectory/closed_loop_trajectory.csv"
+
+
+def _find_ego_rgb_mp4(take_dir: Path) -> Path | None:
+    """Locate the ego RGB MP4. None when no candidate exists.
+
+    Glob matches all aria<N>_214-1.mp4 variants. In the rare case
+    multiple match (multi-Aria recordings), pick the lexicographically
+    first — Ego-Exo4D conventionally numbers the wearer's device
+    lowest, and the atomic_descriptions annotations are tied to that
+    primary ego perspective.
+    """
+    matches = sorted(take_dir.glob(_EGO_RGB_GLOB))
+    return matches[0] if matches else None
 
 
 def is_egoexo4d_take(take_dir: Path) -> bool:
     """True when `take_dir` looks like an Ego-Exo4D take directory.
 
-    Detection requires BOTH the ego RGB MP4 and the closed-loop SLAM
-    trajectory — partial layouts (e.g. someone copied just the MP4)
+    Detection requires BOTH a usable ego RGB MP4 and the closed-loop
+    SLAM trajectory — partial layouts (e.g. someone copied just one)
     aren't routed through this path, which keeps the autodetect strict
     and predictable.
     """
     if not take_dir.is_dir():
         return False
-    return (take_dir / _EGO_RGB_MP4).exists() and (take_dir / _TRAJ_CSV).exists()
+    return _find_ego_rgb_mp4(take_dir) is not None and (take_dir / _TRAJ_CSV).exists()
 
 
 def ego_rgb_mp4(take_dir: Path) -> Path:
-    return take_dir / _EGO_RGB_MP4
+    """Return the ego RGB MP4 for `take_dir`. Raises if absent.
+
+    Callers that want a tri-state should use `is_egoexo4d_take` first;
+    raising here keeps the orchestrator from having to handle a None
+    after it's already committed to the egoexo4d branch.
+    """
+    p = _find_ego_rgb_mp4(take_dir)
+    if p is None:
+        raise FileNotFoundError(
+            f"no ego RGB MP4 under {take_dir}/frame_aligned_videos/ "
+            f"(glob: aria*_214-1.mp4)"
+        )
+    return p
 
 
 def load_egoexo4d_trajectory(

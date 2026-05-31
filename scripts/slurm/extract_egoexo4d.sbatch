@@ -116,8 +116,11 @@ if [[ ! -d "$TAKE_DIR" ]]; then
   echo "[slurm] ERR: take dir $TAKE_DIR not found" >&2
   exit 1
 fi
-if [[ ! -f "$TAKE_DIR/frame_aligned_videos/aria01_214-1.mp4" ]]; then
-  echo "[slurm] ERR: $TAKE_DIR/frame_aligned_videos/aria01_214-1.mp4 missing" >&2
+# Ego RGB stream filename varies across takes (aria01_*..aria06_*) —
+# the orchestrator's egoexo4d_take helper globs aria*_214-1.mp4, so
+# we just confirm at least one match exists before launching.
+if ! compgen -G "$TAKE_DIR/frame_aligned_videos/aria*_214-1.mp4" > /dev/null; then
+  echo "[slurm] ERR: no $TAKE_DIR/frame_aligned_videos/aria*_214-1.mp4 found" >&2
   exit 1
 fi
 mkdir -p "$OUT_DIR"
