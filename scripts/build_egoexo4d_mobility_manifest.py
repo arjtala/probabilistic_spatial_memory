@@ -43,18 +43,21 @@ import sys
 from pathlib import Path
 
 
-def trajectory_length_m(csv_path: Path) -> float:
-    """Sum 3D step distances from an Aria MPS closed_loop_trajectory.csv.
+def trajectory_extent_m(csv_path: Path) -> float:
+    """Bounding-box diagonal of the SLAM trajectory in meters.
 
-    Schema columns of interest (same as aria_vrs._read_slam_trajectory):
-      - tx_world_device, ty_world_device, tz_world_device (meters)
+    Aria MPS samples ~1000 Hz; summing Σ‖step‖ across all 250k+ rows
+    inflates by 10x or more from per-sample jitter (a wearer "standing
+    still" still racks up many meters of fake path length). Bounding-box
+    diagonal across (tx, ty, tz) measures *how far the wearer actually
+    went*, which is what matters for whether PSM has H3 cells to
+    distinguish.
 
-    Sums sqrt((dx)^2 + (dy)^2 + (dz)^2) across consecutive rows. Returns
-    0.0 for malformed/empty files (caller should treat as no-data, not
-    zero-mobility).
+    Returns 0.0 for malformed/empty files.
     """
-    prev: tuple[float, float, float] | None = None
-    total = 0.0
+    xs: list[float] = []
+    ys: list[float] = []
+    zs: list[float] = []
     try:
         with csv_path.open() as f:
             reader = csv.DictReader(f)
@@ -63,22 +66,19 @@ def trajectory_length_m(csv_path: Path) -> float:
                 return 0.0
             for row in reader:
                 try:
-                    p = (
-                        float(row["tx_world_device"]),
-                        float(row["ty_world_device"]),
-                        float(row["tz_world_device"]),
-                    )
+                    xs.append(float(row["tx_world_device"]))
+                    ys.append(float(row["ty_world_device"]))
+                    zs.append(float(row["tz_world_device"]))
                 except (KeyError, ValueError):
                     continue
-                if prev is not None:
-                    dx = p[0] - prev[0]
-                    dy = p[1] - prev[1]
-                    dz = p[2] - prev[2]
-                    total += (dx * dx + dy * dy + dz * dz) ** 0.5
-                prev = p
     except OSError:
         return 0.0
-    return total
+    if not xs:
+        return 0.0
+    dx = max(xs) - min(xs)
+    dy = max(ys) - min(ys)
+    dz = max(zs) - min(zs)
+    return (dx * dx + dy * dy + dz * dz) ** 0.5
 
 
 def trajectory_duration_s(csv_path: Path) -> float:
@@ -124,7 +124,7 @@ def main() -> int:
         "--questions-root", type=Path,
         default=Path("/checkpoint/dream/arjangt/video_retrieval/egoexo4d_atomic"),
     )
-    ap.add_argument("--threshold-m", type=float, default=50.0)
+    ap.add_argument("--threshold-m", type=float, default=10.0)
     ap.add_argument(
         "--out-manifest", type=Path,
         default=Path("/checkpoint/dream/arjangt/video_retrieval/egoexo4d_mobility.json"),
@@ -147,12 +147,12 @@ def main() -> int:
     entries: list[dict] = []
     for i, name in enumerate(take_names, start=1):
         csv_path = args.takes_root / name / "trajectory" / "closed_loop_trajectory.csv"
-        traj_m = trajectory_length_m(csv_path)
+        traj_m = trajectory_extent_m(csv_path)
         dur_s = trajectory_duration_s(csv_path)
         n_q = count_questions(args.questions_root / name / "questions.yaml")
         entries.append({
             "take_name": name,
-            "traj_len_m": round(traj_m, 2),
+            "traj_extent_m": round(traj_m, 2),
             "duration_s": round(dur_s, 2),
             "n_questions": n_q,
             "above_threshold": traj_m >= args.threshold_m,
@@ -160,8 +160,8 @@ def main() -> int:
         if i % 50 == 0 or i == len(take_names):
             print(f"  scored {i}/{len(take_names)}", file=sys.stderr)
 
-    entries.sort(key=lambda e: e["traj_len_m"], reverse=True)
-    lengths = [e["traj_len_m"] for e in entries if e["traj_len_m"] > 0]
+    entries.sort(key=lambda e: e["traj_extent_m"], reverse=True)
+    lengths = [e["traj_extent_m"] for e in entries if e["traj_extent_m"] > 0]
     above = [e for e in entries if e["above_threshold"]]
 
     # Distribution snapshot — drives the threshold-choice rationale in the paper.
@@ -171,7 +171,7 @@ def main() -> int:
             idx = int(round(p * (len(sorted_l) - 1)))
             return sorted_l[idx]
         print("", file=sys.stderr)
-        print(f"[mobility] trajectory length distribution (n={len(lengths)}):", file=sys.stderr)
+        print(f"[mobility] trajectory extent (bbox diagonal) distribution (n={len(lengths)}):", file=sys.stderr)
         print(f"  min    = {min(lengths):8.1f} m", file=sys.stderr)
         print(f"  p25    = {pct(0.25):8.1f} m", file=sys.stderr)
         print(f"  median = {statistics.median(lengths):8.1f} m", file=sys.stderr)

@@ -96,12 +96,18 @@ def load_egoexo4d_trajectory(
 ) -> tuple[np.ndarray | None, np.ndarray | None]:
     """Read SLAM trajectory + project onto frame timestamps -> (lats, lngs).
 
-    `frame_ts_s` must be relative-seconds since video start (i.e.
-    `arange(N) / sample_fps` — what extract.py produces for MP4
-    inputs). The trajectory CSV's `tracking_timestamp_us` is device-
-    clock microseconds, also relative to take start, so the two clocks
-    line up directly (frame_aligned_videos is "frame aligned" to the
-    trajectory by construction).
+    `frame_ts_s` is relative-seconds since video start (`arange(N) /
+    sample_fps` from extract.py). The trajectory CSV's
+    `tracking_timestamp_us` is device-clock microseconds starting from
+    boot (~10^8 us into the recording for typical takes), NOT zero —
+    `frame_aligned_videos/aria*_214-1.mp4` is the same image stream
+    re-muxed to start at MP4 wall-time 0.
+
+    We re-base the trajectory clock by subtracting its first timestamp,
+    matching what `aria_vrs.read_vrs_session` does for VRS-side
+    timestamps. Without this every frame interp-clamps to the first
+    trajectory row, collapsing lat/lng to a single (constant) point and
+    making PSM's spatial axis degenerate for every Ego-Exo4D take.
 
     Returns (None, None) when the CSV is missing or malformed; caller
     should fall back to synthetic snake-grid.
@@ -113,6 +119,11 @@ def load_egoexo4d_trajectory(
     if parsed is None:
         return None, None
     track_ts_s, tx, ty = parsed
+    if track_ts_s.size:
+        # Re-base to start at 0 so it shares an origin with the MP4's
+        # arange/fps timeline. Without this `np.interp` clamps every
+        # frame (all < track_ts_s[0]) to the trajectory's first row.
+        track_ts_s = track_ts_s - track_ts_s[0]
     fr_tx, fr_ty = _interpolate_track_to_frames(frame_ts_s, track_ts_s, tx, ty)
     lats, lngs = _project_xy_to_latlng(
         fr_tx, fr_ty, origin_lat=origin_lat, origin_lng=origin_lng,
