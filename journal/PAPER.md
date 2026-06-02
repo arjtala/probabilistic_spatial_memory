@@ -10,11 +10,17 @@ writeups remain the source of truth for *results*.
 - **Venue**: ECCV 2026 **Wearables AI Workshop** (primary). Organized by
   Seungwhan Moon; focus is real-time multimodal contextual assistants
   for wearable devices.
-- **Corpus** (locked 2026-05-28, revised twice same day): **Aria Gen 2 Pilot Dataset (headline) + Ego4D NLQ val split (benchmark comparison).** Two corpora because each alone has a limitation:
-  - **Aria Gen 2 Pilot** (12 sequences, ~1.1h total, ~5-6 min/seq across activities `walk_*`, `cook_*`, `clean_*`, `eat_*`, `play_*`). Real GPS on outdoor sessions + Aria MPS SLAM on indoor sessions + rich per-session annotations (depth, scene, diarization, hand-object interaction). Native Wearables AI fit. **Limitation:** 12 sequences is small; needs supplementary corpus for scale-credibility.
-  - **Ego4D NLQ val split** (~1.6K pre-annotated `[t_start, t_end]` QA pairs). Established benchmark — "we report on Ego4D NLQ" is a one-line credibility claim. Pre-annotated questions skip the annotation-labor risk that was the highest-timeline item before. **Limitation:** not Aria, GPS sparse to nonexistent, needs MP4 + JSON-sidecar reader path alongside the VRS reader.
-  Engine, scripts, codec, perf fix, prompting protocols transfer to both unchanged. Two extraction passes; the VRS reader being built lands first (for Aria Gen 2) and an Ego4D MP4-format reader follows.
-  The 3-session internal Aria corpus used through 2026-05-28 was internal-only and cannot appear in a published paper. All Aria result numbers prior to the Aria-Gen-2 / Ego4D reruns are classified "internal preliminary validation."
+- **Corpus** (locked 2026-06-02 after third revision): **Aria Gen 2 Pilot Dataset + Nymeria subset.** Two corpora chosen to exercise PSM's spatial axis at two distinct scales:
+  - **Aria Gen 2 Pilot** (12 sessions, ~1.1h total). `walk_0` + `walk_1` have real GPS (confirmed `vrs_gps` track_mode); the other 10 are indoor (`vrs_slam`, fake-origin projection). Native Wearables AI fit; rich per-session annotations (depth, scene, diarization, hand-object interaction) available for ablation. **Question annotation: manual** (5-10 q/session, ~120 total — task #7).
+  - **Nymeria subset** (30 sessions on cluster at `/checkpoint/.../nymeria_partial/`, ~805 GB, each with `recording_head/data/data.vrs` + `recording_head/mps/slam/closed_loop_trajectory.csv` + `narration/atomic_action.csv`). **Question annotation: automatic** from the atomic_action.csv narrations (~5,600 questions across the 30 sessions; the existing VRS reader handles the Nymeria layout via `_locate_vrs_file`'s `recording_head/data/data.vrs` candidate).
+  - **Spatial-axis displacement analysis** (`scripts/nymeria_slam_displacement.py`, commit `0415ba4`/`85e4b6d`) shows Nymeria's per-session bounding-box extent is graded across three scales:
+    - **Street-scale** (1 session, 69m extent): carves at H3 res 10
+    - **Building-scale** (2 sessions, ~27m): carves at res 11
+    - **Room-scale** (23 sessions, 4-13m): carves at res 12-13
+    - **Sub-room** (4 sessions, <3m): spatial axis degenerates; temporal-only regime
+  Combined with Aria Gen 2's outdoor walks (street-scale, real GPS), this gives the paper a complete graded scale benchmark from sit-down to street, all on egocentric wearable footage. **H3 resolution is the one knob tuned per-corpus**; paper reports per-resolution accuracy with an ablation showing the failure mode when `r` is mismatched to the actual mobility scale.
+
+  **Corpora considered and rejected this week**: Ego4D NLQ (annotations not on cluster; AWS token flow blocked); Ego-Exo4D atomic_descriptions (only 7/696 takes >10m bbox extent — fundamentally room-scale skilled-task footage where spatial axis degenerates regardless of H3 tuning; commits `db19ab4`/`9b1aafb` and the displacement-distribution diagnostics). Engine, scripts, codec, perf fix, prompting protocols transfer to whichever corpora end up in the final write-up unchanged.
 - **Fallback if Wearables rejects**: MUSTCV (Spatial Intelligence
   through Time). Same paper, slight reframing to lead with the
   "spatial reasoning over time" axis instead of "wearable assistant."
@@ -66,21 +72,22 @@ same accuracy without the buffer.
 Seven experiments, ordered by criticality. Items 1-4 are reviewer-fatal
 if missing; items 5-7 strengthen but aren't deal-breakers.
 
-**Corpus pivot 2026-05-28**: all status notes below preserve the Aria
+**Corpus pivot 2026-06-02**: status notes below preserve the Aria
 internal-validation results as proof the pipeline works end-to-end,
-but the published numbers come from Nymeria reruns. Item 0 is the
-load-bearing prerequisite for everything else.
+but the published numbers come from Aria Gen 2 + Nymeria reruns.
+Item 0 is the load-bearing prerequisite for everything else.
 
 | # | Experiment | Tracked in | Status | Blocker |
 |---|---|---|---|---|
-| 0 | Nymeria pipeline: download + VRS parser + extraction subset | EXPERIMENTS.md (new section needed) | not started | hard prerequisite for items 1-6 |
-| 1 | Naive retrieval baselines (no H3) | EXPERIMENTS.md E11 | Aria-internal done (2026-05-26); **Nymeria rerun pending** | item 0 |
-| 2 | PSM hyperparameter sensitivity | EXPERIMENTS.md E12 | Aria-internal done (2026-05-28); **Nymeria rerun pending** | item 0 |
-| 3 | MLLM baselines: Llama-3.2-90B-Vision (SGLang) + Gemini 3 Pro (API) | EXPERIMENTS.md E10 | not started | needs MLLM client + frozen prompting protocol |
-| 4 | End-to-end PSM → MLLM reranker | EXPERIMENTS.md E5 | spec only | depends on #3 (same protocol) |
-| 5 | Question-bank for Nymeria sessions (target 50-80 q) | TODO.md, this file | not started | annotation labor on Nymeria narrations |
-| 6 | Encoder-bypass stress test on Nymeria | this file | not started | needs `query_mode: last_seen` questions with Nymeria GPS |
-| 7 | Memory + latency vs session length | this file | Aria-internal done (2026-05-26); **Nymeria rerun pending** | item 0 |
+| 0a | Aria Gen 2 pipeline: VRS reader + extraction of 12 sessions | EXPERIMENTS.md | **done** (commits `9ee1c9b`..`e7babe3`, verified all 12 with `vrs_gps`/`vrs_slam`) | — |
+| 0b | Nymeria pipeline: reader + atomic_action questions + extraction of 30 sessions | EXPERIMENTS.md | **in progress** (reader `a3e4a72`, sbatch ready; extraction sweep submitted today) | extraction wall time |
+| 1 | Naive retrieval baselines (no H3) | EXPERIMENTS.md E11 | Aria-internal done (2026-05-26); **Aria Gen 2 + Nymeria rerun pending** | item 0b |
+| 2 | PSM hyperparameter sensitivity (incl. H3 res across mobility scales) | EXPERIMENTS.md E12 | Aria-internal done (2026-05-28); **rerun pending** | item 0b |
+| 3 | MLLM baselines: Gemini 3.1 Pro + Claude 4.6 Opus (api.llama.com proxy) | EXPERIMENTS.md E10 | **client + harness done** (commit `471e4ab`/`d051757`/`6c10625`/`ed9f2f7`), smoke-tested on Gemini end-to-end; **full sweep pending** | item 0b + questions |
+| 4 | End-to-end PSM → MLLM reranker | EXPERIMENTS.md E5 | spec only; harness is the same `eval_psm_mllm.py` from #3 | depends on #3 (same protocol) |
+| 5 | Question-bank for Aria Gen 2 sessions (target ~120 q manually authored) | TODO.md, this file, task #7 | **annotation pending** | manual viewing pass |
+| 6 | Encoder-bypass stress test (last-seen mode) | this file | not started | needs `query_mode: last_seen` questions with real GPS (Aria Gen 2 walks) |
+| 7 | Memory + latency vs session length | this file | Aria-internal done (2026-05-26); **rerun pending on Nymeria for scale-credibility** | item 0b |
 
 ## Critical-path order
 
@@ -104,20 +111,20 @@ the bounded-memory framing above. The new critical path:
    the paper rides on a memory claim rather than an accuracy one.
 4. **E10 (MLLM baseline)** still gating for the prefilter half of the
    story. Without showing the MLLM gap exists on our corpus, we can't
-   pitch PSM as a prefilter for anything. The plan reports **two
-   MLLMs**, both in the final paper:
-   - **Llama-3.2-90B-Vision** via vLLM on the H200 dream allocation —
-     the open-weights reproducibility baseline. Unlimited rate, free
-     per call. Iterate the prompting protocol here (~days 1-3 of E10
-     work) while the question bank is also expanding.
-   - **Gemini 3 Pro** via API — the frontier-ceiling baseline. Run
-     once with the frozen protocol after Llama validates the harness.
-     Budget ~$50-100 in API calls. This is the apples-to-apples
-     comparison against the Localization Paradox paper's own measurements.
-   The two-baseline structure pre-empts "you picked a weak baseline"
-   and supports the headline framing: *"both open (Llama-3.2-90B) and
-   frontier (Gemini 3 Pro) MLLMs collapse on temporal grounding; the
-   gap is architectural, not a matter of model scale."*
+   pitch PSM as a prefilter for anything. The plan now reports **two
+   proprietary MLLMs**, both via the internal `api.llama.com/.../openai/v1`
+   proxy (no SGLang ops burden):
+   - **Gemini 3.1 Pro** (`gemini-3-1-pro-preview-genai`). Frontier
+     reasoning-model baseline; thinking tokens come out of `max_tokens`,
+     so the client uses 1024+ token budgets by default.
+   - **Claude 4.6 Opus** (`claude-4-6-opus-genai`). Second proprietary
+     vendor; same proxy, same request shape — only the `model` field
+     and `CLAUDE_API_KEY` differ.
+   The two-vendor structure pre-empts "you picked a weak baseline"
+   and supports the framing: *"two independent frontier MLLMs collapse on
+   temporal grounding; the gap is architectural, not vendor-specific."*
+   Llama-3.2-90B via SGLang is parked for v2 / camera-ready — the
+   proxy already serves what we need.
 5. **E5 (PSM → MLLM reranker)** is still the punchline. Now needs to
    show: PSM + MLLM reranker > vanilla MLLM on *grounding* metrics
    (mIoU), regardless of who wins on raw question-answering accuracy.
@@ -230,3 +237,11 @@ Add dated entries here as work lands; mirror to the EXPERIMENTS.md experiment wh
   **Pre-pivot action items (preserved here as the playbook for the Nymeria rerun):** re-run at H3 res=11 to report tuned operating point; update §1-§3 drafts to use res=11; F3 figure SVG at `journal/figures/hyperparam_sensitivity.svg`. `eval_bigg_all.sh` now exposes H3_RES + EXEMPLARS + TIME_WINDOW + CAPACITY env knobs (commit `e8922a6`) so the Nymeria rerun lands at the tuned operating point in one flag.
 - 2026-05-28 — **Corpus pivot: Nymeria-only from now on.** The 3-session Aria corpus used through this date is internal-only and cannot appear in a published paper. All Aria result numbers (E11 83% Hit @5, E12 hyperparameter curves, item 7 latency benchmarks, v1/v2 writeups) are now classified "internal preliminary validation" — they confirm the pipeline works end-to-end but cannot be cited. Engine, scripts, codec, perf fix, eval harness all transfer to Nymeria unchanged. New item 0 added to the experiments table: **Nymeria pipeline** (download + VRS reader + extraction subset + question annotation). Hard prerequisite for items 1-7. Aria experiments stop immediately; all cluster cycles redirect to Nymeria from here. Wearables AI Jul 1 milestone preserved — no scope cuts to the paper (E10/E5 still in), but timeline pressure intensifies because items 1, 2, 7 need to re-land on Nymeria before being publishable.
 - 2026-05-28 — **Corpus pivot finalized (third revision today): Aria Gen 2 Pilot + Ego4D NLQ val.** Aria Gen 2 Pilot inspection showed 12 sequences / 1.1h total — roughly the same scale as our internal corpus, so it doesn't solve the small-corpus reviewer flag on its own. Pairing with Ego4D NLQ adds: (a) ~1.6K pre-annotated `[t_start, t_end]` QA pairs (skips the annotation-labor risk that was the highest-timeline item on the plan), (b) benchmark-credibility — "we report on Ego4D NLQ" is one line, vs three paragraphs defending a hand-annotated 20-question set, and (c) a natural test of the Localization Paradox hypothesis on the right kind of dataset. Aria Gen 2 still anchors the headline (Wearables-AI-native, rich annotations: diarization + HOI + depth + scene). Two extraction passes: VRS reader for Aria Gen 2 + Aria Everyday Activities (next session), MP4 + JSON-sidecar path for Ego4D NLQ. Engine transfers unchanged.
+
+- 2026-05-29 — **Aria Gen 2 extraction landed.** All 12 sessions extracted with CLIP-L (commits `9ee1c9b`..`e7babe3`); verified `walk_0`/`walk_1` -> `vrs_gps` (real GPS streams 281-2 read from VRS), other 10 -> `vrs_slam` (closed-loop SLAM trajectory projected at fake origin). Discovered + fixed two bugs along the way: (a) GPS API contact firing the `projectaria-tools` quality-warning per call (silenced via fd-2 redirect, commit `870caed`/`cc761b2`), (b) `track_mode` was computed in the orchestrator but never serialized onto h5 group attrs (fixed in commit `5f9bdbe`, schema bump for ModelGroupSpec).
+
+- 2026-05-31 — **E10 client + harness landed end-to-end.** `scripts/_mllm_client.py` (Gemini 3.1 Pro + Claude 4.6 Opus via api.llama.com proxy) + `scripts/eval_psm_mllm.py` (PSM `--search` -> top-k candidates -> nearest cached / on-the-fly ffmpeg-decoded JPEG per candidate -> MLLM picks 1-based index -> emit per-question record in eval_lookback's schema for the aggregator). Smoke-tested on Gemini end-to-end. Three follow-ups along the way: (i) bumped smoke_test budget so Gemini's hidden thinking tokens don't exhaust it, (ii) auto-resolve source video via h5's `source_video` attr so cross-tree layouts work without --video, (iii) MLLM picks consistently came back as "1" on the cmu_soccer16_2 smoke take — diagnosis was that PSM returned 1 candidate per query (single H3 cell), not an MLLM order-bias bug.
+
+- 2026-06-01 — **Ego-Exo4D dropped after mobility-distribution diagnostic.** Ego-Exo4D atomic_descriptions looked attractive on annotation density (53K ego-visible+sure narrations across 696 takes, no AWS dance), but the wearer-trajectory bounding-box distribution (commits `db19ab4`/`9b1aafb`) showed median per-take displacement is 2.7m (skilled-task takes happen at a workbench / counter / soccer sideline). Only 7/696 takes exceed even 10m of bbox extent. Tried tightening PSM operating point on the longest take (`georgiatech_cooking_06_01_5`, 18 min, 229 q): still 1 H3 cell, 1 time bucket. Even at H3 res 13 (3.5m edge), most takes don't cross a cell boundary. **Conclusion**: Ego-Exo4D's skilled-task structure is fundamentally room-scale, no PSM operating point recovers spatial signal. Dropped from v1; mentioned in related work as motivating the per-corpus H3-resolution ablation.
+
+- 2026-06-02 — **Nymeria added as the v1 second corpus.** Discovered 30 fully-populated Nymeria sessions at `/checkpoint/.../nymeria_partial/` (~805 GB, each with VRS + SLAM trajectory + atomic_action.csv narrations). Inventory and SLAM-displacement probe (`scripts/nymeria_inventory.py` commit `d687c12`; `scripts/nymeria_slam_displacement.py` `0415ba4`/`85e4b6d`) show a graded mobility distribution: 1 session at street scale (69m bbox -> r10), 2 at building scale (~27m -> r11), 23 at room scale (4-13m -> r12-r13), 4 sub-room (< 3m, temporal-only regime). Combined with Aria Gen 2's outdoor walks (real GPS, street scale), this gives a complete graded-scale benchmark across all of egocentric wearable footage. Nymeria narration reader + per-session questions.yaml converter committed (`a3e4a72`); extraction sbatch ready (30-session array, 16-way concurrency, ~30-45 min wall). VRS reader's existing `_locate_vrs_file` handles Nymeria's `recording_head/data/data.vrs` layout without code changes. **Aria Gen 2 + Nymeria = v1 corpus locked.** Ego4D NLQ + Ego-Exo4D parked as v2 candidates if the published v1 reception warrants a scale extension.
