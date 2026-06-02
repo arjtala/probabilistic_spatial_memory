@@ -9,6 +9,13 @@ from .egoexo4d_atomic import (
     read_atomic_descriptions,
     summarize_atomic_split,
 )
+from .nymeria_narration import (
+    NymeriaNarration,
+    NymeriaSession,
+    read_nymeria_root,
+    read_session_narrations,
+    summarize_nymeria_split,
+)
 from .json_sidecar import (
     GPSSidecar,
     IMUSidecar,
@@ -26,6 +33,8 @@ __all__ = [
     "IMUSidecar",
     "NlqQuery",
     "NlqVideo",
+    "NymeriaNarration",
+    "NymeriaSession",
     "VrsExtractResult",
     "capture_time_epoch",
     "extract_frames",
@@ -35,8 +44,11 @@ __all__ = [
     "read_imu_json",
     "read_metadata_json",
     "read_nlq_annotations",
+    "read_nymeria_root",
+    "read_session_narrations",
     "read_vrs_session",
     "summarize_atomic_split",
     "summarize_nlq_split",
+    "summarize_nymeria_split",
     "video_duration",
 ]
