@@ -202,26 +202,136 @@ def _read_source_video_attr(features_h5: Path) -> Path | None:
     return Path(s)
 
 
+class VrsFrameSource(FrameSource):
+    """Pull a single JPEG from an Aria VRS file on-the-fly.
+
+    Reuses projectaria-tools' RGB stream decoder. The first fetch
+    incurs the VRS provider open + RGB-stream enumeration (~1-2 s);
+    subsequent fetches are sub-second since the provider is cached.
+
+    Trade-off vs Mp4FrameSource: VRS decode is slower per-frame because
+    we walk to the right device-clock timestamp instead of using
+    ffmpeg's keyframe seek. For PSM->MLLM eval at ~5 frames/query that's
+    fine (<5s/query overhead) and saves us re-extracting Nymeria's
+    8.7 GB VRS files just to keep JPEGs around.
+    """
+    def __init__(self, vrs_path: Path, scratch_root: Path | None = None):
+        self.vrs_path = vrs_path
+        self._scratch = Path(tempfile.mkdtemp(
+            prefix="psm-mllm-vrs-",
+            dir=str(scratch_root) if scratch_root else None,
+        ))
+        self._provider = None
+        self._rgb_stream = None
+        self._first_ts_s: float | None = None
+        self._cache: dict[int, Path] = {}
+
+    def _ensure_provider(self):
+        if self._provider is not None:
+            return
+        from projectaria_tools.core import data_provider
+        from projectaria_tools.core.stream_id import StreamId
+        self._provider = data_provider.create_vrs_data_provider(str(self.vrs_path))
+        if self._provider is None:
+            raise RuntimeError(f"projectaria-tools failed to open {self.vrs_path}")
+        # 214-1 is the primary RGB camera on Aria Gen 1 and Gen 2.
+        self._rgb_stream = StreamId("214-1")
+        n = self._provider.get_num_data(self._rgb_stream)
+        if n == 0:
+            raise RuntimeError(f"{self.vrs_path}: no frames on stream 214-1")
+        # Need the first-frame timestamp to convert our session-relative
+        # `t_s` back into VRS device-clock seconds. The extractor rebases
+        # device_ts -= device_ts[0] when writing features.h5 timestamps,
+        # so we mirror the same offset here.
+        _, first_record = self._provider.get_image_data_by_index(self._rgb_stream, 0)
+        self._first_ts_s = first_record.capture_timestamp_ns / 1e9
+
+    def fetch(self, t_s: float) -> Path:
+        # Quantize to whole seconds for caching — VRS decode is heavy
+        # enough that we don't want to decode twice for two top-k
+        # candidates a few hundred ms apart.
+        bucket = int(round(max(0.0, t_s)))
+        if bucket in self._cache:
+            return self._cache[bucket]
+        self._ensure_provider()
+        # Walk the stream forward; find the frame whose device-clock
+        # timestamp (relative to the first frame) is closest to bucket.
+        # Linear scan is fine — Aria streams index O(N) cheaply and
+        # we're decoding ~5 frames/query, not 5000.
+        target_dev_ts = self._first_ts_s + bucket
+        n = self._provider.get_num_data(self._rgb_stream)
+        # Binary-search would be cleaner; linear is good enough at N<5k.
+        best_i = 0
+        best_d = float("inf")
+        for i in range(n):
+            _, rec = self._provider.get_image_data_by_index(self._rgb_stream, i)
+            ts_s = rec.capture_timestamp_ns / 1e9
+            d = abs(ts_s - target_dev_ts)
+            if d < best_d:
+                best_d = d
+                best_i = i
+            if ts_s > target_dev_ts and best_d < 1.0:
+                # Walked past the target; stop scanning.
+                break
+        image_data, _ = self._provider.get_image_data_by_index(self._rgb_stream, best_i)
+        arr = image_data.to_numpy_array()
+        from PIL import Image
+        out = self._scratch / f"frame_t{bucket:06d}.jpg"
+        Image.fromarray(arr).save(out, format="JPEG", quality=90)
+        self._cache[bucket] = out
+        return out
+
+    def cleanup(self) -> None:
+        import shutil
+        shutil.rmtree(self._scratch, ignore_errors=True)
+
+
 def _resolve_video_from_source_attr(source: Path) -> Path | None:
-    """Map `source_video` attr -> a usable MP4 path, or None if no good option.
+    """Map `source_video` attr -> a usable video path, or None.
 
     The attr might be:
-      - An MP4 file (legacy MP4 extractions): return as-is.
+      - An MP4 file: return as-is (caller uses Mp4FrameSource).
+      - A VRS file: return as-is (caller uses VrsFrameSource).
       - An Ego-Exo4D take directory: pick frame_aligned_videos/aria*_214-1.mp4.
-      - An Aria session directory (has video.vrs): return None; on-the-fly
-        VRS decode is too slow, caller will surface the right error.
+      - A Nymeria/AEA session directory: pick recording_head/data/data.vrs.
+      - An Aria Gen 2 take directory: pick video.vrs.
+      - None of the above: None.
     """
     if source.is_file() and source.suffix == ".mp4":
+        return source
+    if source.is_file() and source.suffix == ".vrs":
         return source
     if source.is_dir():
         # Ego-Exo4D layout.
         ee_mp4 = next(source.glob("frame_aligned_videos/aria*_214-1.mp4"), None)
         if ee_mp4 is not None:
             return ee_mp4
-        # Aria session — not handled here. Return None so caller falls
-        # through to the VRS-too-slow SystemExit path.
+        # Nymeria / AEA layout.
+        nymeria_vrs = source / "recording_head" / "data" / "data.vrs"
+        if nymeria_vrs.exists():
+            return nymeria_vrs
+        # Aria Gen 2 Pilot layout.
+        gen2_vrs = source / "video.vrs"
+        if gen2_vrs.exists():
+            return gen2_vrs
+        # Self-organized.
+        for candidate in ("main.vrs", "aria01.vrs"):
+            p = source / candidate
+            if p.exists():
+                return p
         return None
     return None
+
+
+def _make_source_for(path: Path) -> FrameSource:
+    """Pick Mp4FrameSource vs VrsFrameSource based on file suffix.
+
+    Used by both the --video override and the source_video-attr
+    resolution path so the two stay consistent.
+    """
+    if path.suffix == ".vrs":
+        return VrsFrameSource(path)
+    return Mp4FrameSource(path)
 
 
 def make_frame_source(
@@ -262,33 +372,35 @@ def make_frame_source(
     if override_video is not None:
         if not override_video.exists():
             raise SystemExit(f"--video {override_video} does not exist")
-        return Mp4FrameSource(override_video)
+        return _make_source_for(override_video)
 
     default_frames = features_h5.parent / "frames"
     if default_frames.exists() and any(default_frames.glob("frame_*.jpg")):
         return CachedFramesSource(default_frames, sample_fps)
 
-    # Cross-tree resolution via the h5's source_video attr. This is the
-    # common Ego-Exo4D case: features.h5 lives under /checkpoint/..., but
-    # the source MP4 is under /datasets/egoexo4d/v2/takes/<name>/.
+    # Cross-tree resolution via the h5's source_video attr. Covers:
+    #   - Ego-Exo4D: features.h5 under /checkpoint/..., MP4 under /datasets/...
+    #   - Nymeria:   features.h5 under /checkpoint/.../nymeria_atomic/,
+    #                VRS under /checkpoint/.../nymeria_partial/
+    #   - Aria Gen 2 Pilot: features.h5 + VRS share a dir; either layout works
     source_attr = _read_source_video_attr(features_h5)
     if source_attr is not None:
         recovered = _resolve_video_from_source_attr(source_attr)
         if recovered is not None:
-            return Mp4FrameSource(recovered)
+            return _make_source_for(recovered)
 
-    # Auto-detect from session-dir layout.
+    # Auto-detect from session-dir layout (legacy single-tree setups).
     session_dir = features_h5.parent
     egoexo_mp4 = next(session_dir.glob("frame_aligned_videos/aria*_214-1.mp4"), None)
     if egoexo_mp4 is not None:
         return Mp4FrameSource(egoexo_mp4)
 
-    if (session_dir / "video.vrs").exists():
-        raise SystemExit(
-            f"{features_h5} appears to be from a VRS session ({session_dir/'video.vrs'}); "
-            "on-the-fly VRS decode is too slow. Re-run extractor with --keep-frames, "
-            "or pass --frames-dir / --video explicitly."
-        )
+    for vrs_candidate in (
+        session_dir / "video.vrs",
+        session_dir / "recording_head" / "data" / "data.vrs",
+    ):
+        if vrs_candidate.exists():
+            return VrsFrameSource(vrs_candidate)
 
     sibling_mp4s = sorted(session_dir.glob("*.mp4"))
     if len(sibling_mp4s) == 1:
