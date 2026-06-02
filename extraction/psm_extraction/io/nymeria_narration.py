@@ -72,10 +72,55 @@ class NymeriaSession:
     narrations: list[NymeriaNarration] = field(default_factory=list)
 
 
+# Trajectory CSV's first row gives us the Aria device-clock time the
+# recording started. The narration's start_time / end_time are on the
+# same device clock, so we subtract trajectory_t0 to put them on the
+# extractor's 0-relative timeline. Path mirrors aria_vrs._locate_slam_trajectory's
+# Nymeria/AEA candidate.
+_TRAJECTORY_CSV = "recording_head/mps/slam/closed_loop_trajectory.csv"
+
+
+def _trajectory_t0_seconds(session_dir: Path) -> float | None:
+    """Return the first tracking_timestamp_us / 1e6 from the SLAM CSV.
+
+    Used by `read_session_narrations` to rebase narration timestamps
+    onto the same 0-origin timeline the VRS extractor writes for frame
+    timestamps. Both narration `start_time`/`end_time` and trajectory
+    `tracking_timestamp_us` are on the head VRS device clock; subtracting
+    the trajectory's first row aligns them with the rebased features.h5
+    timeline.
+
+    Returns None if the CSV is missing or unreadable; caller will skip
+    the rebase (matching the legacy behavior that produced t=0-mismatched
+    questions.yaml — better to error visibly than rebase against a
+    guessed zero).
+    """
+    p = session_dir / _TRAJECTORY_CSV
+    if not p.is_file():
+        return None
+    try:
+        with p.open() as f:
+            reader = csv.DictReader(f)
+            if "tracking_timestamp_us" not in (reader.fieldnames or []):
+                return None
+            first = next(reader, None)
+            if first is None:
+                return None
+            return float(first["tracking_timestamp_us"]) / 1e6
+    except (OSError, ValueError, KeyError):
+        return None
+
+
 def read_session_narrations(
     session_dir: Path,
 ) -> NymeriaSession | None:
     """Load `narration/atomic_action.csv` for one Nymeria session.
+
+    Rebases narration timestamps by subtracting the trajectory CSV's
+    first `tracking_timestamp_us` so they match the extractor's
+    0-relative features.h5 timeline. When the trajectory CSV is missing
+    (no SLAM), returns None — without the rebase the narrations would
+    land at unphysical times like `33446s` for a 1207s-long recording.
 
     Returns None if the CSV is missing — caller should skip the
     session rather than emit an empty record (otherwise downstream
@@ -84,6 +129,13 @@ def read_session_narrations(
     """
     csv_path = session_dir / _NARRATION_CSV
     if not csv_path.is_file():
+        return None
+    t0 = _trajectory_t0_seconds(session_dir)
+    if t0 is None:
+        # Nymeria sessions without a SLAM trajectory CSV can't be
+        # rebased; without rebase the narration intervals are unusable
+        # (off by ~33,000s). Better to drop the session than to write
+        # questions that always miss the ground truth.
         return None
 
     out: list[NymeriaNarration] = []
@@ -97,20 +149,25 @@ def read_session_narrations(
             if not text:
                 continue
             try:
-                t0 = float(row["start_time"])
-                t1 = float(row["end_time"])
+                t_start = float(row["start_time"]) - t0
+                t_end = float(row["end_time"]) - t0
             except (KeyError, TypeError, ValueError):
                 continue
-            if t1 <= t0:
+            if t_end <= t_start:
                 continue  # degenerate interval; skip.
-            key = (text, t0)
+            if t_start < 0:
+                # Narration recorded before the trajectory started —
+                # would land at a negative timestamp in features.h5,
+                # which the eval IoU math can't match. Drop.
+                continue
+            key = (text, t_start)
             if key in seen:
                 continue
             seen.add(key)
             out.append(NymeriaNarration(
                 text=text,
-                t_start_sec=t0,
-                t_end_sec=t1,
+                t_start_sec=t_start,
+                t_end_sec=t_end,
                 annotator_id=row.get("annotator", "") or "",
                 request_uid=row.get("request_id", "") or "",
                 gaia_id=row.get("gaia_id", "") or "",
