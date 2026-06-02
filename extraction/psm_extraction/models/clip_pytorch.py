@@ -156,7 +156,18 @@ class CLIPPyTorchRunner(ModelRunner):
     def embed_text(self, query: str) -> np.ndarray:
         torch = self._torch
         with torch.inference_mode():
-            inputs = self._processor(text=[query], return_tensors="pt", padding=True)
+            # CLIP's text encoder hard-caps at 77 tokens; long-form narrations
+            # (Nymeria atomic_action, Ego-Exo4D atomic_descriptions) routinely
+            # blow past this. Truncate at the tokenizer rather than letting
+            # the embedding layer raise, since the queries-are-too-long failure
+            # mode is "drop trailing context", not "fail the run."
+            inputs = self._processor(
+                text=[query],
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=77,
+            )
             inputs = {k: v.to(self._device) for k, v in inputs.items()}
             feats = self._model.get_text_features(**inputs)
             feats = _coerce_clip_features(feats, self._model, "text")
