@@ -29,17 +29,20 @@ from pathlib import Path
 
 DEFAULT_ROOT = Path("/checkpoint/dream/arjangt/video_retrieval/nymeria_partial")
 
-# Approximate H3 cell edge lengths in meters at the equator, from the
-# H3 docs. We use these to give a back-of-envelope "would PSM carve
-# this session into N cells?" answer without hitting the H3 library.
-# Edge length ~ avg distance between adjacent cell centers.
+# Average H3 cell edge lengths in meters from the H3 docs:
+# https://h3geo.org/docs/core-library/restable/#cell-areas
+# Edge length ~ avg distance between adjacent cell centers; we use it
+# as the "is this bbox larger than one cell?" threshold. The threshold
+# is a lower bound on whether PSM might carve into multiple cells —
+# actual carving depends on the path crossing boundaries, not just
+# spanning a diagonal that exceeds the cell edge.
 _H3_EDGE_M = {
-    10: 65_000,
-    11: 24_900,
-    12: 9_415,
-    13: 3_560,
-    14: 1_348,
-    15: 510,
+    10: 65.9,
+    11: 24.9,
+    12: 9.4,
+    13: 3.56,
+    14: 1.35,
+    15: 0.51,
 }
 
 
@@ -97,7 +100,7 @@ def main() -> int:
         f"{'session':<55s} "
         f"{'integ_m':>8s} {'ext3D_m':>8s} {'ext_xy':>7s} "
         f"{'dx':>6s} {'dy':>6s} {'dz':>6s} "
-        f"{'>r13':>5s} {'>r14':>5s} {'>r15':>5s}"
+        f"{'>r10':>5s} {'>r11':>5s} {'>r12':>5s} {'>r13':>5s} {'>r14':>5s}"
     )
     print(header)
     print("-" * len(header))
@@ -116,13 +119,7 @@ def main() -> int:
         dz = bbox_extent_m(zs)
         ext3d = math.sqrt(dx * dx + dy * dy + dz * dz)
         ext_xy = math.sqrt(dx * dx + dy * dy)
-        # Crude "does this span > 1 H3 cell?" at various resolutions:
-        # assume the bbox diagonal exceeds the cell edge length.
-        # This is approximate — actual carving depends on the wearer's
-        # path crossing cell boundaries, not just spanning the diagonal.
-        # But for an "is this even potentially multi-cell?" probe it's
-        # the right order of magnitude.
-        spans = {r: ("Y" if ext3d >= _H3_EDGE_M[r] else "-") for r in (13, 14, 15)}
+        spans = {r: ("Y" if ext3d >= _H3_EDGE_M[r] else "-") for r in (10, 11, 12, 13, 14)}
         rows.append((ext3d, d.name, (integ, ext3d, ext_xy, dx, dy, dz, spans)))
 
     rows.sort(key=lambda r: -r[0])
@@ -134,14 +131,15 @@ def main() -> int:
         print(f"{name:<55s} "
               f"{integ:>8.1f} {ext3d:>8.2f} {ext_xy:>7.2f} "
               f"{dx:>6.2f} {dy:>6.2f} {dz:>6.2f} "
-              f"{spans[13]:>5s} {spans[14]:>5s} {spans[15]:>5s}")
+              f"{spans[10]:>5s} {spans[11]:>5s} {spans[12]:>5s} {spans[13]:>5s} {spans[14]:>5s}")
 
     print()
     print("# integ_m   = Σ‖step‖, matches metadata.json's head_trajectory_m")
     print("# ext3D_m   = sqrt(dx² + dy² + dz²), bounding-box diagonal")
     print("# ext_xy    = ground-plane bbox diagonal (tx, ty only)")
-    print("# >r13/14/15 = does ext3D_m exceed H3 cell edge at that resolution?")
-    print(f"#                r13={_H3_EDGE_M[13]:.0f}m  r14={_H3_EDGE_M[14]:.0f}m  r15={_H3_EDGE_M[15]:.0f}m")
+    print("# >r10..14  = does ext3D_m exceed avg H3 cell edge at that resolution?")
+    print("#   r10=65.9m  r11=24.9m  r12=9.4m  r13=3.56m  r14=1.35m")
+    print("#   (cell areas: r10=15047m²  r11=2150m²  r12=307m²  r13=43.9m²  r14=6.27m²)")
     return 0
 
 
