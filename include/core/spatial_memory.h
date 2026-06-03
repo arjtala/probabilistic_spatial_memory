@@ -90,13 +90,23 @@ typedef struct {
 // are ignored). k_ring >= 0 restricts the scan to the H3 k-ring neighborhood
 // around (center_lat, center_lng).
 //
+// per_cell_cap controls how many top-similarity exemplars each tile may
+// contribute to the final top-k. Default of 1 enforces spatial diversity
+// (each place can win at most one of the top-k slots). Setting it equal to
+// max_out reduces to plain top-K-across-all-exemplars (= brute-force), which
+// is the right knob when the wearer stays in one cell and you'd rather have
+// 5 temporally-distinct moments from that one cell than 1 moment + 4 empty
+// slots. Values in between trade per-cell breadth for spatial diversity.
+// Pass 0 to mean "1" so the legacy 2-arg callers keep their semantics.
+//
 // Results are sorted by similarity descending; ties broken by t_max descending.
-// Returns the total number of matched tiles; probe mode (out == NULL or
-// max_out == 0) scans without writing.
+// Returns the total number of (cell, exemplar) candidates considered; probe
+// mode (out == NULL or max_out == 0) scans without writing.
 size_t SpatialMemory_query_similar(SpatialMemory *sm, const float *query,
                                    size_t dim, double center_lat,
                                    double center_lng, int k_ring,
-                                   SpatialMemorySimilar *out, size_t max_out);
+                                   SpatialMemorySimilar *out, size_t max_out,
+                                   size_t per_cell_cap);
 
 void SpatialMemory_free(SpatialMemory *sm);
 

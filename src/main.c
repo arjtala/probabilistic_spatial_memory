@@ -31,6 +31,7 @@ enum {
   EXEMPLARS_OPT_VAL,
   SEED_OPT_VAL,
   EXEMPLAR_CODEC_OPT_VAL,
+  PER_CELL_CAP_OPT_VAL,
 };
 
 typedef enum {
@@ -51,6 +52,7 @@ typedef struct {
   double last_seen_lng;
   int last_seen_k_ring;
   size_t last_seen_top;
+  size_t per_cell_cap;
   bool search_mode;
   const char *search_path;
   bool has_center;
@@ -223,6 +225,7 @@ static void print_usage(const char *program) {
   fprintf(stderr, "  --search <path>         Retrieve by embedding similarity (binary float32 LE vector)\n");
   fprintf(stderr, "  --center LAT,LNG        Optional geographic center for --search\n");
   fprintf(stderr, "  --exemplars N           Per-tile reservoir size (auto-set to 8 with --search)\n");
+  fprintf(stderr, "  --per-cell-cap N        Max top-k slots one cell may fill (default: 1)\n");
   fprintf(stderr, "  --seed N                Reservoir-sampler seed (uint64, decimal or 0x...) for reproducible runs\n");
   fprintf(stderr, "  --exemplar-codec NAME   Exemplar payload codec: raw | turboquant_2b | turboquant_3b | turboquant_4b (default: raw)\n");
   fprintf(stderr, "\nRetention window = capacity * time-window (default: 12 * 5.0s = 60s).\n");
@@ -244,6 +247,7 @@ static void cli_options_init(CliOptions *options) {
   options->last_seen_lng = 0.0;
   options->last_seen_k_ring = 0;
   options->last_seen_top = 5;
+  options->per_cell_cap = 1;
   options->search_mode = false;
   options->search_path = NULL;
   options->has_center = false;
@@ -355,6 +359,7 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
       {"exemplars", required_argument, NULL, EXEMPLARS_OPT_VAL},
       {"seed", required_argument, NULL, SEED_OPT_VAL},
       {"exemplar-codec", required_argument, NULL, EXEMPLAR_CODEC_OPT_VAL},
+      {"per-cell-cap", required_argument, NULL, PER_CELL_CAP_OPT_VAL},
       {0, 0, 0, 0},
   };
 
@@ -437,6 +442,12 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
     case EXEMPLARS_OPT_VAL:
       if (!parse_size_t_in_range(optarg, "exemplars", 0, SIZE_MAX,
                                  &options->exemplar_capacity)) {
+        return false;
+      }
+      break;
+    case PER_CELL_CAP_OPT_VAL:
+      if (!parse_size_t_in_range(optarg, "per-cell-cap", 1, SIZE_MAX,
+                                 &options->per_cell_cap)) {
         return false;
       }
       break;
@@ -686,7 +697,8 @@ static bool run_similar_output(SpatialMemory *sm, const CliOptions *opts,
   double center_lng = opts->has_center ? opts->center_lng : 0.0;
   int k_ring = opts->has_center ? opts->last_seen_k_ring : -1;
   size_t total_found = SpatialMemory_query_similar(
-      sm, query, dim, center_lat, center_lng, k_ring, results, top);
+      sm, query, dim, center_lat, center_lng, k_ring, results, top,
+      opts->per_cell_cap);
   size_t written = (total_found < top) ? total_found : top;
 
   if (opts->output_format == OUTPUT_JSON) {

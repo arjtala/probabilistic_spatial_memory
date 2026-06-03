@@ -160,6 +160,7 @@ def run_psm_search(
     seed: int | None,
     exemplar_codec: str,
     verbose: bool,
+    per_cell_cap: int = 1,
 ) -> dict:
     cmd = [
         str(psm_binary),
@@ -172,6 +173,7 @@ def run_psm_search(
         "--top", str(top),
         "--exemplars", str(exemplars),
         "--exemplar-codec", exemplar_codec,
+        "--per-cell-cap", str(per_cell_cap),
         "--search", str(query_path),
         "-j",
     ]
@@ -248,6 +250,11 @@ def main() -> int:
     ap.add_argument("--h3-resolution", type=int, default=10)
     ap.add_argument("--precision", type=int, default=10)
     ap.add_argument("--exemplars", type=int, default=8)
+    ap.add_argument("--per-cell-cap", type=int, default=1,
+                    help="Max top-k slots a single H3 cell may fill. Default 1 "
+                         "enforces spatial diversity; raise toward --top when "
+                         "the wearer stayed in one cell and embedding similarity "
+                         "matters more than place diversity.")
     ap.add_argument(
         "--exemplar-codec", default="raw",
         choices=["raw", "turboquant_2b", "turboquant_3b", "turboquant_4b"],
@@ -355,6 +362,7 @@ def main() -> int:
                     seed=(None if args.seed < 0 else args.seed),
                     exemplar_codec=args.exemplar_codec,
                     verbose=args.verbose,
+                    per_cell_cap=args.per_cell_cap,
                 )
 
             results = payload.get("results", [])

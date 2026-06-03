@@ -313,7 +313,7 @@ void test_sm_query_similar_empty(void) {
   SpatialMemory *sm = SpatialMemory_new(RESOLUTION, CAPACITY, PRECISION, 4, EXEMPLAR_CODEC_RAW);
   float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};
   SpatialMemorySimilar out[4];
-  size_t n = SpatialMemory_query_similar(sm, q, 4, 0.0, 0.0, -1, out, 4);
+  size_t n = SpatialMemory_query_similar(sm, q, 4, 0.0, 0.0, -1, out, 4, 1);
   ASSERT(0 == (int)n, 0, (int)n);
   SpatialMemory_free(sm);
 }
@@ -324,7 +324,7 @@ void test_sm_query_similar_exact_match(void) {
   SpatialMemory_observe(sm, 1.0, LAT, LNG, v, sizeof(v));
 
   SpatialMemorySimilar out[4];
-  size_t n = SpatialMemory_query_similar(sm, v, 4, 0.0, 0.0, -1, out, 4);
+  size_t n = SpatialMemory_query_similar(sm, v, 4, 0.0, 0.0, -1, out, 4, 1);
   ASSERT(1 == (int)n, 1, (int)n);
   ASSERT(out[0].cell == CELLID_RS10, 1, out[0].cell == CELLID_RS10);
   // cos(x, x) == 1.0 for any non-zero x; allow tiny float slack.
@@ -342,7 +342,7 @@ void test_sm_query_similar_picks_closer_exemplar(void) {
 
   float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};
   SpatialMemorySimilar out[4];
-  size_t n = SpatialMemory_query_similar(sm, q, 4, 0.0, 0.0, -1, out, 4);
+  size_t n = SpatialMemory_query_similar(sm, q, 4, 0.0, 0.0, -1, out, 4, 1);
   ASSERT(1 == (int)n, 1, (int)n);
   ASSERT(out[0].similarity > 0.9999, 1, out[0].similarity > 0.9999);
   // The "near" exemplar at t=20 should have won, not the orthogonal one.
@@ -359,7 +359,7 @@ void test_sm_query_similar_ranks_tiles(void) {
 
   float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};
   SpatialMemorySimilar out[4];
-  size_t n = SpatialMemory_query_similar(sm, q, 4, 0.0, 0.0, -1, out, 4);
+  size_t n = SpatialMemory_query_similar(sm, q, 4, 0.0, 0.0, -1, out, 4, 1);
   ASSERT(n >= 2, 1, n >= 2);
   // v_a is more aligned with q than v_b, so it should rank first.
   ASSERT(out[0].similarity > out[1].similarity, 1,
@@ -376,7 +376,7 @@ void test_sm_query_similar_mismatched_dim_skipped(void) {
 
   float q4[4] = {1.0f, 0.0f, 0.0f, 0.0f};
   SpatialMemorySimilar out[4];
-  size_t n = SpatialMemory_query_similar(sm, q4, 4, 0.0, 0.0, -1, out, 4);
+  size_t n = SpatialMemory_query_similar(sm, q4, 4, 0.0, 0.0, -1, out, 4, 1);
   ASSERT(0 == (int)n, 0, (int)n);
   SpatialMemory_free(sm);
 }
@@ -390,7 +390,7 @@ void test_sm_query_similar_k_ring_restricts_scan(void) {
 
   SpatialMemorySimilar out[4];
   // k_ring=2 around LAT/LNG excludes Tokyo.
-  size_t n = SpatialMemory_query_similar(sm, v, 4, LAT, LNG, 2, out, 4);
+  size_t n = SpatialMemory_query_similar(sm, v, 4, LAT, LNG, 2, out, 4, 1);
   ASSERT(1 == (int)n, 1, (int)n);
   ASSERT(out[0].cell == CELLID_RS10, 1, out[0].cell == CELLID_RS10);
   SpatialMemory_free(sm);
@@ -402,9 +402,9 @@ void test_sm_query_similar_probe_mode(void) {
   SpatialMemory_observe(sm, 1.0, LAT, LNG, v, sizeof(v));
   SpatialMemory_observe(sm, 2.0, LAT + 0.01, LNG, v, sizeof(v));
 
-  size_t n_null = SpatialMemory_query_similar(sm, v, 4, 0.0, 0.0, -1, NULL, 10);
+  size_t n_null = SpatialMemory_query_similar(sm, v, 4, 0.0, 0.0, -1, NULL, 10, 1);
   SpatialMemorySimilar out[1];
-  size_t n_zero = SpatialMemory_query_similar(sm, v, 4, 0.0, 0.0, -1, out, 0);
+  size_t n_zero = SpatialMemory_query_similar(sm, v, 4, 0.0, 0.0, -1, out, 0, 1);
   ASSERT(n_null == n_zero, 1, n_null == n_zero);
   ASSERT(n_null >= 2, 1, n_null >= 2);
   SpatialMemory_free(sm);

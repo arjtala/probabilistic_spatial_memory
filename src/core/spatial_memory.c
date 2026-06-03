@@ -242,15 +242,36 @@ static int compare_similar_desc(const void *a, const void *b) {
 // only need it for the top-k tiles that survive sorting. The caller fills in
 // t_min/t_max/count for the surviving rows after qsort; see
 // `fill_window_for_top_k` below.
-static bool score_tile_similar(Tile *tile, const ExemplarCodecQuery *prepared,
-                               SpatialMemorySimilar *out) {
+// Fill `out_rows` (capacity `cap`) with up to `cap` highest-similarity
+// exemplars from `tile`, sorted by similarity descending. Returns the
+// number of rows written.
+//
+// `cap == 1` matches the legacy `score_tile_similar` behavior (one best
+// exemplar per tile) and is the spatial-diversity default. `cap > 1`
+// lets a single tile contribute multiple results when the wearer stayed
+// in one place — useful when there's effectively no spatial structure
+// to exploit (tiny indoor takes, single-cell sessions).
+//
+// Like score_tile_similar, this does NOT call RingBuffer_merge_window —
+// the t_min/t_max/count fields are placeholder + filled in by
+// fill_window_for_top_k only for the top-k survivors after qsort. All
+// rows from a given tile share the same RingBuffer state so the
+// merge-window result is identical across them; fill_window_for_top_k
+// is therefore called once per *unique* tile in the top-k, not once
+// per row.
+static size_t score_tile_similar_topn(Tile *tile,
+                                      const ExemplarCodecQuery *prepared,
+                                      SpatialMemorySimilar *out_rows,
+                                      size_t cap) {
+  if (cap == 0) return 0;
   size_t n_ex = Tile_exemplar_count(tile);
-  if (n_ex == 0) return false;
+  if (n_ex == 0) return 0;
 
-  double best_sim = -2.0;  // any valid cosine in [-1, 1] beats this sentinel.
-  double best_t = 0.0;
-  bool found = false;
-
+  // Insertion-sort into out_rows[]. cap is small (1..top, ~5-10
+  // typical), so quadratic insertion is faster than malloc-ing a
+  // separate buffer + qsort + memcpy. Stays malloc-free, matching
+  // the perf-critical contract of the original score_tile_similar.
+  size_t nrows = 0;
   for (size_t i = 0; i < n_ex; ++i) {
     const TileExemplar *ex = Tile_exemplar_at(tile, i);
     if (!ex || !ex->data) continue;
@@ -258,25 +279,39 @@ static bool score_tile_similar(Tile *tile, const ExemplarCodecQuery *prepared,
     if (!ExemplarCodec_cosine(prepared, ex->data, ex->size, &sim)) {
       continue;
     }
-    if (sim > best_sim) {
-      best_sim = sim;
-      best_t = ex->t;
-      found = true;
+    // Find the insertion point: scan from the end. nrows is small,
+    // and most exemplars don't beat the existing top — common case
+    // is "doesn't dislodge anyone" which exits the loop in 1 cmp.
+    if (nrows == cap && sim <= out_rows[cap - 1].similarity) {
+      continue;
     }
+    size_t pos = (nrows < cap) ? nrows : cap - 1;
+    while (pos > 0 && out_rows[pos - 1].similarity < sim) {
+      out_rows[pos] = out_rows[pos - 1];
+      pos--;
+    }
+    out_rows[pos].cell = tile->cellId;
+    out_rows[pos].similarity = sim;
+    out_rows[pos].exemplar_t = ex->t;
+    // Provisional t_min/t_max/count — fill_window_for_top_k overwrites
+    // for surviving rows. Same convention as score_tile_similar.
+    out_rows[pos].t_min = ex->t;
+    out_rows[pos].t_max = ex->t;
+    out_rows[pos].count = 0.0;
+    if (nrows < cap) nrows++;
   }
-  if (!found) return false;
+  return nrows;
+}
 
-  // Provisional t_min/t_max/count — populated for real only for the top-k
-  // survivors after sorting. Default to the winning exemplar's timestamp +
-  // zero count so a caller that ignores the merge-window pass still gets
-  // sensible values rather than uninitialized garbage.
-  out->cell = tile->cellId;
-  out->similarity = best_sim;
-  out->exemplar_t = best_t;
-  out->t_min = best_t;
-  out->t_max = best_t;
-  out->count = 0.0;
-  return true;
+// Score the single best exemplar in a tile and write it to *out. Kept as
+// a thin wrapper over score_tile_similar_topn(cap=1) for callers that
+// want exactly-one-per-tile semantics without threading the cap arg
+// through. Currently unused (the query path goes through topn directly),
+// but kept for future direct-use sites and clarity in the call graph.
+__attribute__((unused))
+static bool score_tile_similar(Tile *tile, const ExemplarCodecQuery *prepared,
+                               SpatialMemorySimilar *out) {
+  return score_tile_similar_topn(tile, prepared, out, 1) == 1;
 }
 
 // Fill in t_min / t_max / count for one already-scored row by merging that
@@ -297,8 +332,10 @@ static void fill_window_for_top_k(SpatialMemorySimilar *row, Tile *tile,
 size_t SpatialMemory_query_similar(SpatialMemory *sm, const float *query,
                                    size_t dim, double center_lat,
                                    double center_lng, int k_ring,
-                                   SpatialMemorySimilar *out, size_t max_out) {
+                                   SpatialMemorySimilar *out, size_t max_out,
+                                   size_t per_cell_cap) {
   if (!sm || !query || dim == 0) return 0;
+  if (per_cell_cap == 0) per_cell_cap = 1;  // legacy 1-per-cell default.
 
   ExemplarCodecQuery *prepared =
       ExemplarCodecQuery_new(sm->exemplar_codec, dim, query);
@@ -340,6 +377,8 @@ size_t SpatialMemory_query_similar(SpatialMemory *sm, const float *query,
     ExemplarCodecQuery_free(prepared);
     return 0;
   }
+  // Each tile may contribute up to per_cell_cap rows. Multiply.
+  max_scratch *= per_cell_cap;
 
   SpatialMemorySimilar *scratch = (SpatialMemorySimilar *)malloc(
       max_scratch * sizeof(SpatialMemorySimilar));
@@ -356,16 +395,14 @@ size_t SpatialMemory_query_similar(SpatialMemory *sm, const float *query,
       if (cell == H3_NULL) continue;
       Tile *tile = TileTable_get(sm->tiles, cell);
       if (!tile) continue;
-      if (score_tile_similar(tile, prepared, &scratch[nfound])) {
-        nfound++;
-      }
+      nfound += score_tile_similar_topn(tile, prepared, &scratch[nfound],
+                                        per_cell_cap);
     }
   } else {
     TileTableIterator it = TileTable_iterator(sm->tiles);
     while (TileTable_next(&it)) {
-      if (score_tile_similar(it.value, prepared, &scratch[nfound])) {
-        nfound++;
-      }
+      nfound += score_tile_similar_topn(it.value, prepared, &scratch[nfound],
+                                        per_cell_cap);
     }
   }
   free(cells);
@@ -379,9 +416,26 @@ size_t SpatialMemory_query_similar(SpatialMemory *sm, const float *query,
   // query, but only return O(max_out) of them. Calling merge_window only
   // on the survivors collapses ~1000x of HLL allocations per query into
   // ~10x at the default top-10.
+  //
+  // When per_cell_cap > 1, multiple top-k survivors may share the same
+  // tile (cell). All share the same RingBuffer so the merge-window result
+  // is identical for any row from that tile — compute once per unique
+  // cell, then memcpy the (t_min, t_max, count) triple into siblings.
   if (out && max_out > 0) {
     size_t to_copy = (nfound < max_out) ? nfound : max_out;
     for (size_t i = 0; i < to_copy; ++i) {
+      // Did we already merge-window this cell in a previous iteration?
+      bool seen = false;
+      for (size_t j = 0; j < i; ++j) {
+        if (scratch[j].cell == scratch[i].cell) {
+          scratch[i].t_min = scratch[j].t_min;
+          scratch[i].t_max = scratch[j].t_max;
+          scratch[i].count = scratch[j].count;
+          seen = true;
+          break;
+        }
+      }
+      if (seen) continue;
       Tile *tile = TileTable_get(sm->tiles, scratch[i].cell);
       if (tile) {
         fill_window_for_top_k(&scratch[i], tile, sm->capacity);

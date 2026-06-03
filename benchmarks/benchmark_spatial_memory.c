@@ -223,7 +223,7 @@ static void run_query_similar(const Coord *coords, size_t observe_ops,
   double start = monotonic_seconds();
   for (size_t i = 0; i < query_ops; ++i) {
     size_t n = SpatialMemory_query_similar(sm, query, dim, 0.0, 0.0, -1, out,
-                                           TOP);
+                                           TOP, 1);
     if (n > 0) hits++;
   }
   double elapsed = monotonic_seconds() - start;

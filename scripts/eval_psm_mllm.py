@@ -525,6 +525,9 @@ def main() -> int:
     ap.add_argument("--precision", type=int, default=14)
     ap.add_argument("--exemplars", type=int, default=128)
     ap.add_argument("--exemplar-codec", default="raw")
+    ap.add_argument("--per-cell-cap", type=int, default=1,
+                    help="Max top-k slots a single H3 cell may fill (see "
+                         "eval_lookback.py for ablation details).")
     ap.add_argument("--seed", type=int, default=-1)
     ap.add_argument("--exemplar-tolerance", type=float, default=1.5)
     ap.add_argument("--clip-checkpoint",
@@ -623,6 +626,7 @@ def main() -> int:
                 seed=(None if args.seed < 0 else args.seed),
                 exemplar_codec=args.exemplar_codec,
                 verbose=args.verbose,
+                per_cell_cap=args.per_cell_cap,
             )
             results = payload.get("results", [])
 
