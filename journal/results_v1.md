@@ -260,3 +260,32 @@ Operationally: the Nymeria mobility-extent probe
 (`scripts/nymeria_slam_displacement.py`) is the gate. Above 5m
 bbox: include. Below: exclude with footnote.
 
+
+## Multi-session generalization (2026-06-04)
+
+Sweep of `per_cell_cap` ∈ {1,2,3,5} across 4 Nymeria sessions
+spanning the mobility distribution. Same operating point as the
+shelby_arroyo_act0 sweep (H3 res 12, ex=1024, CPU CLIP).
+
+| Session | bbox | tier | cap=1 | cap=2 | cap=3 | cap=5 (= K) | Δ |
+|---|---|---|---|---|---|---|---|
+| shelby_arroyo_act0  | 69 m | street    | 8.0%  | 10.2% | 10.7% | **13.4%** | +5.4pp |
+| james_johnson_act0  | 27 m | building  | 8.2%  | 11.8% | 12.4% | **18.2%** | +10.0pp |
+| angela_harrell_act4 | 27 m | building  | 4.5%  | 9.0%  | 9.6%  | **11.9%** | +7.4pp |
+| jason_smith_act3    | 13 m | room      | 5.0%  | 6.5%  | 8.5%  | **10.6%** | +5.6pp |
+
+All four sessions show monotone Hit@5 lift with cap (5.4–10.0pp,
+mean +7.1pp); bucket mIoU@5 falls monotonically on all four
+(table omitted for length; same Pareto shape as the single-session
+analysis). The absolute Hit@5 values vary across sessions
+(james_johnson hits 18.2% at cap=5 because its narrations are more
+visually distinct — S14-By_my_desk vs the social-scene S3 / S16 /
+S19 of the others), but the **shape of the operating-point trade
+is universal**. The paper's cap-ablation claim now holds across
+4 sessions and 3 mobility tiers; sub-room (act3-style) is
+excluded as a benchmark limitation.
+
+This closes the 'single-session caveat' in §6 limitations and
+populates §5.5 (Multi-session generalization). Captures live at
+`captures/multisession_pcc_sweep/<sid>/eval_<sid>_pcc<cap>.json`.
+

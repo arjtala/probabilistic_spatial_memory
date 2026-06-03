@@ -209,22 +209,58 @@ selection.}
 \subsection{Multi-session generalization}
 \label{sec:results-multisession}
 
-\textbf{[PENDING]} A four-session sweep across the Nymeria mobility
-distribution (one session each from the street, building, room, and
-sub-room bbox-extent quartiles) is in flight. The single-session
-result above (\S\ref{sec:results-main}) was on the lone
-\texttt{shelby\_arroyo\_act0} street-scale session; this section will
-report whether the cap effect generalizes to the lower-mobility
-regimes that dominate the Nymeria distribution (median bbox extent
-$\sim$5\,m).
+Table~\ref{tab:multisession} reports the \texttt{per\_cell\_cap}
+sweep on four Nymeria sessions spanning the mobility distribution:
+the street-scale \texttt{shelby\_arroyo\_act0} (69\,m bbox, the
+single session of \S\ref{sec:results-main}), the building-scale
+\texttt{james\_johnson\_act0} and \texttt{angela\_harrell\_act4}
+($\sim$27\,m bbox), and the room-scale
+\texttt{jason\_smith\_act3} ($\sim$13\,m bbox). All four use the
+same operating point as \S\ref{sec:results-main} (H3 res 12,
+ex=1024).
 
-Preliminary result: on the \texttt{james\_johnson\_act3} sub-room
-session (3\,m bbox), both PSM and brute-force CLIP plateau at 1.2\%
-Hit@5 --- the methods co-fail on questions referencing a tiny space
-the wearer never left. We treat sub-room sessions
-(bbox extent $< 5$\,m) as a benchmark limitation and report main
-results only on sessions above that threshold
-(\S\ref{sec:limitations}).
+\begin{table}[t]
+\centering
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccc}
+\toprule
+Session & \texttt{cap}=1 & \texttt{cap}=2 & \texttt{cap}=3 & \texttt{cap}=$K$ \\
+\midrule
+\texttt{shelby\_arroyo\_act0}  (69\,m, street) & 8.0\%  & 10.2\% & 10.7\% & \textbf{13.4\%} \\
+\texttt{james\_johnson\_act0}  (27\,m, building) & 8.2\% & 11.8\% & 12.4\% & \textbf{18.2\%} \\
+\texttt{angela\_harrell\_act4} (27\,m, building) & 4.5\% & 9.0\%  & 9.6\%  & \textbf{11.9\%} \\
+\texttt{jason\_smith\_act3}    (13\,m, room)     & 5.0\% & 6.5\%  & 8.5\%  & \textbf{10.6\%} \\
+\bottomrule
+\end{tabular}
+\caption{Hit@5 across four Nymeria sessions spanning the mobility
+distribution. The monotone \texttt{per\_cell\_cap} effect holds
+on every session: relaxing the per-cell cap from 1 to $K$ buys
+5--10pp of Hit@5. The absolute values vary across sessions (a
+function of the underlying narration difficulty, not the
+\texttt{cap} knob), but the \emph{shape} of the operating-point
+trade is consistent. Bucket mIoU@5 (omitted for table compactness)
+falls monotonically with cap on all four sessions, confirming the
+Pareto trade of \S\ref{sec:results-pareto}.}
+\label{tab:multisession}
+\end{table}
+
+\paragraph{The cap effect is robust to session character.} The lift
+from \texttt{cap}=1 to \texttt{cap}=$K$ is 5.4pp (shelby), 10.0pp
+(james), 7.4pp (angela), and 5.6pp (jason). The variation reflects
+how much benefit relaxed spatial diversity gives on the particular
+revisit pattern of each session; the underlying mechanism is the same.
+
+\paragraph{Sub-room sessions are excluded.} We exclude the
+\texttt{james\_johnson\_act3} session (3\,m bbox, a sub-room
+recording dominated by sit-down work at a desk) from this
+generalization claim. On that session both PSM and brute-force CLIP
+plateau at $\sim$1.2\% Hit@5 across all \texttt{cap} values --- the
+narrations describe a tiny space the wearer never left, and the
+visually-most-similar frame is rarely the annotator's chosen ground
+truth. We treat sub-room mobility as a benchmark limitation rather
+than a method failure mode (\S\ref{sec:limitations}); the
+\texttt{nymeria\_slam\_displacement} probe in our reproducibility
+script provides a per-session bbox-extent gating threshold.
 
 \subsection{Memory and latency vs.\ session length}
 \label{sec:results-memory-latency}
