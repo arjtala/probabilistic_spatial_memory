@@ -163,3 +163,59 @@ Two changes vs. the original v1 plan:
 - [ ] Item 7 numbers re-validated on Nymeria (the Aria-internal
       latency numbers should hold but the writeup should reference
       Nymeria-scale frame counts)
+
+## Ablation sweep: `per_cell_cap` × `exemplars` × session (2026-06-03)
+
+Two follow-up sweeps on shelby_arroyo_act0 and a sub-room session.
+
+### Reservoir-size ablation (shelby_arroyo_act0, 187 q, r12)
+
+| `per_cell_cap` | exemplars=128 | exemplars=1024 | Δ |
+|---|---|---|---|
+| 1 | 9.1% | 8.0% | +1.1pp |
+| 2 | 9.6% | 10.2% | -0.6pp |
+| 3 | 10.2% | 10.7% | -0.5pp |
+| 5 (= K) | **11.2%** | **13.4%** | -2.2pp |
+
+At the permissive operating point (cap=K), tightening reservoir from
+1024 -> 128 costs ~2.2pp Hit@5 — the bounded-memory tradeoff in
+isolation. At cap=1 the reservoir size is essentially free (strict
+place diversity dominates the selection). The bounded-memory v1 result
+is: **PSM at ex=128, cap=5 achieves 11.2% Hit@5** (83% of brute-force's
+13.4%) at 8× memory reduction vs the full embedding bank.
+
+The slight `cap=1` *lift* with smaller reservoir (9.1% vs 8.0%) is
+within noise on a single 187-question session but consistent with the
+hypothesis that small reservoir + strict diversity = more
+representative per-cell exemplar. Worth re-checking across more
+sessions before drawing conclusions.
+
+### Sub-room session: james_johnson_act3 (171 q, 3m bbox extent, r12)
+
+| `per_cell_cap` | Hit@5 |
+|---|---|
+| 1 | 0.6% |
+| 2 | 1.2% |
+| 3 | 1.2% |
+| 5 | 1.2% |
+
+**Effectively no signal at any operating point.** This is the sub-room
+displacement regime (3m bbox = wearer sitting at one location); cap
+doesn't matter because there's barely any spatial structure to
+exploit. The questions are the same revisit-heavy long-narration shape
+that we saw on the indoor scenes of shelby_arroyo_act0, but compressed
+to a tiny space — every narration describes the same room and brute-
+force CLIP would presumably struggle too. Pending the brute-force
+co-failure check; if confirmed, **mobility threshold becomes a
+limitation to surface in §6**: PSM (and CLIP-based retrieval in
+general) requires the wearer to actually have moved.
+
+This is the same finding the Ego-Exo4D drop diagnosed
+(`scripts/build_egoexo4d_mobility_manifest.py`): atomic-narration
+benchmarks degenerate at sub-room mobility. The Nymeria displacement
+quartiles let us threshold cleanly:
+
+- 1 session at street scale (62m): PSM matches brute-force at cap=5
+- 22 sessions at room scale (4-30m): expect partial matching (pending sweep)
+- 4 sessions at sub-room (<3m): excluded, document as limitation
+
