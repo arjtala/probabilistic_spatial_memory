@@ -219,3 +219,21 @@ quartiles let us threshold cleanly:
 - 22 sessions at room scale (4-30m): expect partial matching (pending sweep)
 - 4 sessions at sub-room (<3m): excluded, document as limitation
 
+
+### Brute-force co-failure check on sub-room session (act3, 2026-06-03)
+
+Brute-force CLIP on `james_johnson_act3` (171 questions, 3m bbox):
+**1.2% Hit@5 (2/171), 0.007 exemplar mIoU@5**. Identical ceiling to
+PSM at every cap value. **Confirmed**: sub-room mobility is the
+benchmark's failure regime, not PSM's. Paper writes this as:
+
+> Both PSM and brute-force CLIP collapse to <1.5% Hit@5 on
+> sub-room sessions (wearer bbox extent < 3m). The narrations at
+> this scale describe rooms the wearer never left, making any
+> single-frame answer ambiguous. We exclude such sessions from
+> the main reporting and note them as a benchmark limitation.
+
+Operationally: the Nymeria mobility-extent probe
+(`scripts/nymeria_slam_displacement.py`) is the gate. Above 5m
+bbox: include. Below: exclude with footnote.
+
