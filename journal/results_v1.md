@@ -34,10 +34,33 @@ stays the plan, this is the results-of-record.
 | PSM-only, `per_cell_cap=3` | 10.7% | 0.060 | 0.014 |
 | PSM-only, `per_cell_cap=5` (= K) | **13.4%** (25/187) | 0.074 | 0.013 |
 | PSM->Gemini, `per_cell_cap=1` | 8.0% (15/187) | 0.073 | 0.019 |
-| PSM->Gemini, `per_cell_cap=5` | _pending_ | _pending_ | _pending_ |
+| PSM->Gemini, `per_cell_cap=5` | **13.4%** (25/187) | **0.101** | 0.013 |
 
 Sources: `captures/eval_<sid>_pcc{1,2,3,5}.json`,
-`/tmp/smoke_brute_<sid>.json`, `/tmp/full_nymeria_<sid>.json`.
+`/tmp/smoke_brute_<sid>.json`, `/tmp/full_nymeria_<sid>.json`,
+`/tmp/full_mllm_pcc5_<sid>.json`.
+
+### Reading the table
+
+Two non-obvious things in the numbers:
+
+1. **MLLM rerank doesn't move Hit@5, but moves mIoU.** PSM-only @
+   cap=5 and PSM->Gemini @ cap=5 both hit the same 25/187 questions
+   (Hit@5 = 13.4%). But Gemini's rerank lifts exemplar mIoU@5 from
+   0.074 -> 0.101 — a 37% relative improvement on the localization-
+   precision metric. The rerank picks *more precisely-timed*
+   exemplars within the same correct cell, not different cells.
+   This is a genuine architectural finding: **MLLM rerank's value
+   at this operating point is localization quality, not retrieval
+   recall.**
+
+2. **PSM->Gemini @ cap=1 has exemplar mIoU 0.073, basically tied
+   with PSM-only @ cap=5 (0.074).** Cap=1 + rerank is roughly as
+   good as cap=5 alone on the localization metric, at much lower
+   memory cost. The MLLM rerank substitutes for the per-cell cap
+   relaxation. Worth surfacing in §5 — gives reviewers a clear
+   "PSM (bounded) + MLLM rerank ≈ brute-force CLIP" headline that
+   doesn't depend on per_cell_cap tuning.
 
 ## What's the headline claim?
 
