@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Figure 3 — Operating-point Pareto: per_cell_cap × {Hit@5, bucket mIoU@5}
+  for PSM-only on Nymeria shelby_arroyo_act0 (187 narrations).
+  Hand-authored SVG so paper-figure tooling stays minimal; reproducible
+  from captures/eval_<sid>_pcc{1,2,3,5}.json.
+
+  Two y-axes: left = Hit@5 (rising with cap), right = bucket mIoU@5
+  (falling with cap). The two metrics on the same plot makes the
+  Pareto trade visible at a glance.
+
+  Numbers (source = captures/eval_<sid>_pcc<cap>.json::summary):
+    cap=1:  hit@5 = 0.080, bucket_mIoU@5 = 0.019
+    cap=2:  hit@5 = 0.102, bucket_mIoU@5 = 0.014
+    cap=3:  hit@5 = 0.107, bucket_mIoU@5 = 0.014
+    cap=5:  hit@5 = 0.134, bucket_mIoU@5 = 0.013
+  brute-force CLIP reference: hit@5 = 0.134 (matches PSM cap=5),
+  shown as a horizontal dashed line on the Hit@5 axis.
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 720 460"
+     font-family="system-ui, sans-serif"
+     font-size="13">
+
+  <!-- Plot frame -->
+  <rect x="0" y="0" width="720" height="460" fill="white"/>
+
+  <!-- Title -->
+  <text x="360" y="28" text-anchor="middle" font-size="16" font-weight="600">
+    Operating-point Pareto: per-cell-cap trade
+  </text>
+  <text x="360" y="46" text-anchor="middle" font-size="11" fill="#555">
+    Nymeria shelby_arroyo_act0, 187 narrations · CLIP-L · H3 res 12 · ex=1024
+  </text>
+
+  <!-- Plot box: x-axis is per_cell_cap, left-y is Hit@5, right-y is bucket mIoU@5 -->
+  <!-- Plot area: x 90..620, y 80..380 -->
+  <line x1="90"  y1="380" x2="620" y2="380" stroke="#333" stroke-width="1.2"/>
+  <line x1="90"  y1="80"  x2="90"  y2="380" stroke="#333" stroke-width="1.2"/>
+  <line x1="620" y1="80"  x2="620" y2="380" stroke="#333" stroke-width="1.2"/>
+
+  <!-- x ticks: per_cell_cap ∈ {1, 2, 3, 5}.
+       Map cap values to x positions linearly across {1..5}:
+         x(cap) = 90 + (cap - 1) / 4 * 530
+         cap=1 -> 90
+         cap=2 -> 222.5
+         cap=3 -> 355
+         cap=4 -> 487.5  (not measured)
+         cap=5 -> 620 -->
+  <g stroke="#666" stroke-width="0.8">
+    <line x1="90"  y1="380" x2="90"  y2="386"/>
+    <line x1="222.5" y1="380" x2="222.5" y2="386"/>
+    <line x1="355" y1="380" x2="355" y2="386"/>
+    <line x1="487.5" y1="380" x2="487.5" y2="386"/>
+    <line x1="620" y1="380" x2="620" y2="386"/>
+  </g>
+  <g text-anchor="middle" font-size="12" fill="#333">
+    <text x="90"    y="402">1</text>
+    <text x="222.5" y="402">2</text>
+    <text x="355"   y="402">3</text>
+    <text x="487.5" y="402">4</text>
+    <text x="620"   y="402">5 (= K)</text>
+  </g>
+  <text x="355" y="428" text-anchor="middle" font-size="13" fill="#333">
+    per_cell_cap (max top-K slots one H3 cell may fill)
+  </text>
+
+  <!-- left y axis: Hit@5 from 0% to 16%
+       y(hit) = 380 - (hit / 0.16) * 300 -->
+  <g stroke="#666" stroke-width="0.8">
+    <line x1="84"  y1="380" x2="90"  y2="380"/>
+    <line x1="84"  y1="305" x2="90"  y2="305"/>  <!-- 4% -->
+    <line x1="84"  y1="230" x2="90"  y2="230"/>  <!-- 8% -->
+    <line x1="84"  y1="155" x2="90"  y2="155"/>  <!-- 12% -->
+    <line x1="84"  y1="80"  x2="90"  y2="80"/>   <!-- 16% -->
+  </g>
+  <g text-anchor="end" font-size="11" fill="#1f6feb">
+    <text x="80" y="384">0%</text>
+    <text x="80" y="309">4%</text>
+    <text x="80" y="234">8%</text>
+    <text x="80" y="159">12%</text>
+    <text x="80" y="84">16%</text>
+  </g>
+  <text x="34" y="230" text-anchor="middle" font-size="13" fill="#1f6feb"
+        transform="rotate(-90 34 230)">
+    exemplar Hit@5 (higher better)
+  </text>
+
+  <!-- right y axis: bucket mIoU@5 from 0 to 0.022
+       y(miou) = 380 - (miou / 0.022) * 300 -->
+  <g stroke="#666" stroke-width="0.8">
+    <line x1="620" y1="380" x2="626" y2="380"/>
+    <line x1="620" y1="312.7" x2="626" y2="312.7"/>  <!-- 0.005 -->
+    <line x1="620" y1="245.5" x2="626" y2="245.5"/>  <!-- 0.010 -->
+    <line x1="620" y1="178.2" x2="626" y2="178.2"/>  <!-- 0.015 -->
+    <line x1="620" y1="111"   x2="626" y2="111"/>    <!-- 0.020 -->
+  </g>
+  <g text-anchor="start" font-size="11" fill="#d97706">
+    <text x="630" y="384">0.000</text>
+    <text x="630" y="316.7">0.005</text>
+    <text x="630" y="249.5">0.010</text>
+    <text x="630" y="182.2">0.015</text>
+    <text x="630" y="115">0.020</text>
+  </g>
+  <text x="700" y="230" text-anchor="middle" font-size="13" fill="#d97706"
+        transform="rotate(90 700 230)">
+    bucket mIoU@5 (higher better)
+  </text>
+
+  <!-- Brute-force CLIP reference: Hit@5 = 0.134, y = 380 - (0.134/0.16)*300 = 128.75 -->
+  <line x1="90" y1="128.75" x2="620" y2="128.75"
+        stroke="#1f6feb" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/>
+  <text x="610" y="123" text-anchor="end" font-size="11" fill="#1f6feb" opacity="0.8">
+    brute-force CLIP-L (Hit@5 = 13.4%)
+  </text>
+
+  <!-- Data: Hit@5 (left axis, blue)
+       cap=1: y = 380 - 0.080/0.16 * 300 = 230
+       cap=2: y = 380 - 0.102/0.16 * 300 = 188.75
+       cap=3: y = 380 - 0.107/0.16 * 300 = 179.375
+       cap=5: y = 380 - 0.134/0.16 * 300 = 128.75 -->
+  <polyline fill="none" stroke="#1f6feb" stroke-width="2"
+            points="90,230 222.5,188.75 355,179.375 620,128.75"/>
+  <g fill="#1f6feb">
+    <circle cx="90"    cy="230"    r="5"/>
+    <circle cx="222.5" cy="188.75" r="5"/>
+    <circle cx="355"   cy="179.375" r="5"/>
+    <circle cx="620"   cy="128.75" r="5"/>
+  </g>
+  <!-- Hit@5 value labels above each point -->
+  <g text-anchor="middle" font-size="11" fill="#1f6feb" font-weight="600">
+    <text x="90"    y="220">8.0%</text>
+    <text x="222.5" y="178.75">10.2%</text>
+    <text x="355"   y="169.375">10.7%</text>
+    <text x="620"   y="118.75">13.4%</text>
+  </g>
+
+  <!-- Data: bucket mIoU@5 (right axis, orange)
+       Mapping y(miou) = 380 - (miou / 0.022) * 300
+       cap=1: y = 380 - 0.019/0.022 * 300 = 121.0
+       cap=2: y = 380 - 0.014/0.022 * 300 = 189.1
+       cap=3: y = 380 - 0.014/0.022 * 300 = 189.1
+       cap=5: y = 380 - 0.013/0.022 * 300 = 202.7 -->
+  <polyline fill="none" stroke="#d97706" stroke-width="2"
+            points="90,121.0 222.5,189.1 355,189.1 620,202.7"/>
+  <g fill="#d97706">
+    <circle cx="90"    cy="121.0" r="5"/>
+    <circle cx="222.5" cy="189.1" r="5"/>
+    <circle cx="355"   cy="189.1" r="5"/>
+    <circle cx="620"   cy="202.7" r="5"/>
+  </g>
+  <g text-anchor="middle" font-size="11" fill="#d97706" font-weight="600">
+    <text x="90"    y="111">0.019</text>
+    <text x="222.5" y="207">0.014</text>
+    <text x="355"   y="207">0.014</text>
+    <text x="620"   y="220.7">0.013</text>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(120 60)">
+    <rect x="0" y="-12" width="220" height="22" fill="white" stroke="#ccc" stroke-width="0.5"/>
+    <line x1="6" y1="-1" x2="26" y2="-1" stroke="#1f6feb" stroke-width="2"/>
+    <circle cx="16" cy="-1" r="4" fill="#1f6feb"/>
+    <text x="32" y="3" font-size="11" fill="#333">Hit@5 (left)</text>
+    <line x1="110" y1="-1" x2="130" y2="-1" stroke="#d97706" stroke-width="2"/>
+    <circle cx="120" cy="-1" r="4" fill="#d97706"/>
+    <text x="136" y="3" font-size="11" fill="#333">bucket mIoU@5 (right)</text>
+  </g>
+
+  <!-- Annotation: trade direction -->
+  <g transform="translate(360 350)" text-anchor="middle">
+    <text font-size="11" fill="#555">
+      Strict place diversity ←————————————————→ Permissive (= brute-force)
+    </text>
+  </g>
+</svg>
