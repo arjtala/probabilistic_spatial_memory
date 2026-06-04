@@ -224,6 +224,11 @@ class VrsFrameSource(FrameSource):
         self._provider = None
         self._rgb_stream = None
         self._first_ts_s: float | None = None
+        # All RGB frame timestamps in device-clock seconds, indexed
+        # by frame index. Cached on provider open so subsequent
+        # fetches use np.searchsorted (O(log N)) instead of an O(N)
+        # linear scan per fetch.
+        self._frame_ts_s: np.ndarray | None = None
         self._cache: dict[int, Path] = {}
 
     def _ensure_provider(self):
@@ -239,12 +244,22 @@ class VrsFrameSource(FrameSource):
         n = self._provider.get_num_data(self._rgb_stream)
         if n == 0:
             raise RuntimeError(f"{self.vrs_path}: no frames on stream 214-1")
-        # Need the first-frame timestamp to convert our session-relative
-        # `t_s` back into VRS device-clock seconds. The extractor rebases
-        # device_ts -= device_ts[0] when writing features.h5 timestamps,
-        # so we mirror the same offset here.
-        _, first_record = self._provider.get_image_data_by_index(self._rgb_stream, 0)
-        self._first_ts_s = first_record.capture_timestamp_ns / 1e9
+        # Walk the stream once at open time: cache every frame's
+        # device-clock timestamp into a contiguous numpy array. The
+        # walk costs ~1-2s for a 1000-frame session and avoids paying
+        # an O(N) get_image_data_by_index scan per fetch. (Linear-scan-
+        # per-fetch made the multi-session sweep ~24h instead of ~2h
+        # in the first attempt at this code path.)
+        ts = np.empty(n, dtype=np.float64)
+        for i in range(n):
+            _, rec = self._provider.get_image_data_by_index(self._rgb_stream, i)
+            ts[i] = rec.capture_timestamp_ns / 1e9
+        self._first_ts_s = float(ts[0])
+        # Store device-clock seconds *re-based to 0* so the lookup is
+        # against the same timeline as the features.h5 timestamps the
+        # caller passes in. Matches what aria_vrs.read_vrs_session
+        # writes at extraction time.
+        self._frame_ts_s = ts - ts[0]
 
     def fetch(self, t_s: float) -> Path:
         # Quantize to whole seconds for caching — VRS decode is heavy
@@ -254,25 +269,18 @@ class VrsFrameSource(FrameSource):
         if bucket in self._cache:
             return self._cache[bucket]
         self._ensure_provider()
-        # Walk the stream forward; find the frame whose device-clock
-        # timestamp (relative to the first frame) is closest to bucket.
-        # Linear scan is fine — Aria streams index O(N) cheaply and
-        # we're decoding ~5 frames/query, not 5000.
-        target_dev_ts = self._first_ts_s + bucket
-        n = self._provider.get_num_data(self._rgb_stream)
-        # Binary-search would be cleaner; linear is good enough at N<5k.
-        best_i = 0
-        best_d = float("inf")
-        for i in range(n):
-            _, rec = self._provider.get_image_data_by_index(self._rgb_stream, i)
-            ts_s = rec.capture_timestamp_ns / 1e9
-            d = abs(ts_s - target_dev_ts)
-            if d < best_d:
-                best_d = d
-                best_i = i
-            if ts_s > target_dev_ts and best_d < 1.0:
-                # Walked past the target; stop scanning.
-                break
+        # Binary search for the closest frame to the target (in the
+        # rebased 0-relative timeline). np.searchsorted gives the
+        # insertion point; we pick whichever of the two neighbors is
+        # closer in time.
+        ts = self._frame_ts_s
+        idx = int(np.searchsorted(ts, float(bucket)))
+        if idx == 0:
+            best_i = 0
+        elif idx >= len(ts):
+            best_i = len(ts) - 1
+        else:
+            best_i = idx if abs(ts[idx] - bucket) < abs(ts[idx - 1] - bucket) else idx - 1
         image_data, _ = self._provider.get_image_data_by_index(self._rgb_stream, best_i)
         arr = image_data.to_numpy_array()
         from PIL import Image

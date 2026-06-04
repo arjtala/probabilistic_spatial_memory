@@ -92,7 +92,15 @@ def main() -> int:
                 "--clip-checkpoint", args.clip_checkpoint,
                 "--out", str(out_path),
             ]
-            proc = subprocess.run(cmd, check=False)
+            # PYTHONUNBUFFERED forces the child's stdout to flush per
+            # line so the parent terminal shows per-query progress as
+            # it happens. Also passes --verbose so the child emits the
+            # [eval] qN: pick=X lines.
+            import os
+            env = os.environ.copy()
+            env["PYTHONUNBUFFERED"] = "1"
+            cmd.append("--verbose")
+            proc = subprocess.run(cmd, check=False, env=env)
             if proc.returncode != 0:
                 print(f"[psm-mllm-sweep] FAIL on {sid} pcc={cap}; continuing",
                       file=sys.stderr)
