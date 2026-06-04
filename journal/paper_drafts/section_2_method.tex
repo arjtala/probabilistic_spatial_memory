@@ -1,0 +1,168 @@
+% Section 2 — PSM architecture
+% Status: v1 draft. Describes the engine's three data structures
+% (H3 cells / ring buffer of HLLs / reservoir-sampled exemplars)
+% and the per_cell_cap selection rule. Anchored on the actual
+% C-side surface in include/core/{spatial_memory,tile,ring_buffer}.h
+% so any future reader can navigate from the prose to the code.
+
+\section{Probabilistic Spatial Memory}
+\label{sec:method}
+
+PSM is a streaming spatial-temporal index. It ingests a stream of
+$(t, \mathrm{lat}, \mathrm{lng}, \mathbf{e})$ tuples ---
+timestamp, geographic position, and a $d$-dimensional CLIP
+embedding --- and supports a bounded-memory top-$K$
+similarity-search query at any time. The substrate is built from
+three layered probabilistic data structures, each of which serves a
+specific role in the bounded-memory property.
+
+\subsection{H3 spatial tessellation}
+\label{sec:method-h3}
+
+We tessellate the wearer's geographic trajectory using
+H3~\cite{uber-h3}, an open-source hexagonal hierarchical
+geospatial indexing system. Every ingested $(t, \mathrm{lat},
+\mathrm{lng}, \mathbf{e})$ tuple is mapped to its containing H3
+cell at a chosen resolution $r$, and the per-cell state described
+in the next two subsections is updated. The choice of $r$ governs
+the spatial granularity:
+H3 resolution 10 corresponds to $\sim$65\,m hex edges (street
+scale); resolution 12 to $\sim$9\,m (room scale); resolution 13 to
+$\sim$3.5\,m (sub-room). PSM exposes $r$ as a query-time parameter
+because the right value depends on the wearer's mobility regime
+(\S\ref{sec:results-multisession}).
+
+The hexagonal tessellation has two properties relevant to PSM.
+First, all six neighbors of a cell are equidistant from its
+center, which makes k-ring neighborhood queries (``what was I
+doing near here?'') trivial. Second, the cells are global ---
+a single $(\mathrm{lat}, \mathrm{lng})$ position maps to the same
+H3 cell across recordings, sessions, and devices --- which is the
+key property for the federated-memory experiments we defer to
+follow-up work.
+
+\subsection{Time-decayed ring buffer of HyperLogLog sketches}
+\label{sec:method-ring-buffer}
+
+Each H3 cell maintains a ring buffer of $C$ HyperLogLog
+sketches~\cite{flajolet-hll}. The buffer rotates on a configurable
+time-window cadence (default 30\,s); ingesting a tuple writes the
+hash of the frame's embedding into the current sketch and advances
+the buffer pointer when the time-window elapses. Old sketches
+expire as the ring wraps, implementing strict bounded-time
+retention without an unbounded log.
+
+The HLL sketches serve two purposes in PSM. First, they give a
+cardinality estimate of distinct events the wearer experienced in
+this cell over the last $C \cdot \mathrm{window}$ seconds, which
+will be used by the counting question class
+(``how many people did I see at the kitchen?'') in follow-up work.
+Second, they give the cell's \emph{temporal envelope} ---
+$(t_{\min}, t_{\max})$ across the non-expired sketches --- which
+PSM returns as the bucket window for each top-$K$ candidate.
+The bucket window is what the downstream MLLM consumes as its
+``where in the recording should I look?'' hint.
+
+\paragraph{Memory bound.} Each HLL sketch occupies
+$2^p$ bytes at precision $p$ (default $p = 14 \Rightarrow$ 16\,KB).
+A cell's ring buffer is $C \cdot 16\,\mathrm{KB} = 960\,\mathrm{KB}$
+at the default $C = 60$. The bound is per-cell and time-window-bounded,
+independent of recording duration.
+
+\subsection{Reservoir-sampled exemplars}
+\label{sec:method-exemplars}
+
+The HLL sketches give us counts and time envelopes but not the
+embeddings themselves --- a top-$K$ similarity query needs to
+score query-vs-frame cosines, which requires storing some of the
+ingested embeddings. We use \emph{Algorithm R reservoir
+sampling}~\cite{vitter-reservoir} per H3 cell, with a configurable
+reservoir capacity $R$ (default 128). After ingesting $n > R$
+frames into a cell, the reservoir holds a uniformly random
+$R$-sized sample of all frames the wearer experienced there.
+
+The reservoir is the bounded-memory substitute for the linearly-growing
+embedding bank that brute-force CLIP keeps. At $R = 128$ and CLIP-L's
+$d = 768$, each cell occupies $128 \cdot 768 \cdot 4$ bytes
+$\approx 384$\,KB --- a wearable that visits 100 distinct cells in a
+day stores $\sim$38\,MB total, vs $\sim$200\,MB for an embedding
+bank over the same recording. The asymptotic gap grows with
+recording length: brute-force is $\Theta(N)$; PSM is $\Theta(R \cdot
+|\mathrm{cells}|)$ and $|\mathrm{cells}|$ is bounded by the
+physical area the wearer covers, not the recording duration.
+
+\paragraph{TurboQuant codec.} An optional exemplar-codec layer
+(TurboQuant~\cite{turboquant}, our 2-/3-/4-bit implementation
+in \texttt{src/core/exemplar\_codec.c}) compresses stored exemplars
+5--10$\times$ at no Hit@5 cost compared to \texttt{raw} float32.
+We report all main results with \texttt{raw} for clarity; the
+codec is the natural next step for on-device deployment.
+
+\subsection{Top-$K$ query with \texttt{per\_cell\_cap}}
+\label{sec:method-query}
+
+A top-$K$ similarity query takes a query vector $\mathbf{q}$
+($d$-dimensional, matching the encoder), an optional
+$(\mathrm{lat}, \mathrm{lng})$ center and a k-ring neighborhood
+radius. The query semantics: ``return the top-$K$ candidates
+$(t_i, \mathrm{cell}_i, \mathbf{e}_i)$ sorted by
+$\cos(\mathbf{q}, \mathbf{e}_i)$ descending, with the cell's
+ring-buffer-derived bucket window $(t_{\min}, t_{\max})_i$.''
+Two query modes:
+(a) \emph{global search} ($k$-ring $= -1$) iterates every
+tile in the SpatialMemory; (b) \emph{local search}
+($k$-ring $\geq 0$) iterates only the H3 cells in the $k$-ring
+neighborhood around $(\mathrm{lat}, \mathrm{lng})$. The latter is
+the right query mode for the ``where did I last see X near here?''
+use case --- the PSM-only mode that needs zero embedding-space
+text alignment.
+
+\paragraph{Per-cell capacity bound.} The novel contribution at the
+query layer is the \texttt{per\_cell\_cap} parameter. PSM's
+top-$K$ aggregation step proceeds in two phases:
+(i) for each H3 cell within the search radius, return the top-$\min$
+exemplars within that cell, where $\min$ is $\min(\texttt{per\_cell\_cap},
+\texttt{cell.reservoir.size})$;
+(ii) sort the union of all per-cell results by similarity
+descending and return the top $K$.
+The selection structure is malloc-free at the per-cell layer
+(insertion-sort into a fixed-cap buffer; bounded by
+$\texttt{per\_cell\_cap}$, typically 1--$K$). The
+\texttt{RingBuffer\_merge\_window} call --- the load-bearing
+expensive op in the query path --- runs only on the top-$K$
+\emph{surviving} cells, not on every scanned tile, giving a
+22.7$\times$ wall-time speedup measured on cluster hardware
+(\S\ref{sec:results-memory-latency}).
+
+The \texttt{per\_cell\_cap} parameter is the operating-point knob
+that distinguishes PSM from brute-force CLIP retrieval.
+\texttt{cap}=1 enforces strict spatial diversity: each top-$K$ slot
+represents a distinct H3 cell. \texttt{cap}=$K$ removes the
+per-cell constraint entirely, reducing to plain top-$K$ over the
+union of reservoir exemplars across all in-radius cells.
+The intermediate values trade off smoothly
+(\S\ref{sec:results-pareto}). The default is \texttt{cap}=1
+because, for the look-back QA use case PSM is designed for, the
+question typically references a distinct place; the cap-$K$
+permissive setting is the right tuning for revisit-heavy queries
+where the question's answer is a moment, not a place.
+
+\subsection{Streaming ingestion}
+\label{sec:method-ingest}
+
+PSM ingests frames one at a time. The ingest path per frame is:
+(i) compute H3 cell from $(\mathrm{lat}, \mathrm{lng})$;
+(ii) write the embedding hash into the current cell's
+ring-buffer sketch and advance the buffer if the time-window
+elapsed;
+(iii) update the cell's reservoir via Algorithm R, which is
+$O(1)$ per frame regardless of $n$.
+No global re-indexing, no batch reorganization. The substrate
+supports queries at any time after the first ingest.
+
+The cluster-validated per-frame ingest cost is
+$\sim$3\,$\mu$s amortized (Aria-internal benchmark, dominated by
+HLL hash insertion). At 1\,fps Nymeria recordings the ingest
+cost is negligible; at higher frame rates (60\,fps real-time
+wearable streams) the per-frame budget is still well within
+on-device limits.

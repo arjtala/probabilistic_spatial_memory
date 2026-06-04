@@ -1,0 +1,138 @@
+% PSM: Probabilistic Spatial Memory for Wearable Look-Back QA
+% ECCV 2026 Wearables AI Workshop submission, v1 draft skeleton.
+%
+% This is a generic LaTeX skeleton, not the ECCV style itself —
+% drop in eccv2026.sty / \documentclass{eccv2026} when the
+% workshop's style file lands. The section content (sections 1-7,
+% one .tex file each in this dir) is target-agnostic and will
+% slot into the ECCV style directly with no rewrites.
+%
+% To compile locally (any TeX distribution):
+%   cd journal/paper_drafts
+%   pdflatex main.tex
+%   bibtex main
+%   pdflatex main.tex
+%   pdflatex main.tex
+%
+% Section status (2026-06-04):
+%   §1 Intro        v1 drafted
+%   §2 Architecture v1 drafted
+%   §3 Pipeline     v1 drafted
+%   §4 Setup        folded into §5.1; standalone §4 omitted
+%   §5 Results      v1 drafted (§5.5 multi-session locked;
+%                                §5.8 Aria Gen 2 PENDING task #7)
+%   §6 Limitations  v1 drafted
+%   §7 Conclusion   placeholder; write last
+
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+% Generic geometry approximating ECCV column widths so page-count
+% estimates are roughly faithful while waiting on the workshop style.
+\usepackage[letterpaper, top=0.875in, bottom=1.25in,
+            left=0.75in, right=0.75in, columnsep=0.25in]{geometry}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\usepackage{caption}
+\usepackage{xspace}
+
+% Macros used across sections.
+\newcommand{\psm}{\textsc{PSM}\xspace}
+\newcommand{\caponek}{\texttt{per\_cell\_cap}\xspace}
+
+\title{Probabilistic Spatial Memory:\\
+A Bounded-Memory Retrieval Substrate for\\
+Wearable Look-Back Question Answering}
+
+% Author block intentionally blank for double-blind review.
+\author{Anonymous Authors\\
+ECCV 2026 Wearables AI Workshop Submission}
+
+\date{}
+
+\begin{document}
+
+\twocolumn[
+\maketitle
+\begin{abstract}
+\noindent
+% TODO: tighten abstract to ~200 words once §5 numbers stabilize
+% (post-MLLM multi-session sweep, post-Aria Gen 2 annotation).
+% Current draft is paper-spec sized but unedited prose.
+A wearable AI assistant captures hours of egocentric video per day;
+answering a look-back question (``where did I leave my keys?'')
+requires retrieving the relevant moments from a large frame
+stream under strict on-device memory bounds. Brute-force CLIP
+retrieval over the full embedding bank grows linearly with
+recording duration, which is structurally inappropriate for the
+streaming bounded-memory wearable setting. We propose
+\textbf{Probabilistic Spatial Memory} (\psm), a streaming spatial-
+temporal index combining an H3 hex-grid tessellation, a time-
+decayed ring buffer of HyperLogLog sketches per cell, and
+reservoir-sampled CLIP-embedding exemplars. \psm{} exposes a
+\caponek{} knob that smoothly trades strict spatial diversity
+(\texttt{cap}=1: each top-$K$ slot a distinct H3 cell) for
+permissive embedding-similarity precision
+(\texttt{cap}=$K$: reduces to brute-force over all reservoir
+exemplars). On a 187-question subset of the public Nymeria
+egocentric benchmark, \psm{} at \texttt{cap}=$K$ recovers brute-
+force CLIP retrieval exactly (13.4\% Hit@5, same 25 questions);
+\psm{} at the bounded-memory default \texttt{cap}=1 paired with a
+single Gemini-3.1-Pro rerank achieves localization mIoU
+indistinguishable from brute-force CLIP's (0.073 vs 0.074), at
+one-fifth the candidate budget. The operating-point effect
+generalizes across four Nymeria sessions spanning the street-,
+building-, and room-scale mobility tiers. The engine ($\sim$700
+LoC of portable C) and Python eval harness are released under MIT.
+\end{abstract}
+\vspace{1em}
+]
+
+% ---- Body sections -------------------------------------------------
+\input{section_1_intro.tex}
+\input{section_2_method.tex}
+\input{section_3_pipeline.tex}
+% §4 Experimental setup is folded into §5.1 (Setup subsection).
+\input{section_5_results.tex}
+\input{section_6_limitations.tex}
+
+% TODO: §7 Conclusion — write after §5 numbers stabilize.
+\section{Conclusion}
+\label{sec:conclusion}
+[PLACEHOLDER] Wrap-up paragraph: PSM as the architectural answer to
+bounded-memory streaming retrieval; the per-cell-cap knob as the
+operating-point lever; PSM\,$\rightarrow$\,Gemini at \texttt{cap}=1
+matching brute-force on the localization metric the MLLM downstream
+consumes; near-term follow-ups (federated memory, on-device MLLM,
+counting via HLL cardinality).
+
+\section*{Reproducibility}
+\label{sec:reproducibility}
+All experiments use the
+\href{https://github.com/anonymized/probabilistic_spatial_memory}{released
+PSM engine + Python harness}.
+Key reproduction commands:
+\begin{itemize}\setlength{\itemsep}{0pt}\small
+  \item \texttt{python scripts/sweep\_per\_cell\_cap.py} ---
+    operating-point sweep on \texttt{shelby\_arroyo\_act0}
+    (Tables~\ref{tab:headline}, \ref{tab:ex-ablation}).
+  \item \texttt{python scripts/multisession\_per\_cell\_cap\_sweep.py}
+    --- four-session generalization (Table~\ref{tab:multisession}).
+  \item \texttt{python scripts/eval\_psm\_mllm.py ... --mllm gemini}
+    --- PSM\,$\rightarrow$\,Gemini rerank
+    (Table~\ref{tab:headline}, last two rows).
+\end{itemize}
+
+% ---- Bibliography -------------------------------------------------
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

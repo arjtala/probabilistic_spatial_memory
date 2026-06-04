@@ -1,0 +1,132 @@
+% Section 3 — Method: PSM as MLLM prefilter
+% Status: v1 draft. Describes the three-stage pipeline (PSM search
+% -> frame fetch -> MLLM rerank) and the frozen prompt template.
+% Anchored on scripts/eval_psm_mllm.py and scripts/_mllm_client.py.
+
+\section{Method: PSM as MLLM Prefilter}
+\label{sec:pipeline}
+
+The PSM substrate of \S\ref{sec:method} returns a top-$K$
+candidate set for a query, but the candidates are
+$(t, \mathrm{cell}, \mathrm{lat}, \mathrm{lng}, \mathbf{e})$
+tuples --- not natural-language answers. For look-back QA
+applications, we use PSM as a \emph{prefilter} that narrows the
+search space, and a frontier MLLM as the \emph{reranker} that
+picks the localized answer.
+
+\subsection{Pipeline}
+\label{sec:pipeline-stages}
+
+The pipeline has three stages, each addressing a distinct failure
+mode of the alternatives.
+
+\paragraph{Stage 1: PSM top-$K$ retrieval.} Given the question
+text $q$, embed it with the same encoder used for ingest
+(CLIP-L for our experiments) and call
+\texttt{SpatialMemory\_query\_similar} with the embedding as query
+vector, the configured \texttt{per\_cell\_cap}, and $K = 5$. The
+call returns 5 candidate $(t_i, t_{\min,i}, t_{\max,i},
+\mathrm{cell}_i)$ tuples, sorted by cosine similarity descending.
+This stage runs sub-millisecond per query
+(\S\ref{sec:results-memory-latency}).
+
+\paragraph{Stage 2: Frame fetch.} Each candidate $t_i$ identifies a
+single frame in the original recording. We decode that frame
+on-demand from the source video stream
+(\texttt{aria01\_214-1.mp4} for Aria Gen 2, \texttt{data.vrs}'s
+RGB stream for Nymeria) using either ffmpeg keyframe-seek (for
+MP4 sources) or \texttt{projectaria-tools}'s indexed VRS reader
+(for VRS sources). Frames are JPEG-encoded at quality 90 and
+base64-embedded as \texttt{data:image/jpeg} URIs for the MLLM call.
+
+The frame-fetch stage is the latency bottleneck of the eval
+pipeline (1--5\,s/frame for VRS, 50--200\,ms/frame for MP4)
+because it pays a video-seek cost per candidate. For a deployed
+wearable assistant the stage would dissolve: the wearer's frames
+are already in the device's frame buffer or in the local cache
+that fed the PSM ingest loop, so the cost would be a memcpy
+rather than a video decode. Our reported wall-clock numbers
+should be read as eval-infrastructure overhead, not deployment
+overhead.
+
+\paragraph{Stage 3: MLLM rerank.} The 5 base64 frames plus the
+question text are sent in a single API call to the frontier MLLM
+(Gemini 3.1 Pro for the main results; the same harness supports
+Claude 4.6 Opus by changing one flag, on the same OpenAI-compatible
+proxy endpoint). The frozen prompt:
+
+\begin{quote}\small\ttfamily
+You are shown \{K\} candidate frames from a wearable camera
+recording, numbered 1 to \{K\}. They are PSM-retrieved
+candidates for the following look-back question:
+
+  "\{question\}"
+
+Pick the SINGLE frame number that best answers the question.
+Respond with just the number (e.g.\ "3"). If none of the frames
+clearly answer the question, respond with the number of the
+frame you find most plausible --- do not refuse to choose.
+\end{quote}
+
+The prompt is the same across all sessions, all questions, both
+MLLMs. We chose ``pick the index'' over ``write the answer''
+because the eval metric is a temporal localization
+(exemplar Hit@5 / mIoU), not free-text QA --- the MLLM's job is to
+disambiguate among PSM's candidates, not to compose an answer.
+The parsed integer reorders PSM's top-$K$ so the chosen frame is
+in position 1 and the remaining four PSM candidates fill 2--$K$.
+
+\subsection{Why this composition works}
+\label{sec:pipeline-rationale}
+
+The architectural claim of the paper is that PSM and the MLLM
+contribute orthogonal properties to the retrieval task, and that
+the composition matches a brute-force CLIP oracle on the metric
+the MLLM downstream actually consumes.
+
+\paragraph{PSM contributes \emph{recall}.} The substrate's job is
+to return a candidate set that contains the answer. Empirically
+(\S\ref{sec:results-main}), at \texttt{per\_cell\_cap}=$K$
+PSM's top-5 contains the answer for the same 25/187 Nymeria
+questions brute-force CLIP's top-5 does --- the substrate does not
+lose retrieval signal vs the full embedding bank.
+
+\paragraph{The MLLM contributes \emph{localization precision}.} The
+reranker's job is to pick the most temporally-precise candidate
+from PSM's top-5. Empirically (also \S\ref{sec:results-main}),
+PSM\,$\rightarrow$\,Gemini at \texttt{cap}=$K$ achieves the same
+Hit@5 as PSM-only at \texttt{cap}=$K$ (both 13.4\%) but lifts
+exemplar mIoU@5 by 37\% relative (0.074\,$\rightarrow$\,0.101).
+The MLLM is not recovering candidates PSM dropped; it is selecting
+better-timed candidates from those PSM kept.
+
+\paragraph{The composition.} At \texttt{cap}=1 + Gemini rerank,
+PSM matches brute-force CLIP on the localization metric
+(0.073 vs 0.074 exemplar mIoU@5) while keeping the cap-1
+spatial-diversity guarantee. The bounded-memory substrate plus a
+single MLLM call substitutes for the full embedding bank plus a
+fine-grained top-$K$ search, on the metric a downstream MLLM
+consumer cares about.
+
+\subsection{Streaming considerations}
+\label{sec:pipeline-streaming}
+
+PSM ingest is $O(1)$ per frame
+(\S\ref{sec:method-ingest}), so the substrate runs continuously
+on-device alongside the wearer's normal recording loop. The
+MLLM-rerank stage is the only one that requires a network call
+to a remote API. We assume the wearer's assistant batches queries
+to amortize the API cost; the eval-time per-query latency
+($\sim$2--10\,s on Gemini, dominated by hidden thinking tokens for
+reasoning models) is the right ballpark for a non-interactive
+look-back use case (``end-of-day summary'', ``where did I leave
+X?'') but would need a smaller / on-device MLLM for the interactive
+real-time use case described in the workshop's CFP.
+
+For the v1 results we report end-to-end wall-clock numbers from
+the OpenAI-compatible proxy serving Gemini 3.1 Pro; we do not
+claim PSM\,$\rightarrow$\,small-on-device-MLLM latency until
+that substitution is measured. The workshop's Edge Computing
+research area
+(\S\ref{sec:intro} contributions list, third bullet) is the
+natural target for that follow-up.

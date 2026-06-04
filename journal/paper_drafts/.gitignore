@@ -1,0 +1,8 @@
+# LaTeX build artifacts (compile-on-demand; the .tex and the rendered
+# figure PDFs are the version-controlled source-of-truth).
+main.aux
+main.bbl
+main.blg
+main.log
+main.out
+main.pdf

@@ -150,6 +150,17 @@ actually consumes.
 \subsection{Operating-point Pareto: Hit@5 vs bucket mIoU}
 \label{sec:results-pareto}
 
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{per_cell_cap_pareto.pdf}
+  \caption{Operating-point Pareto for \caponek{} on
+  \texttt{shelby\_arroyo\_act0}. Hit@5 (blue, left axis) rises
+  monotonically with the cap; bucket mIoU@5 (orange, right axis)
+  falls monotonically. Brute-force CLIP-L's Hit@5 is shown as a
+  dashed reference line.}
+  \label{fig:pareto}
+\end{figure}
+
 Figure~\ref{fig:pareto} plots Hit@5 (rising) and bucket mIoU@5
 (falling) as \texttt{per\_cell\_cap} sweeps from 1 to $K$. The two
 metrics disagree: relaxing the cap recovers retrieval recall but
