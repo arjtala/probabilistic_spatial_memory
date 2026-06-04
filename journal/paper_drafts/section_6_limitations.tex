@@ -1,0 +1,104 @@
+% Section 6 — Limitations
+% Status: v1 draft. Five limitations worth surfacing explicitly:
+%   (1) Revisit-heavy long-narration ceiling
+%   (2) Sub-room mobility exclusion (benchmark, not method)
+%   (3) CLIP-77-token text truncation under-reports long-narration accuracy
+%   (4) Single-corpus until task #7 lands
+%   (5) Latency claim from synthetic workload, not Nymeria-scale validation
+
+\section{Limitations}
+\label{sec:limitations}
+
+We surface five limitations of the v1 results so they are not
+mistaken for stronger claims than they support.
+
+\paragraph{Benchmark ceiling on revisit-heavy narrations.}
+Both PSM and brute-force CLIP plateau at 13.4\% Hit@5 on the
+\texttt{shelby\_arroyo\_act0} session (\S\ref{sec:results-main}),
+and at similar single-digit values on the lower-mobility sessions
+(\S\ref{sec:results-multisession}). The dominant failure mode is
+\emph{revisit-heavy long narration}: the wearer enters the living
+room many times during the recording, and each entry is
+visually nearly identical, so the annotator's chosen ground-truth
+interval is one of many indistinguishable matching frames. Both
+methods converge on the visually-most-similar frame, which is
+rarely the annotator's pick.
+\emph{This is a benchmark hardness ceiling, not a method-quality
+signal:} PSM and brute-force CLIP agree on the 25/187 questions
+that \emph{are} groundable (\S\ref{sec:results-failure}) and
+disagree only on the inherently ambiguous remainder. Subsequent
+benchmarks should either (a) include only narrations whose
+ground-truth interval is the unique visual match in the recording,
+or (b) score against \emph{any} acceptable revisit window rather
+than the single one the annotator chose.
+
+\paragraph{Sub-room mobility is excluded.}
+We exclude Nymeria sessions with wearer bounding-box extent
+$< 5$\,m from the main result. On such sessions
+(e.g.\ \texttt{james\_johnson\_act3}, a 3\,m-bbox desk-work session)
+both PSM and brute-force CLIP plateau at 1.2\% Hit@5 because the
+narrations describe a space the wearer never left, and the
+text--image alignment cannot distinguish among $\sim$300 frames of
+visually indistinguishable indoor scene. Roughly 13\% of our 30
+candidate Nymeria sessions fall in this regime; the rest (street-,
+building-, and room-scale) are reported.
+We treat sub-room mobility as a corpus characteristic rather than
+a method limitation. The
+\texttt{scripts/nymeria\_slam\_displacement.py} probe in our
+reproducibility script provides the per-session bbox-extent
+threshold.
+
+\paragraph{CLIP text encoder caps at 77 tokens.}
+Nymeria \texttt{atomic\_action} narrations are full-sentence
+descriptions (``C is walking forward in the hallway and turns left
+toward the laundry closet, then opens the door with her right
+hand''). Many tokenize to 80--120 tokens, exceeding the CLIP-L
+text encoder's 77-token positional limit. We truncate at 77 tokens
+at the tokenizer level; this drops trailing context that the
+brute-force CLIP and PSM baselines both lose access to.
+A non-truncating text encoder (longCLIP, or one of the recent
+1024-token CLIP variants) would likely improve accuracy by a few
+percentage points; we leave that comparison to future work.
+
+\paragraph{Single Nymeria session for the headline table.}
+The headline table (\S\ref{sec:results-main}) and the
+operating-point Pareto figure (Figure~\ref{fig:pareto}) are
+reported on the single-session
+\texttt{shelby\_arroyo\_act0}. The multi-session generalization
+(\S\ref{sec:results-multisession}) confirms the
+\texttt{per\_cell\_cap} trade is monotone on four sessions, but the
+absolute Hit@5 ceiling varies across sessions
+(\texttt{james\_johnson\_act0} hits 18.2\% at \texttt{cap}=$K$;
+\texttt{jason\_smith\_act3} hits 10.6\%) as a function of the
+session's narration style. The cross-corpus story
+(\S\ref{sec:results-aria}) extends to the Aria Gen 2 Pilot
+Dataset's outdoor walking sessions; a wider deployment study is
+out of scope for this workshop submission and would be the
+natural extension for a journal version.
+
+\paragraph{Latency numbers from synthetic workload.}
+PSM's reported per-query latency of $\sim$700\,$\mu$s
+(\S\ref{sec:results-memory-latency}) is from a synthetic
+benchmark workload: 1{,}024 tiles, dim 128, 4 exemplars per tile,
+running on the cluster's H200 nodes. A real Nymeria session
+typically has $\sim$10 tiles at dim 1280 with 128 exemplars,
+which means the constant factors in the actual per-query cost
+differ from our benchmark. The \emph{asymptotic} independence of
+PSM's latency from frame count (the load-bearing claim) holds in
+both workloads, but a real-session micro-benchmark would tighten
+the latency comparison. We will report this in a follow-up.
+
+\paragraph{What this paper does not claim.}
+For clarity, we note four claims this work does \emph{not} make.
+(a) We do not claim PSM is a generic MLLM grounding method;
+PSM is a retrieval substrate, the MLLM does the grounding.
+(b) We do not claim PSM solves the counting question class;
+the time-decayed HLL sketches are diagnostic-only until the
+real-counting scorer lands in a follow-up.
+(c) We do not claim PSM is the only architecture for this
+problem; we propose one shape, not the only one. (d) We do not
+claim that brute-force CLIP-L is the strongest possible baseline;
+larger encoders (bigG, EVA, SigLIP) likely shift absolute Hit@5
+values upward, but the architectural claim
+(PSM matches brute-force at appropriate operating point) is
+encoder-agnostic.

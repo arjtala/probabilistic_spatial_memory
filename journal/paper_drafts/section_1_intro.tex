@@ -1,0 +1,120 @@
+% Section 1 — Introduction
+% Status: v1 draft. Anchor on Wearables AI CFP topic-area alignment
+% and the three-paragraph contribution structure:
+%   (1) The problem: streaming egocentric retrieval is unbounded;
+%       brute-force CLIP grows linearly in N.
+%   (2) The architecture: PSM as a spatial-temporal index +
+%       reservoir-sampled exemplars + ring-buffer time decay, with
+%       per_cell_cap as the tuneable place-vs-similarity knob.
+%   (3) The contribution: PSM matches brute-force at strict bounded
+%       memory + spatial diversity, MLLM rerank composes with the
+%       index multiplicatively (recall vs localization).
+
+\section{Introduction}
+\label{sec:intro}
+
+A wearable AI assistant sees the world through the user's eyes,
+continuously, for hours per day. To answer a look-back question
+---``where did I leave my keys?'', ``what was that street sign?'',
+``when did I last see Maria?''--- the assistant needs to find the
+relevant moments from its own past. The straightforward solution is
+to embed every frame the camera saw with a vision--language encoder
+(CLIP, SigLIP, EVA) and run a top-$K$ cosine-similarity retrieval
+over the resulting embedding bank. This works, but the embedding
+bank grows linearly in recording duration: at a 1\,fps sampling and
+CLIP-L's 768-dim float32 embeddings, an hour of egocentric video
+occupies $\sim$10\,MB; a typical day, $\sim$200\,MB; the wearable's
+on-device limit binds in days, not weeks. The substrate is not
+appropriate for a bounded-memory streaming setting.
+
+\paragraph{The architectural question.} What does the right
+retrieval substrate look like for a wearable AI assistant? Three
+properties matter. First, \emph{bounded memory}: per-cell state
+that does not grow with recording duration. Second, \emph{spatial
+locality}: the assistant should be able to answer
+``what places did I visit?'' as cleanly as it answers ``what
+moments matter?''; the index should reflect the user's actual
+trajectory through physical space. Third, \emph{streaming
+ingestion}: frames arrive one at a time, the index updates
+in-place, and queries can be served at any time without
+re-indexing.
+
+\paragraph{Probabilistic Spatial Memory.}
+We propose \textbf{PSM}, a streaming spatial-temporal index for
+egocentric look-back retrieval. PSM combines three probabilistic
+data structures over an H3 hex-grid tessellation of the wearer's
+geographic trajectory:
+(1) \emph{reservoir-sampled exemplars} per H3 cell preserve a
+fixed-size sample of the CLIP embeddings the wearer captured in
+that place;
+(2) a \emph{time-decayed ring buffer of HyperLogLog sketches} per
+cell tracks unique-event cardinality over recent time windows; and
+(3) a \emph{per-cell capacity bound} (\texttt{per\_cell\_cap})
+governs how many top-$K$ retrieval slots a single H3 cell may fill,
+implementing strict spatial diversity at \texttt{cap}=1 and
+permissive top-$K$-across-all-exemplars at \texttt{cap}=$K$.
+The substrate is bounded in memory (fixed per cell, even as
+recording duration grows unboundedly), streaming
+(per-frame ingest, no global re-indexing), and trivially
+queryable: a top-$K$ search returns $K$ candidate $(t, \mathrm{lat},
+\mathrm{lng})$ triples in sub-millisecond C-side wall-time.
+
+\paragraph{The PSM--MLLM prefilter pipeline.}
+Modern multimodal LLMs (Gemini~3, Claude~4, GPT-4o) achieve strong
+single-frame visual grounding but degrade sharply on temporal
+grounding over long-context video~\cite{localization-paradox-2026}.
+For wearable look-back, this is exactly the failure mode: the
+question asks ``when?'' and the MLLM cannot answer reliably without
+seeing every frame, which the wearable cannot afford to ship to a
+remote API. We propose PSM as a \emph{prefilter} for the MLLM:
+PSM returns its top-$K$ spatial-temporal candidates over the
+bounded-memory index; the MLLM reranks the $K$ candidate frames
+and emits the localized answer. The architecture composes
+multiplicatively: PSM provides the candidate set (recall), the
+MLLM provides localization precision within the set, and the two
+contributions are largely orthogonal.
+
+\paragraph{Contributions.}
+\begin{itemize}
+  \item \textbf{Probabilistic Spatial Memory:} a streaming
+    bounded-memory spatial-temporal index for egocentric video,
+    combining H3 cells, time-decayed ring-buffer HLL sketches, and
+    reservoir-sampled exemplars (\S\ref{sec:method}).
+  \item \textbf{The \texttt{per\_cell\_cap} knob:} a new
+    operating-point parameter that smoothly trades strict spatial
+    diversity for embedding-similarity precision between two
+    endpoints (\texttt{cap}=1 vs \texttt{cap}=$K$), reducing to
+    plain top-$K$-over-all-exemplars at \texttt{cap}=$K$.
+    Empirically, \texttt{cap}=$K$ recovers brute-force CLIP
+    retrieval accuracy exactly on a 187-question Nymeria
+    benchmark; \texttt{cap}=1 trades 5.4 percentage points of
+    Hit@5 for spatial diversity (\S\ref{sec:results-main}).
+  \item \textbf{PSM\,$\rightarrow$\,Gemini at \texttt{cap}=1
+    matches brute-force CLIP on localization mIoU:} the
+    bounded-memory operating point paired with a single Gemini-3.1-Pro
+    rerank achieves exemplar mIoU@5 of 0.073, statistically
+    indistinguishable from brute-force CLIP's 0.074. The MLLM rerank
+    substitutes for the per-cell-cap relaxation
+    (\S\ref{sec:results-main}).
+  \item \textbf{Multi-session generalization:} the
+    \texttt{per\_cell\_cap} effect replicates across 4 Nymeria
+    sessions spanning the street-, building-, and room-scale
+    mobility tiers (\S\ref{sec:results-multisession}).
+  \item \textbf{Open-source release:} the C-side PSM engine
+    (\texttt{src/core/spatial\_memory.c}, $\sim$700 LoC) and the
+    Python extraction/eval pipeline are released under MIT
+    (\S\ref{sec:reproducibility}).
+\end{itemize}
+
+\paragraph{Workshop scope alignment.}
+This work targets three of the Wearables AI Workshop's listed
+research areas. \emph{Long-Context \& Real-Time Interactions:}
+PSM's reservoir + ring-buffer state is fixed-size per cell and
+sub-millisecond per query, addressing the bounded-memory side of
+the ``memory bottlenecks for sustained dialog'' theme.
+\emph{Persistent Scene and Object Memory from Video:}
+H3 + ring-buffer is a time-aware spatial representation of the
+user's environment, designed for retrieval. \emph{Efficient AI
+/ Edge Computing:} the engine's TurboQuant 2/3/4-bit exemplar
+codec compresses per-cell exemplar storage 5--10$\times$ at no
+Hit@5 cost, suitable for on-device deployment.
