@@ -77,7 +77,7 @@ Table~\ref{tab:headline} reports the headline comparison. Three
 patterns emerge.
 
 % Header row + brute-force + PSM at three cap values + PSM->Gemini at two cap values
-\begin{table}[t]
+\begin{table*}[t]
 \centering
 \begin{tabular}{lccc}
 \toprule
@@ -104,7 +104,7 @@ budget. Hit@5 and bucket mIoU move in opposite directions across the
 \texttt{cap} sweep --- the operating-point Pareto trade discussed in
 \S\ref{sec:results-pareto}.}
 \label{tab:headline}
-\end{table}
+\end{table*}
 
 \paragraph{PSM is a strict generalization of brute-force.} At
 \texttt{per\_cell\_cap} $= K$ (= top-$K$ budget), PSM hits the
@@ -230,7 +230,7 @@ single session of \S\ref{sec:results-main}), the building-scale
 same operating point as \S\ref{sec:results-main} (H3 res 12,
 ex=1024).
 
-\begin{table}[t]
+\begin{table*}[t]
 \centering
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{lcccc}
@@ -253,7 +253,7 @@ trade is consistent. Bucket mIoU@5 (omitted for table compactness)
 falls monotonically with cap on all four sessions, confirming the
 Pareto trade of \S\ref{sec:results-pareto}.}
 \label{tab:multisession}
-\end{table}
+\end{table*}
 
 \paragraph{The cap effect is robust to session character.} The lift
 from \texttt{cap}=1 to \texttt{cap}=$K$ is 5.4pp (shelby), 10.0pp
@@ -274,7 +274,7 @@ one extra hit). The ``MLLM rerank contributes localization
 precision, not retrieval recall'' claim is consistent across the
 mobility distribution.
 
-\begin{table}[t]
+\begin{table*}[t]
 \centering
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{lcccc}
@@ -302,7 +302,7 @@ permissive cap wins by a wider margin, indicating that
 ``bounded-memory + rerank \(\approx\) permissive PSM'' is an
 operating-point claim, not a universal equivalence.}}
 \label{tab:multisession-mllm}
-\end{table}
+\end{table*}
 
 \paragraph{Sub-room sessions are excluded.} We exclude the
 \texttt{james\_johnson\_act3} session (3\,m bbox, a sub-room
@@ -330,13 +330,16 @@ matmul). Memory: PSM is fixed-size per H3 cell (independent of
 session length); brute-force grows linearly. The crossover is more
 dramatic on memory than on latency.
 
-Figure~\ref{fig:memory-latency} (F6 in the paper plan) overlays
-the two methods; reservoir-sized PSM at exemplars=128 occupies
+Concretely: reservoir-sized PSM at exemplars=128 occupies
 $\sim$1\,MB per cell vs brute-force's $\sim$13\,MB total for a
 15-minute CLIP-L session. At Nymeria-scale recordings (20\,min,
 $\sim$1{,}200 frames), this becomes a $\sim$10\,$\times$ memory
 advantage. The advantage grows with session length: at projected
 hour-long egocentric streams, the gap is two orders of magnitude.
+A dedicated memory-vs-session-length figure is deferred to the
+camera-ready version, pending the latency micro-benchmark at
+real Nymeria operating points
+(\S\ref{sec:limitations}).
 
 \subsection{Failure analysis}
 \label{sec:results-failure}

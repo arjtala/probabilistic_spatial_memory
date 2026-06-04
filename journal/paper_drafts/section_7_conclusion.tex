@@ -1,0 +1,64 @@
+% Section 7 — Conclusion
+% Status: v1 draft. Three paragraphs:
+%   (a) restate the architectural finding
+%   (b) honest scope: what generalized vs what didn't
+%   (c) follow-up directions framed against the workshop's CFP
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+We presented \psm, a streaming bounded-memory spatial-temporal
+retrieval substrate for egocentric look-back question answering.
+The engine combines an H3 hex-grid tessellation, time-decayed
+ring-buffer HyperLogLog sketches, and reservoir-sampled CLIP-
+embedding exemplars, with a novel \caponek{} query knob that
+smoothly trades strict spatial diversity for embedding-similarity
+precision. The substrate's per-cell state is bounded independently
+of recording duration; per-query latency is sub-millisecond after
+the optimization in \S\ref{sec:method-query} amortizes the
+per-tile RingBuffer merge over only the surviving top-$K$ rows.
+
+\paragraph{What the evidence supports.}
+On the 187-question Nymeria atomic-action benchmark, PSM at the
+permissive operating point (\caponek{} $= K$) recovers brute-force
+CLIP retrieval exactly --- same 25 hits, same exemplar mIoU. Paired
+with a Gemini-3.1-Pro reranker, the strict-diversity default
+(\caponek{} $= 1$) achieves localization mIoU indistinguishable
+from brute-force CLIP on the highest-mobility session
+(0.073 vs 0.074), and lifts mIoU by 29--73\% relative across all
+four sessions in the multi-session sweep. The operating-point
+trade is monotone on every session and across mobility tiers from
+13\,m to 69\,m bbox extent; sub-room sessions ($<$5\,m bbox)
+co-fail PSM and brute-force at $\sim$1\% Hit@5, which we surface
+as a benchmark hardness ceiling rather than a method-quality
+signal. The substrate's bounded-memory advantage compounds with
+recording length: an hour of CLIP-L embeddings at 1\,fps occupies
+$\sim$10\,MB in brute-force's bank vs $\sim$2\,MB across the
+typical 5--10 cells a wearer occupies, with the gap growing
+linearly thereafter.
+
+\paragraph{Follow-up directions.}
+Three extensions naturally fit the Wearables AI Workshop's
+research areas. (a) \emph{On-device MLLM rerank} would close the
+loop on Edge Computing: replacing Gemini with a small on-device
+vision-language model (e.g. Phi-3.5-Vision, SmolVLM) tests
+whether the per-cell-cap + reranker composition holds when the
+reranker itself is bounded by wearable compute. (b) \emph{Counting
+via HLL cardinality}: the time-decayed ring-buffer sketches in
+\S\ref{sec:method-ring-buffer} already track unique-event
+cardinality per cell; surfacing them to the question answerer
+extends \psm{} to a question class beyond moment-grounding
+(``how many distinct people did I see at the kitchen today?'').
+(c) \emph{Federated memory across wearers}: H3 cells are global,
+so two devices visiting the same cell can merge their PSM state
+via HLL union and reservoir sampling without sharing raw frames
+--- a privacy-preserving foundation for the workshop's
+``Persistent Scene and Object Memory'' theme at multi-user scale.
+
+The engine implementation (\textasciitilde{}700 LoC of portable C,
+HDF5 storage, projectaria-tools/ffmpeg ingest) and the Python
+evaluation harness are released under MIT to support the workshop's
+``reproducible, open-sourced breakthroughs'' criterion for the
+challenges. We hope \psm{} serves as a useful retrieval-substrate
+baseline that future Wearable-AI assistants can deploy or improve
+on without re-implementing the bounded-memory plumbing.
