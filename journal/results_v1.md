@@ -289,3 +289,32 @@ This closes the 'single-session caveat' in §6 limitations and
 populates §5.5 (Multi-session generalization). Captures live at
 `captures/multisession_pcc_sweep/<sid>/eval_<sid>_pcc<cap>.json`.
 
+
+## Multi-session MLLM rerank (2026-06-04)
+
+PSM->Gemini sweep across the same 4 sessions at the two endpoint
+cap values, after the VrsFrameSource searchsorted perf fix
+(commit `e41fed6`) that cut runtime from ~24h to ~1h.
+
+| Session | PSM @1 mIoU | +Gemini @1 mIoU | PSM @5 mIoU | +Gemini @5 mIoU |
+|---|---|---|---|---|
+| shelby_arroyo_act0  | 0.044 | 0.069 (+57%) | 0.074 | 0.101 (+37%) |
+| james_johnson_act0  | 0.047 | 0.067 (+43%) | 0.106 | 0.137 (+29%) |
+| angela_harrell_act4 | 0.026 | 0.045 (+73%) | 0.064 | 0.099 (+55%) |
+| jason_smith_act3    | 0.028 | 0.041 (+46%) | 0.054 | 0.087 (+61%) |
+
+Hit@5 unchanged across the sweep except for james_johnson @ cap=5
+(18.2% -> 19.4%, +1.2pp). MLLM rerank lift on exemplar mIoU@5 is
+**+29-73% relative on every session × cap combo**, with smaller
+sessions (lower absolute mIoU) seeing larger relative lift.
+
+**Honest qualification on the 'bounded-memory + rerank ≈ permissive
+PSM' claim**: holds on shelby (highest mobility, 0.069 vs 0.074),
+weakens on lower-mobility sessions where PSM @ cap=5 alone retains
+a margin over PSM @ cap=1 + Gemini. The architectural framing
+'rerank contributes localization precision' is robust; the
+'rerank substitutes for cap relaxation' framing is operating-point
+specific. §1 contribution bullet updated to reflect.
+
+Captures: `captures/multisession_psm_mllm/<sid>/eval_<sid>_mllm_pcc{1,5}.json`.
+

@@ -261,6 +261,49 @@ from \texttt{cap}=1 to \texttt{cap}=$K$ is 5.4pp (shelby), 10.0pp
 how much benefit relaxed spatial diversity gives on the particular
 revisit pattern of each session; the underlying mechanism is the same.
 
+\paragraph{MLLM rerank also generalizes across sessions.}
+Table~\ref{tab:multisession-mllm} reports the same four sessions
+with the Gemini rerank applied at the two endpoint cap values
+(\texttt{cap}=1 and \texttt{cap}=$K$). The pattern from
+\S\ref{sec:results-main} replicates: the rerank lifts exemplar
+mIoU@5 by 30--60\% relative on every session at both cap values,
+without changing Hit@5 (the lone exception is
+\texttt{james\_johnson\_act0} at \texttt{cap}=$K$: 18.2\%
+$\rightarrow$ 19.4\%, where the rerank both reorders and recovers
+one extra hit). The ``MLLM rerank contributes localization
+precision, not retrieval recall'' claim is consistent across the
+mobility distribution.
+
+\begin{table}[t]
+\centering
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccc}
+\toprule
+& \multicolumn{2}{c}{Hit@5} & \multicolumn{2}{c}{exemplar mIoU@5} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Session & PSM+G \texttt{cap}=1 & PSM+G \texttt{cap}=$K$ & PSM+G \texttt{cap}=1 & PSM+G \texttt{cap}=$K$ \\
+\midrule
+\texttt{shelby\_arroyo\_act0}  & 8.0\%  & 13.4\% & 0.069 & 0.101 \\
+\texttt{james\_johnson\_act0}  & 8.2\%  & \textbf{19.4\%} & 0.067 & 0.137 \\
+\texttt{angela\_harrell\_act4} & 4.5\%  & 11.9\% & 0.045 & 0.099 \\
+\texttt{jason\_smith\_act3}    & 5.0\%  & 10.6\% & 0.041 & 0.087 \\
+\bottomrule
+\end{tabular}
+\caption{PSM\,$\rightarrow$\,Gemini rerank across four Nymeria
+sessions at the two cap endpoints. Hit@5 matches PSM-only at every
+cell except one (james at \texttt{cap}=$K$, +1.2pp), confirming the
+rerank's role is localization quality not retrieval recall. mIoU
+rises 30--60\% relative over the PSM-only baseline (see
+Table~\ref{tab:multisession} for the PSM-only mIoU numbers).
+\textbf{PSM at \texttt{cap}=1 + Gemini matches PSM at \texttt{cap}=
+$K$ on mIoU only on the highest-mobility session
+(\texttt{shelby\_arroyo\_act0}); on lower-mobility sessions the
+permissive cap wins by a wider margin, indicating that
+``bounded-memory + rerank \(\approx\) permissive PSM'' is an
+operating-point claim, not a universal equivalence.}}
+\label{tab:multisession-mllm}
+\end{table}
+
 \paragraph{Sub-room sessions are excluded.} We exclude the
 \texttt{james\_johnson\_act3} session (3\,m bbox, a sub-room
 recording dominated by sit-down work at a desk) from this

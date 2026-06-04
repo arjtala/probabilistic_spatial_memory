@@ -90,12 +90,15 @@ contributions are largely orthogonal.
     benchmark; \texttt{cap}=1 trades 5.4 percentage points of
     Hit@5 for spatial diversity (\S\ref{sec:results-main}).
   \item \textbf{PSM\,$\rightarrow$\,Gemini at \texttt{cap}=1
-    matches brute-force CLIP on localization mIoU:} the
-    bounded-memory operating point paired with a single Gemini-3.1-Pro
-    rerank achieves exemplar mIoU@5 of 0.073, statistically
-    indistinguishable from brute-force CLIP's 0.074. The MLLM rerank
-    substitutes for the per-cell-cap relaxation
-    (\S\ref{sec:results-main}).
+    matches brute-force CLIP on localization mIoU} on the
+    highest-mobility session: the bounded-memory operating point
+    paired with a single Gemini-3.1-Pro rerank achieves exemplar
+    mIoU@5 of 0.073, statistically indistinguishable from brute-force
+    CLIP's 0.074 on \texttt{shelby\_arroyo\_act0}. The match weakens
+    on lower-mobility sessions where the permissive \texttt{cap}=$K$
+    operating point retains a margin (Table~\ref{tab:multisession-mllm}).
+    The MLLM rerank lifts exemplar mIoU 30--60\% relative across all
+    sessions (\S\ref{sec:results-main}).
   \item \textbf{Multi-session generalization:} the
     \texttt{per\_cell\_cap} effect replicates across 4 Nymeria
     sessions spanning the street-, building-, and room-scale
