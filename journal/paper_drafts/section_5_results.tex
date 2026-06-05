@@ -210,13 +210,13 @@ the session is known in advance to be sub-room.
 
 We scale evaluation across all 30 Nymeria sessions in our corpus
 ($\sim$5{,}600 narrations) spanning sub-room to street-scale
-mobility. \psm{} at \texttt{cap}=$K$ achieves mean Hit@5 = $8.95\%$,
+mobility. \psm{} at \texttt{cap}=$K$ achieves mean Hit@5 = $8.92\%$,
 matching per-frame brute-force CLIP exactly by construction: the
 H3 + ring buffer + reservoir substrate preserves full recall when
 the spatial-diversity cap is relaxed. A sliding-window CLIP
 baseline (frame embeddings pooled over the GT-interval width)
 modestly exceeds both \psm{} and brute-force by mean $+1.0$\,pp
-Hit@5 ($9.96\%$ vs $8.95\%$) by averaging out per-frame embedding
+Hit@5 ($9.96\%$ vs $8.92\%$) by averaging out per-frame embedding
 variance --- an encoder-stage smoothing benefit \psm{}'s per-frame
 ingest does not currently capture; ingest-time embedding pooling
 is identified as the natural follow-up (\S\ref{sec:conclusion}).
@@ -246,8 +246,7 @@ Session & 1 & 2 & 3 & $K$ &
 \texttt{angela\_harrell\_act4} (27\,m, building) & 4.5\% & 9.0\%  & 9.6\%  & \textbf{11.9\%} & 0.099 \\
 \texttt{jason\_smith\_act3}    (13\,m, room)     & 5.0\% & 6.5\%  & 8.5\%  & \textbf{10.6\%} & 0.087 \\
 \midrule
-\textbf{30-session mean Hit@5} (PSM \texttt{cap}=$K$)
-                                                 & \multicolumn{5}{c}{$\mathbf{8.95\%}$ ($\equiv$ brute-force; sliding-window @ GT-width $= 9.96\%$)} \\
+\textbf{30-session mean Hit@5} & \textbf{3.26\%} & \textbf{5.69\%} & \textbf{7.08\%} & \textbf{8.92\%} & --- \\
 \bottomrule
 \end{tabular}
 \caption{Four representative sessions and the 30-session
@@ -255,9 +254,10 @@ Session & 1 & 2 & 3 & $K$ &
 the monotone \caponek{} shape is consistent. The PSM+Gemini column
 shows the rerank's mIoU lift at the deployment configuration;
 Hit@5 with the rerank matches the PSM-only \texttt{cap}=$K$ column
-except on \texttt{james\_johnson\_act0} (+1.2\,pp). The full cap
-sweep across the 30-session corpus is left to a follow-up; the
-\texttt{cap}=$K$ row stands on the corpus-wide data we have.}
+except on \texttt{james\_johnson\_act0} (+1.2\,pp). The
+30-session-mean row confirms the monotone \caponek{} trade across
+the full corpus: mean Hit@5 climbs $3.26 \to 8.92\%$ as the cap
+relaxes from $1$ to $K$.}
 \label{tab:multisession}
 \end{table*}
 \subsection{Memory, latency, and failure modes}

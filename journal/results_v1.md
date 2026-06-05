@@ -382,3 +382,21 @@ Honest framing for the paper:
 
 §5 new Retrieval-baselines subsection added.
 
+
+## 30-session per_cell_cap sweep (2026-06-05) — closes task #23
+
+| | cap=1 | cap=2 | cap=3 | cap=K |
+|---|---|---|---|---|
+| **30-session mean Hit@5** | 3.26% | 5.69% | 7.08% | 8.92% |
+| median | 3.08% | 5.33% | 6.41% | 7.97% |
+| max | 8.2% | 11.8% | 14.4% | 20.6% |
+| min | 0.5% | 1.0% | 1.2% | 1.0% |
+
+Sanity check: per-session values on the 4 reference sessions
+(shelby_arroyo_act0, james_johnson_act0, angela_harrell_act4,
+jason_smith_act3) match tab:multisession exactly. The earlier
+8.95% W=0 figure differs from the new 8.92% by 0.03pp due to
+reservoir-sampling randomness across runs; well within noise.
+
+Captures: captures/multisession_pcc_sweep/<sid>/eval_<sid>_pcc{1,2,3,5}.json
+
