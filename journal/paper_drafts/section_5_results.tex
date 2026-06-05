@@ -439,6 +439,63 @@ than a method failure mode (\S\ref{sec:limitations}); the
 \texttt{nymeria\_slam\_displacement} probe in our reproducibility
 script provides a per-session bbox-extent gating threshold.
 
+\paragraph{Corpus-wide aggregate.}
+Beyond the four illustrative sessions above, we ran \psm{} at
+\texttt{cap}=$K$, a sliding-window CLIP @ 10\,s baseline, and a
+query-time temporal-pool variant of \psm{} (negative result, below)
+across all 30 Nymeria recordings for which extraction completed.
+Table~\ref{tab:corpus} reports the Hit@5 distribution per method.
+
+\begin{table}[t]
+\centering
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{lcccc}
+\toprule
+Method & mean & median & max & min \\
+\midrule
+\psm{} \texttt{cap}=$K$ ($\equiv$brute-force) & 8.95\% & 7.95\% & 20.6\% & 1.0\% \\
+Sliding-window CLIP @ $\ell{=}10$\,s          & \textbf{9.96\%} & \textbf{9.65\%} & 27.1\% & 0.5\% \\
+\psm{} \texttt{cap}=$K$ + W=30 pool rerank    & 8.80\% & 8.15\% & 20.0\% & 0.5\% \\
+\bottomrule
+\end{tabular}
+\caption{Hit@5 distributions across 30 Nymeria sessions. The
+sliding-window baseline lifts mean Hit@5 by $+1.01$\,pp over
+\psm{} at \texttt{cap}=$K$ (median $+0.50$\,pp), improving on
+16 of 30 sessions, neutral on 3, worsening on 11. The \psm{}
+query-time pool rerank (described below) shifts mean Hit@5 by
+$-0.15$\,pp --- in noise. The single-session win of \psm{}+pool on
+\texttt{shelby\_arroyo\_act0} (13.4\%\,$\rightarrow$\,15.0\%,
+matching sliding-window @ 10\,s) does not generalize.}
+\label{tab:corpus}
+\end{table}
+
+\paragraph{Negative result: query-time temporal-pool rerank.}
+Sliding-window CLIP's mean $+1$\,pp lift suggests temporal pooling
+of CLIP embeddings recovers some signal that per-frame cosine
+misses. To test whether \psm{} could capture the same lift without
+the storage cost of the full per-window-mean bank, we built a
+query-time rerank: \psm{} returns top-$K{=}50$ candidates, and each
+candidate's exemplar embedding is replaced by the mean of features
+within $\pm 15$\,s of \texttt{exemplar\_t} before re-scoring. The
+top-5 is then truncated for evaluation. On
+\texttt{shelby\_arroyo\_act0} this lifted Hit@5 from 13.4\% to
+15.0\% --- matching sliding-window @ 10\,s exactly. Across the
+30-session corpus, however, the lift does not survive: mean
+$\Delta=-0.15$\,pp (8 sessions improved, 12 neutral, 10 worsened).
+The reason: \psm{}'s top-$K{=}50$ candidate set is already exhaustive
+at typical Nymeria session lengths (the recordings are short enough
+that 50 candidates approximate exhaustive search), so the rerank can
+only reshuffle the same candidates; the sliding-window win comes
+from \emph{different} candidate windows being scored after smoothing.
+Pre-smoothing the embedding bank before \psm{} ingest (an alternative
+location for the smoothing operation) also failed: smoothed
+exemplar embeddings drift \texttt{exemplar\_t} outside the GT
+interval and collapse Hit@5 by 2--4\,pp. We conclude that absorbing
+the encoder-stage smoothing benefit at \psm{}'s bounded-memory
+operating point requires modifying the substrate itself --- maintaining
+a per-cell running mean alongside the reservoir, scored at query
+time --- which we defer to camera-ready (\S\ref{sec:conclusion}).
+
 \subsection{Memory and latency vs.\ session length}
 \label{sec:results-memory-latency}
 

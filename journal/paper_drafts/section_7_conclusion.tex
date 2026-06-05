@@ -38,7 +38,7 @@ typical 5--10 cells a wearer occupies, with the gap growing
 linearly thereafter.
 
 \paragraph{Follow-up directions.}
-Four extensions naturally fit the Wearables AI Workshop's
+Five extensions naturally fit the Wearables AI Workshop's
 research areas. (a) \emph{Outdoor, GPS-grounded look-back QA}
 on Aria Gen 2 Pilot's~\cite{aria-gen2-pilot}
 \texttt{walk\_0}/\texttt{walk\_1} sessions ($\sim$300\,m wearer
@@ -59,7 +59,17 @@ via HLL cardinality}: the time-decayed ring-buffer sketches in
 cardinality per cell; surfacing them to the question answerer
 extends \psm{} to a question class beyond moment-grounding
 (``how many distinct people did I see at the kitchen today?'').
-(d) \emph{Federated memory across wearers}: H3 cells are global,
+(d) \emph{Per-cell running-mean exemplars}: \S\ref{sec:results-multisession}
+documents a $+1$\,pp Hit@5 gap between \psm{} and sliding-window
+CLIP @ 10\,s that query-time and pre-ingest pooling did \emph{not}
+close. Maintaining a single running-mean embedding per cell
+alongside the reservoir (\(+\)one embedding per cell, \(\sim\)3\,KiB
+at CLIP-L), and scoring both the top reservoir exemplar and the
+cell mean at query time, is the smallest substrate change expected
+to absorb the smoothing benefit without compromising
+\texttt{exemplar\_t} precision; we defer the C-side implementation
+and ablation to the camera-ready.
+(e) \emph{Federated memory across wearers}: H3 cells are global,
 so two devices visiting the same cell can merge their PSM state
 via HLL union and reservoir sampling without sharing raw frames
 --- a privacy-preserving foundation for the workshop's
