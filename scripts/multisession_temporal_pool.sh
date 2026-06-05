@@ -12,12 +12,24 @@ set -euo pipefail
 ROOT="${ROOT:-/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic}"
 CKPT="${CKPT:-laion/CLIP-ViT-L-14-laion2B-s32B-b82K}"
 
-SESSIONS="${SESSIONS:-
-20230608_s0_shelby_arroyo_act0_3ciwl8
-20230607_s0_james_johnson_act0_84zw4k
-20230614_s0_angela_harrell_act4_n2hnh4
-20230612_s0_jason_smith_act3_84zw4k
-}"
+# Auto-discover sessions: any directory under $ROOT that contains both
+# clip_l_features.h5 and questions.yaml. Override with SESSIONS env var
+# to specify explicit names.
+if [ -z "${SESSIONS:-}" ]; then
+  SESSIONS="$(
+    for d in "$ROOT"/*/; do
+      sid="$(basename "$d")"
+      if [ -f "$d/clip_l_features.h5" ] && [ -f "$d/questions.yaml" ]; then
+        echo "$sid"
+      fi
+    done
+  )"
+fi
+if [ -z "$SESSIONS" ]; then
+  echo "!!! no sessions found under $ROOT with both clip_l_features.h5 + questions.yaml"
+  exit 1
+fi
+echo "=== discovered $(echo "$SESSIONS" | wc -w) sessions under $ROOT"
 
 W="${W:-30}"
 P="${P:-50}"
