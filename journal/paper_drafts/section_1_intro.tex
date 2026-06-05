@@ -110,15 +110,9 @@ contributions are largely orthogonal.
     \S\ref{sec:conclusion} footnote).
 \end{itemize}
 
-\paragraph{Workshop scope alignment.}
-This work targets three of the Wearables AI Workshop's listed
-research areas. \emph{Long-Context \& Real-Time Interactions:}
-PSM's reservoir + ring-buffer state is fixed-size per cell and
-sub-millisecond per query, addressing the bounded-memory side of
-the ``memory bottlenecks for sustained dialog'' theme.
-\emph{Persistent Scene and Object Memory from Video:}
-H3 + ring-buffer is a time-aware spatial representation of the
-user's environment, designed for retrieval. \emph{Efficient AI
-/ Edge Computing:} the engine's TurboQuant 2/3/4-bit exemplar
-codec compresses per-cell exemplar storage 5--10$\times$ at no
-Hit@5 cost, suitable for on-device deployment.
+The work touches three of the Wearables AI Workshop's areas:
+Long-Context \& Real-Time Interactions (bounded per-query state),
+Persistent Scene and Object Memory from Video (time-aware
+spatial representation), and Efficient AI / Edge Computing (a
+TurboQuant 2/3/4-bit exemplar codec compresses per-cell storage
+5--10$\times$ at no Hit@5 cost, suitable for on-device deployment).

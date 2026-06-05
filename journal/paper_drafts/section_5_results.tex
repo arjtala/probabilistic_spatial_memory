@@ -106,119 +106,58 @@ PSM, \texttt{cap}=$K$ + Gemini & 1024 & \textbf{13.4\%} (25/187) & \textbf{0.101
 \end{tabular}
 \caption{Headline retrieval results on Nymeria
 \texttt{shelby\_arroyo\_act0} (187 narrations). The bounded-memory
-deployment configuration uses reservoir $R=128$ exemplars per cell
-(top block); at \texttt{cap}=$K$ it achieves 83\% of brute-force
-CLIP's Hit@5 (11.2\% vs 13.4\%) at $8\times$ smaller per-cell state.
-The $R=1024$ rows (middle, bottom blocks) report the same engine at
-an oracle-sized reservoir to isolate the spatial-diversity
-\texttt{per\_cell\_cap} effect from reservoir eviction: at $R=1024$,
-\texttt{cap}=$K$ recovers brute-force exactly (same 25 hits, same
-exemplar mIoU). MLLM rerank rows show \texttt{cap}=$K$ matches
-brute-force on Hit@5 and lifts exemplar mIoU 37\% relative
-($0.074 \rightarrow 0.101$); \texttt{cap}=1 + rerank achieves
-exemplar mIoU statistically indistinguishable from brute-force CLIP
-(0.073 vs 0.074) at one-fifth the candidate budget. Hit@5 in the
-$R=128$ bounded-memory block is the load-bearing deployment claim;
-the $R=1024$ rows isolate the spatial-diversity \texttt{cap} effect
-from reservoir eviction and provide the architectural upper bound.
-Hit@5 and bucket mIoU move in opposite directions
-across the cap sweep --- the operating-point Pareto trade discussed
-in \S\ref{sec:results-pareto}.}
+deployment uses $R=128$ (top block); $R=1024$ rows are an
+oracle-sized reservoir that isolates the \caponek{} effect from
+reservoir eviction. At $R=1024$ \caponek{}$=K$ recovers brute-force
+exactly; the MLLM rerank lifts mIoU $37\%$ relative without
+changing Hit@5, and \caponek{}=1+rerank matches brute-force on
+mIoU at one-fifth the candidate budget.}
 \label{tab:headline}
 \end{table*}
 
-\paragraph{Bounded-memory PSM achieves 83\% of brute-force on
-Hit@5.} At the deployment configuration ($R=128$, \texttt{cap}=$K$),
-PSM achieves 11.2\% Hit@5 against brute-force CLIP's 13.4\% --- 83\%
-of the oracle's recall at $8\times$ smaller per-cell state. With the
-reservoir relaxed to the oracle setting ($R=1024$, \texttt{cap}=$K$),
-PSM hits the \emph{same 25 of 187 questions} brute-force does, with
-identical exemplar mIoU (0.074). The H3 + ring buffer + reservoir
-substrate is therefore a strict generalization of brute-force in the
-limit of unbounded per-cell capacity --- the bounded-memory cost at
-the deployment configuration is the 2.2pp gap between the two rows.
+\paragraph{The headline claims.} At the deployment configuration
+($R{=}128$, \caponek{}$=K$), \psm{} achieves $83\%$ of brute-force
+CLIP's Hit@5 ($11.2\%$ vs $13.4\%$) at $8\times$ smaller per-cell
+state; at $R{=}1024$, $\caponek{} {=} K$ hits the \emph{same 25
+of 187} questions brute-force does, with identical exemplar mIoU
+($0.074$) --- the substrate is a strict generalization of
+brute-force in the limit of unbounded per-cell capacity, with the
+bounded-memory cost being the $2.2$\,pp gap between the two rows.
+Strict spatial diversity (\caponek{}$=1$) costs $5.4$\,pp Hit@5
+($8.0\%$ vs $13.4\%$) on this revisit-heavy session because
+visits to the same place collapse into one bucket --- the
+intended behavior when the look-back question references a
+distinct place; revisit-heavy questions are not the cap-1 design
+point.
 
-\paragraph{Strict spatial diversity is a 5.4-point trade.} At
-\texttt{cap}=1 (the bounded-memory + strict-diversity default), PSM
-enforces that each top-$K$ slot represents a distinct H3 cell. On a
-session where the wearer revisits the same place often (the Nymeria
-narrations are 60--70\% revisit-heavy), this costs 5.4pp of Hit@5
-(8.0\% vs 13.4\% at $R=1024$) because revisits to the same spot
-collapse into one bucket. The \emph{purpose} of the cap-1
-default is exactly this: when the look-back question references a
-distinct place (``where did I leave the laundry basket?''), the
-strict-diversity top-$K$ surfaces $K$ distinct candidate places,
-which is the right behavior. Revisit-heavy questions (``what was I
-doing in the living room?'') are not the design point of cap-1.
-
-\paragraph{The benchmark ceiling is shared.} Brute-force CLIP itself
-caps at 13.4\% Hit@5 on this session, so a reader may ask whether
-PSM's parity is meaningful at such low absolute recall.
-We address this directly: of the 187 narrations, 162 are
-revisit-heavy long sentences where every visually-similar frame is
-indistinguishable to a CLIP-cosine ranking (\S\ref{sec:results-failure})
---- both PSM and brute-force converge on the visually-most-similar
-frame, which is rarely the annotator's chosen interval. On the 25
-narrations that \emph{are} temporally distinct enough to be
-groundable by either method, PSM at \texttt{cap}=$K$ recovers the
-correct interval for all 25 (\emph{conditional accuracy = 100\%
-on the groundable subset}). The 13.4\% Hit@5 ceiling is a
-benchmark hardness signal, not a method capability signal; the
-architectural claim is that PSM's bounded-memory substrate inherits
-exactly the strengths and weaknesses of the underlying CLIP
-embedding bank.
-
-\paragraph{MLLM rerank's contribution is localization, not recall.}
-Comparing PSM-only and PSM\,$\rightarrow$\,Gemini at \texttt{cap}=$K$:
-both hit the same 25 questions, but exemplar mIoU rises 0.074
-$\rightarrow$ 0.101 (+37\% relative). The Gemini reranker does not
-recover candidates PSM dropped --- it can only pick from the top-5 PSM
-already returned --- but it reorders \emph{within} the top-5 toward
-more precisely-timed exemplars. The architectural framing:
-\emph{PSM provides the candidate set; the MLLM provides
-localization precision; the two compose multiplicatively.}
-
-\paragraph{Bounded-memory + rerank closes the gap.}
-PSM\,$\rightarrow$\,Gemini at \texttt{cap}=1 achieves exemplar mIoU
-0.073 --- statistically indistinguishable from brute-force CLIP's
-0.074 --- while keeping strict spatial diversity and bounded memory.
-This is the headline operating point for the paper: the engine's
-default behavior (cap-1, ex=1024 per cell, 9.4\,m hex cells) plus a
-single MLLM rerank call matches the brute-force CLIP localization
-oracle on the localization-precision metric the MLLM downstream
-actually consumes.
+\paragraph{Benchmark ceiling \& MLLM rerank.}
+Brute-force CLIP itself caps at $13.4\%$ Hit@5; of the $187$
+narrations, $162$ are revisit-heavy and visually indistinguishable
+to CLIP cosine (\S\ref{sec:results-memory-latency}). On the $25$
+\emph{groundable} narrations, \psm{} at \caponek{}$=K$ recovers
+all 25 (\emph{conditional accuracy $= 100\%$}). The MLLM rerank
+adds localization precision rather than retrieval recall:
+PSM-only and PSM\,$\rightarrow$\,Gemini at \caponek{}$=K$ hit the
+same 25 questions, but exemplar mIoU rises
+$0.074\to0.101$ ($+37\%$ relative). At \caponek{}$=1$+rerank,
+exemplar mIoU $= 0.073$ matches brute-force ($0.074$) while
+keeping strict spatial diversity and bounded memory --- the
+headline operating point for the paper.
 
 \subsection{Operating-point Pareto: Hit@5 vs bucket mIoU}
 \label{sec:results-pareto}
 
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\columnwidth]{per_cell_cap_pareto.pdf}
-  \caption{Operating-point Pareto for \caponek{} on
-  \texttt{shelby\_arroyo\_act0}. Hit@5 (blue, left axis) rises
-  monotonically with the cap; bucket mIoU@5 (orange, right axis)
-  falls monotonically. Brute-force CLIP-L's Hit@5 is shown as a
-  dashed reference line.}
-  \label{fig:pareto}
-\end{figure}
-
-Figure~\ref{fig:pareto} plots Hit@5 (rising) and bucket mIoU@5
-(falling) as \texttt{per\_cell\_cap} sweeps from 1 to $K$. The two
-metrics disagree: relaxing the cap recovers retrieval recall but
-loses bucket-level place diversity, because multiple top-$K$ slots
-that share a cell also share the cell's ring buffer envelope. The
-trade is monotone and the Pareto front spans both endpoints
-(brute-force at one extreme, strict spatial diversity at the other).
-
-\paragraph{Why this is a feature, not a bug.} The two metrics
-measure different downstream uses:
-\emph{Hit@5} is the right metric when the downstream is a single
-moment-grounding answer (``when did I…''); \emph{bucket mIoU@5} is
-the right metric when the downstream wants $K$ distinct places to
-display, summarize, or render. PSM exposes the cap as a tuneable
-because the right operating point genuinely depends on the
-application; we report both metrics at every cap so the application
-designer can pick.
+As \caponek{} sweeps from 1 to $K$, Hit@5 rises monotonically and
+bucket mIoU@5 falls monotonically: relaxing the cap recovers
+retrieval recall but loses bucket-level place diversity because
+top-$K$ slots that share a cell also share the cell's ring-buffer
+envelope. The Pareto front spans both endpoints, with brute-force
+at the recall-maximizing extreme and strict spatial diversity at
+the place-coverage-maximizing extreme. \psm{} exposes \caponek{}
+as a tuneable because the right operating point depends on the
+downstream consumer: Hit@5 matters when answering ``when did I~\dots''
+moment-grounding queries; bucket mIoU@5 matters when the downstream
+needs $K$ distinct places to display or summarize.
 
 \subsection{Retrieval-method baselines}
 \label{sec:results-baselines}
@@ -321,47 +260,30 @@ sweep across the 30-session corpus is left to a follow-up; the
 \texttt{cap}=$K$ row stands on the corpus-wide data we have.}
 \label{tab:multisession}
 \end{table*}
-\subsection{Memory and latency vs.\ session length}
+\subsection{Memory, latency, and failure modes}
 \label{sec:results-memory-latency}
 
-PSM's per-query latency is bounded by matching-tile count, not
-session length: at the cluster-validated workload (1{,}024 tiles, dim
-128, 4 exemplars per tile), the engine completes
-\texttt{query\_similar} in 697\,$\mu$s. Brute-force CLIP grows
-linearly in $N$: 37--53\,$\mu$s/query at the cluster's $\sim$3{,}000
-frame sessions, rising to $\sim$2\,ms at 100{,}000 frames and
-$\sim$20\,ms at 1{,}000{,}000 frames (extrapolated from the linear
-matmul). Memory: PSM is fixed-size per H3 cell (independent of
-session length); brute-force grows linearly. The crossover is more
-dramatic on memory than on latency.
+\paragraph{Memory and latency.} \psm{}'s per-query latency is
+bounded by matching-tile count, not session length: $\sim$700\,$\mu$s
+at the synthetic 1024-tile workload (\S\ref{sec:limitations}); brute-force CLIP
+grows linearly in $N$ (extrapolating from per-session
+$\sim$50\,$\mu$s at 3k frames to $\sim$20\,ms at 1M frames).
+On memory the gap is more dramatic: \psm{} is per-cell
+fixed-size, brute-force is linear in $N$. At a 15\,min CLIP-L
+session, reservoir-sized \psm{} ($R{=}128$) occupies $\sim$1\,MB
+per cell vs brute-force's $\sim$13\,MB total bank; at hour-long
+streams the gap grows by two orders of magnitude.
 
-Concretely: reservoir-sized PSM at exemplars=128 occupies
-$\sim$1\,MB per cell vs brute-force's $\sim$13\,MB total for a
-15-minute CLIP-L session. At Nymeria-scale recordings (20\,min,
-$\sim$1{,}200 frames), this becomes a $\sim$10\,$\times$ memory
-advantage. The advantage grows with session length: at projected
-hour-long egocentric streams, the gap is two orders of magnitude.
-A dedicated memory-vs-session-length figure is deferred to the
-camera-ready version, pending the latency micro-benchmark at
-real Nymeria operating points
-(\S\ref{sec:limitations}).
-
-\subsection{Failure analysis}
-\label{sec:results-failure}
-
-Of the 162 questions both PSM and brute-force CLIP miss on
-\texttt{shelby\_arroyo\_act0}, the dominant failure mode (137 / 162)
-is \emph{revisit-heavy long narration}: ``C is chatting with her
-peers while standing in the living room,'' ``C is walking forward
-in the hallway,'' etc. The wearer revisits these places repeatedly
-in the same recording; the visually-most-similar frame is rarely
-the annotator's chosen ground truth, and any single answer is
-inherently ambiguous. This is a benchmark hardness ceiling
-(the methods agree on the 25 questions that \emph{are} groundable),
-not a method-quality signal. The 25 questions that succeed all
-reference temporally-distinct events (``C closes the cabinet,''
-``C walks toward the kitchen then turns left'') where the
-ground-truth window is the only matching visual evidence.
+\paragraph{Failure modes.} Of the 162 questions both \psm{} and
+brute-force miss on \texttt{shelby\_arroyo\_act0}, $137$ are
+\emph{revisit-heavy long narrations} (``C is chatting with her
+peers while standing in the living room'', ``C is walking forward
+in the hallway'') where the wearer revisits these places
+repeatedly and any single visually-similar frame is rarely the
+annotator's pick. The $25$ groundable questions all reference
+temporally-distinct events (``C closes the cabinet''). The shared
+13.4\% Hit@5 ceiling is a benchmark hardness signal, not a
+method-quality one (\S\ref{sec:limitations}).
 
 % Cross-corpus story consolidated into §6 (Conclusion) Follow-up
 % paragraph rather than maintained here as a stub — see venue-aware
