@@ -24,6 +24,14 @@ the cluster (write access to your home dir):
     export LONGCLIP_ROOT=~/long-clip
     # The runner adds $LONGCLIP_ROOT to sys.path on import.
 
+    # Long-CLIP's loader imports ftfy + regex (same runtime deps as OpenAI
+    # CLIP). Install them if not already present:
+    pip install ftfy regex
+
+    # NOTE: Long-CLIP does not ship as a PyPI package -- the repo has no
+    # setup.py / pyproject.toml, so `pip install` on it directly fails.
+    # The sys.path approach above is the path of least resistance.
+
 ## Usage
 
     from psm_extraction.models import make_runner
@@ -101,6 +109,17 @@ class LongCLIPPyTorchRunner(ModelRunner):
         self._torch = __import__("torch")
 
         _ensure_longclip_on_path()
+        # Long-CLIP's loader imports ftfy + regex (CLIP-tokenizer deps).
+        # Surface a clear error if either is missing, before the unrelated
+        # "no module named longclip" fallback message fires.
+        try:
+            import ftfy  # noqa: F401
+            import regex  # noqa: F401
+        except ImportError as exc:
+            raise RuntimeError(
+                "Long-CLIP requires ftfy + regex (same as OpenAI CLIP). "
+                "Install with: pip install ftfy regex"
+            ) from exc
         try:
             # The official Long-CLIP repo's canonical import is
             # `from model import longclip` (the loader module lives under
