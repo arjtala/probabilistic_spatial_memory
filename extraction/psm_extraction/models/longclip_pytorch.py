@@ -102,16 +102,24 @@ class LongCLIPPyTorchRunner(ModelRunner):
 
         _ensure_longclip_on_path()
         try:
-            from longclip import load as longclip_load
-            from longclip import tokenize as longclip_tokenize
+            # The official Long-CLIP repo's canonical import is
+            # `from model import longclip` (the loader module lives under
+            # the repo's `model/` directory). Some forks restructure to
+            # a top-level `longclip` package; try both.
+            try:
+                from model import longclip as _longclip  # type: ignore[import-not-found]
+            except ImportError:
+                import longclip as _longclip  # type: ignore[import-not-found]
         except ImportError as exc:
             raise RuntimeError(
-                "Could not import the `longclip` package. Ensure the "
-                "Long-CLIP repo is cloned and LONGCLIP_ROOT points to "
-                "its root directory."
+                "Could not import Long-CLIP. Tried `from model import longclip` "
+                "and `import longclip` from LONGCLIP_ROOT. Verify the repo "
+                "checkout has model/longclip.py (or a top-level longclip "
+                "package) and that LONGCLIP_ROOT points to the repo root."
             ) from exc
 
-        self._tokenize = longclip_tokenize
+        self._tokenize = _longclip.tokenize
+        longclip_load = _longclip.load
         self.context_length = int(context_length)
 
         # Default checkpoint: look in $LONGCLIP_ROOT/checkpoints/longclip-L.pt
