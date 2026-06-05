@@ -64,34 +64,23 @@ ECCV 2026 Wearables AI Workshop Submission}
 \maketitle
 \begin{abstract}
 \noindent
-% TODO: tighten abstract to ~200 words once §5 numbers stabilize
-% (post-MLLM multi-session sweep, post-Aria Gen 2 annotation).
-% Current draft is paper-spec sized but unedited prose.
 A wearable AI assistant captures hours of egocentric video per day;
 answering a look-back question (``where did I leave my keys?'')
-requires retrieving the relevant moments from a large frame
-stream under strict on-device memory bounds. Brute-force CLIP
-retrieval over the full embedding bank grows linearly with
-recording duration, which is structurally inappropriate for the
-streaming bounded-memory wearable setting. We propose
-\textbf{Probabilistic Spatial Memory} (\psm), a streaming spatial-
-temporal index combining an H3 hex-grid tessellation, a time-
-decayed ring buffer of HyperLogLog sketches per cell, and
-reservoir-sampled CLIP-embedding exemplars. \psm{} exposes a
-\caponek{} knob that smoothly trades strict spatial diversity
-(\texttt{cap}=1: each top-$K$ slot a distinct H3 cell) for
-permissive embedding-similarity precision
-(\texttt{cap}=$K$: reduces to brute-force over all reservoir
-exemplars). On a 187-question subset of the public Nymeria
-egocentric benchmark, \psm{} at \texttt{cap}=$K$ recovers brute-
-force CLIP retrieval exactly (13.4\% Hit@5, same 25 questions);
-\psm{} at the bounded-memory default \texttt{cap}=1 paired with a
-single Gemini-3.1-Pro rerank achieves localization mIoU
-indistinguishable from brute-force CLIP's (0.073 vs 0.074), at
-one-fifth the candidate budget. The operating-point effect
-generalizes across four Nymeria sessions spanning the street-,
-building-, and room-scale mobility tiers. The engine ($\sim$700
-LoC of portable C) and Python eval harness are released under MIT.
+requires retrieving the relevant moments under strict on-device
+memory bounds. We propose \textbf{Probabilistic Spatial Memory}
+(\psm), a streaming spatial-temporal index combining an H3 hex-grid
+tessellation, a time-decayed ring buffer of HyperLogLog sketches per
+cell, and reservoir-sampled CLIP-embedding exemplars. \psm{} exposes
+a novel \caponek{} knob that smoothly trades strict spatial diversity
+for embedding-similarity precision; the permissive endpoint
+(\texttt{cap}=$K$) reduces to brute-force retrieval over all
+in-reservoir exemplars, and on the highest-mobility session in our
+Nymeria evaluation, \psm{} at the bounded-memory default paired with
+a single MLLM rerank matches brute-force CLIP on localization
+mIoU at one-fifth the candidate budget. The operating-point effect
+generalizes across four sessions spanning street-, building-, and
+room-scale mobility tiers. The C engine ($\sim$700 LoC) and Python
+eval harness are released under MIT.
 \end{abstract}
 \vspace{1em}
 ]
@@ -100,7 +89,7 @@ LoC of portable C) and Python eval harness are released under MIT.
 \input{section_1_intro.tex}
 \input{section_2_method.tex}
 \input{section_3_pipeline.tex}
-% §4 Experimental setup is folded into §5.1 (Setup subsection).
+\input{section_4_related.tex}
 \input{section_5_results.tex}
 \input{section_6_limitations.tex}
 

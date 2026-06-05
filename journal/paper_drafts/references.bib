@@ -1,25 +1,8 @@
 @comment{
-  references.bib stub for the PSM ECCV 2026 Wearables AI Workshop
-  submission. Each entry below is a placeholder until the
-  canonical citation is resolved. The @comment{} block here is a
-  bibtex-safe way to record file-level notes (lines starting
-  with `%' in the original draft tripped bibtex's parser).
+  references.bib for PSM ECCV 2026 Wearables AI Workshop submission.
 }
 
-@misc{localization-paradox-2026,
-  title  = {The Localization Paradox in Long-Context Video QA},
-  author = {Anonymous},
-  year   = {2026},
-  note   = {Placeholder citation for the Localization-Paradox motivating
-            paper; resolve to the public preprint once available.},
-}
-
-@misc{uber-h3,
-  title        = {{H3}: Uber's Hexagonal Hierarchical Spatial Index},
-  author       = {{Uber Technologies}},
-  year         = {2018},
-  howpublished = {\url{https://h3geo.org/}},
-}
+% ─── Core methods we build on ─────────────────────────────────────
 
 @inproceedings{flajolet-hll,
   author    = {Flajolet, Philippe and Fusy, {\'E}ric and Gandouet, Olivier
@@ -40,6 +23,36 @@
   year    = {1985},
 }
 
+@misc{uber-h3,
+  title        = {{H3}: Uber's Hexagonal Hierarchical Spatial Index},
+  author       = {{Uber Technologies}},
+  year         = {2018},
+  howpublished = {\url{https://h3geo.org/}},
+}
+
+@misc{turboquant,
+  title  = {TurboQuant: Randomized Hadamard + Lloyd-Max Scalar Quantization
+            for Embedding Compression},
+  author = {Anonymous},
+  year   = {2024},
+  note   = {PLACEHOLDER: resolve to canonical TurboQuant paper before
+            submission, or cite our implementation in
+            \texttt{src/core/exemplar\_codec.c} directly.},
+}
+
+% ─── Encoders used for evaluation ────────────────────────────────
+
+@inproceedings{radford2021clip,
+  author    = {Radford, Alec and Kim, Jong Wook and Hallacy, Chris and
+               Ramesh, Aditya and Goh, Gabriel and Agarwal, Sandhini and
+               Sastry, Girish and Askell, Amanda and Mishkin, Pamela and
+               Clark, Jack and Krueger, Gretchen and Sutskever, Ilya},
+  title     = {Learning Transferable Visual Models From Natural Language
+               Supervision},
+  booktitle = {International Conference on Machine Learning (ICML)},
+  year      = {2021},
+}
+
 @misc{clip-l-laion,
   title        = {{CLIP-ViT-L-14-laion2B-s32B-b82K}: OpenCLIP reproduction
                   of OpenAI's CLIP-L},
@@ -48,27 +61,125 @@
   howpublished = {\url{https://huggingface.co/laion/CLIP-ViT-L-14-laion2B-s32B-b82K}},
 }
 
-@misc{nymeria,
-  title  = {Nymeria: A Massive Collection of Egocentric Multimodal Recordings},
-  author = {Meta Reality Labs},
-  year   = {2024},
-  note   = {Placeholder; resolve to the Nymeria release paper /
-            project page.},
+@misc{gemini-3-pro,
+  title        = {Gemini 3.1 Pro},
+  author       = {{Google DeepMind}},
+  year         = {2026},
+  howpublished = {\url{https://deepmind.google/technologies/gemini/}},
+  note         = {PLACEHOLDER: replace with model-card or technical-report URL
+                  when canonical citation is available.},
 }
 
-@misc{turboquant,
-  title  = {TurboQuant: Randomized Hadamard + Lloyd-Max Scalar Quantization
-            for Embedding Compression},
-  author = {Anonymous},
+% ─── Corpora ─────────────────────────────────────────────────────
+
+@misc{nymeria,
+  title  = {Nymeria: A Massive Collection of Egocentric Multimodal Recordings},
+  author = {{Meta Reality Labs}},
   year   = {2024},
-  note   = {Placeholder; resolve to the canonical TurboQuant paper /
-            our implementation in \texttt{src/core/exemplar\_codec.c}.},
+  note   = {PLACEHOLDER: resolve to the Nymeria release paper / project page.},
 }
 
 @misc{aria-gen2-pilot,
   title  = {Aria Gen 2 Pilot Dataset},
-  author = {Meta Reality Labs},
+  author = {{Meta Reality Labs}},
   year   = {2024},
-  note   = {Placeholder; resolve to the project page citing the 12
+  note   = {PLACEHOLDER: resolve to the project page citing the 12
             preview sessions used in \S\ref{sec:results-aria}.},
+}
+
+% ─── Motivating paper (concurrent / preprint) ────────────────────
+
+@misc{localization-paradox-2026,
+  title  = {The Localization Paradox in Long-Context Video QA},
+  author = {Anonymous},
+  year   = {2026},
+  note   = {PLACEHOLDER: resolve to the public preprint when available;
+            otherwise frame as concurrent work in the related-work
+            paragraph and replicate the paradox on our corpus via E10.},
+}
+
+% ─── Related work: episodic memory retrieval ─────────────────────
+
+@inproceedings{ego4d-nlq,
+  author    = {Grauman, Kristen and others},
+  title     = {{Ego4D}: Around the World in 3{,}000 Hours of Egocentric Video},
+  booktitle = {CVPR},
+  year      = {2022},
+  note      = {We cite the dataset paper for its episodic-memory / NLQ task,
+                the closest published precedent for our look-back QA framing.},
+}
+
+@inproceedings{ego-exo4d,
+  author    = {Grauman, Kristen and others},
+  title     = {{Ego-Exo4D}: Understanding Skilled Human Activity from
+               First- and Third-Person Perspectives},
+  booktitle = {CVPR},
+  year      = {2024},
+}
+
+% ─── Related work: long-context video QA benchmarks ─────────────
+
+@inproceedings{egoschema,
+  author    = {Mangalam, Karttikeya and Akshulakov, Raiymbek and
+               Malik, Jitendra},
+  title     = {{EgoSchema}: A Diagnostic Benchmark for Very Long-form Video
+               Language Understanding},
+  booktitle = {NeurIPS},
+  year      = {2023},
+}
+
+@inproceedings{moviechat,
+  author    = {Song, Enxin and others},
+  title     = {{MovieChat}: From Dense Token to Sparse Memory for Long Video
+               Understanding},
+  booktitle = {CVPR},
+  year      = {2024},
+}
+
+% ─── Related work: streaming approximate-nearest-neighbor indices ─
+
+@inproceedings{diskann,
+  author    = {Subramanya, Suhas Jayaram and Devvrit and Kadekodi, Rohan
+               and Krishnaswamy, Ravishankar and Simhadri, Harsha Vardhan},
+  title     = {{DiskANN}: Fast Accurate Billion-point Nearest Neighbor
+               Search on a Single Node},
+  booktitle = {NeurIPS},
+  year      = {2019},
+}
+
+@inproceedings{spann,
+  author    = {Chen, Qi and others},
+  title     = {{SPANN}: Highly-efficient Billion-scale Approximate Nearest
+               Neighborhood Search},
+  booktitle = {NeurIPS},
+  year      = {2021},
+}
+
+@article{hnsw,
+  author  = {Malkov, Yu A. and Yashunin, Dmitry A.},
+  title   = {Efficient and robust approximate nearest neighbor search using
+             Hierarchical Navigable Small World graphs},
+  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  year    = {2020},
+}
+
+% ─── Related work: spatial databases ─────────────────────────────
+
+@inproceedings{guttman1984rtrees,
+  author    = {Guttman, Antonin},
+  title     = {{R-trees}: A Dynamic Index Structure for Spatial Searching},
+  booktitle = {ACM SIGMOD},
+  year      = {1984},
+}
+
+@article{moon2001geohilbert,
+  author  = {Moon, Bongki and Jagadish, H. V. and Faloutsos, Christos and
+             Saltz, Joel H.},
+  title   = {Analysis of the clustering properties of the {Hilbert}
+             space-filling curve},
+  journal = {IEEE Transactions on Knowledge and Data Engineering},
+  volume  = {13},
+  number  = {1},
+  pages   = {124--141},
+  year    = {2001},
 }

@@ -64,10 +64,17 @@ The bucket window is what the downstream MLLM consumes as its
 ``where in the recording should I look?'' hint.
 
 \paragraph{Memory bound.} Each HLL sketch occupies
-$2^p$ bytes at precision $p$ (default $p = 14 \Rightarrow$ 16\,KB).
-A cell's ring buffer is $C \cdot 16\,\mathrm{KB} = 960\,\mathrm{KB}$
-at the default $C = 60$. The bound is per-cell and time-window-bounded,
-independent of recording duration.
+$2^p$ bytes at precision $p$ (default $p = 14 \Rightarrow$ 16\,KiB).
+A cell's ring buffer is $C \cdot 16\,\mathrm{KiB} = 960\,\mathrm{KiB}$
+at the default $C = 60$. The bound is per-cell and
+time-window-bounded, independent of recording duration. We note
+that for the v1 evaluation, only the buffer's $(t_{\min}, t_{\max})$
+envelope is consumed downstream; the cardinality estimates are
+forward-looking infrastructure for the counting question class
+(\S\ref{sec:conclusion}). A pure $(t_{\min}, t_{\max})$ tracker
+would drop per-cell state from 960\,KiB to a constant 16 bytes; we
+defer that ablation to camera-ready since the counting use case
+motivates carrying the HLL sketches as a v2 deliverable.
 
 \subsection{Reservoir-sampled exemplars}
 \label{sec:method-exemplars}
@@ -83,8 +90,9 @@ $R$-sized sample of all frames the wearer experienced there.
 
 The reservoir is the bounded-memory substitute for the linearly-growing
 embedding bank that brute-force CLIP keeps. At $R = 128$ and CLIP-L's
-$d = 768$, each cell occupies $128 \cdot 768 \cdot 4$ bytes
-$\approx 384$\,KB --- a wearable that visits 100 distinct cells in a
+$d = 768$, each cell occupies $128 \cdot 768 \cdot 4 = 393\,216$
+bytes $\approx 384$\,KiB --- a wearable that visits 100 distinct
+cells in a
 day stores $\sim$38\,MB total, vs $\sim$200\,MB for an embedding
 bank over the same recording. The asymptotic gap grows with
 recording length: brute-force is $\Theta(N)$; PSM is $\Theta(R \cdot
@@ -130,8 +138,8 @@ The selection structure is malloc-free at the per-cell layer
 $\texttt{per\_cell\_cap}$, typically 1--$K$). The
 \texttt{RingBuffer\_merge\_window} call --- the load-bearing
 expensive op in the query path --- runs only on the top-$K$
-\emph{surviving} cells, not on every scanned tile, giving a
-22.7$\times$ wall-time speedup measured on cluster hardware
+\emph{surviving} cells, not on every scanned tile, which keeps
+per-query latency sub-millisecond on session-scale workloads
 (\S\ref{sec:results-memory-latency}).
 
 The \texttt{per\_cell\_cap} parameter is the operating-point knob
