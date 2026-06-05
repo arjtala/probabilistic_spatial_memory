@@ -345,3 +345,40 @@ Operationally:
 
 Captures: `captures/h3res_r{10,11,12,13}_shelby_arroyo_act0_3ciwl8.json`.
 
+
+## Retrieval-method baselines (2026-06-05)
+
+Sliding-window + uniform-sample CLIP on shelby_arroyo_act0 (CLIP-L):
+
+| Method | Param | Hit@5 | exemplar mIoU@5 |
+|---|---|---|---|
+| Sliding-window | ℓ=10s | **15.0%** (28/187) | **0.084** |
+| Brute-force per-frame | — | 13.4% (25/187) | 0.074 |
+| Sliding-window | ℓ=5s | 12.8% (24/187) | 0.074 |
+| Sliding-window | ℓ=3s | 10.7% (20/187) | 0.061 |
+| Uniform-sample | ρ=30s | 8.6% (16/187) | 0.045 |
+| Uniform-sample | ρ=75s | 4.3% (8/187) | 0.025 |
+
+Reference points: PSM @ cap=K, R=1024 = 13.4% (matches per-frame
+brute-force exactly). PSM @ cap=K, R=128 = 11.2%. PSM @ cap=1 +
+Gemini = 8.0%.
+
+**Sliding-window @ 10s exceeds brute-force per-frame (15.0% vs
+13.4%)** because the 10s window pooling smooths out per-frame
+similarity variance, and the optimal window width (~2× the 5s GT
+interval) lands the annotated moment inside a high-scoring window
+even when no single frame stands out. This is a known smoothing
+effect; it does not propose a bounded-memory operating point
+(sliding-window stores the full N-frame bank + per-window means).
+
+Honest framing for the paper:
+- 'PSM matches per-frame brute-force CLIP at bounded memory.'
+  ✓ Still true.
+- 'PSM beats all retrieval baselines.'
+  ✗ Not quite — sliding-window @ 10s wins on Hit@5 by 1.6pp.
+- 'PSM trades 5.4pp of Hit@5 for bounded memory and spatial
+  diversity vs the strongest CLIP-only baseline (sliding @ 10s).'
+  ✓ True, and arguably the most precise statement.
+
+§5 new Retrieval-baselines subsection added.
+

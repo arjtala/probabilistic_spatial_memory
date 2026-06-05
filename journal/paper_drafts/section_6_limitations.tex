@@ -84,7 +84,7 @@ both workloads, but a real-session micro-benchmark would tighten
 the latency comparison. We will report this in a follow-up.
 
 \paragraph{What this paper does not claim.}
-For clarity, we note four claims this work does \emph{not} make.
+For clarity, we note five claims this work does \emph{not} make.
 (a) We do not claim PSM is a generic MLLM grounding method;
 PSM is a retrieval substrate, the MLLM does the grounding.
 (b) We do not claim PSM solves the counting question class;
@@ -92,8 +92,11 @@ the time-decayed HLL sketches are diagnostic-only until the
 real-counting scorer lands in a follow-up.
 (c) We do not claim PSM is the only architecture for this
 problem; we propose one shape, not the only one. (d) We do not
-claim that brute-force CLIP-L is the strongest possible baseline;
-larger encoders (bigG, EVA, SigLIP) likely shift absolute Hit@5
-values upward, but the architectural claim
-(PSM matches brute-force at appropriate operating point) is
-encoder-agnostic.
+claim that per-frame brute-force CLIP is the strongest possible
+CLIP-only baseline; sliding-window CLIP at the GT-interval
+width modestly exceeds it on Hit@5
+(Table~\ref{tab:baselines}), and PSM does not match that smoothing
+effect at its bounded-memory operating point. (e) We do not
+claim that CLIP-L is the strongest possible encoder; larger
+variants (bigG, EVA, SigLIP) likely shift absolute Hit@5 values
+upward, but the architectural claim is encoder-agnostic.
