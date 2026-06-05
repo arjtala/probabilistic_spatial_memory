@@ -55,11 +55,20 @@ toward the laundry closet, then opens the door with her right
 hand''). Many tokenize to 80--120 tokens, exceeding the CLIP-L
 text encoder's 77-token positional limit. We truncate at 77 tokens
 at the tokenizer level; this drops trailing context that the
-brute-force CLIP and PSM baselines both lose access to.
-A non-truncating text encoder such as Long-CLIP~\cite{zhang2024longclip},
-or one of the recent 1024-token CLIP variants, would likely improve
-accuracy by a few percentage points; we leave that comparison to
-future work.
+brute-force CLIP and \psm{} baselines both lose access to.
+We tested whether a non-truncating text encoder would close this
+gap, swapping in Long-CLIP-L~\cite{zhang2024longclip} (the same
+ViT-L/14 architecture as CLIP-L, with positional embeddings
+stretched from 77 to 248 tokens) and re-extracting both text and
+image features on the headline session. The Long-CLIP swap
+\emph{degraded} Hit@5 by $2.2$\,pp ($13.4\%\to11.2\%$), suggesting
+that the truncated trailing context is auxiliary description that
+adds noise rather than signal on this benchmark, and that
+Long-CLIP's fine-tuning on long-caption COCO/Flickr-style pairs
+shifts the embedding space away from what works for short-action
+retrieval. Other long-context encoders (1024-token CLIP variants,
+SigLIP~2~\cite{tschannen2025siglip2}) may behave differently; we
+leave that broader sweep to future work.
 
 \paragraph{Single corpus.} All headline numbers are on Nymeria
 indoor recordings. The multi-session table
