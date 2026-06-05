@@ -1,68 +1,59 @@
 % Section 4 — Related Work
-% Status: v1 draft. Four short paragraphs covering the categories the
-% second reviewer asked for: episodic memory retrieval, long-context
-% video QA benchmarks, streaming ANN indices, spatial databases.
-% Goal is differentiation not lit-survey — say what PSM is similar to,
-% then say what's different.
+% Status: v2 draft. Restructured per R3 venue notes — front-load
+% the workshop audience's home turf (egocentric memory-augmented
+% video LLMs), keep ANN/spatial-DB short. Citations curated against
+% the workshop's CFP topic areas.
 
 \section{Related Work}
 \label{sec:related}
 
-\paragraph{Episodic memory and look-back QA.}
-Ego4D's Natural Language Queries
-task~\cite{ego4d-nlq} is the closest published precedent for our
-look-back QA framing: text query over an egocentric video, return a
-$[t_\text{start}, t_\text{end}]$ interval. NLQ baselines treat the
-entire video as a single bag of frames and rank with a learned
-text-frame alignment; we use the same eval shape but report on
-Nymeria (longer, mobile recordings with SLAM-derived spatial
-metadata) and substitute a fixed CLIP encoder + a bounded-memory
-spatial-temporal index for the trained NLQ models. The Ego-Exo4D
-atomic-description protocol~\cite{ego-exo4d} provided the
-narration-as-query inspiration for our atomic-action repurposing of
-Nymeria.
+\paragraph{Egocentric video understanding and episodic memory.}
+Ego4D~\cite{grauman2022ego4d} and its Natural Language Queries
+benchmark established the look-back QA task on egocentric video at
+3{,}000-hour scale; EgoSchema~\cite{mangalam2023egoschema}
+contributed a long-form MCQ diagnostic that exposed the temporal-
+grounding collapse motivating our PSM-as-prefilter pipeline. The
+literal use case (``where did I leave my keys?'') was articulated
+in earlier workshop work~\cite{barmann2022keys}; Di and
+Xie~\cite{di2024grounded} introduced unified grounded-QA over long
+egocentric videos with end-to-end neural grounding. Our contribution
+is structurally orthogonal: we provide a bounded-memory spatial-
+temporal substrate that any of these MLLM grounding methods can
+rerank, rather than retraining a new grounding head.
 
-\paragraph{Long-context video question answering.}
-EgoSchema~\cite{egoschema} and MovieChat~\cite{moviechat} document
-the temporal-grounding collapse that motivates our PSM-as-prefilter
-pipeline: frontier MLLMs (Gemini, Claude, GPT) achieve strong
-single-frame visual grounding but degrade sharply on temporal
-localization over long-context video. MovieChat in particular
-proposes a memory architecture (dense $\rightarrow$ sparse token
-compression) for the long-video QA setting; the design point differs
-from ours in two ways. MovieChat compresses tokens \emph{inside} an
-MLLM forward pass, requiring re-running the model on the compressed
-state; PSM compresses the substrate \emph{outside} the MLLM, returning
-a bounded top-$K$ candidate set that any downstream MLLM can rerank
-without retraining. The two approaches are complementary: PSM as
-front-end retrieval, MovieChat-style memory as MLLM-internal
-compression.
+\paragraph{Memory-augmented video LLMs.}
+MovieChat~\cite{song2024moviechat}, MA-LMM~\cite{he2024malmm},
+Flash-VStream~\cite{zhang2024flashvstream}, and
+LifelongMemory~\cite{wang2024lifelongmemory} all address bounded-
+memory long-video understanding. They differ from \psm{} in two
+important ways. First, they bound memory in \emph{token} space:
+dense-to-sparse merging inside the LLM forward pass, KV-cache
+compression, or recurrent state. \psm{} bounds memory in
+\emph{geographic} space (H3 hex cells) and is therefore queryable
+along a spatial axis that token-space memory cannot answer
+(``what was I doing near here?''). Second, the token-space methods
+require re-running the LLM on the compressed state; \psm{} runs
+upstream of any MLLM, returning a top-$K$ candidate set that the
+downstream model reranks without retraining. The two approaches are
+complementary: \psm{} as front-end retrieval, token-space methods
+as MLLM-internal compression.
 
-\paragraph{Streaming approximate-nearest-neighbor indices.}
-DiskANN~\cite{diskann}, SPANN~\cite{spann}, and streaming variants
-of HNSW~\cite{hnsw} address billion-scale ANN search with bounded
-per-query cost. They are the right substrate when (a) the query is
-purely a vector lookup with no spatial constraint, and (b) the index
-is built once over a static or near-static corpus. PSM differs on
-both axes: queries optionally constrain to an H3 $k$-ring
-neighborhood (``what was I doing near here?''), and ingestion is
+\paragraph{Streaming search and spatial indexing.}
+DiskANN~\cite{jayaram2019diskann} and SPANN~\cite{chen2021spann}
+deliver billion-point ANN with bounded per-query cost over
+near-static corpora; locally-adaptive vector
+quantization~\cite{aguerrebere2024lvq} extends the streaming case
+with per-vector compression. \psm{} differs in two ways: queries
+optionally constrain to an H3 $k$-ring neighborhood (the
+``near here'' spatial axis ANN does not expose), and ingestion is
 fully streaming with bounded per-cell state that ages out via the
-ring buffer. PSM's reservoir-sampled exemplars per cell are
-analogous to a tiny per-cell ANN index ($R \leq 1024$ per cell,
-exact-cosine over $R$), and could in principle be replaced by a
-small HNSW; we use exact cosine for the v1 evaluation because the
-per-cell $R$ is small enough that the asymptotic ANN benefit does
-not apply.
-
-\paragraph{Spatial databases and geographic indexing.}
-R-trees~\cite{guttman1984rtrees} and space-filling
-curves~\cite{moon2001geohilbert} are the canonical spatial-database
-substrates for $(x, y)$-keyed lookups. PSM's H3 tessellation~\cite{uber-h3}
-is structurally a regular-grid alternative to R-tree's data-driven
-subdivisions; H3's hexagonal geometry gives equidistant neighbors
-(the basis for $k$-ring queries) and a globally-stable cell-id
-scheme that supports federated-memory operations across devices
-without coordinating a shared spatial schema. PSM is not a geo-database
-in the SQL sense --- it does not support range, join, or aggregation
-queries beyond ``top-$K$ by cosine similarity'' --- but inherits the
-$O(\log)$ cell-lookup property of the underlying H3 index.
+ring buffer. The H3 hex grid~\cite{brodsky2018h3} is a regular-grid
+alternative to R-tree-style data-driven subdivisions~\cite{guttman1984rtrees};
+its hexagonal geometry provides equidistant neighbors and a
+globally-stable cell-id scheme, the latter being the basis for
+the federated-memory extension we discuss in
+\S\ref{sec:conclusion}. The probabilistic substrate
+(HyperLogLog~\cite{flajolet2007hyperloglog}, reservoir
+sampling~\cite{vitter1985reservoir}) is standard; the contribution
+is in how the two compose with the H3 tessellation under the
+\caponek{} query knob.

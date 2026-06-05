@@ -1,46 +1,12 @@
 @comment{
   references.bib for PSM ECCV 2026 Wearables AI Workshop submission.
+  Citations curated against the workshop's CFP topic areas
+  (Long-Context & Real-Time Interactions; Persistent Scene and Object
+  Memory; Efficient AI / Edge Computing). Priority groups marked
+  inline; placeholder entries flagged for resolution before submission.
 }
 
-% ─── Core methods we build on ─────────────────────────────────────
-
-@inproceedings{flajolet-hll,
-  author    = {Flajolet, Philippe and Fusy, {\'E}ric and Gandouet, Olivier
-               and Meunier, Fr{\'e}d{\'e}ric},
-  title     = {{HyperLogLog}: the analysis of a near-optimal cardinality
-               estimation algorithm},
-  booktitle = {Conference on Analysis of Algorithms (AofA)},
-  year      = {2007},
-}
-
-@article{vitter-reservoir,
-  author  = {Vitter, Jeffrey S.},
-  title   = {Random sampling with a reservoir},
-  journal = {ACM Transactions on Mathematical Software},
-  volume  = {11},
-  number  = {1},
-  pages   = {37--57},
-  year    = {1985},
-}
-
-@misc{uber-h3,
-  title        = {{H3}: Uber's Hexagonal Hierarchical Spatial Index},
-  author       = {{Uber Technologies}},
-  year         = {2018},
-  howpublished = {\url{https://h3geo.org/}},
-}
-
-@misc{turboquant,
-  title  = {TurboQuant: Randomized Hadamard + Lloyd-Max Scalar Quantization
-            for Embedding Compression},
-  author = {Anonymous},
-  year   = {2024},
-  note   = {PLACEHOLDER: resolve to canonical TurboQuant paper before
-            submission, or cite our implementation in
-            \texttt{src/core/exemplar\_codec.c} directly.},
-}
-
-% ─── Encoders used for evaluation ────────────────────────────────
+% ─── Encoders (must-cite) ────────────────────────────────────────
 
 @inproceedings{radford2021clip,
   author    = {Radford, Alec and Kim, Jong Wook and Hallacy, Chris and
@@ -49,7 +15,9 @@
                Clark, Jack and Krueger, Gretchen and Sutskever, Ilya},
   title     = {Learning Transferable Visual Models From Natural Language
                Supervision},
-  booktitle = {International Conference on Machine Learning (ICML)},
+  booktitle = {ICML},
+  pages     = {8748--8763},
+  publisher = {PMLR},
   year      = {2021},
 }
 
@@ -61,22 +29,69 @@
   howpublished = {\url{https://huggingface.co/laion/CLIP-ViT-L-14-laion2B-s32B-b82K}},
 }
 
-@misc{gemini-3-pro,
-  title        = {Gemini 3.1 Pro},
-  author       = {{Google DeepMind}},
-  year         = {2026},
-  howpublished = {\url{https://deepmind.google/technologies/gemini/}},
-  note         = {PLACEHOLDER: replace with model-card or technical-report URL
-                  when canonical citation is available.},
+@article{google2024gemini,
+  title   = {{Gemini 1.5}: Unlocking Multimodal Understanding Across
+             Millions of Tokens of Context},
+  author  = {{Google DeepMind}},
+  journal = {arXiv preprint arXiv:2403.05530},
+  year    = {2024},
+  note    = {Cite the Gemini family; the specific reranker we use
+             (Gemini 3.1 Pro) is queried through the OpenAI-compatible
+             internal proxy with model id \texttt{gemini-3-1-pro-preview-genai}.},
 }
 
-% ─── Corpora ─────────────────────────────────────────────────────
+% ─── Egocentric video datasets & benchmarks (must-cite) ─────────
 
-@misc{nymeria,
-  title  = {Nymeria: A Massive Collection of Egocentric Multimodal Recordings},
-  author = {{Meta Reality Labs}},
-  year   = {2024},
-  note   = {PLACEHOLDER: resolve to the Nymeria release paper / project page.},
+@inproceedings{grauman2022ego4d,
+  title     = {Ego4D: Around the World in 3{,}000 Hours of Egocentric Video},
+  author    = {Grauman, Kristen and Westbury, Andrew and Byrne, Eugene and
+               Chavis, Zachary and Furnari, Antonino and Girdhar, Rohit and
+               Hamburger, Jackson and Jiang, Hao and Liu, Miao and Liu, Xingyu and
+               Martin, Miguel and others},
+  booktitle = {CVPR},
+  pages     = {18995--19012},
+  year      = {2022},
+}
+
+@article{ma2024nymeria,
+  title   = {Nymeria: A Massive Collection of Multimodal Egocentric Daily
+             Motion in the Wild},
+  author  = {Ma, Lingni and others},
+  journal = {arXiv preprint arXiv:2406.09905},
+  year    = {2024},
+}
+
+@article{engel2024aria,
+  title   = {{Project Aria}: A New Tool for Egocentric Multi-Modal AI Research},
+  author  = {Engel, Jakob and Kang, Kiran and Gupta, Sach and others},
+  journal = {arXiv preprint arXiv:2308.13561},
+  year    = {2023},
+}
+
+@inproceedings{mangalam2023egoschema,
+  author    = {Mangalam, Karttikeya and Akshulakov, Raiymbek and
+               Malik, Jitendra},
+  title     = {{EgoSchema}: A Diagnostic Benchmark for Very Long-form Video
+               Language Understanding},
+  booktitle = {NeurIPS},
+  volume    = {36},
+  pages     = {46212--46244},
+  year      = {2023},
+}
+
+@inproceedings{barmann2022keys,
+  title     = {Where Did I Leave My Keys? Episodic-Memory-Based Question
+               Answering on Egocentric Videos},
+  author    = {B{\"a}rmann, Leonard and Waibel, Alex},
+  booktitle = {CVPR Workshops},
+  year      = {2022},
+}
+
+@inproceedings{di2024grounded,
+  title     = {Grounded Question-Answering in Long Egocentric Videos},
+  author    = {Di, Shangzhe and Xie, Weidi},
+  booktitle = {CVPR},
+  year      = {2024},
 }
 
 @misc{aria-gen2-pilot,
@@ -84,102 +99,135 @@
   author = {{Meta Reality Labs}},
   year   = {2024},
   note   = {PLACEHOLDER: resolve to the project page citing the 12
-            preview sessions used in \S\ref{sec:results-aria}.},
+            preview sessions referenced in \S\ref{sec:conclusion}.},
 }
 
-% ─── Motivating paper (concurrent / preprint) ────────────────────
+% ─── Memory-augmented video LLMs (should-cite, positioning) ─────
+
+@inproceedings{song2024moviechat,
+  author    = {Song, Enxin and Chai, Wenhao and Wang, Guanhong and
+               Zhang, Yucheng and Zhou, Haoyang and Wu, Feiyang and
+               Chi, Haozhe and Guo, Xun and Ye, Tian and Zhang, Yanting and
+               Lu, Yan and Hwang, Jenq-Neng and Wang, Gaoang},
+  title     = {{MovieChat}: From Dense Token to Sparse Memory for Long
+               Video Understanding},
+  booktitle = {CVPR},
+  pages     = {18221--18232},
+  year      = {2024},
+}
+
+@inproceedings{he2024malmm,
+  author    = {He, Bo and Li, Hengduo and Jang, Young Kyun and Jia, Menglin
+               and Cao, Xuefei and Shah, Ashish and Shrivastava, Abhinav and
+               Lim, Ser-Nam},
+  title     = {{MA-LMM}: Memory-Augmented Large Multimodal Model for
+               Long-Term Video Understanding},
+  booktitle = {CVPR},
+  year      = {2024},
+}
+
+@article{zhang2024flashvstream,
+  author  = {Zhang, Haoji and Wang, Yiqin and Tang, Yansong and Liu, Yong and
+             Feng, Jiashi and Dai, Jifeng and Jin, Xiaojie},
+  title   = {{Flash-VStream}: Memory-Based Real-Time Understanding for
+             Long Video Streams},
+  journal = {arXiv preprint arXiv:2406.08085},
+  year    = {2024},
+}
+
+@article{wang2024lifelongmemory,
+  author  = {Wang, Ying and Yang, Yanlai and Ren, Mengye},
+  title   = {{LifelongMemory}: Leveraging LLMs for Answering Queries in
+             Long-form Egocentric Videos},
+  journal = {arXiv preprint arXiv:2312.05269},
+  year    = {2024},
+}
+
+% ─── Streaming ANN and vector search ────────────────────────────
+
+@inproceedings{jayaram2019diskann,
+  title     = {{DiskANN}: Fast Accurate Billion-point Nearest Neighbor
+               Search on a Single Node},
+  author    = {Jayaram Subramanya, Suhas and Devvrit, Fnu and
+               Simhadri, Harsha Vardhan and Krishnawamy, Ravishankar and
+               Kadekodi, Rohan},
+  booktitle = {NeurIPS},
+  volume    = {32},
+  year      = {2019},
+}
+
+@inproceedings{chen2021spann,
+  title     = {{SPANN}: Highly-efficient Billion-scale Approximate Nearest
+               Neighborhood Search},
+  author    = {Chen, Qi and Zhao, Bing and Wang, Haidong and Li, Mingqin and
+               Liu, Chuanjie and Li, Zengzhong and Yang, Mao and
+               Wang, Jingdong},
+  booktitle = {NeurIPS},
+  volume    = {34},
+  year      = {2021},
+}
+
+@article{aguerrebere2024lvq,
+  title   = {Locally-Adaptive Quantization for Streaming Vector Search},
+  author  = {Aguerrebere, Cecilia and Hildebrand, Mark and
+             Bhati, Ishwar Singh and Willke, Theodore and Tepper, Mariano},
+  journal = {arXiv preprint arXiv:2402.02044},
+  year    = {2024},
+}
+
+% ─── Spatial indexing + probabilistic data structures ───────────
+
+@misc{brodsky2018h3,
+  title        = {{H3}: Uber's Hexagonal Hierarchical Spatial Index},
+  author       = {Brodsky, Isaac},
+  howpublished = {\url{https://github.com/uber/h3}},
+  year         = {2018},
+}
+
+@inproceedings{guttman1984rtrees,
+  title     = {{R-trees}: A Dynamic Index Structure for Spatial Searching},
+  author    = {Guttman, Antonin},
+  booktitle = {ACM SIGMOD},
+  pages     = {47--57},
+  year      = {1984},
+}
+
+@inproceedings{flajolet2007hyperloglog,
+  title     = {{HyperLogLog}: The Analysis of a Near-Optimal Cardinality
+               Estimation Algorithm},
+  author    = {Flajolet, Philippe and Fusy, {\'E}ric and Gandouet, Olivier
+               and Meunier, Fr{\'e}d{\'e}ric},
+  booktitle = {Conference on Analysis of Algorithms (AofA)},
+  pages     = {127--146},
+  year      = {2007},
+}
+
+@article{vitter1985reservoir,
+  author  = {Vitter, Jeffrey S.},
+  title   = {Random Sampling with a Reservoir},
+  journal = {ACM Transactions on Mathematical Software},
+  volume  = {11},
+  number  = {1},
+  pages   = {37--57},
+  year    = {1985},
+}
+
+% ─── Motivating / concurrent work ────────────────────────────────
 
 @misc{localization-paradox-2026,
   title  = {The Localization Paradox in Long-Context Video QA},
   author = {Anonymous},
   year   = {2026},
   note   = {PLACEHOLDER: resolve to the public preprint when available;
-            otherwise frame as concurrent work in the related-work
-            paragraph and replicate the paradox on our corpus via E10.},
+            otherwise frame as concurrent work in §\ref{sec:intro}.},
 }
 
-% ─── Related work: episodic memory retrieval ─────────────────────
-
-@inproceedings{ego4d-nlq,
-  author    = {Grauman, Kristen and others},
-  title     = {{Ego4D}: Around the World in 3{,}000 Hours of Egocentric Video},
-  booktitle = {CVPR},
-  year      = {2022},
-  note      = {We cite the dataset paper for its episodic-memory / NLQ task,
-                the closest published precedent for our look-back QA framing.},
-}
-
-@inproceedings{ego-exo4d,
-  author    = {Grauman, Kristen and others},
-  title     = {{Ego-Exo4D}: Understanding Skilled Human Activity from
-               First- and Third-Person Perspectives},
-  booktitle = {CVPR},
-  year      = {2024},
-}
-
-% ─── Related work: long-context video QA benchmarks ─────────────
-
-@inproceedings{egoschema,
-  author    = {Mangalam, Karttikeya and Akshulakov, Raiymbek and
-               Malik, Jitendra},
-  title     = {{EgoSchema}: A Diagnostic Benchmark for Very Long-form Video
-               Language Understanding},
-  booktitle = {NeurIPS},
-  year      = {2023},
-}
-
-@inproceedings{moviechat,
-  author    = {Song, Enxin and others},
-  title     = {{MovieChat}: From Dense Token to Sparse Memory for Long Video
-               Understanding},
-  booktitle = {CVPR},
-  year      = {2024},
-}
-
-% ─── Related work: streaming approximate-nearest-neighbor indices ─
-
-@inproceedings{diskann,
-  author    = {Subramanya, Suhas Jayaram and Devvrit and Kadekodi, Rohan
-               and Krishnaswamy, Ravishankar and Simhadri, Harsha Vardhan},
-  title     = {{DiskANN}: Fast Accurate Billion-point Nearest Neighbor
-               Search on a Single Node},
-  booktitle = {NeurIPS},
-  year      = {2019},
-}
-
-@inproceedings{spann,
-  author    = {Chen, Qi and others},
-  title     = {{SPANN}: Highly-efficient Billion-scale Approximate Nearest
-               Neighborhood Search},
-  booktitle = {NeurIPS},
-  year      = {2021},
-}
-
-@article{hnsw,
-  author  = {Malkov, Yu A. and Yashunin, Dmitry A.},
-  title   = {Efficient and robust approximate nearest neighbor search using
-             Hierarchical Navigable Small World graphs},
-  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
-  year    = {2020},
-}
-
-% ─── Related work: spatial databases ─────────────────────────────
-
-@inproceedings{guttman1984rtrees,
-  author    = {Guttman, Antonin},
-  title     = {{R-trees}: A Dynamic Index Structure for Spatial Searching},
-  booktitle = {ACM SIGMOD},
-  year      = {1984},
-}
-
-@article{moon2001geohilbert,
-  author  = {Moon, Bongki and Jagadish, H. V. and Faloutsos, Christos and
-             Saltz, Joel H.},
-  title   = {Analysis of the clustering properties of the {Hilbert}
-             space-filling curve},
-  journal = {IEEE Transactions on Knowledge and Data Engineering},
-  volume  = {13},
-  number  = {1},
-  pages   = {124--141},
-  year    = {2001},
+@misc{turboquant,
+  title  = {TurboQuant: Randomized Hadamard + Lloyd-Max Scalar Quantization
+            for Embedding Compression},
+  author = {Anonymous},
+  year   = {2024},
+  note   = {PLACEHOLDER: may resolve to Aguerrebere et al.~\cite{aguerrebere2024lvq}
+            depending on canonical TurboQuant reference; otherwise cite the
+            engine's own \texttt{src/core/exemplar\_codec.c} implementation.},
 }

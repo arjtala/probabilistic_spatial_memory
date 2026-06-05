@@ -22,7 +22,7 @@ budget.
 \label{sec:results-setup}
 
 \paragraph{Corpus.} Our primary results are on the Nymeria atomic-action
-narration benchmark~\cite{nymeria}, a public egocentric dataset
+narration benchmark~\cite{ma2024nymeria}, a public egocentric dataset
 collected with Project Aria Gen 1 headsets. Per-session
 \texttt{atomic\_action.csv} files provide $\sim$5-second action
 windows narrated by independent annotators
@@ -44,7 +44,7 @@ high-mobility session (\texttt{shelby\_arroyo\_act0}, 187 narrations,
 \S\ref{sec:results-multisession}.
 
 \paragraph{Encoder.} CLIP-L
-(\texttt{laion/CLIP-ViT-L-14-laion2B-s32B-b82K})~\cite{clip-l-laion},
+(\texttt{laion/CLIP-ViT-L-14-laion2B-s32B-b82K})~\cite{clip-l-laion,radford2021clip},
 768-dimensional embeddings, $\sim$1{,}133 frames per session at
 1\,fps. Per-query text encoding is one CLIP-L forward pass
 (11.6\,ms on CPU); the rest of PSM is C-side milliseconds.
@@ -124,17 +124,6 @@ deployment claim and the $R=1024$ rows provide the architectural
 upper bound. Hit@5 and bucket mIoU move in opposite directions
 across the cap sweep --- the operating-point Pareto trade discussed
 in \S\ref{sec:results-pareto}.}
-\label{tab:headline}
-\end{table*}
-\texttt{shelby\_arroyo\_act0} (187 narrations). PSM at the permissive
-operating point (\texttt{per\_cell\_cap} = $K$ = 5) recovers
-brute-force CLIP exactly on Hit@5 and exemplar mIoU. PSM at the
-strict spatial-diversity default (\texttt{cap}=1) paired with a
-Gemini-3.1-Pro reranker matches brute-force on \emph{localization
-precision} (exemplar mIoU 0.073 vs 0.074) at one-fifth the candidate
-budget. Hit@5 and bucket mIoU move in opposite directions across the
-\texttt{cap} sweep --- the operating-point Pareto trade discussed in
-\S\ref{sec:results-pareto}.}
 \label{tab:headline}
 \end{table*}
 

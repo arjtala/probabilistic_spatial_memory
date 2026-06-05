@@ -20,7 +20,7 @@ specific role in the bounded-memory property.
 \label{sec:method-h3}
 
 We tessellate the wearer's geographic trajectory using
-H3~\cite{uber-h3}, an open-source hexagonal hierarchical
+H3~\cite{brodsky2018h3}, an open-source hexagonal hierarchical
 geospatial indexing system. Every ingested $(t, \mathrm{lat},
 \mathrm{lng}, \mathbf{e})$ tuple is mapped to its containing H3
 cell at a chosen resolution $r$, and the per-cell state described
@@ -45,7 +45,7 @@ follow-up work.
 \label{sec:method-ring-buffer}
 
 Each H3 cell maintains a ring buffer of $C$ HyperLogLog
-sketches~\cite{flajolet-hll}. The buffer rotates on a configurable
+sketches~\cite{flajolet2007hyperloglog}. The buffer rotates on a configurable
 time-window cadence (default 30\,s); ingesting a tuple writes the
 hash of the frame's embedding into the current sketch and advances
 the buffer pointer when the time-window elapses. Old sketches
@@ -83,7 +83,7 @@ The HLL sketches give us counts and time envelopes but not the
 embeddings themselves --- a top-$K$ similarity query needs to
 score query-vs-frame cosines, which requires storing some of the
 ingested embeddings. We use \emph{Algorithm R reservoir
-sampling}~\cite{vitter-reservoir} per H3 cell, with a configurable
+sampling}~\cite{vitter1985reservoir} per H3 cell, with a configurable
 reservoir capacity $R$ (default 128). After ingesting $n > R$
 frames into a cell, the reservoir holds a uniformly random
 $R$-sized sample of all frames the wearer experienced there.
