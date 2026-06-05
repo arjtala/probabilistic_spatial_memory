@@ -51,9 +51,9 @@ overhead.
 
 \paragraph{Stage 3: MLLM rerank.} The 5 base64 frames plus the
 question text are sent in a single API call to the frontier MLLM
-(Gemini 3.1 Pro for the main results; the same harness supports
-Claude 4.6 Opus by changing one flag, on the same OpenAI-compatible
-proxy endpoint). The frozen prompt:
+(Gemini 3.1 Pro~\cite{google2026gemini} for the main results; the
+same harness supports Claude 4.6 Opus by changing one flag, on the
+same OpenAI-compatible proxy endpoint). The frozen prompt:
 
 \begin{quote}\small\ttfamily
 You are shown \{K\} candidate frames from a wearable camera
