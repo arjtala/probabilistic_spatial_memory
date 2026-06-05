@@ -188,7 +188,7 @@ Two further pipeline components are external to this repo and are described per-
 - **Text-query adapter** (E5, E7): embed a benchmark question via a vision-language text tower (CLIP / SigLIP / DINO) and match against per-tile exemplar embeddings to produce the semantic cue. Sits outside `libpsm`.
 - **Grounded response stage** (E5): forward PSM's top-k `(cell, t_start, t_end)` intervals plus the corresponding evidence frames to an MLLM as explicit grounding context. This is an MLLM API call, not engine code.
 
-**Status:** First-pass results for E5/E6/E7 are in `datasets/localization_paradox.md` (initial demo) and `datasets/localization_paradox2.md` (follow-up: encoder ablation, place-aware question extension, encoder-bypass query mode). Headline: 83% Hit@5 on a 22-question set across 3 sessions × 5 seeds × 2 encoders, 100% on the 8 place-aware questions. E9 (TurboQuant compressed exemplars) is also done — see § E9 Result below — and confirms 9.7× exemplar-memory reduction at 2-bit with statistically flat Hit@5. Benchmark integration (Gemini 3 Pro / GPT-5 in the loop) is still pending; the local query-only results are the foundation.
+**Status:** First-pass results for E5/E6/E7 are in `journal/localization_paradox.md` (initial demo) and `journal/localization_paradox2.md` (follow-up: encoder ablation, place-aware question extension, encoder-bypass query mode). Headline: 83% Hit@5 on a 22-question set across 3 sessions × 5 seeds × 2 encoders, 100% on the 8 place-aware questions. E9 (TurboQuant compressed exemplars) is also done — see § E9 Result below — and confirms 9.7× exemplar-memory reduction at 2-bit with statistically flat Hit@5. Benchmark integration (Gemini 3 Pro / GPT-5 in the loop) is still pending; the local query-only results are the foundation.
 
 ### E5. PSM as Retrieval Prefilter for MLLM Temporal Grounding
 
@@ -201,7 +201,7 @@ Current capability:
 - `scripts/eval_lookback.py` is the production text-query harness: embeds a question via CLIP, calls `psm --search`, and reports per-question IoU + Hit@k. Now supports `query_mode: last_seen` for encoder-free location_trace queries.
 - `scripts/eval_bigg_all.sh` runs a paired encoder × seed sweep across multiple sessions.
 - The in-tree extraction pipeline (`python -m psm_extraction extract --models clip,dino[,jepa]`) reproduces the Aria pipeline's `features.h5` shape end-to-end on Apple Silicon — verified on a 15-min Fulham session with DINOv3 attention-distribution parity to the original. So a benchmark session that ships `data.mp4 + gps.json + imu.json + metadata.json` can be ingested entirely in-house, no external pipeline required.
-- Local query-only first pass: see `datasets/localization_paradox2.md` for 22-question × 5-seed × 2-encoder results. Full benchmark evaluation (with an MLLM in the loop) is still external to this repo.
+- Local query-only first pass: see `journal/localization_paradox2.md` for 22-question × 5-seed × 2-encoder results. Full benchmark evaluation (with an MLLM in the loop) is still external to this repo.
 
 Inputs:
 - A benchmark subset with usable spatial context (GPS or coarse scene localization)
@@ -231,7 +231,7 @@ Question:
 Current capability:
 - `RingBuffer_merge_window` already returns cardinality estimates; `precision` in `[10, 18]` controls error.
 - The benchmark's diagnostic analysis shows Counting is the weakest category across all MLLMs — a gap PSM is structurally well-placed to fill.
-- `scripts/eval_lookback.py` accepts a `count: <int>` field on questions and reports `count_predicted` (currently `len(distinct cells in top-k)`), `count_abs_error`, `count_correct`. **Known issue:** this prediction is `--top`-cap-bound, not HLL-cardinality-bound — at top-5 it under-predicts, at top-20 it saturates at the cap. See `datasets/localization_paradox2.md` § "Counting limitation" for a sketch of the two ways to fix this (similarity-threshold cell counting, or an `psm --cardinality "<text>" --threshold τ` flag wired to `RingBuffer_merge_window`).
+- `scripts/eval_lookback.py` accepts a `count: <int>` field on questions and reports `count_predicted` (currently `len(distinct cells in top-k)`), `count_abs_error`, `count_correct`. **Known issue:** this prediction is `--top`-cap-bound, not HLL-cardinality-bound — at top-5 it under-predicts, at top-20 it saturates at the cap. See `journal/localization_paradox2.md` § "Counting limitation" for a sketch of the two ways to fix this (similarity-threshold cell counting, or an `psm --cardinality "<text>" --threshold τ` flag wired to `RingBuffer_merge_window`).
 
 Protocol:
 1. Select benchmark sessions containing Counting questions.
@@ -251,7 +251,7 @@ Question:
 Current capability:
 - Exemplar embedding retention landed (see TODO "Localization Paradox Alignment"); E7 is no longer blocked.
 - `psm --search` and `psm --last-seen` are both wired through `scripts/eval_lookback.py`. The `query_mode: last_seen` path is the encoder-free version of E7 — it answers location-trace questions purely from H3 cell membership, with no embedding model in the loop.
-- First-pass result: Palo Alto's "where did I drive in reverse" question hits bucket Hit @5 = 100% across all 5 reservoir seeds × both encoders, fully deterministic. See `datasets/localization_paradox2.md` § 3 for detail.
+- First-pass result: Palo Alto's "where did I drive in reverse" question hits bucket Hit @5 = 100% across all 5 reservoir seeds × both encoders, fully deterministic. See `journal/localization_paradox2.md` § 3 for detail.
 - Per-query latency typically `O(matching_tiles × capacity)` — sub-millisecond on session-scale memories.
 
 Protocol:
@@ -360,7 +360,7 @@ Decision rule:
 
 ### E9 Result (2026-05-12)
 
-Faithful TurboQuant (sign-flip + Walsh-Hadamard rotation, Lloyd-Max-optimal scalar quantization, bit-packed payload) is implemented in `core/exemplar_codec.{h,c}` and selectable via `psm --exemplar-codec {raw,turboquant_2b,turboquant_3b,turboquant_4b}`. Sweep run on the 3-session × 5-seed × 20-question scoreable corpus from the §1–§3 Localization Paradox follow-up, OpenCLIP-bigG (1280-d), `--exemplars 128`. Full breakdown lives in [`datasets/localization_paradox2.md` § G](datasets/localization_paradox2.md#g-e9-turboquant-exemplar-compression-result); summary here.
+Faithful TurboQuant (sign-flip + Walsh-Hadamard rotation, Lloyd-Max-optimal scalar quantization, bit-packed payload) is implemented in `core/exemplar_codec.{h,c}` and selectable via `psm --exemplar-codec {raw,turboquant_2b,turboquant_3b,turboquant_4b}`. Sweep run on the 3-session × 5-seed × 20-question scoreable corpus from the §1–§3 Localization Paradox follow-up, OpenCLIP-bigG (1280-d), `--exemplars 128`. Full breakdown lives in [`journal/localization_paradox2.md` § G](journal/localization_paradox2.md#g-e9-turboquant-exemplar-compression-result); summary here.
 
 **Memory compression** (bigG embeddings padded to 2048-d after RHT):
 
@@ -405,6 +405,13 @@ Faithful TurboQuant (sign-flip + Walsh-Hadamard rotation, Lloyd-Max-optimal scal
 
 ### E10. Reproducing the Localization Paradox on PSM's corpus
 
+**Status (2026-06-05):** Client + harness landed (`scripts/eval_psm_mllm.py`,
+`scripts/_mllm_client.py`, commits `471e4ab`/`d051757`). Nymeria sweep
+done end-to-end: 4 sessions × {`per_cell_cap`=1, `per_cell_cap`=$K$} via
+Gemini 3.1 Pro. Headline numbers in [`journal/results_v1.md`](journal/results_v1.md#multi-session-mllm-rerank-2026-06-04).
+Aria-internal results are now classified internal-preliminary (see
+[`journal/PAPER.md`](journal/PAPER.md) 2026-05-28 corpus pivot).
+
 Question:
 - Does the temporal-grounding collapse documented for frontier MLLMs at benchmark scale also appear on our 3-session, 20-question corpus? Without this, every comparison in the v2 writeup is against a *cited* number, not a *measured* one.
 
@@ -435,6 +442,13 @@ Decision rule:
 
 ### E11. Retrieval-Method Ablation
 
+**Status (2026-06-05):** Brute-force CLIP-L baseline landed on Nymeria
+`shelby_arroyo_act0` (13.4% Hit@5, 25/187; see [`journal/results_v1.md`](journal/results_v1.md)).
+Sliding-window + uniform-sample baselines still pending on Nymeria — `scripts/eval_brute_force_clip.py`
+already in place; the other two harnesses need `--clip-checkpoint`
+threading like brute-force got in commit `00d6383`. Aria-internal results
+(PSM 83% / brute 80%) are classified internal-preliminary.
+
 Question:
 - Does PSM's spatial decomposition (H3 + ring buffer + reservoir) actually help, or does any retrieval method get our headline numbers on this corpus?
 
@@ -460,6 +474,15 @@ Decision rule:
 - If PSM Hit @5 < brute-force Hit @5, the corpus is too small to need spatial structure and we should either scale up or change the headline claim.
 
 ### E12. PSM Hyperparameter Sensitivity
+
+**Status (2026-06-05):** Operating-point sweep on Nymeria done:
+`per_cell_cap` ∈ {1,2,3,5} × exemplars ∈ {128, 1024} on
+`shelby_arroyo_act0` ([`captures/eval_<sid>_pcc*.json`](captures/);
+table in [`journal/results_v1.md`](journal/results_v1.md)). Multi-
+session generalization across 4 sessions × 4 caps also landed
+(`scripts/multisession_per_cell_cap_sweep.py`). H3-resolution ablation
+on Nymeria still pending — Aria-internal numbers (res 8-12) classified
+internal-preliminary.
 
 Question:
 - How robust is the v2 result to the three knobs we never swept: H3 resolution, retention window, reservoir size? A reviewer will assume we tuned on the test set unless we show otherwise.

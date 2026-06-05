@@ -1,5 +1,12 @@
 # Localization Paradox and PSM Demo
 
+> ⚠️ **Internal-preliminary, superseded.** This writeup uses the original 3-session
+> internal Aria corpus, which was classified internal-only on 2026-05-28 and
+> cannot appear in a published paper. All numbers below are validation that the
+> pipeline works end-to-end, not publishable results. The current
+> results-of-record live in [`results_v1.md`](results_v1.md) (Nymeria-based,
+> 2026-06-04). See [`PAPER.md`](PAPER.md) for the corpus-pivot reasoning.
+
 ## TL;DR
 
 Probabilistic Spatial Memeory (PSM) is a bounded, time-decayed spatial-memory engine built on HyperLogLog sketches over an H3 hex grid. It is structurally a candidate for closing the **localization paradox** in streaming egocentric memory, i.e. the gap between an MLLM's *semantic* answer ("you saw a yellow bus") and its near-zero *temporal grounding*, the `[t_start, t_end]` interval that proves it.

@@ -1,5 +1,12 @@
 # Localization Paradox — Follow-up
 
+> ⚠️ **Internal-preliminary, superseded.** This writeup uses the original 3-session
+> internal Aria corpus, which was classified internal-only on 2026-05-28 and
+> cannot appear in a published paper. All numbers below are validation that the
+> pipeline works end-to-end, not publishable results. The current
+> results-of-record live in [`results_v1.md`](results_v1.md) (Nymeria-based,
+> 2026-06-04). See [`PAPER.md`](PAPER.md) for the corpus-pivot reasoning.
+
 Follow-up to [`localization_paradox.md`](./localization_paradox.md).
 Previously it was shown that PSM, a bounded spatial-memory engine, can answer
 "where/when did I see X?" questions over a 15-minute egocentric video at
