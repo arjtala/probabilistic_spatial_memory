@@ -258,6 +258,23 @@ selection.}
 % (scripts/multisession_per_cell_cap_sweep.py) finishes — populate
 % with one row per session × cap, broken out by mobility tier.
 
+\paragraph{H3 resolution does not move Hit@5 but does move bucket
+mIoU.} Re-running the headline operating point (\texttt{cap}=$K$,
+$R$=1{,}024) on \texttt{shelby\_arroyo\_act0} at $r \in \{10, 11, 12, 13\}$
+gives Hit@5 of $\{13.9, 13.4, 13.4, 13.4\}\%$ and bucket mIoU@5 of
+$\{0.004, 0.012, 0.013, 0.019\}$. Hit@5 is roughly flat because
+\texttt{cap}=$K$ at any resolution picks the top-$K$ by global cosine
+similarity; the resolution only changes which cell each hit is
+attributed to. Bucket mIoU, in contrast, rises monotonically with
+finer resolution: smaller cells produce tighter ring-buffer
+envelopes that overlap the ground-truth interval more precisely.
+Bucket Hit@5 (IoU $\geq 0.3$) only fires at $r=13$ ($1.6\%$, 3
+narrations), at which point the ring-buffer windows are tight
+enough to clear the threshold. We default to $r=12$ because it
+matches the room-scale recordings dominating the Nymeria
+distribution; $r=13$ would be the right pick for a session
+characterized in advance as sub-room.
+
 \subsection{Multi-session generalization}
 \label{sec:results-multisession}
 

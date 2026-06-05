@@ -318,3 +318,30 @@ specific. §1 contribution bullet updated to reflect.
 
 Captures: `captures/multisession_psm_mllm/<sid>/eval_<sid>_mllm_pcc{1,5}.json`.
 
+
+## H3 resolution ablation (2026-06-05)
+
+Sweep on shelby_arroyo_act0 at the headline operating point
+(cap=K, R=1024):
+
+| H3 res | edge length | Hit@5  | exemplar mIoU@5 | bucket mIoU@5 | bucket Hit@5 |
+|---|---|---|---|---|---|
+| 10 | 65 m  | 13.9% | 0.077 | 0.004 | 0.0% |
+| 11 | 25 m  | 13.4% | 0.074 | 0.012 | 0.0% |
+| 12 | 9.4 m | 13.4% | 0.074 | 0.013 | 0.0% |
+| 13 | 3.5 m | 13.4% | 0.074 | **0.019** | **1.6%** |
+
+Hit@5 is essentially flat across resolutions — at cap=K the top-K is
+picked by global cosine similarity regardless of how the spatial
+axis is carved. Bucket mIoU rises monotonically with finer resolution
+(0.004 -> 0.019, ~5x); bucket Hit@5 only fires at r=13 because the
+tighter envelopes finally clear the 0.3 IoU threshold.
+
+Operationally:
+  - Default r=12 matches room-scale Nymeria distribution.
+  - r=13 is the right pick for known-sub-room sessions.
+  - r=10/11 is the right pick for street-scale Aria Gen 2 walks
+    (already done in our cross-corpus extraction; future-work eval).
+
+Captures: `captures/h3res_r{10,11,12,13}_shelby_arroyo_act0_3ciwl8.json`.
+
