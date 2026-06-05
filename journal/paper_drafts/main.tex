@@ -24,16 +24,13 @@
 %   §6 Limitations  v1 drafted
 %   §7 Conclusion   placeholder; write last
 
-\documentclass[10pt,twocolumn,letterpaper]{article}
-
-% Generic geometry approximating ECCV column widths so page-count
-% estimates are roughly faithful while waiting on the workshop style.
-\usepackage[letterpaper, top=0.875in, bottom=1.25in,
-            left=0.75in, right=0.75in, columnsep=0.25in]{geometry}
+% Springer LNCS template (ECCV's required format). When the
+% workshop-specific eccv2026.sty drops, swap \documentclass{llncs}
+% for \documentclass{eccv2026}; the body is otherwise compatible.
+\documentclass[runningheads]{llncs}
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage{lmodern}
 \usepackage{microtype}
 \usepackage{graphicx}
 \usepackage{booktabs}
@@ -41,29 +38,24 @@
 \usepackage{amssymb}
 \usepackage{xcolor}
 \usepackage[hidelinks]{hyperref}
-\usepackage{caption}
 \usepackage{xspace}
 
 % Macros used across sections.
 \newcommand{\psm}{\textsc{PSM}\xspace}
 \newcommand{\caponek}{\texttt{per\_cell\_cap}\xspace}
 
-\title{Probabilistic Spatial Memory:\\
-A Bounded-Memory Retrieval Substrate for\\
-Wearable Look-Back Question Answering}
+\title{Probabilistic Spatial Memory: A Bounded-Memory Retrieval
+Substrate for Wearable Look-Back Question Answering}
 
 % Author block intentionally blank for double-blind review.
-\author{Anonymous Authors\\
-ECCV 2026 Wearables AI Workshop Submission}
-
-\date{}
+\author{Anonymous}
+\institute{Anonymous Institution\\\email{anon@example.com}}
 
 \begin{document}
 
-\twocolumn[
 \maketitle
+
 \begin{abstract}
-\noindent
 A wearable AI assistant captures hours of egocentric video per day;
 answering a look-back question (``where did I leave my keys?'')
 requires retrieving the relevant moments under strict on-device
@@ -81,9 +73,10 @@ mIoU at one-fifth the candidate budget. The operating-point effect
 generalizes across four sessions spanning street-, building-, and
 room-scale mobility tiers. The C engine ($\sim$700 LoC) and Python
 eval harness are released under MIT.
+
+\keywords{Egocentric video \and Spatial memory \and Bounded memory \and
+Look-back QA \and Retrieval substrate \and Wearable AI.}
 \end{abstract}
-\vspace{1em}
-]
 
 % ---- Body sections -------------------------------------------------
 \input{section_1_intro.tex}
