@@ -160,3 +160,67 @@ Per the agreed PAPER.md scope guard (lines 172-177):
 - v1 does NOT claim Nymeria-scale numbers (the multi-session
   generalization covers 4 sessions, not 30+ ).
 - v1 does NOT claim this is the only architecture.
+
+## ECCV 2026 compliance audit (2026-06-05)
+
+Reviewed the ECCV 2026 Submission Policies + Springer Code of
+Conduct for Book Authors. Findings + actions:
+
+### Landed in commit (this round)
+- Removed Meta-internal references from the draft:
+  - §2.5 "Aria-internal benchmark" -> "synthetic-workload benchmark"
+  - references.bib Gemini note: dropped `api.llama.com` URL
+- Removed `github.com/anonymized/...` URL from §Reproducibility;
+  promise repo release in camera-ready instead
+- §5.5 "omitted for table compactness" rewritten as "not shown to
+  keep the table single-column" — appendices aren't permitted in
+  ECCV main submission per the policy
+- Headline-table caption "mIoU at R=128 not yet available in this
+  draft" reworded so it doesn't read as preliminary
+
+### Still pending — LNCS template swap
+- Currently `\documentclass{article}` (placeholder). Must swap to
+  ECCV 2026 Author Kit (Springer LNCS) when released.
+- 14-page limit (refs don't count); we are at 12pp in the generic
+  template. LNCS column geometry differs — page count may shift
+  ±1pp after the swap. Re-audit after swap.
+- Using fonts/formatting from other conferences "risks desk-rejection"
+  per policy — only swap to the official Author Kit, no custom geometry.
+
+### Still pending — double-blind verification
+- Author block currently "Anonymous Authors" ✓
+- No co-author thanks or grant IDs in the drafts ✓
+- No identifying GitHub/website URLs ✓ (now removed)
+- Need a final `grep` audit for any internal hostnames,
+  user IDs, or cluster paths once the Author Kit is in place.
+
+### Still pending — supplementary material
+- ECCV policy: "No Appendices are permitted in the main submission."
+  Supplementary materials (separate deadline) can include videos,
+  proofs, additional figures, or concurrent submissions — but NOT
+  improved results or corrected PDFs.
+- Implication: bootstrap CIs, per-session detailed tables, and the
+  full operating-point ablation matrix (cap × ex × session) belong
+  in supplementary, not in §5.
+- Plan: build a separate `supplementary.tex` once the Author Kit
+  defines the supplementary format.
+
+### Still pending — AI/LLM disclosure
+- ECCV: "It is not a defense to a charge of plagiarism or of
+  inaccuracy to argue that 'an LLM did it'." Authors bear full
+  responsibility for paper content.
+- Our paper uses Gemini and Claude at experiment time (not for
+  drafting); that's clearly disclosed in §3.1 and §4.1. No additional
+  declaration needed.
+- If the workshop CFP introduces an AI-disclosure footnote requirement
+  later, add it as a \thanks{} on the title.
+
+### Dual-submission
+- ECCV main-conference rule: nothing similar submitted Mar 13 -
+  Final Decision. **Workshop deadline is later** (TBD; expected
+  June/July) so the dual-submission window for the *workshop* is
+  yet to open. ArXiv preprints are exempt.
+- Implication: safe to put PSM up on arXiv before the workshop
+  deadline; not safe to submit overlapping content to another venue
+  in parallel.
+

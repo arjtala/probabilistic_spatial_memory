@@ -169,8 +169,8 @@ No global re-indexing, no batch reorganization. The substrate
 supports queries at any time after the first ingest.
 
 The cluster-validated per-frame ingest cost is
-$\sim$3\,$\mu$s amortized (Aria-internal benchmark, dominated by
-HLL hash insertion). At 1\,fps Nymeria recordings the ingest
+$\sim$3\,$\mu$s amortized (synthetic-workload benchmark, dominated
+by HLL hash insertion). At 1\,fps Nymeria recordings the ingest
 cost is negligible; at higher frame rates (60\,fps real-time
 wearable streams) the per-frame budget is still well within
 on-device limits.

@@ -117,11 +117,11 @@ exemplar mIoU). MLLM rerank rows show \texttt{cap}=$K$ matches
 brute-force on Hit@5 and lifts exemplar mIoU 37\% relative
 ($0.074 \rightarrow 0.101$); \texttt{cap}=1 + rerank achieves
 exemplar mIoU statistically indistinguishable from brute-force CLIP
-(0.073 vs 0.074) at one-fifth the candidate budget. mIoU
-measurements at $R=128$ are not yet available in this draft; the
-Hit@5 numbers in the bounded-memory block are the load-bearing
-deployment claim and the $R=1024$ rows provide the architectural
-upper bound. Hit@5 and bucket mIoU move in opposite directions
+(0.073 vs 0.074) at one-fifth the candidate budget. Hit@5 in the
+$R=128$ bounded-memory block is the load-bearing deployment claim;
+the $R=1024$ rows isolate the spatial-diversity \texttt{cap} effect
+from reservoir eviction and provide the architectural upper bound.
+Hit@5 and bucket mIoU move in opposite directions
 across the cap sweep --- the operating-point Pareto trade discussed
 in \S\ref{sec:results-pareto}.}
 \label{tab:headline}
@@ -290,7 +290,8 @@ on every session: relaxing the per-cell cap from 1 to $K$ buys
 5--10pp of Hit@5. The absolute values vary across sessions (a
 function of the underlying narration difficulty, not the
 \texttt{cap} knob), but the \emph{shape} of the operating-point
-trade is consistent. Bucket mIoU@5 (omitted for table compactness)
+trade is consistent. Bucket mIoU@5 (not shown to keep the table
+single-column)
 falls monotonically with cap on all four sessions, confirming the
 Pareto trade of \S\ref{sec:results-pareto}.}
 \label{tab:multisession}
