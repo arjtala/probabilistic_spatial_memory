@@ -35,6 +35,7 @@ METHOD_TAGS = {
     "_sliding_w10s": "sw_10s",
     "_uniform_r30s": "uniform_30s",
     "_uniform_r75s": "uniform_75s",
+    "_longclip_text": "longclip",
 }
 
 

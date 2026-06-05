@@ -67,7 +67,7 @@ def resolve_backend(requested: str) -> str:
     )
 
 
-SUPPORTED_FAMILIES = ("clip", "dino", "jepa")
+SUPPORTED_FAMILIES = ("clip", "longclip", "dino", "jepa")
 
 
 def make_runner(
@@ -105,6 +105,19 @@ def make_runner(
 
         return CLIPPyTorchRunner(
             checkpoint=checkpoint or "openai/clip-vit-base-patch32",
+            device="cpu" if chosen == "cpu" else device,
+            **kwargs,
+        )
+
+    if name == "longclip":
+        if chosen == "mlx":
+            raise NotImplementedError(
+                "MLX Long-CLIP runner is not implemented; use backend='pytorch'."
+            )
+        from .longclip_pytorch import LongCLIPPyTorchRunner
+
+        return LongCLIPPyTorchRunner(
+            checkpoint=checkpoint,
             device="cpu" if chosen == "cpu" else device,
             **kwargs,
         )
