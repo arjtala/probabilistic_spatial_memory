@@ -86,24 +86,15 @@ Look-back QA \and Retrieval substrate \and Wearable AI.}
 \input{section_5_results.tex}
 \input{section_6_limitations.tex}
 
-% TODO: §7 Conclusion — write after §5 numbers stabilize.
 \input{section_7_conclusion.tex}
 
-\section*{Reproducibility}
-\label{sec:reproducibility}
-All experiments use the released PSM engine and Python evaluation
-harness (MIT-licensed; URL withheld for double-blind review and
-will be added in the camera-ready). Key reproduction commands:
-\begin{itemize}\setlength{\itemsep}{0pt}\small
-  \item \texttt{python scripts/sweep\_per\_cell\_cap.py} ---
-    operating-point sweep on \texttt{shelby\_arroyo\_act0}
-    (Tables~\ref{tab:headline}, \ref{tab:ex-ablation}).
-  \item \texttt{python scripts/multisession\_per\_cell\_cap\_sweep.py}
-    --- four-session generalization (Table~\ref{tab:multisession}).
-  \item \texttt{python scripts/eval\_psm\_mllm.py ... --mllm gemini}
-    --- PSM\,$\rightarrow$\,Gemini rerank
-    (Table~\ref{tab:headline}, last two rows).
-\end{itemize}
+% Reproducibility note: the engine + eval harness are released
+% under MIT (URL withheld for double-blind review; available in
+% the camera-ready). Key reproduction entry points:
+%   scripts/sweep_per_cell_cap.py             (per_cell_cap sweep)
+%   scripts/multisession_per_cell_cap_sweep.py (multi-session)
+%   scripts/eval_psm_mllm.py --mllm gemini    (PSM->Gemini rerank)
+% Folded into a footnote below to save vertical space.
 
 % ---- Bibliography -------------------------------------------------
 \bibliographystyle{plain}

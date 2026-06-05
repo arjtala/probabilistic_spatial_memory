@@ -33,20 +33,15 @@ or (b) score against \emph{any} acceptable revisit window rather
 than the single one the annotator chose.
 
 \paragraph{Sub-room mobility is excluded.}
-We exclude Nymeria sessions with wearer bounding-box extent
-$< 5$\,m from the main result. On such sessions
-(e.g.\ \texttt{james\_johnson\_act3}, a 3\,m-bbox desk-work session)
-both PSM and brute-force CLIP plateau at 1.2\% Hit@5 because the
-narrations describe a space the wearer never left, and the
-text--image alignment cannot distinguish among $\sim$300 frames of
-visually indistinguishable indoor scene. Roughly 13\% of our 30
-candidate Nymeria sessions fall in this regime; the rest (street-,
-building-, and room-scale) are reported.
-We treat sub-room mobility as a corpus characteristic rather than
-a method limitation. The
-\texttt{scripts/nymeria\_slam\_displacement.py} probe in our
-reproducibility script provides the per-session bbox-extent
-threshold.
+Nymeria sessions with wearer bounding-box extent $<5$\,m
+($\sim$13\% of our 30 candidate sessions; the
+\texttt{nymeria\_slam\_displacement.py} probe gates this) are
+excluded from the main result. On such sessions both \psm{} and
+brute-force CLIP plateau near $1\%$ Hit@5 because the narrations
+describe a space the wearer never left and the text--image
+alignment cannot distinguish among visually indistinguishable
+indoor frames. We treat sub-room mobility as a corpus
+characteristic rather than a method limitation.
 
 \paragraph{CLIP text encoder caps at 77 tokens.}
 Nymeria \texttt{atomic\_action} narrations are full-sentence
@@ -70,28 +65,21 @@ retrieval. Other long-context encoders (1024-token CLIP variants,
 SigLIP~2~\cite{tschannen2025siglip2}) may behave differently; we
 leave that broader sweep to future work.
 
-\paragraph{Single corpus.} All headline numbers are on Nymeria
-indoor recordings. The multi-session table
-(\S\ref{sec:results-multisession}) confirms the \texttt{per\_cell\_cap}
-trade is monotone across four sessions and three mobility tiers
-(13--69\,m bbox), but the absolute Hit@5 ceiling varies with session
-character (\texttt{james\_johnson\_act0} hits 18.2\% at
-\texttt{cap}=$K$; \texttt{jason\_smith\_act3} hits 10.6\%).
-Outdoor street-scale evaluation on the Aria Gen 2 Pilot Dataset
-(real GPS, $\sim$300\,m wearer trajectories) is identified as the
-natural extension (\S\ref{sec:conclusion}).
+\paragraph{Single corpus.} Headline numbers are Nymeria indoor
+recordings (4-session detail + 30-session aggregate in
+\S\ref{sec:results-multisession}); absolute Hit@5 varies with
+session character ($10.6$--$18.2\%$ at \texttt{cap}=$K$ across the
+4-session detail). Outdoor street-scale evaluation on the Aria
+Gen 2 Pilot Dataset~\cite{aria-gen2-pilot} ($\sim$300\,m wearer
+trajectories with real GPS) is the natural extension
+(\S\ref{sec:conclusion}).
 
-\paragraph{Latency numbers from synthetic workload.}
-PSM's reported per-query latency of $\sim$700\,$\mu$s
-(\S\ref{sec:results-memory-latency}) is from a synthetic
-benchmark workload: 1{,}024 tiles, dim 128, 4 exemplars per tile,
-running on the cluster's H200 nodes. A real Nymeria session
-typically has $\sim$10 tiles at dim 1280 with 128 exemplars,
-which means the constant factors in the actual per-query cost
-differ from our benchmark. The \emph{asymptotic} independence of
-PSM's latency from frame count (the load-bearing claim) holds in
-both workloads, but a real-session micro-benchmark would tighten
-the latency comparison. We will report this in a follow-up.
+\paragraph{Latency from synthetic workload.}
+\psm{}'s reported $\sim$700\,$\mu$s per-query latency is from a
+1024-tile dim-128 synthetic benchmark on H200; real Nymeria
+sessions ($\sim$10 tiles at dim 1280, 128 exemplars) shift the
+constants. The asymptotic frame-count independence claim holds
+on both, but a real-session micro-benchmark is a follow-up.
 
 \paragraph{Query-time pooling does not generalize.}
 During method development, we explored a query-time reranking approach (\texttt{W=30} pooling) that averaged the embeddings of the $W$ frames surrounding each top-$K$ candidate before final selection. While this recovered performance on a small early-validation split, it failed to generalize across the 30-session corpus, behaving essentially as random noise relative to the per-frame baseline. We report this negative result to confirm that spatial-temporal smoothing must happen structurally at ingest time (via reservoir or ring buffer), not heuristically at query time.

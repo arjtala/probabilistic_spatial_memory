@@ -20,25 +20,14 @@ specific role in the bounded-memory property.
 \label{sec:method-h3}
 
 We tessellate the wearer's geographic trajectory using
-H3~\cite{brodsky2018h3}, an open-source hexagonal hierarchical
-geospatial indexing system. Every ingested $(t, \mathrm{lat},
-\mathrm{lng}, \mathbf{e})$ tuple is mapped to its containing H3
-cell at a chosen resolution $r$, and the per-cell state described
-in the next two subsections is updated. The choice of $r$ governs
-the spatial granularity:
-H3 resolution 10 corresponds to $\sim$65\,m hex edges (street
-scale); resolution 12 to $\sim$9\,m (room scale); resolution 13 to
-$\sim$3.5\,m (sub-room). PSM exposes $r$ as a query-time parameter
-because the right value depends on the wearer's mobility regime
-(\S\ref{sec:results-multisession}).
-
-The hexagonal tessellation has two properties relevant to PSM.
-First, all six neighbors of a cell are equidistant from its
-center, which makes k-ring neighborhood queries (``what was I
-doing near here?'') trivial. Second, the cells are global ---
-a single $(\mathrm{lat}, \mathrm{lng})$ position maps to the same
-H3 cell across recordings, sessions, and devices --- which is the
-key property for the federated-memory experiments we defer to
+H3~\cite{brodsky2018h3}, a hexagonal hierarchical geospatial
+indexing system. Each ingested tuple is mapped to its containing
+H3 cell at resolution $r$ (default 12, $\sim$9\,m hex edges, room
+scale; we sweep $r \in \{10, 11, 12, 13\}$ in
+\S\ref{sec:results-multisession}, covering street to sub-room
+granularity). H3 cells are global identifiers, so cell IDs are
+comparable across recordings, sessions, and devices --- the key
+property enabling the federated-memory direction we defer to
 follow-up work.
 
 \subsection{Time-decayed ring buffer of HyperLogLog sketches}
@@ -63,18 +52,14 @@ PSM returns as the bucket window for each top-$K$ candidate.
 The bucket window is what the downstream MLLM consumes as its
 ``where in the recording should I look?'' hint.
 
-\paragraph{Memory bound.} Each HLL sketch occupies
-$2^p$ bytes at precision $p$ (default $p = 14 \Rightarrow$ 16\,KiB).
-A cell's ring buffer is $C \cdot 16\,\mathrm{KiB} = 960\,\mathrm{KiB}$
-at the default $C = 60$. The bound is per-cell and
-time-window-bounded, independent of recording duration. We note
-that for the v1 evaluation, only the buffer's $(t_{\min}, t_{\max})$
-envelope is consumed downstream; the cardinality estimates are
-forward-looking infrastructure for the counting question class
-(\S\ref{sec:conclusion}). A pure $(t_{\min}, t_{\max})$ tracker
-would drop per-cell state from 960\,KiB to a constant 16 bytes; we
-defer that ablation to camera-ready since the counting use case
-motivates carrying the HLL sketches as a v2 deliverable.
+\paragraph{Memory bound.} Each HLL sketch occupies $2^p$ bytes at
+precision $p$ (default $p{=}14 \Rightarrow$ 16\,KiB); a cell's
+ring buffer is $C \cdot 16\,\mathrm{KiB} = 960\,\mathrm{KiB}$
+at $C{=}60$. The bound is per-cell and time-window-bounded,
+independent of recording duration. For the v1 evaluation only the
+$(t_{\min}, t_{\max})$ envelope is consumed downstream; the
+cardinality estimates are forward-looking infrastructure for the
+counting question class (\S\ref{sec:conclusion}).
 
 \subsection{Reservoir-sampled exemplars}
 \label{sec:method-exemplars}
@@ -145,33 +130,13 @@ per-query latency sub-millisecond on session-scale workloads
 
 The \texttt{per\_cell\_cap} parameter is the operating-point knob
 that distinguishes PSM from brute-force CLIP retrieval.
-\texttt{cap}=1 enforces strict spatial diversity: each top-$K$ slot
-represents a distinct H3 cell. \texttt{cap}=$K$ removes the
-per-cell constraint entirely, reducing to plain top-$K$ over the
-union of reservoir exemplars across all in-radius cells.
-The intermediate values trade off smoothly
-(\S\ref{sec:results-pareto}). The default is \texttt{cap}=1
-because, for the look-back QA use case PSM is designed for, the
-question typically references a distinct place; the cap-$K$
-permissive setting is the right tuning for revisit-heavy queries
-where the question's answer is a moment, not a place.
-
-\subsection{Streaming ingestion}
-\label{sec:method-ingest}
-
-PSM ingests frames one at a time. The ingest path per frame is:
-(i) compute H3 cell from $(\mathrm{lat}, \mathrm{lng})$;
-(ii) write the embedding hash into the current cell's
-ring-buffer sketch and advance the buffer if the time-window
-elapsed;
-(iii) update the cell's reservoir via Algorithm R, which is
-$O(1)$ per frame regardless of $n$.
-No global re-indexing, no batch reorganization. The substrate
-supports queries at any time after the first ingest.
-
-The cluster-validated per-frame ingest cost is
-$\sim$3\,$\mu$s amortized (synthetic-workload benchmark, dominated
-by HLL hash insertion). At 1\,fps Nymeria recordings the ingest
-cost is negligible; at higher frame rates (60\,fps real-time
-wearable streams) the per-frame budget is still well within
-on-device limits.
+\texttt{cap}=1 enforces strict spatial diversity (each top-$K$
+slot is a distinct H3 cell); \texttt{cap}=$K$ removes the
+per-cell constraint, reducing to plain top-$K$ over the union of
+reservoir exemplars. Intermediate values trade off smoothly
+(\S\ref{sec:results-pareto}).
+Ingest is per-frame, $O(1)$ amortized (H3 lookup + HLL hash +
+Algorithm-R reservoir update, $\sim$3\,$\mu$s on the cluster
+benchmark); no global re-indexing or batch reorganization is
+required, and queries are supported at any time after the first
+ingest.

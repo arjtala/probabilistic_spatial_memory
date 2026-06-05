@@ -247,60 +247,24 @@ closing the residual gap via ingest-time embedding pooling on the
 the only numerical content of this subsection; we omit a separate
 table to save space.
 
-\subsection{Memory ablation}
+\subsection{Memory ablation and H3 resolution}
 \label{sec:results-memory}
 
-Table~\ref{tab:ex-ablation} reports the same sweep with the
-per-cell reservoir tightened from 1{,}024 to 128 (the original
-``bounded memory'' claim). At \texttt{cap}=$K$, the smaller reservoir
-costs 2.2pp Hit@5 (13.4\% $\rightarrow$ 11.2\%); at \texttt{cap}=1
-the cost is essentially zero. The bounded-memory reservoir
-constraint and the spatial-diversity cap constraint operate
-independently: tightening reservoir hurts only the permissive
-operating point because that's the point where reservoir eviction
-actually changes the top-$K$ candidate set.
-
-\begin{table}[t]
-\centering
-\begin{tabular}{cccc}
-\toprule
-\texttt{per\_cell\_cap} & Hit@5 (ex=128) & Hit@5 (ex=1024) & $\Delta$ \\
-\midrule
-1 & 9.1\%  & 8.0\%  & +1.1pp \\
-2 & 9.6\%  & 10.2\% & $-$0.6pp \\
-3 & 10.2\% & 10.7\% & $-$0.5pp \\
-$K$ & \textbf{11.2\%} & \textbf{13.4\%} & $-$2.2pp \\
-\bottomrule
-\end{tabular}
-\caption{Reservoir-size ablation, same session.
-At the bounded-memory operating point (ex=128, $8\times$ smaller
-than ex=1024), PSM at \texttt{cap}=$K$ achieves 83\% of brute-force's
-Hit@5 (11.2\% vs 13.4\%). The \texttt{cap}=1 default is essentially
-free of reservoir-size pressure --- strict diversity dominates the
-selection.}
-\label{tab:ex-ablation}
-\end{table}
-
-% TODO: drop this section in as soon as the multi-session sweep
-% (scripts/multisession_per_cell_cap_sweep.py) finishes — populate
-% with one row per session × cap, broken out by mobility tier.
-
-\paragraph{H3 resolution does not move Hit@5 but does move bucket
-mIoU.} Re-running the headline operating point (\texttt{cap}=$K$,
-$R$=1{,}024) on \texttt{shelby\_arroyo\_act0} at $r \in \{10, 11, 12, 13\}$
-gives Hit@5 of $\{13.9, 13.4, 13.4, 13.4\}\%$ and bucket mIoU@5 of
-$\{0.004, 0.012, 0.013, 0.019\}$. Hit@5 is roughly flat because
-\texttt{cap}=$K$ at any resolution picks the top-$K$ by global cosine
-similarity; the resolution only changes which cell each hit is
-attributed to. Bucket mIoU, in contrast, rises monotonically with
-finer resolution: smaller cells produce tighter ring-buffer
-envelopes that overlap the ground-truth interval more precisely.
-Bucket Hit@5 (IoU $\geq 0.3$) only fires at $r=13$ ($1.6\%$, 3
-narrations), at which point the ring-buffer windows are tight
-enough to clear the threshold. We default to $r=12$ because it
-matches the room-scale recordings dominating the Nymeria
-distribution; $r=13$ would be the right pick for a session
-characterized in advance as sub-room.
+Tightening the per-cell reservoir from $1024$ to $128$ exemplars
+(the bounded-memory deployment configuration) costs $2.2$\,pp
+Hit@5 at \texttt{cap}=$K$ ($13.4\% \to 11.2\%$) and essentially
+zero at \texttt{cap}=1 --- reservoir eviction only bites the
+permissive operating point where the top-$K$ candidate set draws
+from many distinct frames in the same cell. Independently, H3
+resolution barely moves Hit@5 (within $\pm 0.5$\,pp across
+$r \in \{10, 11, 12, 13\}$ at \texttt{cap}=$K$, since global
+cosine ranks frames the same regardless of the cell mapping) but
+does move bucket mIoU@5 monotonically ($0.004 \to 0.019$ from
+$r{=}10$ to $r{=}13$), reflecting tighter ring-buffer envelopes
+at finer cells. Bucket Hit@5 ($\mathrm{IoU} \geq 0.3$) only
+fires at $r{=}13$ ($1.6\%$, 3/187). The $r{=}12$ default tracks
+the room-scale Nymeria recordings; $r{=}13$ is appropriate when
+the session is known in advance to be sub-room.
 
 \subsection{Multi-session generalization}
 \label{sec:results-multisession}

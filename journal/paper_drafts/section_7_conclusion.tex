@@ -19,23 +19,19 @@ the optimization in \S\ref{sec:method-query} amortizes the
 per-tile RingBuffer merge over only the surviving top-$K$ rows.
 
 \paragraph{What the evidence supports.}
-On the 187-question Nymeria atomic-action benchmark, PSM at the
-permissive operating point (\caponek{} $= K$) recovers brute-force
-CLIP retrieval exactly --- same 25 hits, same exemplar mIoU. Paired
-with a Gemini-3.1-Pro reranker, the strict-diversity default
-(\caponek{} $= 1$) achieves localization mIoU indistinguishable
-from brute-force CLIP on the highest-mobility session
-(0.073 vs 0.074), and lifts mIoU by 29--73\% relative across all
-four sessions in the multi-session sweep. The operating-point
-trade is monotone on every session and across mobility tiers from
-13\,m to 69\,m bbox extent; sub-room sessions ($<$5\,m bbox)
-co-fail PSM and brute-force at $\sim$1\% Hit@5, which we surface
-as a benchmark hardness ceiling rather than a method-quality
-signal. The substrate's bounded-memory advantage compounds with
-recording length: an hour of CLIP-L embeddings at 1\,fps occupies
-$\sim$10\,MB in brute-force's bank vs $\sim$2\,MB across the
-typical 5--10 cells a wearer occupies, with the gap growing
-linearly thereafter.
+On 30 Nymeria sessions, \psm{} at \caponek{}$=K$ matches per-frame
+brute-force CLIP exactly by construction (mean Hit@5 $8.95\%$);
+sliding-window CLIP at the GT-interval width modestly exceeds
+both ($+1$\,pp). Paired with a Gemini-3.1-Pro rerank, strict
+spatial diversity (\caponek{}$=1$) matches brute-force on
+localization mIoU on the highest-mobility session
+($0.073$ vs $0.074$) and lifts mIoU by 29--73\% relative across
+the 4-session detail. Sub-room sessions co-fail both methods at
+$\sim$1\% Hit@5 (benchmark ceiling, not method limitation). The
+bounded-memory advantage scales with recording length: an hour
+of CLIP-L at 1\,fps is $\sim$10\,MB brute-force vs $\sim$2\,MB
+across the 5--10 cells a typical wearer occupies, gap linear
+thereafter.
 
 \paragraph{Follow-up directions.}
 Five extensions naturally fit the Wearables AI Workshop's
@@ -75,10 +71,13 @@ via HLL union and reservoir sampling without sharing raw frames
 --- a privacy-preserving foundation for the workshop's
 ``Persistent Scene and Object Memory'' theme at multi-user scale.
 
-The engine implementation (\textasciitilde{}700 LoC of portable C,
-HDF5 storage, projectaria-tools/ffmpeg ingest) and the Python
-evaluation harness are released under MIT to support the workshop's
-``reproducible, open-sourced breakthroughs'' criterion for the
-challenges. We hope \psm{} serves as a useful retrieval-substrate
-baseline that future Wearable-AI assistants can deploy or improve
-on without re-implementing the bounded-memory plumbing.
+The engine ($\sim$700 LoC of portable C with HDF5 storage and
+projectaria-tools/ffmpeg ingest) and the Python evaluation harness
+are released under MIT.\footnote{Repository URL withheld for
+double-blind review; added in the camera-ready. Key reproduction
+entry points: \texttt{scripts/sweep\_per\_cell\_cap.py},
+\texttt{scripts/multisession\_per\_cell\_cap\_sweep.py},
+\texttt{scripts/eval\_psm\_mllm.py\,--mllm\,gemini}.}
+We hope \psm{} serves as a useful retrieval-substrate baseline
+that future Wearable-AI assistants can deploy or improve on without
+re-implementing the bounded-memory plumbing.

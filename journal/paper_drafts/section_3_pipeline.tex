@@ -79,54 +79,15 @@ in position 1 and the remaining four PSM candidates fill 2--$K$.
 \subsection{Architectural decomposition}
 \label{sec:pipeline-rationale}
 
-The architectural claim of the paper is that PSM and the MLLM
-contribute orthogonal properties to the retrieval task, and that
-the composition matches a brute-force CLIP oracle on the metric
-the MLLM downstream actually consumes.
-
-\paragraph{PSM contributes \emph{recall}.} The substrate's job is
-to return a candidate set that contains the answer. Empirically
-(\S\ref{sec:results-main}), at \texttt{per\_cell\_cap}=$K$
-PSM's top-5 contains the answer for the same 25/187 Nymeria
-questions brute-force CLIP's top-5 does --- the substrate does not
-lose retrieval signal vs the full embedding bank.
-
-\paragraph{The MLLM contributes \emph{localization precision}.} The
-reranker's job is to pick the most temporally-precise candidate
-from PSM's top-5. Empirically (also \S\ref{sec:results-main}),
-PSM\,$\rightarrow$\,Gemini at \texttt{cap}=$K$ achieves the same
-Hit@5 as PSM-only at \texttt{cap}=$K$ (both 13.4\%) but lifts
-exemplar mIoU@5 by 37\% relative (0.074\,$\rightarrow$\,0.101).
-The MLLM is not recovering candidates PSM dropped; it is selecting
-better-timed candidates from those PSM kept.
-
-\paragraph{The composition.} At \texttt{cap}=1 + Gemini rerank,
-PSM matches brute-force CLIP on the localization metric
-(0.073 vs 0.074 exemplar mIoU@5) while keeping the cap-1
-spatial-diversity guarantee. The bounded-memory substrate plus a
-single MLLM call substitutes for the full embedding bank plus a
-fine-grained top-$K$ search, on the metric a downstream MLLM
-consumer cares about.
-
-\subsection{Streaming considerations}
-\label{sec:pipeline-streaming}
-
-PSM ingest is $O(1)$ per frame
-(\S\ref{sec:method-ingest}), so the substrate runs continuously
-on-device alongside the wearer's normal recording loop. The
-MLLM-rerank stage is the only one that requires a network call
-to a remote API. We assume the wearer's assistant batches queries
-to amortize the API cost; the eval-time per-query latency
-($\sim$2--10\,s on Gemini, dominated by hidden thinking tokens for
-reasoning models) is the right ballpark for a non-interactive
-look-back use case (``end-of-day summary'', ``where did I leave
-X?'') but would need a smaller / on-device MLLM for the interactive
-real-time use case described in the workshop's CFP.
-
-For the v1 results we report end-to-end wall-clock numbers from
-the OpenAI-compatible proxy serving Gemini 3.1 Pro; we do not
-claim PSM\,$\rightarrow$\,small-on-device-MLLM latency until
-that substitution is measured. The workshop's Edge Computing
-research area
-(\S\ref{sec:intro} contributions list, third bullet) is the
-natural target for that follow-up.
+PSM and the MLLM contribute orthogonal properties:
+\psm{} contributes \emph{recall} (at \caponek{}=$K$ its top-5
+contains the answer for the same 25 of 187 Nymeria narrations
+brute-force CLIP's top-5 does, \S\ref{sec:results-main}); the
+MLLM contributes \emph{localization precision} (PSM\,$\to$\,Gemini
+at \caponek{}=$K$ keeps that 13.4\% Hit@5 but lifts exemplar
+mIoU@5 by 37\% relative, $0.074 \to 0.101$). At \caponek{}=1 +
+Gemini the composition matches brute-force CLIP on mIoU
+($0.073$ vs $0.074$) while keeping strict spatial diversity ---
+the bounded-memory substrate plus a single MLLM call substitutes
+for the full embedding bank plus a fine-grained search on the
+metric a downstream MLLM consumer cares about.
