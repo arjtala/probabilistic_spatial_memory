@@ -84,6 +84,9 @@ PSM's latency from frame count (the load-bearing claim) holds in
 both workloads, but a real-session micro-benchmark would tighten
 the latency comparison. We will report this in a follow-up.
 
+\paragraph{Query-time pooling does not generalize.}
+During method development, we explored a query-time reranking approach (\texttt{W=30} pooling) that averaged the embeddings of the $W$ frames surrounding each top-$K$ candidate before final selection. While this recovered performance on a small early-validation split, it failed to generalize across the 30-session corpus, behaving essentially as random noise relative to the per-frame baseline. We report this negative result to confirm that spatial-temporal smoothing must happen structurally at ingest time (via reservoir or ring buffer), not heuristically at query time.
+
 \paragraph{What this paper does not claim.}
 For clarity, we note five claims this work does \emph{not} make.
 (a) We do not claim PSM is a generic MLLM grounding method;

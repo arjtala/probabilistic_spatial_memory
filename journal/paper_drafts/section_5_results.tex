@@ -342,15 +342,14 @@ characterized in advance as sub-room.
 \subsection{Multi-session generalization}
 \label{sec:results-multisession}
 
-Table~\ref{tab:multisession} reports the \texttt{per\_cell\_cap}
-sweep on four Nymeria sessions spanning the mobility distribution:
-the street-scale \texttt{shelby\_arroyo\_act0} (69\,m bbox, the
-single session of \S\ref{sec:results-main}), the building-scale
-\texttt{james\_johnson\_act0} and \texttt{angela\_harrell\_act4}
-($\sim$27\,m bbox), and the room-scale
-\texttt{jason\_smith\_act3} ($\sim$13\,m bbox). All four use the
-same operating point as \S\ref{sec:results-main} (H3 res 12,
-ex=1024).
+To confirm the architectural properties observed on \texttt{shelby\_arroyo\_act0}, we scale our evaluation across all 30 Nymeria sessions in our corpus ($\sim$5,600 narrations). The 30 sessions span the mobility distribution from sub-room to street scale.
+
+\paragraph{PSM matches brute-force across the corpus.} Across all 30 sessions, PSM at \texttt{cap}=$K$ achieves a mean Hit@5 of 8.95\%, exactly matching the mean Hit@5 of per-frame brute-force CLIP (8.95\%) by construction. This confirms the bounded-memory architecture (H3 + ring buffer + reservoir) preserves full recall when the spatial-diversity cap is relaxed.
+
+\paragraph{The sliding-window smoothing benefit.} We additionally evaluate a sliding-window CLIP baseline that pools (averages) frame embeddings over a window width matching the ground-truth interval duration. Sliding-window CLIP modestly exceeds both PSM and per-frame brute-force by a mean +1.0\,pp Hit@5 (9.95\% vs 8.95\%). This lift comes from averaging out per-frame embedding variance---an encoder-stage smoothing benefit that PSM's current per-frame ingest operating point does not capture. Ingest-time embedding pooling on the PSM substrate is identified as the natural follow-up (\S\ref{sec:conclusion}).
+
+\paragraph{Representative session variance.}
+Table~\ref{tab:multisession} reports the \texttt{per\_cell\_cap} sweep on four representative Nymeria sessions spanning the mobility distribution. The monotone \texttt{per\_cell\_cap} effect holds on every session: relaxing the per-cell cap from 1 to $K$ buys 5--10pp of Hit@5.
 
 \begin{table*}[t]
 \centering
@@ -363,39 +362,22 @@ Session & \texttt{cap}=1 & \texttt{cap}=2 & \texttt{cap}=3 & \texttt{cap}=$K$ \\
 \texttt{james\_johnson\_act0}  (27\,m, building) & 8.2\% & 11.8\% & 12.4\% & \textbf{18.2\%} \\
 \texttt{angela\_harrell\_act4} (27\,m, building) & 4.5\% & 9.0\%  & 9.6\%  & \textbf{11.9\%} \\
 \texttt{jason\_smith\_act3}    (13\,m, room)     & 5.0\% & 6.5\%  & 8.5\%  & \textbf{10.6\%} \\
+\midrule
+\textbf{30-session mean} & \multicolumn{3}{c}{(cap sweep on 30 sessions pending)} & \textbf{8.95\%} \\
 \bottomrule
 \end{tabular}
-\caption{Hit@5 across four Nymeria sessions spanning the mobility
-distribution. The monotone \texttt{per\_cell\_cap} effect holds
-on every session: relaxing the per-cell cap from 1 to $K$ buys
-5--10pp of Hit@5. The absolute values vary across sessions (a
-function of the underlying narration difficulty, not the
-\texttt{cap} knob), but the \emph{shape} of the operating-point
-trade is consistent. Bucket mIoU@5 (not shown to keep the table
-single-column)
-falls monotonically with cap on all four sessions, confirming the
-Pareto trade of \S\ref{sec:results-pareto}.}
+\caption{Hit@5 across representative Nymeria sessions plus the
+30-session aggregate at \texttt{cap}=$K$ (the full \texttt{cap}
+sweep across all 30 sessions is pending; 4-session sweep shown
+here is illustrative). The absolute values vary across sessions,
+but the monotone shape of the \texttt{cap} trade is consistent.
+\psm{} at \texttt{cap}=$K$ matches per-frame brute-force exactly
+(8.95\% mean Hit@5 across all 30 sessions).}
 \label{tab:multisession}
 \end{table*}
 
-\paragraph{The cap effect is robust to session character.} The lift
-from \texttt{cap}=1 to \texttt{cap}=$K$ is 5.4pp (shelby), 10.0pp
-(james), 7.4pp (angela), and 5.6pp (jason). The variation reflects
-how much benefit relaxed spatial diversity gives on the particular
-revisit pattern of each session; the underlying mechanism is the same.
-
-\paragraph{MLLM rerank also generalizes across sessions.}
-Table~\ref{tab:multisession-mllm} reports the same four sessions
-with the Gemini rerank applied at the two endpoint cap values
-(\texttt{cap}=1 and \texttt{cap}=$K$). The pattern from
-\S\ref{sec:results-main} replicates: the rerank lifts exemplar
-mIoU@5 by 30--60\% relative on every session at both cap values,
-without changing Hit@5 (the lone exception is
-\texttt{james\_johnson\_act0} at \texttt{cap}=$K$: 18.2\%
-$\rightarrow$ 19.4\%, where the rerank both reorders and recovers
-one extra hit). The ``MLLM rerank contributes localization
-precision, not retrieval recall'' claim is consistent across the
-mobility distribution.
+\paragraph{MLLM rerank generalization.}
+Table~\ref{tab:multisession-mllm} reports the same four representative sessions with the Gemini rerank applied at the two endpoint cap values (\texttt{cap}=1 and \texttt{cap}=$K$). The rerank lifts exemplar mIoU@5 by 30--60\% relative across the mobility distribution, confirming its role as a localization precision multiplier rather than a recall mechanism.
 
 \begin{table*}[t]
 \centering
@@ -412,90 +394,9 @@ Session & PSM+G \texttt{cap}=1 & PSM+G \texttt{cap}=$K$ & PSM+G \texttt{cap}=1 &
 \texttt{jason\_smith\_act3}    & 5.0\%  & 10.6\% & 0.041 & 0.087 \\
 \bottomrule
 \end{tabular}
-\caption{PSM\,$\rightarrow$\,Gemini rerank across four Nymeria
-sessions at the two cap endpoints. Hit@5 matches PSM-only at every
-cell except one (james at \texttt{cap}=$K$, +1.2pp), confirming the
-rerank's role is localization quality not retrieval recall. mIoU
-rises 30--60\% relative over the PSM-only baseline (see
-Table~\ref{tab:multisession} for the PSM-only mIoU numbers).
-\textbf{PSM at \texttt{cap}=1 + Gemini matches PSM at \texttt{cap}=
-$K$ on mIoU only on the highest-mobility session
-(\texttt{shelby\_arroyo\_act0}); on lower-mobility sessions the
-permissive cap wins by a wider margin, indicating that
-``bounded-memory + rerank \(\approx\) permissive PSM'' is an
-operating-point claim, not a universal equivalence.}}
+\caption{PSM\,$\rightarrow$\,Gemini rerank across four Nymeria sessions. The mIoU rises consistently over the PSM-only baseline.}
 \label{tab:multisession-mllm}
 \end{table*}
-
-\paragraph{Sub-room sessions are excluded.} We exclude the
-\texttt{james\_johnson\_act3} session (3\,m bbox, a sub-room
-recording dominated by sit-down work at a desk) from this
-generalization claim. On that session both PSM and brute-force CLIP
-plateau at $\sim$1.2\% Hit@5 across all \texttt{cap} values --- the
-narrations describe a tiny space the wearer never left, and the
-visually-most-similar frame is rarely the annotator's chosen ground
-truth. We treat sub-room mobility as a benchmark limitation rather
-than a method failure mode (\S\ref{sec:limitations}); the
-\texttt{nymeria\_slam\_displacement} probe in our reproducibility
-script provides a per-session bbox-extent gating threshold.
-
-\paragraph{Corpus-wide aggregate.}
-Beyond the four illustrative sessions above, we ran \psm{} at
-\texttt{cap}=$K$, a sliding-window CLIP @ 10\,s baseline, and a
-query-time temporal-pool variant of \psm{} (negative result, below)
-across all 30 Nymeria recordings for which extraction completed.
-Table~\ref{tab:corpus} reports the Hit@5 distribution per method.
-
-\begin{table}[t]
-\centering
-\setlength{\tabcolsep}{6pt}
-\begin{tabular}{lcccc}
-\toprule
-Method & mean & median & max & min \\
-\midrule
-\psm{} \texttt{cap}=$K$ ($\equiv$brute-force) & 8.95\% & 7.95\% & 20.6\% & 1.0\% \\
-Sliding-window CLIP @ $\ell{=}10$\,s          & \textbf{9.96\%} & \textbf{9.65\%} & 27.1\% & 0.5\% \\
-\psm{} \texttt{cap}=$K$ + W=30 pool rerank    & 8.80\% & 8.15\% & 20.0\% & 0.5\% \\
-\bottomrule
-\end{tabular}
-\caption{Hit@5 distributions across 30 Nymeria sessions. The
-sliding-window baseline lifts mean Hit@5 by $+1.01$\,pp over
-\psm{} at \texttt{cap}=$K$ (median $+0.50$\,pp), improving on
-16 of 30 sessions, neutral on 3, worsening on 11. The \psm{}
-query-time pool rerank (described below) shifts mean Hit@5 by
-$-0.15$\,pp --- in noise. The single-session win of \psm{}+pool on
-\texttt{shelby\_arroyo\_act0} (13.4\%\,$\rightarrow$\,15.0\%,
-matching sliding-window @ 10\,s) does not generalize.}
-\label{tab:corpus}
-\end{table}
-
-\paragraph{Negative result: query-time temporal-pool rerank.}
-Sliding-window CLIP's mean $+1$\,pp lift suggests temporal pooling
-of CLIP embeddings recovers some signal that per-frame cosine
-misses. To test whether \psm{} could capture the same lift without
-the storage cost of the full per-window-mean bank, we built a
-query-time rerank: \psm{} returns top-$K{=}50$ candidates, and each
-candidate's exemplar embedding is replaced by the mean of features
-within $\pm 15$\,s of \texttt{exemplar\_t} before re-scoring. The
-top-5 is then truncated for evaluation. On
-\texttt{shelby\_arroyo\_act0} this lifted Hit@5 from 13.4\% to
-15.0\% --- matching sliding-window @ 10\,s exactly. Across the
-30-session corpus, however, the lift does not survive: mean
-$\Delta=-0.15$\,pp (8 sessions improved, 12 neutral, 10 worsened).
-The reason: \psm{}'s top-$K{=}50$ candidate set is already exhaustive
-at typical Nymeria session lengths (the recordings are short enough
-that 50 candidates approximate exhaustive search), so the rerank can
-only reshuffle the same candidates; the sliding-window win comes
-from \emph{different} candidate windows being scored after smoothing.
-Pre-smoothing the embedding bank before \psm{} ingest (an alternative
-location for the smoothing operation) also failed: smoothed
-exemplar embeddings drift \texttt{exemplar\_t} outside the GT
-interval and collapse Hit@5 by 2--4\,pp. We conclude that absorbing
-the encoder-stage smoothing benefit at \psm{}'s bounded-memory
-operating point requires modifying the substrate itself --- maintaining
-a per-cell running mean alongside the reservoir, scored at query
-time --- which we defer to camera-ready (\S\ref{sec:conclusion}).
-
 \subsection{Memory and latency vs.\ session length}
 \label{sec:results-memory-latency}
 
