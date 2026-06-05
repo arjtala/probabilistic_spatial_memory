@@ -60,21 +60,16 @@ A non-truncating text encoder (longCLIP, or one of the recent
 1024-token CLIP variants) would likely improve accuracy by a few
 percentage points; we leave that comparison to future work.
 
-\paragraph{Single Nymeria session for the headline table.}
-The headline table (\S\ref{sec:results-main}) and the
-operating-point Pareto figure (Figure~\ref{fig:pareto}) are
-reported on the single-session
-\texttt{shelby\_arroyo\_act0}. The multi-session generalization
-(\S\ref{sec:results-multisession}) confirms the
-\texttt{per\_cell\_cap} trade is monotone on four sessions, but the
-absolute Hit@5 ceiling varies across sessions
-(\texttt{james\_johnson\_act0} hits 18.2\% at \texttt{cap}=$K$;
-\texttt{jason\_smith\_act3} hits 10.6\%) as a function of the
-session's narration style. The cross-corpus story
-(\S\ref{sec:results-aria}) extends to the Aria Gen 2 Pilot
-Dataset's outdoor walking sessions; a wider deployment study is
-out of scope for this workshop submission and would be the
-natural extension for a journal version.
+\paragraph{Single corpus.} All headline numbers are on Nymeria
+indoor recordings. The multi-session table
+(\S\ref{sec:results-multisession}) confirms the \texttt{per\_cell\_cap}
+trade is monotone across four sessions and three mobility tiers
+(13--69\,m bbox), but the absolute Hit@5 ceiling varies with session
+character (\texttt{james\_johnson\_act0} hits 18.2\% at
+\texttt{cap}=$K$; \texttt{jason\_smith\_act3} hits 10.6\%).
+Outdoor street-scale evaluation on the Aria Gen 2 Pilot Dataset
+(real GPS, $\sim$300\,m wearer trajectories) is identified as the
+natural extension (\S\ref{sec:conclusion}).
 
 \paragraph{Latency numbers from synthetic workload.}
 PSM's reported per-query latency of $\sim$700\,$\mu$s

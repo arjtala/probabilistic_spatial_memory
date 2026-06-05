@@ -38,18 +38,28 @@ typical 5--10 cells a wearer occupies, with the gap growing
 linearly thereafter.
 
 \paragraph{Follow-up directions.}
-Three extensions naturally fit the Wearables AI Workshop's
-research areas. (a) \emph{On-device MLLM rerank} would close the
-loop on Edge Computing: replacing Gemini with a small on-device
+Four extensions naturally fit the Wearables AI Workshop's
+research areas. (a) \emph{Outdoor, GPS-grounded look-back QA}
+on Aria Gen 2 Pilot's \texttt{walk\_0}/\texttt{walk\_1} sessions
+($\sim$300\,m wearer trajectories with real GPS, H3 res 10 at
+street scale): the engine and harness extend unchanged, and the
+operating-point claim becomes a cross-mobility-tier story
+spanning $\sim$5\,m room scale to $\sim$300\,m street scale.
+Question annotation is in progress at submission time; the
+results land in the camera-ready or journal extension. This is
+also the natural connection to the workshop's streaming
+multi-turn Challenge 2 protocol.
+(b) \emph{On-device MLLM rerank} closes
+the loop on Edge Computing: replacing Gemini with a small on-device
 vision-language model (e.g. Phi-3.5-Vision, SmolVLM) tests
 whether the per-cell-cap + reranker composition holds when the
-reranker itself is bounded by wearable compute. (b) \emph{Counting
+reranker itself is bounded by wearable compute. (c) \emph{Counting
 via HLL cardinality}: the time-decayed ring-buffer sketches in
 \S\ref{sec:method-ring-buffer} already track unique-event
 cardinality per cell; surfacing them to the question answerer
 extends \psm{} to a question class beyond moment-grounding
 (``how many distinct people did I see at the kitchen today?'').
-(c) \emph{Federated memory across wearers}: H3 cells are global,
+(d) \emph{Federated memory across wearers}: H3 cells are global,
 so two devices visiting the same cell can merge their PSM state
 via HLL union and reservoir sampling without sharing raw frames
 --- a privacy-preserving foundation for the workshop's

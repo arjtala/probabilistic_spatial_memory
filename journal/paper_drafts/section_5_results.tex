@@ -33,10 +33,10 @@ truth. \emph{This is a proxy benchmark}: atomic\_action narrations
 were designed as third-person action descriptions, not as look-back
 questions a wearable user would naturally phrase. We use them
 because they are the largest available source of frame-grounded
-text with stable timestamps; the cross-corpus story
-(\S\ref{sec:results-aria}) addresses external validity by reporting
-results on hand-authored natural look-back questions over outdoor
-Aria Gen 2 walks. The full subset on the cluster comprises 30 sessions
+text with stable timestamps. External validity to natural look-back
+queries authored over outdoor wearer-mobility recordings is an
+explicit open direction (\S\ref{sec:conclusion}). The full subset
+on the cluster comprises 30 sessions
 ($\sim$5{,}600 narrations total) ranging from 0.7\,m to 69\,m wearer
 bounding-box extent. We report main results on the single
 high-mobility session (\texttt{shelby\_arroyo\_act0}, 187 narrations,
@@ -410,18 +410,9 @@ reference temporally-distinct events (``C closes the cabinet,''
 ``C walks toward the kitchen then turns left'') where the
 ground-truth window is the only matching visual evidence.
 
-% Cross-corpus subsection lands after Aria Gen 2 questions are
-% authored (task #7); leave placeholder so the section ordering
-% is locked.
-\subsection{Cross-corpus: Aria Gen 2 outdoor walks}
-\label{sec:results-aria}
-
-\textbf{[PENDING]} The Nymeria result above is on a single corpus
-of room-scale indoor egocentric recordings. We complement it with
-results on the Aria Gen 2 Pilot Dataset's two outdoor walking
-sessions (\texttt{walk\_0}, \texttt{walk\_1}), which carry real GPS
-($\sim$300\,m walking trajectory each) and exercise the H3
-spatial index at street scale (resolution 10, $\sim$65\,m hex
-cells). Manually-authored question bank is pending (target
-$\sim$10 questions per session, $\sim$120 total across all 12
-Aria Gen 2 sessions).
+% Cross-corpus story consolidated into §6 (Conclusion) Follow-up
+% paragraph rather than maintained here as a stub — see venue-aware
+% framing notes: a workshop paper is better served by a confident
+% future-work tease than a [PENDING] subsection. Re-enable this
+% subsection if Aria Gen 2 question annotation (task #7) completes
+% before the submission deadline.
