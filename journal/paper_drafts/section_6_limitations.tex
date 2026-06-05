@@ -56,9 +56,10 @@ hand''). Many tokenize to 80--120 tokens, exceeding the CLIP-L
 text encoder's 77-token positional limit. We truncate at 77 tokens
 at the tokenizer level; this drops trailing context that the
 brute-force CLIP and PSM baselines both lose access to.
-A non-truncating text encoder (longCLIP, or one of the recent
-1024-token CLIP variants) would likely improve accuracy by a few
-percentage points; we leave that comparison to future work.
+A non-truncating text encoder such as Long-CLIP~\cite{zhang2024longclip},
+or one of the recent 1024-token CLIP variants, would likely improve
+accuracy by a few percentage points; we leave that comparison to
+future work.
 
 \paragraph{Single corpus.} All headline numbers are on Nymeria
 indoor recordings. The multi-session table
@@ -93,10 +94,21 @@ real-counting scorer lands in a follow-up.
 (c) We do not claim PSM is the only architecture for this
 problem; we propose one shape, not the only one. (d) We do not
 claim that per-frame brute-force CLIP is the strongest possible
-CLIP-only baseline; sliding-window CLIP at the GT-interval
-width modestly exceeds it on Hit@5
-(Table~\ref{tab:baselines}), and PSM does not match that smoothing
-effect at its bounded-memory operating point. (e) We do not
-claim that CLIP-L is the strongest possible encoder; larger
-variants (bigG, EVA, SigLIP) likely shift absolute Hit@5 values
-upward, but the architectural claim is encoder-agnostic.
+CLIP-only baseline. Sliding-window CLIP at the GT-interval
+width modestly exceeds both brute-force and \psm{} at \texttt{cap}=$K$
+by mean $+1.0$\,pp Hit@5 across our 30-session corpus (with the
+gap closing or inverting on 14 of those 30 sessions). This
+encoder-stage smoothing benefit is real but small, and \psm{} does
+not currently absorb it at its bounded-memory operating point ---
+ingest-time embedding smoothing is the natural follow-up.
+(e) We do not claim that CLIP-L is the strongest possible
+encoder. Larger CLIP variants (bigG~\cite{cherti2023scaling},
+EVA-CLIP-18B~\cite{sun2024evaclip18b}) and better-curated training
+data (MetaCLIP~\cite{xu2023metaclip}) would shift absolute Hit@5
+upward; localization-aware encoders such as
+SigLIP~2~\cite{tschannen2025siglip2} are the natural next encoder
+swap. Dense visual encoders such as DINOv2~\cite{oquab2024dinov2}
+and video-native encoders such as V-JEPA~2~\cite{assran2025vjepa2}
+are natural future re-rankers for cases where text--image
+similarity and visual salience disagree, but the architectural
+claim is encoder-agnostic.

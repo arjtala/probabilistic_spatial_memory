@@ -100,11 +100,12 @@ recording length: brute-force is $\Theta(N)$; PSM is $\Theta(R \cdot
 physical area the wearer covers, not the recording duration.
 
 \paragraph{TurboQuant codec.} An optional exemplar-codec layer
-(TurboQuant~\cite{turboquant}, our 2-/3-/4-bit implementation
-in \texttt{src/core/exemplar\_codec.c}) compresses stored exemplars
-5--10$\times$ at no Hit@5 cost compared to \texttt{raw} float32.
-We report all main results with \texttt{raw} for clarity; the
-codec is the natural next step for on-device deployment.
+(a TurboQuant-style 2-/3-/4-bit implementation, related to
+streaming vector quantization~\cite{aguerrebere2024lvq})
+compresses stored exemplars 5--10$\times$ at no Hit@5 cost
+compared to \texttt{raw} float32. All main results use
+\texttt{raw} for clarity; the codec is the natural next step
+for on-device deployment.
 
 \subsection{Top-$K$ query with \texttt{per\_cell\_cap}}
 \label{sec:method-query}

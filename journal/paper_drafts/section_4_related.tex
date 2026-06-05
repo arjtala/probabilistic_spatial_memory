@@ -16,10 +16,24 @@ grounding collapse motivating our PSM-as-prefilter pipeline. The
 literal use case (``where did I leave my keys?'') was articulated
 in earlier workshop work~\cite{barmann2022keys}; Di and
 Xie~\cite{di2024grounded} introduced unified grounded-QA over long
-egocentric videos with end-to-end neural grounding. Our contribution
-is structurally orthogonal: we provide a bounded-memory spatial-
-temporal substrate that any of these MLLM grounding methods can
-rerank, rather than retraining a new grounding head.
+egocentric videos with end-to-end neural grounding, and later
+multi-hop variants make the same temporal localization pressure
+explicit~\cite{chen2025groundedmultihop}. Recent egocentric
+grounding work strengthens the case for a persistent spatial
+substrate: Plizzari et al.~\cite{plizzari2025spatial} find that
+spatial cognition is critical for locating objects across short and
+long time scales, while fine-grained egocentric grounding benchmarks
+such as EgoMask~\cite{liang2025egomask} expose the pixel- and
+spatiotemporal-grounding challenges specific to first-person video.
+Closest to our online setting, ESOM~\cite{manigrasso2026esom}
+maintains a streaming object memory for episodic visual query
+localization; its object-level memory is complementary to \psm{}'s
+place-level H3 memory, and its reported 4\% online success rate
+underscores the hardness of egocentric streaming retrieval. Our
+contribution is structurally orthogonal: we provide a bounded-memory
+spatial-temporal
+substrate that any of these MLLM grounding methods can rerank, rather
+than retraining a new grounding head.
 
 \paragraph{Memory-augmented video LLMs.}
 MovieChat~\cite{song2024moviechat}, MA-LMM~\cite{he2024malmm},

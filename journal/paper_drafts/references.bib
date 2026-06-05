@@ -3,7 +3,7 @@
   Citations curated against the workshop's CFP topic areas
   (Long-Context & Real-Time Interactions; Persistent Scene and Object
   Memory; Efficient AI / Edge Computing). Priority groups marked
-  inline; placeholder entries flagged for resolution before submission.
+  inline.
 }
 
 % ─── Encoders (must-cite) ────────────────────────────────────────
@@ -29,15 +29,17 @@
   howpublished = {\url{https://huggingface.co/laion/CLIP-ViT-L-14-laion2B-s32B-b82K}},
 }
 
-@misc{google2026gemini,
-  title        = {{Gemini 3.1 Pro}},
-  author       = {{Google DeepMind}},
-  year         = {2026},
-  howpublished = {\url{https://deepmind.google/technologies/gemini/}},
-  note         = {Model id \texttt{gemini-3-1-pro-preview-genai}; queried
-                  via an OpenAI-compatible HTTP proxy. PLACEHOLDER:
-                  replace with the model card / technical report URL
-                  when the canonical citation is available.},
+@article{google2026gemini,
+  title   = {Gemini: A Family of Highly Capable Multimodal Models},
+  author  = {{Gemini Team} and Anil, Rohan and Borgeaud, Sebastian
+             and Alayrac, Jean-Baptiste and Yu, Jiahui and Soricut, Radu
+             and Schalkwyk, Johan and Dai, Andrew M. and Hauth, Anja
+             and Millican, Katie and others},
+  journal = {arXiv preprint arXiv:2312.11805},
+  year    = {2023},
+  note    = {Experiments used model id
+             \texttt{gemini-3-1-pro-preview-genai} via an
+             OpenAI-compatible HTTP proxy.},
 }
 
 % ─── Egocentric video datasets & benchmarks (must-cite) ─────────
@@ -94,12 +96,24 @@
   year      = {2024},
 }
 
+@article{chen2025groundedmultihop,
+  author  = {Chen, Qirui and Di, Shangzhe and Xie, Weidi},
+  title   = {Grounded Multi-Hop {VideoQA} in Long-Form Egocentric Videos},
+  journal = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  volume  = {39},
+  number  = {2},
+  pages   = {2159--2167},
+  year    = {2025},
+  doi     = {10.1609/aaai.v39i2.32214},
+}
+
 @misc{aria-gen2-pilot,
-  title  = {Aria Gen 2 Pilot Dataset},
-  author = {{Meta Reality Labs}},
-  year   = {2024},
-  note   = {PLACEHOLDER: resolve to the project page citing the 12
-            preview sessions referenced in \S\ref{sec:conclusion}.},
+  title        = {Aria Gen 2 Pilot Dataset},
+  author       = {{Meta Reality Labs}},
+  year         = {2024},
+  howpublished = {\url{https://www.projectaria.com/resources/}},
+  note         = {Project Aria Gen 2 pilot release used for the
+                  twelve-session paper subset.},
 }
 
 % ─── Memory-augmented video LLMs (should-cite, positioning) ─────
@@ -175,6 +189,17 @@
   year    = {2024},
 }
 
+@inproceedings{cherti2023scaling,
+  author    = {Cherti, Mehdi and Beaumont, Romain and Wightman, Ross and
+               Wortsman, Mitchell and Ilharco, Gabriel and Gordon, Cade and
+               Schuhmann, Christoph and Schmidt, Ludwig and Jitsev, Jenia},
+  title     = {Reproducible Scaling Laws for Contrastive Language-Image
+               Learning},
+  booktitle = {CVPR},
+  pages     = {2818--2829},
+  year      = {2023},
+}
+
 % ─── Spatial indexing + probabilistic data structures ───────────
 
 @misc{brodsky2018h3,
@@ -231,9 +256,11 @@
   author    = {Zhang, Beichen and Zhang, Pan and Dong, Xiaoyi and Zang,
                Yuhang and Wang, Jiaqi},
   title     = {{Long-CLIP}: Unlocking the Long-Text Capability of {CLIP}},
-  booktitle = {ECCV},
-  pages     = {199--217},
+  booktitle = {Computer Vision -- ECCV 2024},
+  pages     = {310--325},
+  publisher = {Springer Nature Switzerland},
   year      = {2024},
+  doi       = {10.1007/978-3-031-72983-6_18},
 }
 
 @article{oquab2024dinov2,
@@ -251,6 +278,17 @@
   year    = {2024},
 }
 
+@techreport{assran2025vjepa2,
+  author      = {Assran, Mahmoud and Bardes, Adrien and Fan, David and
+                 Garrido, Quentin and Howes, Russell and Komeili, Mojtaba
+                 and Muckley, Matthew and Rizvi, Ammar and Roberts, Claire
+                 and Sinha, Koustuv and Zholus, Artem and others},
+  title       = {{V-JEPA} 2: Self-Supervised Video Models Enable
+                 Understanding, Prediction and Planning},
+  institution = {FAIR at Meta},
+  year        = {2025},
+}
+
 @article{xu2023metaclip,
   author  = {Xu, Hu and Xie, Saining and Tan, Xiaoqing Ellen and
              Huang, Po-Yao and Howes, Russell and Sharma, Vasu and
@@ -259,6 +297,14 @@
   title   = {Demystifying {CLIP} Data},
   journal = {arXiv preprint arXiv:2309.16671},
   year    = {2023},
+}
+
+@article{sun2024evaclip18b,
+  author  = {Sun, Quan and Wang, Jinsheng and Yu, Qiying and Cui, Yufeng
+             and Zhang, Fan and Zhang, Xiaosong and Wang, Xinlong},
+  title   = {{EVA-CLIP-18B}: Scaling {CLIP} to 18 Billion Parameters},
+  journal = {arXiv preprint arXiv:2402.04252},
+  year    = {2024},
 }
 
 % ─── Ego streaming memory + grounding (should-cite) ──────────────
@@ -271,7 +317,9 @@
   title     = {Online Episodic Memory Visual Query Localization with
                Egocentric Streaming Object Memory},
   booktitle = {WACV},
+  pages     = {3951--3960},
   year      = {2026},
+  doi       = {10.1109/WACV61042.2026.00385},
 }
 
 @inproceedings{plizzari2025spatial,
@@ -280,25 +328,27 @@
   title     = {Spatial Cognition from Egocentric Video: Out of Sight, Not
                Out of Mind},
   booktitle = {3DV},
+  pages     = {1211--1221},
   year      = {2025},
+  doi       = {10.1109/3DV66043.2025.00115},
 }
 
-% ─── Motivating / concurrent work ────────────────────────────────
-
-@misc{localization-paradox-2026,
-  title  = {The Localization Paradox in Long-Context Video QA},
-  author = {Anonymous},
-  year   = {2026},
-  note   = {PLACEHOLDER: resolve to the public preprint when available;
-            otherwise frame as concurrent work in §\ref{sec:intro}.},
+@inproceedings{liang2025egomask,
+  author    = {Liang, Shuo and Zhong, Yiwu and Hu, Zi-Yuan and Tao, Yeyao
+               and Wang, Liwei},
+  title     = {Fine-Grained Spatiotemporal Grounding on Egocentric Videos},
+  booktitle = {ICCV},
+  pages     = {9385--9395},
+  year      = {2025},
+  doi       = {10.1109/ICCV51701.2025.00876},
 }
 
-@misc{turboquant,
-  title  = {TurboQuant: Randomized Hadamard + Lloyd-Max Scalar Quantization
-            for Embedding Compression},
-  author = {Anonymous},
-  year   = {2024},
-  note   = {PLACEHOLDER: may resolve to Aguerrebere et al.~\cite{aguerrebere2024lvq}
-            depending on canonical TurboQuant reference; otherwise cite the
-            engine's own \texttt{src/core/exemplar\_codec.c} implementation.},
+@article{cheng2024videgothink,
+  author  = {Cheng, Sijie and Fang, Kechen and Yu, Yangyang and
+             Zhou, Sicheng and Li, Bohao and Tian, Ye and Li, Tingguang
+             and Han, Lei and Liu, Yang},
+  title   = {{VidEgoThink}: Assessing Egocentric Video Understanding
+             Capabilities for Embodied {AI}},
+  journal = {arXiv preprint arXiv:2410.11623},
+  year    = {2024},
 }

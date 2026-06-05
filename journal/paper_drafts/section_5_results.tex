@@ -23,7 +23,7 @@ budget.
 
 \paragraph{Corpus.} Our primary results are on the Nymeria atomic-action
 narration benchmark~\cite{ma2024nymeria}, a public egocentric dataset
-collected with Project Aria Gen 1 headsets. Per-session
+collected with Project Aria Gen 1 headsets~\cite{engel2024aria}. Per-session
 \texttt{atomic\_action.csv} files provide $\sim$5-second action
 windows narrated by independent annotators
 (``C walks toward the kitchen then turns to the left,'' etc.).
@@ -263,19 +263,26 @@ recording is reduced to 17 frames and Hit@5 falls to 4.3\%.}
 \end{table}
 
 The sliding-window-at-10\,s outperformance is the cleanest
-single-number comparison reviewers will ask about. Two
+single-number comparison reviewers will ask about. Three
 characterizations matter. First, the win is structural: window
 pooling lifts low-individual-frame similarity scores by averaging
 out per-frame variance, and the optimal $\ell$ tracks the GT
 interval width (8.6\,pp lift from $\ell=3$\,s to $\ell=10$\,s; we
 defer ablating $\ell$ above the GT width to the camera-ready
-version). Second, sliding-window does not propose a bounded-memory
-operating point --- it stores all $N$ frame embeddings \emph{and}
-the per-window means, while PSM keeps only $R$ exemplars per H3
-cell. The architectural claim ``PSM matches per-frame brute-force
-at bounded memory'' survives this comparison; the absolute-Hit@5
+version). Second, the win is modest in aggregate: across the
+30-session corpus, sliding-window @ 10\,s exceeds \psm{} at
+\texttt{cap}=$K$ by mean $+1.01$\,pp Hit@5 (median $+0.5$\,pp,
+improvements on 16 of 30 sessions, neutral on 3, worse on 11),
+so the encoder-stage smoothing benefit is real but small. Third,
+sliding-window does not propose a bounded-memory operating point
+--- it stores all $N$ frame embeddings \emph{and} the per-window
+means, while \psm{} keeps only $R$ exemplars per H3 cell. The
+architectural claim ``\psm{} matches per-frame brute-force at
+bounded memory'' survives this comparison; the absolute-Hit@5
 ceiling among CLIP-only retrieval methods is just slightly higher
-than per-frame brute-force suggests.
+than per-frame brute-force suggests, and closing that residual
+gap is a clean follow-up direction (ingest-time embedding pooling
+on the \psm{} substrate, \S\ref{sec:conclusion}).
 
 \subsection{Memory ablation}
 \label{sec:results-memory}
