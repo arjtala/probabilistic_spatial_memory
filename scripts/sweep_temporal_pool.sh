@@ -28,6 +28,7 @@ for W in $WINDOWS; do
   echo "=== pool_window=${W}s -> $OUT ==="
   python scripts/eval_psm_temporal_pool.py "$H5" "$Q" \
     --pool-window "$W" --per-cell-cap 5 \
+    --top 5 --rerank-pool 50 \
     --h3-resolution 12 --time-window 30 --capacity 60 \
     --exemplars 1024 \
     --clip-device cpu --clip-checkpoint "$CKPT" \

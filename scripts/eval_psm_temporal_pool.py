@@ -98,7 +98,14 @@ def main() -> int:
     ap.add_argument("features", type=Path)
     ap.add_argument("questions", type=Path)
     ap.add_argument("--group", default="clip")
-    ap.add_argument("--top", type=int, default=5)
+    ap.add_argument("--top", type=int, default=5,
+                    help="Final top-K returned to the scorer (Hit@K is "
+                         "computed at this K).")
+    ap.add_argument("--rerank-pool", type=int, default=50,
+                    help="Number of candidates PSM returns before pooling+"
+                         "rerank. Must be >= --top; the rerank only changes "
+                         "Hit@K when extra candidates outside the original "
+                         "top-K can rise above an existing top-K member.")
     ap.add_argument("--per-cell-cap", type=int, default=5)
     ap.add_argument("--time-window", type=float, default=30.0)
     ap.add_argument("--capacity", type=int, default=60)
@@ -156,7 +163,7 @@ def main() -> int:
             qpath.write_bytes(qvec.tobytes())
             payload = run_psm_search(
                 args.psm_binary, args.features, args.group, qpath,
-                top=args.top,
+                top=max(args.top, args.rerank_pool),
                 time_window=args.time_window,
                 capacity=args.capacity,
                 h3_resolution=args.h3_resolution,
@@ -210,8 +217,12 @@ def main() -> int:
                     "count": r.get("count", 0),
                 })
 
-            # Re-sort by new similarity, descending.
+            # Re-sort by new similarity, descending, then truncate to top-K.
+            # Truncation is required for Hit@K to actually change under
+            # reranking; without it we score over all PSM candidates and
+            # the pooling becomes invariant.
             rescored.sort(key=lambda p: -p["similarity"])
+            rescored = rescored[:args.top]
 
             # Score against GT.
             preds = []
