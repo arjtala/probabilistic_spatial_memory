@@ -133,7 +133,14 @@ point.
 \paragraph{Benchmark ceiling \& MLLM rerank.}
 Brute-force CLIP itself caps at $13.4\%$ Hit@5; of the $187$
 narrations, $162$ are revisit-heavy and visually indistinguishable
-to CLIP cosine (\S\ref{sec:results-memory-latency}). On the $25$
+to CLIP cosine (\S\ref{sec:results-memory-latency}). This is
+consistent with recent theoretical work showing that the top-$k$
+subsets a single-vector embedding can return are
+dimension-bounded~\cite{weller2025limit}: at fixed CLIP-L
+dim 768, certain query/answer pairings are not representable as
+``query within $\epsilon$ of answer'' regardless of training data,
+and \psm{}'s substrate inherits this expressivity bound from the
+encoder it indexes. On the $25$
 \emph{groundable} narrations, \psm{} at \caponek{}$=K$ recovers
 all 25 (\emph{conditional accuracy $= 100\%$}). The MLLM rerank
 adds localization precision rather than retrieval recall:
