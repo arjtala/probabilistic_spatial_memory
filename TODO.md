@@ -248,18 +248,18 @@ This section is just for the harness/glue code those experiments need.
 
 ### Baselines + sweeps
 
-- [x] `scripts/eval_brute_force_clip.py` — for E11. Embed every frame of a session, rank all frames by cosine against the query, take top-k. Use the same scorer as `eval_lookback.py` so numbers are directly comparable.
-- [x] `scripts/eval_sliding_window.py` — for E11. Slide 5-second windows, mean-pool frame embeddings inside each window, rank windows. Same scorer.
-- [x] `scripts/eval_uniform_sample.py` — for E11. 1-frame-per-time-window sampling, no learned aggregation. Lower-bound baseline.
-- [x] Hyperparameter sweep loop on top of `eval_bigg_all.sh` — for E12. Adds `H3_RESOLUTION`, `RETENTION` (as `TIME_WINDOW × CAPACITY`), and `EXEMPLARS` env knobs; auto-suffixes the TAG so outputs don't clobber the v2 raw runs. Landed as `scripts/eval_hyperparam_sweep.sh`.
-- [ ] `scripts/eval_hyperparam_aggregate.py` — small extension to the aggregator that pools across hyperparameter axis and plots single-axis sensitivity curves. The plot is paper Figure F3.
+- [x] `scripts/eval_brute_force_clip.py` — for E11. Embed every frame of a session, rank all frames by cosine against the query, take top-k. Use the same scorer as `eval_lookback.py` so numbers are directly comparable. Landed; ran on Nymeria `shelby_arroyo_act0` (13.4% Hit@5).
+- [x] `scripts/eval_sliding_window.py` — for E11. Slide 5-second windows, mean-pool frame embeddings inside each window, rank windows. Same scorer. Script landed; Nymeria sweep still pending (needs the `--clip-checkpoint` threading that brute-force got in `00d6383`).
+- [x] `scripts/eval_uniform_sample.py` — for E11. 1-frame-per-time-window sampling, no learned aggregation. Lower-bound baseline. Script landed; Nymeria sweep still pending (same `--clip-checkpoint` threading as sliding-window).
+- [x] Hyperparameter sweep loop on top of `eval_bigg_all.sh` — for E12. Adds `H3_RESOLUTION`, `RETENTION` (as `TIME_WINDOW × CAPACITY`), and `EXEMPLARS` env knobs; auto-suffixes the TAG so outputs don't clobber the v2 raw runs. Landed as standalone `scripts/eval_hyperparam_sweep.sh`.
+- [x] `scripts/eval_hyperparam_aggregate.py` — small extension to the aggregator that pools across hyperparameter axis and plots single-axis sensitivity curves. The plot is paper Figure F3. Landed as `scripts/eval_hyperparam_plot.py`; F3 SVG at `journal/figures/hyperparam_sensitivity.svg`.
 
 ### MLLM in the loop
 
-- [x] `scripts/_mllm_client.py` — uniform interface over Gemini 3 Pro API, GPT-5 API, and a locally-served vLLM endpoint (for Llama-3.2-90B-Vision or InternVL3.5). Returns predicted `[t_start, t_end]` intervals from (video_path, question). Hides the API-vs-local-serving difference from the caller.
-- [ ] `scripts/eval_mllm_baseline.py` — for E10. Run `mllm_client` over the (session, question) grid, parse intervals, score with the same IoU scorer.
-- [ ] Frozen prompting protocol (text + 2-shot exemplars) for interval elicitation. Store as `prompts/grounding_v1.txt`; pin the protocol in PAPER.md once it's frozen so reviewers can audit.
-- [x] `scripts/eval_psm_mllm.py` — for E5. PSM -> MLLM re-ranking eval harness. Run PSM, take top-k `(cell, t_start, t_end)`, sample N evidence frames per candidate, feed (question, evidence frames) to the MLLM, return predicted interval. Score with the same scorer.
+- [x] `scripts/mllm_client.py` — uniform interface over Gemini 3 Pro API, GPT-5 API, and a locally-served vLLM endpoint (for Llama-3.2-90B-Vision or InternVL3.5). Returns predicted `[t_start, t_end]` intervals from (video_path, question). Hides the API-vs-local-serving difference from the caller. Landed as `scripts/_mllm_client.py`; covers Gemini 3.1 Pro + Claude 4.6 Opus via the internal OpenAI-compat proxy. GPT-5 / open-source vLLM still not wired.
+- [ ] `scripts/eval_mllm_baseline.py` — for E10. Run `mllm_client` over the (session, question) grid, parse intervals, score with the same IoU scorer. (Vanilla-MLLM baseline — distinct from the PSM→MLLM reranker `eval_psm_mllm.py` that already landed.)
+- [x] Frozen prompting protocol (text + 2-shot exemplars) for interval elicitation. Store as `prompts/grounding_v1.txt`; pin the protocol in PAPER.md once it's frozen so reviewers can audit. Landed inline as `_FROZEN_PROMPT_TEMPLATE` in `scripts/eval_psm_mllm.py`; reranker-only (frame-index style), no 2-shot exemplars and no separate `prompts/` file yet. Extract + add exemplars before E10 ships.
+- [x] `scripts/eval_psm_mllm_pipeline.py` — for E5. Run PSM, take top-k `(cell, t_start, t_end)`, sample N evidence frames per candidate, feed (question, evidence frames) to the MLLM, return predicted interval. Score with the same scorer. Landed as `scripts/eval_psm_mllm.py` (commits `471e4ab`/`d051757`).
 
 ### Question bank expansion
 
