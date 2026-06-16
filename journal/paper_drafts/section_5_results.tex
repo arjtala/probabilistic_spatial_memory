@@ -35,7 +35,11 @@ questions a wearable user would naturally phrase. We use them
 because they are the largest available source of frame-grounded
 text with stable timestamps. External validity to natural look-back
 queries authored over outdoor wearer-mobility recordings is an
-explicit open direction (\S\ref{sec:conclusion}). The full subset
+explicit open direction (\S\ref{sec:conclusion}). Dedicated
+temporally-grounded benchmarks such as TGLG~\cite{yu2025tglg} and
+gaze-augmented variants like GazeNLQ~\cite{lin2025gazenlq} define
+what fully-grounded egocentric QA looks like; evaluating PSM against
+these is an explicit follow-up direction. The full subset
 on the cluster comprises 30 sessions
 ($\sim$5{,}600 narrations total) ranging from 0.7\,m to 69\,m wearer
 bounding-box extent. We report main results on the single
@@ -136,7 +140,9 @@ narrations, $162$ are revisit-heavy and visually indistinguishable
 to CLIP cosine (\S\ref{sec:results-memory-latency}). This is
 consistent with recent theoretical work showing that the top-$k$
 subsets a single-vector embedding can return are
-dimension-bounded~\cite{weller2025limit}: at fixed CLIP-L
+dimension-bounded~\cite{weller2025limit}, and with empirical
+evidence that CLIP maps visually distinct frames to $>$0.99 cosine
+similarity~\cite{li2025erroneous}: at fixed CLIP-L
 dim 768, certain query/answer pairings are not representable as
 ``query within $\epsilon$ of answer'' regardless of training data,
 and \psm{}'s substrate inherits this expressivity bound from the

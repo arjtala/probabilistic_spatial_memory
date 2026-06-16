@@ -33,13 +33,21 @@ underscores the hardness of egocentric streaming retrieval. Our
 contribution is structurally orthogonal: we provide a bounded-memory
 spatial-temporal
 substrate that any of these MLLM grounding methods can rerank, rather
-than retraining a new grounding head.
+than retraining a new grounding head. This PSM$\to$MLLM composition
+is an instance of the video retrieval-augmented generation (VideoRAG)
+pattern~\cite{jeong2025videorag}.
 
 \paragraph{Memory-augmented video LLMs.}
 MovieChat~\cite{song2024moviechat}, MA-LMM~\cite{he2024malmm},
 Flash-VStream~\cite{zhang2024flashvstream}, and
 LifelongMemory~\cite{wang2024lifelongmemory} all address bounded-
-memory long-video understanding. They differ from \psm{} in two
+memory long-video understanding. More recent work tightens the bound:
+HERMES~\cite{zhang2026hermes} arranges the KV cache itself as
+hierarchical memory, InfiniPot-V~\cite{kim2025infinipotv} imposes a
+training-free hard memory cap with 94\% reduction, and
+SAVEMem~\cite{wu2025savemem} introduces a 3-tier semantic-aware
+retention structure. These operate inside the MLLM's token space;
+\psm{} operates upstream of it. They differ from \psm{} in two
 important ways. First, they bound memory in \emph{token} space:
 dense-to-sparse merging inside the LLM forward pass, KV-cache
 compression, or recurrent state. \psm{} bounds memory in
