@@ -104,15 +104,12 @@ sliding/uniform Aria-internal numbers may suffice. **Decision:**
 ship sliding/uniform numbers in §5.4 (Memory ablation) footnote
 rather than a full table, to preserve page count.
 
-### Bib placeholders to resolve
+### Bib placeholders — resolved
 
-4 entries still `PLACEHOLDER` in references.bib:
-  - `localization-paradox-2026` (load-bearing for §1, §3)
-  - `nymeria` (load-bearing for §4.1)
-  - `turboquant` (cited in §2.3)
-  - `aria-gen2-pilot` (cited in §7 follow-ups)
-
-R2 top priority. Replace with canonical citations before submission.
+- `nymeria` → resolved as `ma2024nymeria`
+- `aria-gen2-pilot` → resolved (direct entry added)
+- `localization-paradox-2026` → dropped; the paradox is framed descriptively in §1/§3 without citing the unpublished source
+- `turboquant` → dropped; TurboQuant's quantization approach is cited via `aguerrebere2024lvq` (locally-adaptive vector quantization)
 
 ### Figure 1 dual-axis → stacked subplots (R1)
 

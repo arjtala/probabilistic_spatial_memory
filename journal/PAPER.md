@@ -99,8 +99,7 @@ the bounded-memory framing above. The new critical path:
 1. ~~**E11 (naive baselines)**~~ — done. Brute-force CLIP gets 80% Hit @5
    on bigG vs PSM 83%, statistically indistinguishable. Sliding-window
    at 3-10s holds 67-75%. Uniform-sample collapses to 15-42% as the
-   trivial floor. Detailed table in `journal/eccv2026_paper_plan.md`
-   status section.
+   trivial floor. Detailed table in the status section below.
 2. **E7-bounded-memory data (item 7)** is now the highest-priority
    unstarted experiment. The paper claim shifts from accuracy to
    memory/latency, so we need the numbers that make that claim. Quick:

@@ -9,7 +9,7 @@
 
 ## TL;DR
 
-Probabilistic Spatial Memeory (PSM) is a bounded, time-decayed spatial-memory engine built on HyperLogLog sketches over an H3 hex grid. It is structurally a candidate for closing the **localization paradox** in streaming egocentric memory, i.e. the gap between an MLLM's *semantic* answer ("you saw a yellow bus") and its near-zero *temporal grounding*, the `[t_start, t_end]` interval that proves it.
+Probabilistic Spatial Memory (PSM) is a bounded, time-decayed spatial-memory engine built on HyperLogLog sketches over an H3 hex grid. It is structurally a candidate for closing the **localization paradox** in streaming egocentric memory, i.e. the gap between an MLLM's *semantic* answer ("you saw a yellow bus") and its near-zero *temporal grounding*, the `[t_start, t_end]` interval that proves it.
 
 The term comes from a forthcoming streaming egocentric memory benchmark (the "Localization Paradox benchmark" after its headline finding), which evaluates frontier MLLMs (Gemini 3 Pro, GPT-5, InternVL 3.5) on 20K+ hand-annotated "look-back" QA pairs over 613 hours of unscripted Ray-Ban-style smart-glasses video. The headline finding is that frontier models reach 27–50% *semantic* accuracy but their *temporal grounding* `mIoU` against the ground-truth `[t_start, t_end]` intervals collapses to near zero — and the paper's discussion section calls explicitly for "adaptive temporal indexing… and hierarchical memory buffers that can compress hours of video without losing the granular detail of momentary 'needle' events," which is exactly the architectural shape PSM provides.
 

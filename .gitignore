@@ -18,3 +18,10 @@ datasets/
 captures/
 annotation/
 texput.log
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.log
+*.out

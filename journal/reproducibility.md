@@ -7,7 +7,7 @@ Companion runbook to `localization_paradox.md`. Everything here is one-time setu
 ## Prereqs
 
 ```bash
-conda activate psm
+# activate your Python environment with psm-extraction[clip,viz] installed
 pip install -e extraction[clip,viz]
 ```
 
