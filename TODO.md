@@ -169,7 +169,7 @@ Context: a forthcoming streaming egocentric memory benchmark (the "Localization 
 - [x] `scripts/eval_lookback.py` `query_mode: last_seen` field — routes through `psm --last-seen` for true location_trace questions, bypassing CLIP entirely. Demonstrated bucket Hit@5 = 100% deterministic on Palo Alto q9.
 - [x] `scripts/eval_lookback.py` `count: <int>` and `expected: <string>` fields — counting and categorical answers, recorded per-record (counting flagged diagnostic-only pending a real cardinality scorer).
 - [x] `scripts/extract_bigg_all.sh` + `scripts/eval_bigg_all.sh` — paired encoder seed sweeps (CLIP-L vs OpenCLIP-bigG), powering the v2 follow-up writeup.
-- [x] TurboQuant->PSM experiment (E9): compare raw float32 exemplar reservoirs against 2/3/4-bit TurboQuant-style compressed exemplars for `psm --search`, reporting top-k cell overlap, rank stability, cosine error, bytes/tile, and query latency. Result on bigG, 3 sessions × 5 seeds × 20 questions: Hit@5 statistically flat across all four codecs (raw 83.0±2.7%, tq2 81.0±4.2%); top-5 cell-set Jaccard 0.88 (4-bit) → 0.77 (2-bit); 4.9–9.7× exemplar-memory reduction. Full breakdown in `datasets/localization_paradox2.md` § G; summary in `EXPERIMENTS.md` § E9 Result.
+- [x] TurboQuant->PSM experiment (E9): compare raw float32 exemplar reservoirs against 2/3/4-bit TurboQuant-style compressed exemplars for `psm --search`, reporting top-k cell overlap, rank stability, cosine error, bytes/tile, and query latency. Result on bigG, 3 sessions × 5 seeds × 20 questions: Hit@5 statistically flat across all four codecs (raw 83.0±2.7%, tq2 81.0±4.2%); top-5 cell-set Jaccard 0.88 (4-bit) → 0.77 (2-bit); 4.9–9.7× exemplar-memory reduction. Full breakdown in `journal/localization_paradox2.md` § G; summary in `EXPERIMENTS.md` § E9 Result.
 - [x] Add an exemplar codec boundary (`raw_f32` first, then TurboQuant-style bitpacked payloads) so `TileExemplar` can store compressed embeddings without changing the HLL counting path. Landed as `core/exemplar_codec.{h,c}` with `EXEMPLAR_CODEC_RAW`; threaded through `Tile_new` / `SpatialMemory_new` and consumed by `SpatialMemory_query_similar`. Adding a TurboQuant codec is now a localized change.
 - [x] Faithful TurboQuant codecs (`turboquant_{2,3,4}b`): randomized Hadamard transform + Lloyd-Max-optimal quantization, bit-packed payload. Wired through `--exemplar-codec` CLI + `"exemplar_codec"` / `"exemplar_payload_bytes"` JSON fields. Smoke test on a CLIP-512 session: top-1 cell preserved at 4-bit (273 B/exemplar, 7.5x reduction vs raw 2048 B) and at 2-bit (145 B, 14x).
 - [x] Extend `benchmarks/benchmark_spatial_memory.c` or add a small query-bank script to sweep exemplar codec, bit budget, and reservoir size against the raw-float32 baseline. Done on the question-bank side via `scripts/eval_codec_drift.py` + the 4-codec sweep through `eval_bigg_all.sh CODEC=...`; the in-engine bytes/tile + median µs sweep in `benchmark_spatial_memory.c` is still open and tracked under E9 follow-ups in EXPERIMENTS.md.
@@ -231,8 +231,6 @@ After losing ~18 minutes of DINOv3 inference to a poorly-timed `pkill`, shipped 
 
 ### Phase 4 — Polish
 
-### Phase 4 — Polish
-
 - [ ] V-JEPA 2 `prediction_maps` — currently the runner emits encoder embeddings only. The original Aria pipeline produced 16×16 prediction-error maps via the JEPA predictor head against context+target patch sampling. Re-enables the JEPA prediction-error overlay in `psm-viz`. ~200 LOC + careful reading of V-JEPA 2's loss path.
 - [ ] Per-model `--sample-fps` — the orchestrator currently shares one frame-extraction pass across all runners. Adding per-model rates lets a single command produce DINO at 30 fps + JEPA at 0.5 fps in one run, matching the original pipeline's pattern without merging two output files.
 - [ ] `add-group` subcommand: append a new model group to an existing v2 file (closes the Level 3 merge with the existing Aria pipeline once a CLIP runner exists)
@@ -250,18 +248,18 @@ This section is just for the harness/glue code those experiments need.
 
 ### Baselines + sweeps
 
-- [ ] `scripts/eval_brute_force_clip.py` — for E11. Embed every frame of a session, rank all frames by cosine against the query, take top-k. Use the same scorer as `eval_lookback.py` so numbers are directly comparable.
-- [ ] `scripts/eval_sliding_window.py` — for E11. Slide 5-second windows, mean-pool frame embeddings inside each window, rank windows. Same scorer.
-- [ ] `scripts/eval_uniform_sample.py` — for E11. 1-frame-per-time-window sampling, no learned aggregation. Lower-bound baseline.
-- [ ] Hyperparameter sweep loop on top of `eval_bigg_all.sh` — for E12. Adds `H3_RESOLUTION`, `RETENTION` (as `TIME_WINDOW × CAPACITY`), and `EXEMPLARS` env knobs; auto-suffixes the TAG so outputs don't clobber the v2 raw runs.
+- [x] `scripts/eval_brute_force_clip.py` — for E11. Embed every frame of a session, rank all frames by cosine against the query, take top-k. Use the same scorer as `eval_lookback.py` so numbers are directly comparable.
+- [x] `scripts/eval_sliding_window.py` — for E11. Slide 5-second windows, mean-pool frame embeddings inside each window, rank windows. Same scorer.
+- [x] `scripts/eval_uniform_sample.py` — for E11. 1-frame-per-time-window sampling, no learned aggregation. Lower-bound baseline.
+- [x] Hyperparameter sweep loop on top of `eval_bigg_all.sh` — for E12. Adds `H3_RESOLUTION`, `RETENTION` (as `TIME_WINDOW × CAPACITY`), and `EXEMPLARS` env knobs; auto-suffixes the TAG so outputs don't clobber the v2 raw runs. Landed as `scripts/eval_hyperparam_sweep.sh`.
 - [ ] `scripts/eval_hyperparam_aggregate.py` — small extension to the aggregator that pools across hyperparameter axis and plots single-axis sensitivity curves. The plot is paper Figure F3.
 
 ### MLLM in the loop
 
-- [ ] `scripts/mllm_client.py` — uniform interface over Gemini 3 Pro API, GPT-5 API, and a locally-served vLLM endpoint (for Llama-3.2-90B-Vision or InternVL3.5). Returns predicted `[t_start, t_end]` intervals from (video_path, question). Hides the API-vs-local-serving difference from the caller.
+- [x] `scripts/_mllm_client.py` — uniform interface over Gemini 3 Pro API, GPT-5 API, and a locally-served vLLM endpoint (for Llama-3.2-90B-Vision or InternVL3.5). Returns predicted `[t_start, t_end]` intervals from (video_path, question). Hides the API-vs-local-serving difference from the caller.
 - [ ] `scripts/eval_mllm_baseline.py` — for E10. Run `mllm_client` over the (session, question) grid, parse intervals, score with the same IoU scorer.
 - [ ] Frozen prompting protocol (text + 2-shot exemplars) for interval elicitation. Store as `prompts/grounding_v1.txt`; pin the protocol in PAPER.md once it's frozen so reviewers can audit.
-- [ ] `scripts/eval_psm_mllm_pipeline.py` — for E5. Run PSM, take top-k `(cell, t_start, t_end)`, sample N evidence frames per candidate, feed (question, evidence frames) to the MLLM, return predicted interval. Score with the same scorer.
+- [x] `scripts/eval_psm_mllm.py` — for E5. PSM -> MLLM re-ranking eval harness. Run PSM, take top-k `(cell, t_start, t_end)`, sample N evidence frames per candidate, feed (question, evidence frames) to the MLLM, return predicted interval. Score with the same scorer.
 
 ### Question bank expansion
 

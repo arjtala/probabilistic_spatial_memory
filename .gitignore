@@ -17,3 +17,4 @@ __pycache__/
 datasets/
 captures/
 annotation/
+texput.log
