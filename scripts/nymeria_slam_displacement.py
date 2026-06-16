@@ -89,7 +89,16 @@ def bbox_extent_m(vals: list[float]) -> float:
 
 
 def main() -> int:
-    root = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_ROOT
+    import argparse
+    ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
+    ap.add_argument("root", nargs="?", type=Path, default=DEFAULT_ROOT,
+                    help=f"Nymeria release root (default {DEFAULT_ROOT})")
+    ap.add_argument("--min-extent", type=float, default=0.0,
+                    help="only list sessions whose 3D bbox extent (m) >= this")
+    ap.add_argument("--summary", action="store_true",
+                    help="also print a count histogram by H3 resolution")
+    args = ap.parse_args()
+    root = args.root
     if not root.is_dir():
         print(f"ERR: {root} not a directory", file=sys.stderr)
         return 1
@@ -123,17 +132,40 @@ def main() -> int:
         rows.append((ext3d, d.name, (integ, ext3d, ext_xy, dx, dy, dz, spans)))
 
     rows.sort(key=lambda r: -r[0])
+    n_listed = 0
+    n_no_traj = 0
     for _, name, info in rows:
         if info is None:
-            print(f"{name:<55s} (no SLAM trajectory)")
+            n_no_traj += 1
+            if args.min_extent <= 0.0:
+                print(f"{name:<55s} (no SLAM trajectory)")
             continue
         integ, ext3d, ext_xy, dx, dy, dz, spans = info
+        if ext3d < args.min_extent:
+            continue
+        n_listed += 1
         print(f"{name:<55s} "
               f"{integ:>8.1f} {ext3d:>8.2f} {ext_xy:>7.2f} "
               f"{dx:>6.2f} {dy:>6.2f} {dz:>6.2f} "
               f"{spans[10]:>5s} {spans[11]:>5s} {spans[12]:>5s} {spans[13]:>5s} {spans[14]:>5s}")
 
     print()
+    print(f"# scanned {len(sessions)} entries, {n_no_traj} without SLAM, "
+          f"{n_listed} listed (min_extent={args.min_extent}m)")
+    if args.summary:
+        bins = {r: 0 for r in (10, 11, 12, 13, 14)}
+        n_with_traj = 0
+        for _, _, info in rows:
+            if info is None:
+                continue
+            n_with_traj += 1
+            ext3d = info[1]
+            for r in (10, 11, 12, 13, 14):
+                if ext3d >= _H3_EDGE_M[r]:
+                    bins[r] += 1
+        print(f"# of {n_with_traj} sessions with SLAM trajectory:")
+        for r in (10, 11, 12, 13, 14):
+            print(f"#   >= r{r} edge ({_H3_EDGE_M[r]}m): {bins[r]}")
     print("# integ_m   = Σ‖step‖, matches metadata.json's head_trajectory_m")
     print("# ext3D_m   = sqrt(dx² + dy² + dz²), bounding-box diagonal")
     print("# ext_xy    = ground-plane bbox diagonal (tx, ty only)")

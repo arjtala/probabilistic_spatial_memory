@@ -37,10 +37,13 @@ from pathlib import Path
 # Examples:  h3_res_10_1501677363692556_bigG_s0.json
 #            retention_75x12_201703061033_bigG_s3.json
 #            exemplars_128_287142033569927_bigG_s4.json
+#            h3_res_10_20230607_s0_james_johnson_act0_e72nhq_clipL_s0.json
+# `sid` can contain underscores (Nymeria); anchor on the trailing
+# `_<encoder>_s<digits>.json` and take everything between as the sid.
 FNAME_RE = re.compile(
     r"^(?P<axis>h3_res|retention|exemplars)_"
     r"(?P<label>[^_]+)_"
-    r"(?P<sid>\d+)_"
+    r"(?P<sid>.+)_"
     r"(?P<encoder>[^_]+)_"
     r"s(?P<seed>\d+)\.json$"
 )
