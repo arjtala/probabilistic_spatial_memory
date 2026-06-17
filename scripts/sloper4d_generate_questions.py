@@ -40,12 +40,20 @@ from _mllm_client import Mllm, call_mllm  # noqa: E402
 
 
 _CAPTION_PROMPT = (
-    "You are looking at one frame of an egocentric video taken with a "
-    "head-mounted camera. The wearer is walking or running outdoors at a "
-    "university campus. Describe what the wearer can SEE in this frame in "
-    "ONE concise sentence (≤20 words). Focus on visible objects, "
-    "landmarks, and the scene type. Do not include preamble; start "
-    "directly with the description."
+    "You are looking at one frame of an egocentric video from a runner "
+    "on a university campus. Describe the SINGLE most visually "
+    "distinctive feature you can identify in this frame — a specific "
+    "object (sign, building, landmark, sculpture, vehicle, person doing "
+    "something specific), visible text or numbers, or an unusual "
+    "viewpoint. Avoid generic scene words like 'path', 'trees', 'sky', "
+    "'grass', 'person walking', 'cloudy'. One concise sentence, ≤20 "
+    "words. Start directly with the description, no preamble."
+)
+
+_ANTI_EXAMPLE_SUFFIX = (
+    "\n\nIMPORTANT: avoid descriptions that would also fit any of these "
+    "earlier frames from the same recording. Pick a DIFFERENT "
+    "distinguishing detail.\n"
 )
 
 
@@ -89,6 +97,10 @@ def main() -> int:
     ap.add_argument("--iou-threshold", type=float, default=0.3)
     ap.add_argument("--seed", type=int, default=0,
                     help="numpy seed for evenly-spaced-but-jittered timestamp picking")
+    ap.add_argument("--anti-example-k", type=int, default=5,
+                    help="inject the last K captions as anti-examples to force "
+                         "the MLLM toward distinguishing details (default 5; "
+                         "set to 0 to disable)")
     args = ap.parse_args()
 
     # Load timestamps + session_id from the H5.
@@ -164,11 +176,24 @@ def main() -> int:
             jpg = td_path / f"frame_{i:03d}.jpg"
             _decode_frame_at_timestamp(args.video, float(ts), jpg)
             b64 = _jpg_to_b64(jpg)
+            # Build the prompt with anti-example captions from the
+            # last K already-captioned frames. Forces Gemini to pick
+            # a distinguishing detail rather than re-describing the
+            # same scenery primitives ("paved path / sky / trees").
+            recent_captions = [
+                q["query"] for q in questions[-args.anti_example_k:]
+                if isinstance(q, dict) and q.get("query")
+            ]
+            if recent_captions:
+                anti_block = "\n".join(f"- {c}" for c in recent_captions)
+                prompt = _CAPTION_PROMPT + _ANTI_EXAMPLE_SUFFIX + anti_block
+            else:
+                prompt = _CAPTION_PROMPT
             try:
                 caption = call_mllm(
                     model=model,
                     frames_b64=[b64],
-                    prompt=_CAPTION_PROMPT,
+                    prompt=prompt,
                 ).strip()
             except Exception as e:
                 print(f"  WARN: caption failed at ts={ts}: {e}", file=sys.stderr)
