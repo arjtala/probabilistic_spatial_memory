@@ -103,7 +103,7 @@ for enc in $ENCODERS; do
 done
 
 echo
-python "$REPO/scripts/sloper4d_h3_acceptance.py" \
+python "$REPO/scripts/h3_acceptance.py" \
   --captures "$CAPTURES" \
   --sequence "$SEQ"
 

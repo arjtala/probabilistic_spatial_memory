@@ -97,7 +97,7 @@ done
 # both encoders). Standalone script so the local + sbatch drivers
 # share the same verdict logic.
 echo
-python "$REPO/scripts/sloper4d_h3_acceptance.py" \
+python "$REPO/scripts/h3_acceptance.py" \
   --captures "$CAPTURES" \
   --sequence "$SEQ"
 

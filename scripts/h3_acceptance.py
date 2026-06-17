@@ -16,7 +16,7 @@ Rationale (why not a ratio threshold):
   claim independent of encoder baseline strength.
 
 Usage:
-    python scripts/sloper4d_h3_acceptance.py \\
+    python scripts/h3_acceptance.py \\
         --captures captures/sloper4d_seq009_running_002_h3 \\
         --sequence seq009_running_002
 
