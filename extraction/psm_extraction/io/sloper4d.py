@@ -162,12 +162,14 @@ def load_lidar_trajectory(
 def find_video(sequence_dir: Path) -> Path | None:
     """Find the egocentric RGB video in a SLOPER4D sequence.
 
-    Returns the first .mp4 under ``rgb_data/``, or None if missing.
+    Returns the first ``.mp4`` / ``.MP4`` under ``rgb_data/``, or None
+    if missing. SLOPER4D archives ship uppercase ``.MP4`` extensions
+    (the DJI-Action2 default); accept both for robustness.
     """
     rgb_dir = sequence_dir / "rgb_data"
     if not rgb_dir.exists():
         return None
-    videos = sorted(rgb_dir.glob("*.mp4"))
+    videos = sorted(rgb_dir.glob("*.mp4")) + sorted(rgb_dir.glob("*.MP4"))
     return videos[0] if videos else None
 
 

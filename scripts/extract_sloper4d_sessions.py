@@ -90,8 +90,11 @@ def main() -> int:
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # Write a temporary GPS JSON sidecar in Aria format so the
-        # existing orchestrator's align.py can consume it
-        _write_gps_sidecar(traj, out_dir / "gps.json")
+        # existing orchestrator's align.py can consume it. The extract
+        # CLI auto-detects sidecars at `<video_dir>/gps.json`, so place
+        # it next to the MP4 (and clean up afterwards).
+        sidecar_path = video.parent / "gps.json"
+        _write_gps_sidecar(traj, sidecar_path)
 
         # Run extraction via the standard CLI
         import subprocess
@@ -104,16 +107,18 @@ def main() -> int:
             "--sample-fps", str(args.fps),
             "--segment-sec", "1",
             "--session-id", name,
+            "--gps-json", str(sidecar_path),
         ]
-        print(f"  running: {' '.join(cmd[-8:])}", file=sys.stderr)
+        print(f"  running: {' '.join(cmd[-10:])}", file=sys.stderr)
         result = subprocess.run(cmd, check=False)
         if result.returncode != 0:
             print(f"  ERR: extraction failed (rc={result.returncode})",
                   file=sys.stderr)
+            sidecar_path.unlink(missing_ok=True)
             continue
 
         # Clean up temporary sidecar
-        (out_dir / "gps.json").unlink(missing_ok=True)
+        sidecar_path.unlink(missing_ok=True)
 
         print(f"  ✓ {out_h5}", file=sys.stderr)
 
