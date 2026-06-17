@@ -55,10 +55,22 @@ def main() -> int:
 
     print(f"[sloper4d] {len(all_seqs)} sequences to extract", file=sys.stderr)
 
+    # Derive output filename from checkpoint so clipL and bigG land in
+    # different H5 files alongside each other (matches the convention
+    # used by Aria / Nymeria extraction).
+    if "ViT-L-14" in args.checkpoint:
+        h5_basename = "clip_l_features.h5"
+    elif "bigG-14" in args.checkpoint:
+        h5_basename = "clip_bigg_features.h5"
+    else:
+        # Fallback: derive a sanitized name from the last path segment.
+        slug = args.checkpoint.rsplit("/", 1)[-1].lower().replace("-", "_")
+        h5_basename = f"{slug}_features.h5"
+
     for seq_dir in all_seqs:
         name = seq_dir.name
         out_dir = out_root / name
-        out_h5 = out_dir / "clip_l_features.h5"
+        out_h5 = out_dir / h5_basename
 
         if out_h5.exists():
             print(f"[sloper4d] {name}: already extracted, skipping",
