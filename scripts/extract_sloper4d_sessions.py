@@ -108,6 +108,20 @@ def main() -> int:
         sidecar_path = video.parent / "gps.json"
         _write_gps_sidecar(traj, sidecar_path)
 
+        # Encoder-specific frames dir so concurrent clipL + bigG runs
+        # against the same sequence don't race on the orchestrator's
+        # default <out>/frames cleanup. (Whoever finishes first
+        # rmtree's the dir from under the other.) `--keep-frames`
+        # leaves them on disk after the run so a follow-up rerun for
+        # the *same* encoder is a cache hit. The dirs are encoder-
+        # scoped, so the clipL run never touches bigG's frames.
+        if "bigG-14" in args.checkpoint:
+            frames_dir = out_dir / "frames_bigg"
+        elif "ViT-L-14" in args.checkpoint:
+            frames_dir = out_dir / "frames_clipl"
+        else:
+            frames_dir = out_dir / f"frames_{h5_basename.rsplit('.', 1)[0]}"
+
         # Run extraction via the standard CLI
         import subprocess
         cmd = [
@@ -120,8 +134,10 @@ def main() -> int:
             "--segment-sec", "1",
             "--session-id", name,
             "--gps-json", str(sidecar_path),
+            "--frames-dir", str(frames_dir),
+            "--keep-frames",
         ]
-        print(f"  running: {' '.join(cmd[-10:])}", file=sys.stderr)
+        print(f"  running: {' '.join(cmd[-14:])}", file=sys.stderr)
         result = subprocess.run(cmd, check=False)
         if result.returncode != 0:
             print(f"  ERR: extraction failed (rc={result.returncode})",
