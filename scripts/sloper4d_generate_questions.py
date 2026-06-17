@@ -119,9 +119,48 @@ def main() -> int:
     print(f"[sloper4d-qg] {session_id}: picking {n_q} frames; using {model.name}", file=sys.stderr)
 
     questions: list[dict] = []
+    # Stream questions to disk after every successful caption so a
+    # mid-run cancellation (or an MLLM transient) doesn't lose all
+    # the prior work. On rerun, we re-load and resume from the next
+    # un-captioned frame instead of paying for already-done frames.
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    if args.out.exists():
+        try:
+            existing = yaml.safe_load(args.out.read_text()) or {}
+            existing_q = existing.get("questions") or []
+            done_ids = {q.get("id") for q in existing_q if isinstance(q, dict)}
+            questions = list(existing_q)
+            if done_ids:
+                print(
+                    f"[sloper4d-qg] resuming: {len(done_ids)} questions already on disk",
+                    file=sys.stderr,
+                )
+        except Exception as e:
+            print(f"[sloper4d-qg] WARN: could not parse existing {args.out}: {e}", file=sys.stderr)
+            questions = []
+
+    done_ids = {q.get("id") for q in questions if isinstance(q, dict)}
+
+    def _flush() -> None:
+        out_doc = {
+            "session_id": session_id,
+            "session_start_unix": 0.0,
+            "iou_threshold": float(args.iou_threshold),
+            "questions": questions,
+        }
+        # Atomic write: write to .tmp then rename, so a kill mid-write
+        # never leaves a corrupted yaml on disk.
+        tmp = args.out.with_suffix(args.out.suffix + ".tmp")
+        with open(tmp, "w") as f:
+            yaml.safe_dump(out_doc, f, sort_keys=False, allow_unicode=True)
+        tmp.replace(args.out)
+
     with tempfile.TemporaryDirectory() as td:
         td_path = Path(td)
         for i, ts in enumerate(picked_ts):
+            qid = f"q{i+1}"
+            if qid in done_ids:
+                continue
             jpg = td_path / f"frame_{i:03d}.jpg"
             _decode_frame_at_timestamp(args.video, float(ts), jpg)
             b64 = _jpg_to_b64(jpg)
@@ -139,23 +178,13 @@ def main() -> int:
             t_lo = max(0.0, float(ts) - args.interval_half_window_sec)
             t_hi = float(ts) + args.interval_half_window_sec
             questions.append({
-                "id": f"q{i+1}",
+                "id": qid,
                 "query": caption,
                 "intervals": [[round(t_lo, 3), round(t_hi, 3)]],
                 "notes": f"auto-captioned via {model.name} at ts={ts:.3f}s (frame_idx={int(idx_picks[i])})",
             })
+            _flush()
             print(f"  q{i+1} (ts={ts:.1f}s): {caption[:80]}", file=sys.stderr)
-
-    out_doc = {
-        "session_id": session_id,
-        "session_start_unix": 0.0,
-        "iou_threshold": float(args.iou_threshold),
-        "questions": questions,
-    }
-
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    with open(args.out, "w") as f:
-        yaml.safe_dump(out_doc, f, sort_keys=False, allow_unicode=True)
 
     print(f"[sloper4d-qg] wrote {len(questions)} questions to {args.out}", file=sys.stderr)
     return 0
