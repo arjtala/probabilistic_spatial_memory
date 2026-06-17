@@ -9,22 +9,25 @@
 #SBATCH --output=logs/sloper4d_h3_%j.out
 #SBATCH --error=logs/sloper4d_h3_%j.err
 #
-# Run the SLOPER4D seq009 H3-resolution acceptance test (steps 2 + 3
-# of scripts/sloper4d_seq009_acceptance.sh). Step 1 (Gemini frame
+# Run the SLOPER4D H3-resolution acceptance test (steps 2 + 3 of
+# scripts/sloper4d_acceptance.sh). Step 1 (Gemini frame
 # captioning) is intentionally NOT included here — it needs internet
 # access for the proxy and a GEMINI_API_KEY. Run that locally first
 # so questions.yaml lands on disk; this job then assumes the file
 # exists and goes straight to the H3-res sweep.
 #
 # Sweep shape: 5 seeds × 5 H3 values × {clipL, bigG} = 50 eval_lookback
-# invocations on questions.yaml (20 questions × CLIP text encode). On
-# h200 with a warm HF cache: ~2-5 min total wall time.
+# invocations on questions.yaml (N questions × CLIP text encode). On
+# h200 with a warm HF cache: ~10-15 min total wall time.
 #
-# Submit AFTER questions.yaml exists at
-#   /checkpoint/.../sloper4d/seq009_running_002/questions.yaml
+# Submit AFTER questions.yaml exists at $OUT_ROOT/$SEQ/questions.yaml
 #
-# Submit:
-#   sbatch scripts/slurm/sloper4d_seq009_h3.sbatch
+# Submit (defaults to seq009_running_002):
+#   sbatch scripts/slurm/sloper4d_h3.sbatch
+#
+# For other sequences:
+#   sbatch --export=SEQ=seq008_running_001 scripts/slurm/sloper4d_h3.sbatch
+#   sbatch --export=SEQ=seq003_street_002  scripts/slurm/sloper4d_h3.sbatch
 
 set -euo pipefail
 
@@ -44,7 +47,7 @@ cd "${SLURM_SUBMIT_DIR:-$(pwd)}"
 mkdir -p logs
 
 REPO="$(pwd)"
-CAPTURES="$REPO/captures/sloper4d_seq009_h3"
+CAPTURES="$REPO/captures/sloper4d_${SEQ}_h3"
 QUESTIONS="$OUT_ROOT/$SEQ/questions.yaml"
 
 echo "[slurm] job=$SLURM_JOB_ID host=$(hostname) gpu=${CUDA_VISIBLE_DEVICES:-none}"
@@ -87,58 +90,16 @@ done
 for enc in $ENCODERS; do
   python "$REPO/scripts/eval_hyperparam_plot.py" "$CAPTURES" \
     --encoder "$enc" \
-    --out "$REPO/journal/figures/sloper4d_seq009_h3_${enc}.svg" || true
+    --out "$REPO/journal/figures/sloper4d_${SEQ}_h3_${enc}.svg" || true
 done
 
-# Acceptance check (same logic as the local acceptance script).
+# Acceptance check (curve monotonic + ≥5pp r10→r12 absolute lift,
+# both encoders). Standalone script so the local + sbatch drivers
+# share the same verdict logic.
 echo
-echo "━━━ Acceptance check ━━━"
-python - <<'PY'
-import glob, json, re, sys
-from collections import defaultdict
-from pathlib import Path
-
-CAPS = Path("captures/sloper4d_seq009_h3")
-fname_re = re.compile(
-    r"^h3_res_(?P<label>[^_]+)_seq009_running_002_(?P<enc>clipL|bigG)_s(?P<seed>\d+)\.json$"
-)
-
-by_cell = defaultdict(list)
-for p in sorted(CAPS.glob("h3_res_*.json")):
-    m = fname_re.match(p.name)
-    if not m:
-        continue
-    enc = m["enc"]
-    res = int(m["label"])
-    d = json.loads(p.read_text())
-    rate = d.get("summary", {}).get("exemplar_hit_rate_at_5")
-    if rate is None:
-        continue
-    by_cell[(enc, res)].append(rate)
-
-print(f"{'encoder':6s}  {'r10 mean':9s}  {'r12 mean':9s}  {'ratio':7s}  verdict")
-print("-" * 60)
-all_pass = True
-for enc in ("clipL", "bigG"):
-    r10 = by_cell.get((enc, 10), [])
-    r12 = by_cell.get((enc, 12), [])
-    if not r10 or not r12:
-        print(f"{enc:6s}  MISSING DATA r10={len(r10)} r12={len(r12)}")
-        all_pass = False
-        continue
-    mean10 = sum(r10) / len(r10)
-    mean12 = sum(r12) / len(r12)
-    ratio = mean12 / mean10 if mean10 > 0 else float("inf")
-    verdict = "PASS" if ratio >= 2.0 else "FAIL"
-    if ratio < 2.0:
-        all_pass = False
-    print(f"{enc:6s}  {mean10*100:6.1f}%   {mean12*100:6.1f}%   {ratio:5.2f}x   {verdict}")
-print()
-if all_pass:
-    print("ACCEPTANCE: PASS (Nymeria-street finding replicated on SLOPER4D)")
-else:
-    print("ACCEPTANCE: FAIL (consider whether seq009 alone is enough)")
-PY
+python "$REPO/scripts/sloper4d_h3_acceptance.py" \
+  --captures "$CAPTURES" \
+  --sequence "$SEQ"
 
 echo
 echo "[slurm] done."
