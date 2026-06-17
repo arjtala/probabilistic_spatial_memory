@@ -1,0 +1,16 @@
+{
+  "features": "/checkpoint/dream/arjangt/video_retrieval/aria/201703061033/clip_l_features.h5",
+  "group": "clip",
+  "n_frames": 791,
+  "dim": 768,
+  "top": 5,
+  "warmup": 5,
+  "trials_per_query": 200,
+  "n_queries": 20,
+  "median_us": 36.06406971812248,
+  "p95_us": 46.466710045933695,
+  "p99_us": 296.0650529712432,
+  "mean_per_query_median_us": 36.007934249937534,
+  "bytes_in_ram": 2429952,
+  "bytes_per_frame": 3072
+}

@@ -1,0 +1,16 @@
+{
+  "features": "/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic/20230612_s0_jason_smith_act3_c6na21/clip_l_features.h5",
+  "group": "clip",
+  "n_frames": 1019,
+  "dim": 768,
+  "top": 5,
+  "warmup": 5,
+  "trials_per_query": 200,
+  "n_queries": 20,
+  "median_us": 41.97901580482721,
+  "p95_us": 55441.63784943521,
+  "p99_us": 85141.18985738604,
+  "mean_per_query_median_us": 2828.4532309044152,
+  "bytes_in_ram": 3130368,
+  "bytes_per_frame": 3072
+}

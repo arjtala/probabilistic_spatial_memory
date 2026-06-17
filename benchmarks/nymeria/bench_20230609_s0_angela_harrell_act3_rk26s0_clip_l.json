@@ -1,0 +1,16 @@
+{
+  "features": "/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic/20230609_s0_angela_harrell_act3_rk26s0/clip_l_features.h5",
+  "group": "clip",
+  "n_frames": 1019,
+  "dim": 768,
+  "top": 5,
+  "warmup": 5,
+  "trials_per_query": 200,
+  "n_queries": 20,
+  "median_us": 37.57246304303408,
+  "p95_us": 3090.4276994988313,
+  "p99_us": 52863.54410229214,
+  "mean_per_query_median_us": 37.426536437124014,
+  "bytes_in_ram": 3130368,
+  "bytes_per_frame": 3072
+}

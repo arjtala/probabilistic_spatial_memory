@@ -1,0 +1,16 @@
+{
+  "features": "/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic/20230609_s1_heather_becker_act2_2e7xi1/clip_l_features.h5",
+  "group": "clip",
+  "n_frames": 1009,
+  "dim": 768,
+  "top": 5,
+  "warmup": 5,
+  "trials_per_query": 200,
+  "n_queries": 20,
+  "median_us": 41.76353104412556,
+  "p95_us": 14542.201824951913,
+  "p99_us": 61002.5881067849,
+  "mean_per_query_median_us": 42.26741148158908,
+  "bytes_in_ram": 3099648,
+  "bytes_per_frame": 3072
+}

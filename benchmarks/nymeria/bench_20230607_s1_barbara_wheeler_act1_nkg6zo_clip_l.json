@@ -1,0 +1,16 @@
+{
+  "features": "/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic/20230607_s1_barbara_wheeler_act1_nkg6zo/clip_l_features.h5",
+  "group": "clip",
+  "n_frames": 939,
+  "dim": 768,
+  "top": 5,
+  "warmup": 5,
+  "trials_per_query": 200,
+  "n_queries": 20,
+  "median_us": 38.18294499069452,
+  "p95_us": 9512.82696332781,
+  "p99_us": 58513.268174137724,
+  "mean_per_query_median_us": 38.272334495559335,
+  "bytes_in_ram": 2884608,
+  "bytes_per_frame": 3072
+}

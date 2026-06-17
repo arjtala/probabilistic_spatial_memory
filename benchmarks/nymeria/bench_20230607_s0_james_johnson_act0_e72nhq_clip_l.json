@@ -1,0 +1,16 @@
+{
+  "features": "/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic/20230607_s0_james_johnson_act0_e72nhq/clip_l_features.h5",
+  "group": "clip",
+  "n_frames": 1145,
+  "dim": 768,
+  "top": 5,
+  "warmup": 5,
+  "trials_per_query": 200,
+  "n_queries": 20,
+  "median_us": 48.44705108553171,
+  "p95_us": 56048.91827097159,
+  "p99_us": 85328.96785298362,
+  "mean_per_query_median_us": 3219.250147230923,
+  "bytes_in_ram": 3517440,
+  "bytes_per_frame": 3072
+}

@@ -1,0 +1,16 @@
+{
+  "features": "/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic/20230612_s1_christina_jones_act1_ixxtbh/clip_l_features.h5",
+  "group": "clip",
+  "n_frames": 1012,
+  "dim": 768,
+  "top": 5,
+  "warmup": 5,
+  "trials_per_query": 200,
+  "n_queries": 20,
+  "median_us": 40.57202022522688,
+  "p95_us": 6939.376215450466,
+  "p99_us": 59747.889265418,
+  "mean_per_query_median_us": 41.257095290347934,
+  "bytes_in_ram": 3108864,
+  "bytes_per_frame": 3072
+}

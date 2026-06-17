@@ -1,0 +1,16 @@
+{
+  "features": "/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic/20230608_s0_shelby_arroyo_act0_3ciwl8/clip_l_features.h5",
+  "group": "clip",
+  "n_frames": 1133,
+  "dim": 768,
+  "top": 5,
+  "warmup": 5,
+  "trials_per_query": 200,
+  "n_queries": 20,
+  "median_us": 67.4024922773242,
+  "p95_us": 55509.2555237934,
+  "p99_us": 65464.05003173277,
+  "mean_per_query_median_us": 4168.156470404938,
+  "bytes_in_ram": 3480576,
+  "bytes_per_frame": 3072
+}
