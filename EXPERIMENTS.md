@@ -626,3 +626,95 @@ JSON, motion JSON, and metadata.
 E11 (item 1), E12 (item 2), item 7 (latency on Nymeria session sizes),
 plus the new federated-memory + cross-activity probes that the Aria
 corpus couldn't support.
+
+## E0'. SLOPER4D Pipeline (street-scale corpus, 2026-06-17 pivot)
+
+After the full 30-session Nymeria sweep returned flat ~2% Hit@5
+across every (h3_res, retention, exemplars) operating point — the
+hyperparameter sweep made it clear PSM cannot discriminate at
+room scale, which is where 26/30 Nymeria sessions sit (≤9.4 m bbox)
+— the corpus story pivoted. SLOPER4D (Dai et al., CVPR 2023)
+provides multi-session LiDAR-SLAM trajectories at genuine
+street scale, replacing the single Nymeria street-scale session
+(`shelby_arroyo_act0`, 69 m bbox) we had been planning to lean on.
+
+See `journal/PAPER.md` 2026-06-16 + 2026-06-17 entries for the
+full decision log.
+
+### Subset selection
+
+15 sequences shipped in the SLOPER4D release; **6 currently
+downloadable** without an authors' request. Of those 6, 5 are
+retained — `seq002_football_001` is dropped because its 22 m bbox
+is room-scale and below the r10 threshold (66 m H3 edge):
+
+| Sequence | Trajectory | bbox XY | H3 scale | Notes |
+|---|---|---|---|---|
+| seq003_street_002 | 275 m | 105 m | r10 (marginal) | Outdoor street walking |
+| seq005_library_002 | 417 m | 91 m | r11, edge-r10 | Indoor library + outdoor stairs |
+| seq007_garden_001 | 77 m | 66 m | r11 / r12 transition | Bench + path |
+| seq008_running_001 | 225 m | 176 m | r10 (~3× edge) | Outdoor running |
+| seq009_running_002 | 946 m | **446 m** | **r10 (~7 cells)** | Long outdoor run; primary street-scale anchor |
+
+Three additional street-scale sequences (`001_campus_001` 908 m,
+`010_park_001` 642 m, `011_park_002` 1,025 m) are listed in the
+SLOPER4D paper but not in the 6 currently published. If acquired
+via direct request to the authors, they triple the multi-session
+street-scale coverage and we fold them into the same sweep.
+
+Source zips at `/checkpoint/dream/arjangt/SLOPER4D/*.zip` (CC BY-NC-SA 4.0).
+Selectively unzipped to `/checkpoint/dream/arjangt/SLOPER4D-unzipped/`
+(only `lidar_data/lidar_trajectory.txt` + `rgb_data/*.MP4` per
+sequence — skip the multi-GB LiDAR point clouds that PSM doesn't
+need).
+
+### Pipeline scope
+
+1. **`extraction/psm_extraction/io/sloper4d.py`** — trajectory
+   reader. Parses `lidar_data/lidar_trajectory.txt` (space-separated
+   `framenum X Y Z qx qy qz qw timestamp`), projects metric XYZ to
+   WGS84 lat/lng via flat-earth at fake origin
+   `(24.4381, 118.0992)` (Xiamen University, where the dataset was
+   captured). PSM is invariant to origin choice; pinning near XMU
+   is a viz-honesty default.
+2. **`scripts/extract_sloper4d_sessions.py`** — per-sequence
+   orchestrator wrapper. Writes a temporary Aria-style `gps.json`
+   sidecar from the projected trajectory next to the MP4, calls
+   `python -m psm_extraction extract --gps-json …` so the existing
+   CLIP runner + v2 writer + frame-alignment apply unchanged, then
+   cleans up the sidecar. H5 basename matches encoder
+   (`clip_l_features.h5` / `clip_bigg_features.h5`).
+3. **`scripts/extract_sloper4d.sh`** — login-node probe + extract
+   wrapper. Prints the per-sequence trajectory summary before
+   calling the orchestrator.
+4. **`scripts/slurm/extract_sloper4d.sbatch`** — 5-task array per
+   encoder (one task per kept sequence). Submit twice for the
+   clipL + bigG encoder ablation:
+   ```
+   sbatch                              scripts/slurm/extract_sloper4d.sbatch
+   sbatch --export=MODEL=clip_bigg     scripts/slurm/extract_sloper4d.sbatch
+   ```
+5. **Question generation** — TODO. SLOPER4D ships no narration
+   track; the planned framing uses `query_mode: last_seen` GPS-
+   grounded queries (item 6 in PAPER.md), sidestepping manual
+   annotation by using the trajectory itself as ground truth.
+
+### Acceptance criteria
+
+- All 5 sequences extract to v2 `clip_l_features.h5` +
+  `clip_bigg_features.h5` with `track_mode: real_gps` and a
+  populated `gps` sensor group.
+- H3 r10 cell counts on seq009 ≥ 5 (confirms multi-cell carving
+  at the highest-mobility sequence).
+- H3 resolution sweep on seq009 replicates the Nymeria-street
+  finding: Hit @5 at r12 ≥ 2× Hit @5 at r10 for both encoders.
+  Failing that replication implies the Nymeria-street signal was
+  a one-session artifact and the corpus story needs another revision.
+
+### Downstream consumers
+
+E11 (item 1, naive retrieval baselines), E12 (item 2, hyperparameter
+sweep — H3-res ablation is the primary acceptance criterion), and
+item 6 (encoder-bypass `query_mode: last_seen` stress test, which
+SLOPER4D is uniquely well-suited to because its global trajectory
+is dense and accurate).

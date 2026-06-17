@@ -254,6 +254,19 @@ This section is just for the harness/glue code those experiments need.
 - [x] Hyperparameter sweep loop on top of `eval_bigg_all.sh` — for E12. Adds `H3_RESOLUTION`, `RETENTION` (as `TIME_WINDOW × CAPACITY`), and `EXEMPLARS` env knobs; auto-suffixes the TAG so outputs don't clobber the v2 raw runs. Landed as standalone `scripts/eval_hyperparam_sweep.sh`.
 - [x] `scripts/eval_hyperparam_aggregate.py` — small extension to the aggregator that pools across hyperparameter axis and plots single-axis sensitivity curves. The plot is paper Figure F3. Landed as `scripts/eval_hyperparam_plot.py`; F3 SVG at `journal/figures/hyperparam_sensitivity.svg`.
 
+### SLOPER4D street-scale corpus (2026-06-17 pivot)
+
+After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across every operating point (26/30 sessions ≤9.4m bbox → temporal-localization regime, not spatial), pivoted street-scale story to SLOPER4D + Aria Gen 2 walks. See [journal/PAPER.md](journal/PAPER.md) 2026-06-17.
+
+- [x] `extraction/psm_extraction/io/sloper4d.py` — LiDAR trajectory reader + WGS84 projection at Xiamen University fake origin (commit `866de6d`).
+- [x] `scripts/extract_sloper4d_sessions.py` — orchestrator wrapper writing Aria-style `gps.json` sidecar next to MP4 then calling `python -m psm_extraction extract --gps-json …`; cleans up sidecar. Encoder-aware H5 basename (commits `fb5375c`/`acb341a`).
+- [x] `scripts/slurm/extract_sloper4d.sbatch` — 5-task array per encoder; drops `seq002_football_001` (room-scale only); submitted clipL + bigG (jobs `8315558` + `8315559`) on 2026-06-17.
+- [ ] H3-resolution sweep on `seq009_running_002` (446m bbox, primary street-scale anchor) once extraction lands. Acceptance: Hit@5 at r12 ≥ 2× Hit@5 at r10 for both clipL and bigG. This replicates the Nymeria-street single-session finding (3.2% → 8.9% bigG); failure implies that finding was an N=1 artifact.
+- [ ] `query_mode: last_seen` question generator. For each sequence pick N timestamps, look up GPS ground truth, generate "where was C at time t?" questions. GPS-grounded, no manual annotation. This is what makes SLOPER4D annotation-free.
+- [ ] Email SLOPER4D authors (Yudi Dai et al.) requesting `001_campus_001` (908 m), `010_park_001` (642 m), `011_park_002` (1,025 m) — three additional street-scale sequences not in the 6 currently public. Adds ~2.6 km of trajectory, triples multi-session street-scale coverage, makes the multi-session claim bulletproof. Worth doing today even if reply is days away — they slot into the same sweep without code changes.
+
+
+
 ### MLLM in the loop
 
 - [x] `scripts/mllm_client.py` — uniform interface over Gemini 3 Pro API, GPT-5 API, and a locally-served vLLM endpoint (for Llama-3.2-90B-Vision or InternVL3.5). Returns predicted `[t_start, t_end]` intervals from (video_path, question). Hides the API-vs-local-serving difference from the caller. Landed as `scripts/_mllm_client.py`; covers Gemini 3.1 Pro + Claude 4.6 Opus via the internal OpenAI-compat proxy. GPT-5 / open-source vLLM still not wired.
