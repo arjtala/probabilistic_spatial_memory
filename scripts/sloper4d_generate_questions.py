@@ -125,7 +125,23 @@ def main() -> int:
     # Evenly-spaced indices (no jitter — deterministic picks make
     # reruns reproducible).
     idx_picks = np.linspace(0, n_total - 1, n_q, dtype=np.int64)
-    picked_ts = timestamps[idx_picks]
+    # h5_ts: keep H5's original (possibly session-relative) timestamps
+    # for the questions.yaml intervals — eval_lookback.py matches them
+    # against the same H5 field.
+    # video_ts: shifted to start at 0 so ffmpeg `-ss <video_ts>` lands
+    # on a frame the MP4 actually contains. Identical to h5_ts for
+    # sequences whose H5 already starts at 0 (the common case).
+    h5_ts = timestamps[idx_picks]
+    if len(timestamps) > 0 and timestamps[0] > 5.0:
+        offset = float(timestamps[0])
+        print(
+            f"[sloper4d-qg] H5 timestamps start at {offset:.1f}s (session-relative); "
+            f"shifting to video-clock for ffmpeg seek only",
+            file=sys.stderr,
+        )
+        video_ts = h5_ts - offset
+    else:
+        video_ts = h5_ts
 
     model = Mllm.GEMINI if args.model == "gemini" else Mllm.CLAUDE
     print(f"[sloper4d-qg] {session_id}: picking {n_q} frames; using {model.name}", file=sys.stderr)
@@ -169,12 +185,12 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory() as td:
         td_path = Path(td)
-        for i, ts in enumerate(picked_ts):
+        for i, (h5_t, video_t) in enumerate(zip(h5_ts, video_ts)):
             qid = f"q{i+1}"
             if qid in done_ids:
                 continue
             jpg = td_path / f"frame_{i:03d}.jpg"
-            _decode_frame_at_timestamp(args.video, float(ts), jpg)
+            _decode_frame_at_timestamp(args.video, float(video_t), jpg)
             b64 = _jpg_to_b64(jpg)
             # Build the prompt with anti-example captions from the
             # last K already-captioned frames. Forces Gemini to pick
@@ -196,20 +212,23 @@ def main() -> int:
                     prompt=prompt,
                 ).strip()
             except Exception as e:
-                print(f"  WARN: caption failed at ts={ts}: {e}", file=sys.stderr)
+                print(f"  WARN: caption failed at h5_ts={h5_t}: {e}", file=sys.stderr)
                 continue
             # Strip trailing punctuation duplicates and surrounding quotes.
             caption = caption.strip().strip('"').strip("'").strip()
-            t_lo = max(0.0, float(ts) - args.interval_half_window_sec)
-            t_hi = float(ts) + args.interval_half_window_sec
+            # Intervals are written in the H5 clock so eval_lookback can
+            # match them against `clip/timestamps` directly (which uses
+            # the H5 clock — same field).
+            t_lo = max(0.0, float(h5_t) - args.interval_half_window_sec)
+            t_hi = float(h5_t) + args.interval_half_window_sec
             questions.append({
                 "id": qid,
                 "query": caption,
                 "intervals": [[round(t_lo, 3), round(t_hi, 3)]],
-                "notes": f"auto-captioned via {model.name} at ts={ts:.3f}s (frame_idx={int(idx_picks[i])})",
+                "notes": f"auto-captioned via {model.name} at h5_ts={h5_t:.3f}s (video_ts={video_t:.3f}s, frame_idx={int(idx_picks[i])})",
             })
             _flush()
-            print(f"  q{i+1} (ts={ts:.1f}s): {caption[:80]}", file=sys.stderr)
+            print(f"  q{i+1} (h5_ts={h5_t:.1f}s): {caption[:80]}", file=sys.stderr)
 
     print(f"[sloper4d-qg] wrote {len(questions)} questions to {args.out}", file=sys.stderr)
     return 0

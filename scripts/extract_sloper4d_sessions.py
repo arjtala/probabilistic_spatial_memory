@@ -159,16 +159,25 @@ def _write_gps_sidecar(traj, path: Path) -> None:
     The orchestrator's json_sidecar.py reader expects:
     [{stream_id, samples: [{timestamp, latitude, longitude, ...}, ...]}]
 
-    We write the projected lat/lng with the LiDAR timestamps (already
-    in seconds). The orchestrator's align step will interpolate these
-    onto frame timestamps.
+    We project the LiDAR timestamps onto the **video clock** by
+    subtracting `traj.timestamps[0]`. Some SLOPER4D sequences (e.g.
+    seq008_running_001) record LiDAR timestamps that start mid-session
+    (~415 s) while the MP4 starts at 0. Without the offset the
+    orchestrator's align step would interpolate lat/lng at a clock
+    that has no overlap with the video frames, and the resulting H5
+    `clip/timestamps` would be unusable for downstream consumers
+    (questions.yaml intervals + ffmpeg seek both reference video PTS).
     """
     import json
+
+    if len(traj.timestamps) == 0:
+        raise ValueError("empty trajectory: cannot write gps sidecar")
+    t0 = float(traj.timestamps[0])
 
     samples = []
     for i in range(len(traj.timestamps)):
         samples.append({
-            "timestamp": float(traj.timestamps[i]),
+            "timestamp": float(traj.timestamps[i]) - t0,
             "latitude": float(traj.lat[i]),
             "longitude": float(traj.lng[i]),
             "accuracy": 1.0,  # LiDAR-SLAM is sub-metre
