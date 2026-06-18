@@ -46,6 +46,7 @@ import yaml
 
 _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "scripts"))
+sys.path.insert(0, str(_REPO / "extraction"))
 
 from _mllm_client import Mllm, call_mllm  # noqa: E402
 
@@ -211,6 +212,13 @@ def main() -> int:
                          "Frames are aligned 1:1 with the H5 timestamps; "
                          "we pick K evenly-spaced indices. Cheaper + works "
                          "for VRS-source sessions where no MP4 exists.")
+    ap.add_argument("--vrs-session-dir", type=Path, default=None,
+                    help="Aria session dir containing a VRS file (video.vrs "
+                         "or recording_head/data/data.vrs). Triggers a 1 fps "
+                         "JPEG cache via the project's VRS reader, then "
+                         "K evenly-spaced picks. Useful for Nymeria where "
+                         "no MP4 exists and frames weren't kept during the "
+                         "original extraction.")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--k-frames", type=int, default=8,
                     help="number of frames sampled per question (default 8). "
@@ -250,9 +258,21 @@ def main() -> int:
     if args.frames_dir is not None:
         # Pre-extracted JPEGs path: align with the H5 timestamps,
         # pick K evenly-spaced. Cheapest path; works for VRS-source
-        # sessions where no MP4 exists (e.g. Nymeria).
+        # sessions where no MP4 exists.
         decoded = _pick_uniform_from_cache(args.frames_dir, args.k_frames, h5_ts)
-        # decoded[i] = (h5_clock_ts, path), no offset needed.
+        frame_ts_h5 = np.array([t for t, _ in decoded], dtype=np.float64)
+    elif args.vrs_session_dir is not None:
+        # VRS path: call the project's VRS reader to populate a 1 fps
+        # JPEG cache once, then pick K evenly-spaced from it. Cache is
+        # reused across runs.
+        from psm_extraction.io.aria_vrs import read_vrs_session  # noqa
+        frame_cache = args.frame_cache or (args.out.parent / "frames_baseline" / session_id)
+        vrs_out = read_vrs_session(args.vrs_session_dir, sample_fps=1.0,
+                                   output_dir=frame_cache, verbose=False)
+        # Align extracted JPEGs to H5 ts (parallel construction: both
+        # are emitted from the same VRS frames at the same 1 fps).
+        vrs_h5 = vrs_out.timestamps_s.astype(np.float64)
+        decoded = _pick_uniform_from_cache(frame_cache, args.k_frames, vrs_h5)
         frame_ts_h5 = np.array([t for t, _ in decoded], dtype=np.float64)
     elif args.video is not None:
         # MP4 path: ffmpeg single-pass decode at K/duration fps.
@@ -262,7 +282,7 @@ def main() -> int:
         # consistent IoU vs GT (which is in H5 / questions.yaml clock).
         frame_ts_h5 = np.array([t + ts_offset for t, _ in decoded], dtype=np.float64)
     else:
-        raise SystemExit("one of --video or --frames-dir is required")
+        raise SystemExit("one of --video, --frames-dir, or --vrs-session-dir is required")
     frame_paths = [p for _, p in decoded]
     print(f"[mllm-baseline] uniform-sampled K={args.k_frames} frames at H5 ts "
           f"{[f'{t:.1f}' for t in frame_ts_h5]}", file=sys.stderr)
