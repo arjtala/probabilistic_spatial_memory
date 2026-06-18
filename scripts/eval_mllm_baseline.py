@@ -100,6 +100,47 @@ def _point_in_any(t: float, gts: list[tuple[float, float]]) -> int:
 # --- Frame source: ffmpeg single-pass uniform sample ---------------------
 
 
+def _pick_uniform_from_cache(
+    frames_dir: Path,
+    n_frames: int,
+    h5_ts: np.ndarray,
+) -> list[tuple[float, Path]]:
+    """Pick `n_frames` evenly-spaced frames from an existing JPEG cache.
+
+    The orchestrator (and our SLOPER4D / Aria extractors) drops 1 fps
+    JPEGs into `<session>/frames*/frame_*.jpg` when called with
+    --keep-frames or via VRS reader. We just need to align the JPEG
+    list with the H5 timestamps and pick N evenly-spaced indices.
+
+    Returns (h5_clock_ts, path) tuples. Frame ts are inferred to be
+    the H5 timestamps at the same index — both the extractor's
+    JPEGs and the H5 are produced together at the same sample_fps,
+    so frame_i ↔ ts_i is the natural mapping.
+    """
+    all_frames = sorted(frames_dir.glob("frame_*.jpg"))
+    if not all_frames:
+        # Fall back to any *.jpg if the naming doesn't match.
+        all_frames = sorted(frames_dir.glob("*.jpg"))
+    if not all_frames:
+        raise SystemExit(f"no JPEGs found under {frames_dir}")
+    # Length parity is required for ts ↔ frame mapping to be honest.
+    if len(all_frames) != len(h5_ts):
+        # Tolerate a small off-by-one (orchestrator sometimes drops the
+        # last frame); use min(len) and warn.
+        n = min(len(all_frames), len(h5_ts))
+        print(
+            f"[mllm-baseline] WARN: {len(all_frames)} JPEGs vs {len(h5_ts)} H5 ts; "
+            f"truncating to {n}",
+            file=sys.stderr,
+        )
+        all_frames = all_frames[:n]
+        h5_ts = h5_ts[:n]
+    if n_frames > len(all_frames):
+        n_frames = len(all_frames)
+    idx = np.linspace(0, len(all_frames) - 1, n_frames, dtype=np.int64)
+    return [(float(h5_ts[i]), all_frames[i]) for i in idx]
+
+
 def _decode_frames_uniform(
     video_path: Path,
     n_frames: int,
@@ -161,8 +202,15 @@ def main() -> int:
     ap.add_argument("--features", type=Path, required=True,
                     help="features.h5 for the session (timestamps + session_id)")
     ap.add_argument("--questions", type=Path, required=True)
-    ap.add_argument("--video", type=Path, required=True,
-                    help="source MP4 (for frame decoding)")
+    ap.add_argument("--video", type=Path, default=None,
+                    help="source MP4 (decode frames via ffmpeg). One of "
+                         "--video or --frames-dir is required.")
+    ap.add_argument("--frames-dir", type=Path, default=None,
+                    help="dir of pre-extracted JPEGs (from extraction "
+                         "--keep-frames or our SLOPER4D/Aria pipelines). "
+                         "Frames are aligned 1:1 with the H5 timestamps; "
+                         "we pick K evenly-spaced indices. Cheaper + works "
+                         "for VRS-source sessions where no MP4 exists.")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--k-frames", type=int, default=8,
                     help="number of frames sampled per question (default 8). "
@@ -199,11 +247,22 @@ def main() -> int:
     # Decode the uniform-sample frame set once. Same K frames for every
     # question — that's the whole point of "vanilla MLLM with no PSM
     # prefilter": the MLLM sees the same candidate set every time.
-    frame_cache = args.frame_cache or (args.out.parent / "frames_baseline" / session_id)
-    decoded = _decode_frames_uniform(args.video, args.k_frames, duration, frame_cache)
-    # Frame ts are in video clock (0..duration); shift to H5 clock for
-    # consistent IoU vs GT (which is in H5 / questions.yaml clock).
-    frame_ts_h5 = np.array([t + ts_offset for t, _ in decoded], dtype=np.float64)
+    if args.frames_dir is not None:
+        # Pre-extracted JPEGs path: align with the H5 timestamps,
+        # pick K evenly-spaced. Cheapest path; works for VRS-source
+        # sessions where no MP4 exists (e.g. Nymeria).
+        decoded = _pick_uniform_from_cache(args.frames_dir, args.k_frames, h5_ts)
+        # decoded[i] = (h5_clock_ts, path), no offset needed.
+        frame_ts_h5 = np.array([t for t, _ in decoded], dtype=np.float64)
+    elif args.video is not None:
+        # MP4 path: ffmpeg single-pass decode at K/duration fps.
+        frame_cache = args.frame_cache or (args.out.parent / "frames_baseline" / session_id)
+        decoded = _decode_frames_uniform(args.video, args.k_frames, duration, frame_cache)
+        # Frame ts are in video clock (0..duration); shift to H5 clock for
+        # consistent IoU vs GT (which is in H5 / questions.yaml clock).
+        frame_ts_h5 = np.array([t + ts_offset for t, _ in decoded], dtype=np.float64)
+    else:
+        raise SystemExit("one of --video or --frames-dir is required")
     frame_paths = [p for _, p in decoded]
     print(f"[mllm-baseline] uniform-sampled K={args.k_frames} frames at H5 ts "
           f"{[f'{t:.1f}' for t in frame_ts_h5]}", file=sys.stderr)
