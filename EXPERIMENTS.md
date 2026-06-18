@@ -405,12 +405,53 @@ Faithful TurboQuant (sign-flip + Walsh-Hadamard rotation, Lloyd-Max-optimal scal
 
 ### E10. Reproducing the Localization Paradox on PSM's corpus
 
-**Status (2026-06-05):** Client + harness landed (`scripts/eval_psm_mllm.py`,
-`scripts/_mllm_client.py`, commits `471e4ab`/`d051757`). Nymeria sweep
-done end-to-end: 4 sessions × {`per_cell_cap`=1, `per_cell_cap`=$K$} via
-Gemini 3.1 Pro. Headline numbers in [`journal/results_v1.md`](journal/results_v1.md#multi-session-mllm-rerank-2026-06-04).
-Aria-internal results are now classified internal-preliminary (see
-[`journal/PAPER.md`](journal/PAPER.md) 2026-05-28 corpus pivot).
+**Status (2026-06-18, post K-sweep):** Done on the v1 street-scale
+corpus (3 SLOPER4D + 1 Nymeria). `scripts/eval_mllm_baseline.py`
+(landed 2026-06-18, commits `7197033`/`6fce5f4`/`d7cb6b7`) runs the
+vanilla-MLLM baseline at K uniformly-sampled frames per question.
+Result on the 4 sequences at K=8 (matched to PSM's default top-k for
+apples-to-apples):
+
+| sequence              | bbox  | vanilla MLLM Hit@5 | PSM clipL r12 Hit@5 | gap   |
+|-----------------------|-------|--------------------|---------------------|-------|
+| Nymeria shelby (187q) | 69 m  | **0.0 %**          | 7.6 %               | ∞     |
+| seq003_street_002     | 105 m | 6.7 %              | 13.3 %              | 2.0×  |
+| seq008_running_001    | 176 m | 6.7 %              | 30.0 %              | 4.5×  |
+| seq009_running_002    | 446 m | 7.1 %              | 17.9 %              | 2.5×  |
+
+K-sweep on seq009 (K ∈ {8, 16, 32}; K=64 and K=128 both blocked by
+proxy 500s — payload too large for the internal api.llama.com
+proxy) extends the picture to **oracle vs discrimination**:
+
+| K  | oracle upper bound (any frame in GT) | Gemini's actual Hit@5 | discrimination rate |
+|----|--------------------------------------|------------------------|---------------------|
+| 8  | 7.1 % (2/28)                         | 7.1 %                  | 100 % (2/2)         |
+| 16 | 7.1 % (2/28)                         | 3.6 %                  | 50 % (1/2)          |
+| 32 | **21.4 %** (6/28)                    | 7.1 %                  | **33 % (2/6)**      |
+
+The K=32 oracle climbs to 21.4 % (the uniform-sample set contained
+a GT-matching frame for 6/28 questions) but Gemini's pick rate stays
+at 7.1 % — discrimination over a uniform-sample multi-frame video
+baseline **degrades** as K grows: adding candidates dilutes the
+choice rather than refining it.
+
+**Decision rule outcome**: The 2026-05 plan said "if MLLM mIoU < 0.10
+on Location Trace, the v2 cited paradox is real on our corpus and
+the paper has a baseline to beat." Result: vanilla MLLM Hit @ 5 = 0.0 %
+on Nymeria (187 questions), 6.7–7.1 % on the SLOPER4D sequences at
+K=8, flat across K=8/16/32. **Decision rule fires**: the cited paradox
+holds on our street-scale corpus. The §5 framing is the oracle-vs-
+discrimination gap, not a flat-K dismissal — see PAPER.md 2026-06-18
+journal entries.
+
+E10 status: **done**. E5 (PSM → MLLM reranker) ran on the same 4
+sequences immediately after — see E5 status block / PAPER.md
+2026-06-18 reranker entry; rerank is bimodal in Hit @ 1 (helps on
+visually-rich, hurts on visually-poor) and invariant in Hit @ 5.
+
+---
+
+**Original problem statement (preserved for reference, pre-results):**
 
 Question:
 - Does the temporal-grounding collapse documented for frontier MLLMs at benchmark scale also appear on our 3-session, 20-question corpus? Without this, every comparison in the v2 writeup is against a *cited* number, not a *measured* one.
