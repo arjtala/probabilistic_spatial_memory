@@ -62,6 +62,61 @@ DEFAULT_ORIGIN_LAT = 37.4275
 DEFAULT_ORIGIN_LNG = -122.1697
 
 
+# Per-session-prefix origin overrides. The fake-origin choice doesn't
+# change PSM math (H3 cells are globally unique; relative cell-distance
+# is preserved); it only changes where the projected lat/lng lands on
+# a world map. Mapping each LookOut session prefix to its real-world
+# capture area gives honest map visualisations + lets cross-corpus
+# figures avoid all sessions overlapping on top of each other at the
+# Stanford quad default.
+#
+# Sources (rough centers, not exact wearer starting positions):
+#   SanmateoDT*    → San Mateo downtown (~Burlingame Ave / B St)
+#   BurlingameDT*  → Burlingame downtown (Broadway)
+#   Hillsdale*     → Hillsdale Shopping Center, San Mateo
+#   Fostersquare*  → Foster Square Park, Foster City
+#   Mainquad*      → Stanford main quad
+#   Gates*         → Stanford Gates Computer Science building
+#   Huang*         → Stanford Huang Engineering Center
+#   SSC*           → Stanford Shopping Center (University Ave)
+#   Sanmateopark*  → Central Park, San Mateo
+#   Rosegarden*    → San Mateo Central Park rose garden
+#   Sanmateo_to*   → walks between San Mateo landmarks
+#   Traderjoes*    → Trader Joe's, San Mateo (S Norfolk St)
+#   Target*        → Target store, Hillsdale (most likely)
+#   Therapystore*  → unknown shop, treat as San Mateo generic
+#   Test* / UUID   → unknown, default to Stanford
+_SESSION_ORIGIN_OVERRIDES: dict[str, tuple[float, float]] = {
+    "SanmateoDT": (37.5630, -122.3255),
+    "BurlingameDT": (37.5841, -122.3661),
+    "Hillsdale": (37.5390, -122.3045),
+    "Fostersquare": (37.5610, -122.2710),
+    "Mainquad": (37.4275, -122.1697),
+    "Gates": (37.4297, -122.1726),
+    "Huang": (37.4275, -122.1755),
+    "SSC": (37.4435, -122.1715),
+    "Sanmateopark": (37.5560, -122.3260),
+    "Rosegarden": (37.5560, -122.3260),
+    "Sanmateo_to": (37.5595, -122.3260),
+    "Traderjoes": (37.5435, -122.2845),
+    "Target": (37.5377, -122.3043),
+    "Therapystore": (37.5630, -122.3255),
+}
+
+
+def origin_for_session(session_name: str) -> tuple[float, float]:
+    """Return (lat, lng) origin for a LookOut session name.
+
+    Matches the longest prefix in `_SESSION_ORIGIN_OVERRIDES` against
+    `session_name`. Falls back to the Stanford default for unknown
+    prefixes (Test*, UUID-named sessions).
+    """
+    for prefix in sorted(_SESSION_ORIGIN_OVERRIDES, key=len, reverse=True):
+        if session_name.startswith(prefix):
+            return _SESSION_ORIGIN_OVERRIDES[prefix]
+    return (DEFAULT_ORIGIN_LAT, DEFAULT_ORIGIN_LNG)
+
+
 @dataclass(frozen=True)
 class LookOutTrajectory:
     """Per-sequence Aria MPS trajectory projected to WGS84."""
@@ -87,15 +142,26 @@ def _meters_per_degree(lat_deg: float) -> tuple[float, float]:
 def load_slam_trajectory(
     sequence_dir: Path,
     *,
-    origin_lat: float = DEFAULT_ORIGIN_LAT,
-    origin_lng: float = DEFAULT_ORIGIN_LNG,
+    origin_lat: float | None = None,
+    origin_lng: float | None = None,
 ) -> LookOutTrajectory:
     """Load and project a LookOut SLAM trajectory to WGS84.
 
     Reuses the Aria MPS parser from `aria_vrs._read_slam_trajectory`
     (LookOut ships the standard MPS schema). Returns a typed
     LookOutTrajectory the orchestrator + sidecar wrappers can consume.
+
+    If `origin_lat`/`origin_lng` are not supplied, the session name is
+    matched against `_SESSION_ORIGIN_OVERRIDES` for a semi-realistic
+    per-location origin (e.g. SanmateoDT2_Jan12 → San Mateo downtown),
+    falling back to Stanford for unknown prefixes. Pass either origin
+    explicitly to override.
     """
+    if origin_lat is None or origin_lng is None:
+        sess_lat, sess_lng = origin_for_session(sequence_dir.name)
+        origin_lat = origin_lat if origin_lat is not None else sess_lat
+        origin_lng = origin_lng if origin_lng is not None else sess_lng
+
     csv_path = sequence_dir / "slam" / "closed_loop_trajectory.csv"
     if not csv_path.exists():
         raise FileNotFoundError(f"No trajectory file at {csv_path}")
@@ -192,14 +258,15 @@ def discover_sequences(root: Path) -> list[Path]:
 def probe_sequences(
     root: Path,
     *,
-    origin_lat: float = DEFAULT_ORIGIN_LAT,
-    origin_lng: float = DEFAULT_ORIGIN_LNG,
+    origin_lat: float | None = None,
+    origin_lng: float | None = None,
 ) -> list[dict]:
     """Probe all sequences and return summary statistics.
 
     Same shape as SLOPER4D's probe — useful for confirming trajectory
     extents before committing to extraction on a multi-hundred-GB
-    release.
+    release. If origins are None (default), each session resolves to
+    its per-prefix override (San Mateo, Burlingame, Stanford, etc.).
     """
     results = []
     for seq_dir in discover_sequences(root):
