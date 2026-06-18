@@ -305,9 +305,9 @@ def _resolve_video_from_source_attr(source: Path) -> Path | None:
       - An Aria Gen 2 take directory: pick video.vrs.
       - None of the above: None.
     """
-    if source.is_file() and source.suffix == ".mp4":
+    if source.is_file() and source.suffix.lower() == ".mp4":
         return source
-    if source.is_file() and source.suffix == ".vrs":
+    if source.is_file() and source.suffix.lower() == ".vrs":
         return source
     if source.is_dir():
         # Ego-Exo4D layout.
@@ -335,9 +335,11 @@ def _make_source_for(path: Path) -> FrameSource:
     """Pick Mp4FrameSource vs VrsFrameSource based on file suffix.
 
     Used by both the --video override and the source_video-attr
-    resolution path so the two stay consistent.
+    resolution path so the two stay consistent. Suffix matched
+    case-insensitively — SLOPER4D's DJI-Action2 source ships
+    uppercase .MP4 extensions, others may vary.
     """
-    if path.suffix == ".vrs":
+    if path.suffix.lower() == ".vrs":
         return VrsFrameSource(path)
     return Mp4FrameSource(path)
 
@@ -410,7 +412,7 @@ def make_frame_source(
         if vrs_candidate.exists():
             return VrsFrameSource(vrs_candidate)
 
-    sibling_mp4s = sorted(session_dir.glob("*.mp4"))
+    sibling_mp4s = sorted(session_dir.glob("*.mp4")) + sorted(session_dir.glob("*.MP4"))
     if len(sibling_mp4s) == 1:
         return Mp4FrameSource(sibling_mp4s[0])
     if len(sibling_mp4s) > 1:
