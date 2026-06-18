@@ -63,6 +63,88 @@ def _jpg_to_b64(p: Path) -> str:
     return base64.b64encode(p.read_bytes()).decode("utf-8")
 
 
+def _kmeans_pick(emb: np.ndarray, k: int, *, rng_seed: int = 0,
+                 max_iter: int = 50, n_init: int = 5) -> np.ndarray:
+    """k-means on `emb` (N, D), then pick the medoid of each cluster.
+
+    Returns int64 indices into `emb` of length `k`. Pure NumPy — avoids
+    a sklearn dependency for what is a few-hundred-row, few-iteration
+    job. CLIP embeddings are L2-normalised so Euclidean distance is
+    monotone with cosine similarity; using Euclidean keeps the math
+    simple and the picks ranking-equivalent.
+
+    Multi-init: run `n_init` random starts and return the picks of the
+    run with the lowest total within-cluster sum of squares.
+    """
+    rng = np.random.default_rng(rng_seed)
+    n, d = emb.shape
+    if k >= n:
+        return np.arange(n, dtype=np.int64)
+
+    best_score = np.inf
+    best_picks = None
+    for init_i in range(n_init):
+        # k-means++ style init: pick first center at random, then each
+        # subsequent center proportional to its squared distance to the
+        # nearest already-chosen center.
+        centers_idx = [int(rng.integers(n))]
+        for _ in range(1, k):
+            d2 = np.min(
+                np.linalg.norm(emb[:, None, :] - emb[centers_idx][None, :, :], axis=2) ** 2,
+                axis=1,
+            )
+            d2[centers_idx] = 0.0
+            if d2.sum() <= 0:
+                break
+            probs = d2 / d2.sum()
+            centers_idx.append(int(rng.choice(n, p=probs)))
+        centers = emb[centers_idx].copy()
+
+        # Lloyd iterations.
+        labels = np.zeros(n, dtype=np.int64)
+        for _ in range(max_iter):
+            # Distances: (n, k).
+            dists = np.linalg.norm(emb[:, None, :] - centers[None, :, :], axis=2)
+            new_labels = np.argmin(dists, axis=1)
+            if np.array_equal(new_labels, labels):
+                break
+            labels = new_labels
+            for ci in range(k):
+                mask = labels == ci
+                if mask.any():
+                    centers[ci] = emb[mask].mean(axis=0)
+
+        # Score = sum of within-cluster squared distances.
+        score = float(np.sum(np.min(
+            np.linalg.norm(emb[:, None, :] - centers[None, :, :], axis=2) ** 2,
+            axis=1,
+        )))
+
+        # Medoid of each cluster.
+        picks = np.empty(k, dtype=np.int64)
+        for ci in range(k):
+            members = np.where(labels == ci)[0]
+            if len(members) == 0:
+                picks[ci] = int(rng.integers(n))  # degenerate; fallback
+                continue
+            d_to_center = np.linalg.norm(emb[members] - centers[ci], axis=1)
+            picks[ci] = int(members[np.argmin(d_to_center)])
+        # Dedup (rare degenerate case).
+        picks = np.unique(picks)
+        # If dedup shrunk us, fill from random un-picked indices.
+        if len(picks) < k:
+            remaining = np.setdiff1d(np.arange(n), picks)
+            rng.shuffle(remaining)
+            picks = np.concatenate([picks, remaining[: k - len(picks)]])
+
+        if score < best_score:
+            best_score = score
+            best_picks = picks[:k]
+
+    assert best_picks is not None
+    return best_picks
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     ap.add_argument("--session-dir", type=Path, required=True,
@@ -77,6 +159,12 @@ def main() -> int:
     ap.add_argument("--model", choices=["gemini", "claude"], default="gemini")
     ap.add_argument("--iou-threshold", type=float, default=0.3)
     ap.add_argument("--anti-example-k", type=int, default=5)
+    ap.add_argument("--diverse-sample", action="store_true",
+                    help="pick frames via k-means on CLIP embeddings instead of "
+                         "evenly-spaced timestamps. Forces queries to span visually "
+                         "distinct stretches of the trajectory; useful when "
+                         "evenly-spaced picks land in a stationary phase (e.g. "
+                         "walk_0 evenly-spaced ⇒ all parking-lot captions).")
     args = ap.parse_args()
 
     frame_cache = args.frame_cache or (args.session_dir / "frames_qg")
@@ -102,13 +190,29 @@ def main() -> int:
         if g is None or "timestamps" not in g:
             raise RuntimeError(f"{args.features} has no embedding group with timestamps")
         h5_ts = g["timestamps"][:].astype(np.float64)
+        # Load embeddings only if we'll need them for diverse sampling.
+        h5_emb = g["embeddings"][:].astype(np.float32) if args.diverse_sample else None
     print(f"[aria-qg] H5 timestamps: n={len(h5_ts)} "
           f"span {h5_ts[0]:.1f}..{h5_ts[-1]:.1f}s", file=sys.stderr)
 
-    # Pick N evenly-spaced indices into the H5 timestamp array; then
-    # for each one map to the nearest cached frame.
+    # Pick N indices into the H5 timestamp array, then map each one to
+    # the nearest cached frame.
     n_q = min(args.n_questions, len(h5_ts))
-    h5_idx = np.linspace(0, len(h5_ts) - 1, n_q, dtype=np.int64)
+    if args.diverse_sample:
+        assert h5_emb is not None
+        # k-means on the L2-normalized CLIP embeddings, pick the
+        # closest-to-centroid frame from each cluster. Forces queries
+        # to span the visually-distinct regions of the trajectory
+        # instead of clustering on a stationary phase (e.g. walk_0
+        # spent its evenly-spaced picks all in a parking lot).
+        h5_idx = _kmeans_pick(h5_emb, n_q, rng_seed=0)
+        # Sort picks by timestamp so the anti-example prompt stays
+        # temporally coherent (recent captions = recent stretches).
+        h5_idx = h5_idx[np.argsort(h5_ts[h5_idx])]
+        print(f"[aria-qg] k-means diverse sample: {n_q} frames across {len(h5_emb)} embeddings",
+              file=sys.stderr)
+    else:
+        h5_idx = np.linspace(0, len(h5_ts) - 1, n_q, dtype=np.int64)
     picked_h5_ts = h5_ts[h5_idx]
 
     # Aria H5 ts and the VRS-cache ts are in the same device clock
