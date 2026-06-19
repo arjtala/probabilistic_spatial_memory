@@ -43,13 +43,23 @@ from psm_extraction.io.aria_vrs import read_vrs_session  # noqa: E402
 
 _CAPTION_PROMPT_OUTDOOR = (
     "You are looking at one frame of an egocentric video from a person "
-    "walking outdoors. Describe the SINGLE most visually distinctive "
-    "feature you can identify in this frame — a specific object (sign, "
-    "building, landmark, sculpture, vehicle, person doing something "
-    "specific), visible text or numbers, or an unusual viewpoint. Avoid "
-    "generic scene words like 'path', 'trees', 'sky', 'grass', 'person "
-    "walking', 'cloudy'. One concise sentence, ≤20 words. Start "
-    "directly with the description, no preamble."
+    "walking outdoors with head-mounted Project Aria glasses. The Aria "
+    "RGB sensor is mounted rotated 90 degrees by design, so EVERY frame "
+    "in this dataset appears sideways. This is a hardware feature, not "
+    "a property of any specific frame. DO NOT mention rotation, tilt, "
+    "sideways orientation, vertical/horizontal framing, or the camera "
+    "viewpoint itself. Mentally re-orient the frame upright and describe "
+    "the WORLD content as if you were standing there looking at the "
+    "scene. "
+    "Describe the SINGLE most visually distinctive feature in the scene "
+    "— a specific object (sign, building, landmark, sculpture, vehicle, "
+    "person doing something specific), visible text or numbers, or a "
+    "distinctive arrangement of objects. Avoid generic scene words like "
+    "'path', 'trees', 'sky', 'grass', 'person walking', 'cloudy'. Also "
+    "avoid meta-commentary like 'the image shows' or 'the camera "
+    "captures' — just describe the scene content directly. "
+    "One concise sentence, ≤20 words. Start directly with the description, "
+    "no preamble, no chain-of-thought."
 )
 
 _ANTI_EXAMPLE_SUFFIX = (
