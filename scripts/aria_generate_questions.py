@@ -147,13 +147,22 @@ def _kmeans_pick(emb: np.ndarray, k: int, *, rng_seed: int = 0,
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
-    ap.add_argument("--session-dir", type=Path, required=True,
-                    help="Aria session dir containing video.vrs (or similar)")
+    ap.add_argument("--session-dir", type=Path, default=None,
+                    help="Aria session dir containing video.vrs (or similar). "
+                         "Mutually exclusive with --frames-dir.")
+    ap.add_argument("--frames-dir", type=Path, default=None,
+                    help="Pre-extracted JPEG/PNG dir (e.g. LookOut's "
+                         "rgb_data/undistorted_aa/). Skips VRS read; "
+                         "frames are aligned 1:1 with H5 timestamps by "
+                         "list position. Mutually exclusive with "
+                         "--session-dir.")
     ap.add_argument("--features", type=Path, required=True,
                     help="features.h5 to derive H5 timestamps + session_id from")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--frame-cache", type=Path, default=None,
-                    help="dir for the 1 fps frame cache (default: <session>/frames_qg)")
+                    help="dir for the 1 fps frame cache when reading VRS "
+                         "(default: <session>/frames_qg). Ignored when "
+                         "--frames-dir is set (frames are already on disk).")
     ap.add_argument("--n-questions", type=int, default=30)
     ap.add_argument("--interval-half-window-sec", type=float, default=1.5)
     ap.add_argument("--model", choices=["gemini", "claude"], default="gemini")
@@ -167,23 +176,85 @@ def main() -> int:
                          "walk_0 evenly-spaced ⇒ all parking-lot captions).")
     args = ap.parse_args()
 
-    frame_cache = args.frame_cache or (args.session_dir / "frames_qg")
+    if (args.session_dir is None) == (args.frames_dir is None):
+        raise SystemExit(
+            "exactly one of --session-dir or --frames-dir is required"
+        )
 
-    # Populate / reuse the 1 fps JPEG cache via the project's VRS reader.
-    # This is the same code path the orchestrator uses during extraction
-    # with --keep-frames; the manifest check makes re-runs free.
-    print(f"[aria-qg] reading VRS frames from {args.session_dir}", file=sys.stderr)
-    vrs_out = read_vrs_session(args.session_dir, sample_fps=1.0,
-                               output_dir=frame_cache, verbose=True)
-    frame_paths = vrs_out.frame_paths
-    frame_ts = vrs_out.timestamps_s  # device-clock seconds, monotonic, ≈1Hz spacing
-    print(f"[aria-qg] {len(frame_paths)} cached frames span "
-          f"{frame_ts[0]:.1f}..{frame_ts[-1]:.1f}s", file=sys.stderr)
+    if args.frames_dir is not None:
+        # Pre-extracted-frames path. The LookOut layout is the prototype:
+        # rgb_data/undistorted_aa/ holds the full-rate (20 fps) PNGs and
+        # rgb_data/rgb_info.pkl holds (frame_idx, capture_ts_ns) tuples
+        # for each PNG. The features.h5 was written from a 1-fps subsample
+        # of those frames, so we need to redo the same subsample logic
+        # here to align H5 indices with PNG file paths.
+        rgb_info_path = args.frames_dir.parent / "rgb_info.pkl"
+        if rgb_info_path.exists():
+            import pickle
+            with rgb_info_path.open("rb") as f:
+                rgb_info = pickle.load(f)
+            full_ts_ns = np.array([int(r[1]) for r in rgb_info], dtype=np.int64)
+            full_ts_s = (full_ts_ns - full_ts_ns[0]) / 1e9
+            # Same greedy 1-fps subsample the extractor used.
+            target_fps = 1.0
+            period = 1.0 / target_fps
+            kept_idx = [0]
+            next_t = float(full_ts_s[0]) + period
+            for i in range(1, len(full_ts_s)):
+                if float(full_ts_s[i]) >= next_t:
+                    kept_idx.append(i)
+                    next_t = float(full_ts_s[i]) + period
+            # Frame_i ↔ kept_idx[i]'th PNG, named "<kept_idx[i]>_*.png"
+            # in the LookOut layout (see scripts/extract_lookout_sessions.py).
+            frame_paths = [
+                args.frames_dir / f"{idx}_undistorted_512_243.png"
+                for idx in kept_idx
+            ]
+            missing = [p for p in frame_paths if not p.exists()]
+            if missing:
+                raise SystemExit(
+                    f"{len(missing)}/{len(frame_paths)} subsampled PNGs missing under "
+                    f"{args.frames_dir} (first: {missing[0].name})"
+                )
+            frame_ts = np.array([full_ts_s[i] for i in kept_idx], dtype=np.float64)
+            print(f"[aria-qg] using {len(frame_paths)} LookOut-subsampled frames "
+                  f"from {args.frames_dir}", file=sys.stderr)
+        else:
+            # Generic glob path (no rgb_info.pkl) — assume frames are
+            # already in 1:1 correspondence with H5 timestamps (e.g. an
+            # extractor variant that kept them at 1 fps directly).
+            frame_paths = sorted(
+                list(args.frames_dir.glob("*.jpg"))
+                + list(args.frames_dir.glob("*.JPG"))
+                + list(args.frames_dir.glob("*.png"))
+                + list(args.frames_dir.glob("*.PNG"))
+            )
+            if not frame_paths:
+                raise SystemExit(f"no .jpg/.png frames under {args.frames_dir}")
+            frame_ts = np.arange(len(frame_paths), dtype=np.float64)
+            print(f"[aria-qg] using {len(frame_paths)} pre-extracted frames "
+                  f"(no rgb_info.pkl; assuming 1:1 with H5)", file=sys.stderr)
+    else:
+        # VRS path. Populate / reuse the 1 fps JPEG cache via the
+        # project's VRS reader. Same code path the orchestrator uses
+        # during extraction with --keep-frames; the manifest check
+        # makes re-runs free.
+        frame_cache = args.frame_cache or (args.session_dir / "frames_qg")
+        print(f"[aria-qg] reading VRS frames from {args.session_dir}", file=sys.stderr)
+        vrs_out = read_vrs_session(args.session_dir, sample_fps=1.0,
+                                   output_dir=frame_cache, verbose=True)
+        frame_paths = vrs_out.frame_paths
+        frame_ts = vrs_out.timestamps_s
+        print(f"[aria-qg] {len(frame_paths)} cached frames span "
+              f"{frame_ts[0]:.1f}..{frame_ts[-1]:.1f}s", file=sys.stderr)
 
     # Load H5 timestamps to keep the questions.yaml intervals
     # consistent with eval_lookback's matching against clip/timestamps.
     with h5py.File(args.features, "r") as h:
-        session_id = h.attrs.get("session_id", args.session_dir.name)
+        session_id = h.attrs.get(
+            "session_id",
+            (args.session_dir.name if args.session_dir else args.frames_dir.parent.name),
+        )
         if isinstance(session_id, bytes):
             session_id = session_id.decode()
         g = next((h[k] for k in ("clip", "dino", "jepa") if k in h), None)
