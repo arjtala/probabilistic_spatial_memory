@@ -23,11 +23,14 @@
 #   8 SSC3_jan17_               Stanford SSC   186m
 #   9 Hillsdale6_jan14          Hillsdale      178m
 #
-# 5 locations × 2 sequences each, all bbox >= 178m. Submit twice for
-# the clipL + bigG encoder ablation:
+# Submit twice for the clipL + bigG encoder ablation. NOTE: pass
+# `--export=ALL,...` (not just `--export=...`) so the conda init
+# environment from your login shell is preserved alongside the
+# overrides; the script also falls back to sourcing conda.sh
+# explicitly, but ALL is the cleanest signal of intent:
 #
-#   sbatch                              scripts/slurm/extract_lookout.sbatch
-#   sbatch --export=MODEL=clip_bigg     scripts/slurm/extract_lookout.sbatch
+#   sbatch --export=ALL                       scripts/slurm/extract_lookout.sbatch
+#   sbatch --export=ALL,MODEL=clip_bigg       scripts/slurm/extract_lookout.sbatch
 #
 # Env knobs:
 #   ROOT       /checkpoint/dream/arjangt/LookOut-unzipped/aria_navigation_blurred
@@ -77,7 +80,23 @@ if [[ "$SLURM_ARRAY_TASK_ID" -ge "$N" ]]; then
 fi
 NAME="${SEQ_ARR[$SLURM_ARRAY_TASK_ID]}"
 
-source activate "$CONDA_ENV"
+# Activate the conda env explicitly via the hook so we don't rely on
+# PATH coming through SBATCH's env propagation. `source activate` (the
+# old shortcut) silently fails with "activate: No such file or directory"
+# when --export drops the conda-init PATH entries — which happened on
+# the bigG array when the submit used `--export=MODEL=...` instead of
+# `--export=ALL,MODEL=...`.
+CONDA_BASE="${CONDA_BASE:-/home/arjangt/.conda}"
+if [[ -f "$CONDA_BASE/etc/profile.d/conda.sh" ]]; then
+  source "$CONDA_BASE/etc/profile.d/conda.sh"
+elif [[ -f /opt/conda/etc/profile.d/conda.sh ]]; then
+  source /opt/conda/etc/profile.d/conda.sh
+else
+  echo "[slurm] ERR: conda.sh not found; cannot activate env" >&2
+  exit 1
+fi
+conda activate "$CONDA_ENV"
+
 export PYTHONUNBUFFERED=1
 export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
 export TRANSFORMERS_OFFLINE="${TRANSFORMERS_OFFLINE:-1}"

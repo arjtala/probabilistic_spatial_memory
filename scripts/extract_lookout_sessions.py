@@ -119,26 +119,32 @@ def extract_one(
     rgb_info_path = sequence_dir / "rgb_data" / "rgb_info.pkl"
     with rgb_info_path.open("rb") as f:
         rgb_info = pickle.load(f)
-    frame_ids = np.array([int(r[0]) for r in rgb_info], dtype=np.int64)
+    # rgb_info.pkl uses an ABSOLUTE capture index (starts at 3-4, the
+    # first valid frame after the device boot/warm-up). The PNG
+    # filenames in undistorted_aa/ are 0..N-1 SEQUENTIAL — they match
+    # the POSITION in the rgb_info list, not the absolute index.
+    # Empirically:
+    #   Fostersquare1: rgb_info ids 3..8625 (N=8623),  PNGs 0..8622 (off by +3)
+    #   BurlingameDT5: rgb_info ids 3..5209 (N=5207),  PNGs 0..5206 (off by +3)
+    #   SanmateoDT2:   rgb_info ids 4..4987 (N=4984),  PNGs 0..4983 (off by +4)
+    # So PNG index = enumerate index, NOT rgb_info[i][0].
     frame_ts_ns = np.array([int(r[1]) for r in rgb_info], dtype=np.int64)
-    # Convert to seconds from the first frame.
     frame_ts_s = (frame_ts_ns - frame_ts_ns[0]) / 1e9
-    print(f"  rgb_info: {len(frame_ids)} frames at "
-          f"{(len(frame_ids)-1)/max(1e-9, frame_ts_s[-1]):.1f} fps native, "
+    print(f"  rgb_info: {len(rgb_info)} frames at "
+          f"{(len(rgb_info)-1)/max(1e-9, frame_ts_s[-1]):.1f} fps native, "
           f"target fps={target_fps}", file=sys.stderr)
 
     # Subsample to target fps.
     kept_idx = _pick_subsample_indices(frame_ts_s, target_fps)
     kept_ts = frame_ts_s[kept_idx]
-    kept_frame_ids = frame_ids[kept_idx]
     print(f"  subsampled to {len(kept_idx)} frames", file=sys.stderr)
 
-    # Build PNG paths.
+    # Build PNG paths from the sequential position in rgb_info.
     frames_dir = find_frame_dir(sequence_dir)
     if frames_dir is None:
         raise SystemExit(f"no frames dir at {sequence_dir}/rgb_data/undistorted_aa")
     png_paths = [
-        frames_dir / f"{fid}_undistorted_512_243.png" for fid in kept_frame_ids
+        frames_dir / f"{int(i)}_undistorted_512_243.png" for i in kept_idx
     ]
     missing = [p for p in png_paths if not p.exists()]
     if missing:
