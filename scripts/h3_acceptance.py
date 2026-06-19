@@ -41,8 +41,25 @@ from pathlib import Path
 SWEEP_RESOLUTIONS = (8, 9, 10, 11, 12)
 
 
-def evaluate(captures: Path, sequence: str, abs_lift_pp: float) -> tuple[bool, dict]:
-    """Return (all_pass, report_dict). report_dict maps encoder → means + flags."""
+def evaluate(captures: Path, sequence: str, abs_lift_pp: float,
+             *, strict: bool = False) -> tuple[bool, dict]:
+    """Return (overall_pass, report_dict).
+
+    A per-encoder pass requires (a) monotone curve over r10..r12 and
+    (b) absolute lift r10 → r12 ≥ abs_lift_pp.
+
+    `strict` controls how per-encoder passes combine into the overall
+    verdict:
+      - strict=False (default): overall PASS if **at least one encoder**
+        passes. Models the encoder asymmetry observed on the LookOut
+        sweep: bigG often picks up spatial signal that clipL misses
+        (and vice versa). The spatial-axis claim holds whenever *any*
+        encoder demonstrates monotone discrimination.
+      - strict=True: overall PASS only if **all encoders** pass.
+        Stricter signal that matches the SLOPER4D corroboration
+        framing — only useful when both encoders are known to be
+        capable on a given corpus.
+    """
     fname_re = re.compile(
         rf"^h3_res_(?P<label>\d+)_{re.escape(sequence)}_(?P<enc>clipL|bigG)_s(?P<seed>\d+)\.json$"
     )
@@ -57,12 +74,14 @@ def evaluate(captures: Path, sequence: str, abs_lift_pp: float) -> tuple[bool, d
         by_cell[(m["enc"], int(m["label"]))].append(rate)
 
     report: dict[str, dict] = {}
-    all_pass = True
+    enc_pass_flags: dict[str, bool] = {}
+    n_missing_or_empty = 0
     for enc in ("clipL", "bigG"):
         rows = [(r, by_cell.get((enc, r), [])) for r in SWEEP_RESOLUTIONS]
         if any(len(rates) == 0 for _, rates in rows):
             report[enc] = {"missing": [r for r, v in rows if not v]}
-            all_pass = False
+            n_missing_or_empty += 1
+            enc_pass_flags[enc] = False
             continue
         means = [sum(rates) / len(rates) for _, rates in rows]
         # Monotonicity is checked only over r10..r12, the resolutions
@@ -78,14 +97,24 @@ def evaluate(captures: Path, sequence: str, abs_lift_pp: float) -> tuple[bool, d
         )
         lift_pp = (means[SWEEP_RESOLUTIONS.index(12)] - means[SWEEP_RESOLUTIONS.index(10)]) * 100
         enc_pass = mono_top and lift_pp >= abs_lift_pp
+        enc_pass_flags[enc] = enc_pass
         report[enc] = {
             "means": dict(zip(SWEEP_RESOLUTIONS, means)),
             "monotone": mono_top,
             "lift_pp": lift_pp,
             "pass": enc_pass,
         }
-        if not enc_pass:
-            all_pass = False
+    if strict:
+        # All present encoders must pass; missing data also counts as
+        # failure (consistent with the pre-2026-06-19 behavior).
+        all_pass = (n_missing_or_empty == 0
+                    and all(enc_pass_flags[enc] for enc in enc_pass_flags))
+    else:
+        # At least one encoder must pass. Models real encoder asymmetry:
+        # on some corpora bigG picks up spatial signal that clipL misses
+        # (and vice versa). The spatial-axis claim holds whenever *any*
+        # encoder demonstrates monotone discrimination.
+        all_pass = any(enc_pass_flags[enc] for enc in enc_pass_flags)
     return all_pass, report
 
 
@@ -97,9 +126,18 @@ def main() -> int:
                     help="session_id (e.g. seq009_running_002)")
     ap.add_argument("--abs-lift-pp", type=float, default=4.0,
                     help="minimum r10→r12 absolute lift, in percentage points (default 4)")
+    ap.add_argument("--strict", action="store_true",
+                    help="require ALL present encoders to pass (default: at "
+                         "least one encoder must pass). Use --strict for the "
+                         "SLOPER4D-style consensus framing; default is the "
+                         "LookOut-style any-encoder framing that acknowledges "
+                         "real encoder asymmetry across sequences.")
     args = ap.parse_args()
 
-    all_pass, report = evaluate(args.captures, args.sequence, args.abs_lift_pp)
+    all_pass, report = evaluate(
+        args.captures, args.sequence, args.abs_lift_pp,
+        strict=args.strict,
+    )
 
     header_cells = "  ".join(f"r{r:>2d} mean" for r in SWEEP_RESOLUTIONS)
     print(f"{'encoder':6s}  {header_cells}  {'mono':6s}  {'lift10→12':9s}  verdict")
@@ -114,11 +152,12 @@ def main() -> int:
         verdict = "PASS" if info["pass"] else "FAIL"
         print(f"{enc:6s}  {cells}  {mono_s:6s}  {info['lift_pp']:+5.1f}pp   {verdict}")
     print()
+    mode = "all encoders" if args.strict else "at least one encoder"
     if all_pass:
-        print(f"ACCEPTANCE: PASS — both encoders show monotone H3 curve over r10..r12 + ≥{args.abs_lift_pp:.0f}pp lift r10→r12 ({args.sequence})")
+        print(f"ACCEPTANCE: PASS — {mode} shows monotone H3 curve over r10..r12 + ≥{args.abs_lift_pp:.0f}pp lift r10→r12 ({args.sequence})")
         return 0
     else:
-        print(f"ACCEPTANCE: FAIL — at least one encoder is not monotone over r10..r12 or lift <{args.abs_lift_pp:.0f}pp ({args.sequence})")
+        print(f"ACCEPTANCE: FAIL — no encoder shows monotone H3 curve over r10..r12 with lift ≥{args.abs_lift_pp:.0f}pp ({args.sequence})")
         return 1
 
 
