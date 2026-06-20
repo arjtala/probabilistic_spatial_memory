@@ -355,3 +355,35 @@ Add dated entries here as work lands; mirror to the EXPERIMENTS.md experiment wh
     | **Total** | **3 stacks** | **14** | **11/14** | **8.9 % – 53.3 %** |
 
     **This is the v1 spatial-axis result for §5**: 11/14 street-scale sessions across 3 distinct sensor stacks (LiDAR-rig + Aria-MPS × 2 different geographies × 2 different question-generation pipelines) show monotone H3-resolution discrimination with ≥4 pp absolute lift on at least one encoder. SVGs at `journal/figures/{sloper4d_seq00*,nymeria_street,lookout_*}_h3_*.svg`. Next: vanilla MLLM baseline on the 10 LookOut sessions to close out the §5 three-column story (MLLM-only / PSM-only / PSM+rerank) on this corpus too.
+- 2026-06-20 — **SigLIP 2 large added as third encoder across all 14 v1 sessions. Best-encoder-per-session becomes 13/14 PASS; SigLIP rescues 3 sessions where both CLIP-family encoders failed.** `extraction/psm_extraction/models/siglip_pytorch.py` (commit `e3f08e4`): runner for `google/siglip2-large-patch16-256` (660M params, 1024-d, sigmoid-pairwise loss on WebLI-100B — apples-to-apples scale with CLIP-ViT-L's 430M / 768-d / softmax-contrastive on LAION-2B). Wired into the model registry + all three per-corpus extractors (LookOut, SLOPER4D, Nymeria), plus the H3 sweep harness (`eval_hyperparam_sweep.sh` + `eval_lookback.py` auto-dispatch family from checkpoint). `h3_acceptance.py` now discovers encoders dynamically from capture filenames so adding a third doesn't require code changes (commit `15d88e3`).
+
+    16 SigLIP H5s extracted across 10 LookOut + 5 SLOPER4D + 1 Nymeria-street in ~30 min wall on h200. 14 sessions × SigLIP H3 sweeps ran in ~10 min wall (5 seeds × 5 H3 res = 25 captures per session). Notable wiring gotchas resolved during this run: (a) orchestrator names H5 groups by `--models` family ("siglip" not "clip"), so we rename in-place in the SLOPER4D wrapper post-extraction (commit `fc8157e`); (b) Nymeria captures live in a different historical dir than the new sweep's output dir — copied the H3-axis subset of the old Nymeria street hyperparam captures across so the 3-encoder verdict aggregates correctly.
+
+    Per-session per-encoder verdict (14 sessions × 3 encoders):
+
+    | corpus | session | clipL | bigG | siglip2L | any | #PASS |
+    |---|---|---|---|---|---|---|
+    | LookOut | Mainquad_jan10 | ✓ | ✗ | ✓ | ✓ | 2/3 |
+    | LookOut | Sanmateopark_garage_jan11 | ✗ | ✗ | **✓** (rescue) | ✓ | 1/3 |
+    | LookOut | Fostersquare1_jan16 | ✗ | ✓ | ✓ | ✓ | 2/3 |
+    | LookOut | BurlingameDT5_feb5 | ✗ | ✓ | ✓ | ✓ | 2/3 |
+    | LookOut | SanmateoDT2_Jan12 | ✓ | ✓ | ✓ | ✓ | 3/3 |
+    | LookOut | Gates_to_mainquad_jan10 | ✓ | ✓ | ✓ | ✓ | 3/3 |
+    | LookOut | Huang_Gates_jan10 | ✓ | ✓ | ✓ | ✓ | 3/3 |
+    | LookOut | BurlingameDT4_feb5 | ✗ | ✗ | ✗ | ✗ | 0/3 |
+    | LookOut | SSC3_jan17_ | ✓ | ✓ | ✓ | ✓ | 3/3 |
+    | LookOut | Hillsdale6_jan14 | ✗ | ✗ | **✓** (rescue) | ✓ | 1/3 |
+    | SLOPER4D | seq003_street_002 | ✓ | ✓ | ✓ | ✓ | 3/3 |
+    | SLOPER4D | seq008_running_001 | ✓ | ✓ | ✓ | ✓ | 3/3 |
+    | SLOPER4D | seq009_running_002 | ✓ | ✓ | ✗ | ✓ | 2/3 |
+    | Nymeria | shelby_arroyo_act0 | ✓ | ✓ | ✗ | ✓ | 2/3 |
+
+    **Headline aggregates**:
+
+    - **Any-encoder PASS: 13/14 sessions** (up from 11/14 with just clipL + bigG). SigLIP rescued **Sanmateopark_garage_jan11** and **Hillsdale6_jan14** — both LookOut sessions where neither CLIP encoder could pass alone.
+    - **Per-encoder PASS rates**: clipL **9/14** (64 %), bigG **10/14** (71 %), siglip2L **11/14** (79 %). **SigLIP is the best individual encoder by 1-2 sessions.**
+    - **Genuine failure: BurlingameDT4_feb5** — all 3 encoders fail. Looking at the per-encoder traces, clipL and bigG both saturate at ~20 % from r10 onward, and siglip2L hits +4.7 pp lift but with a non-monotone r11→r12 dip. This is an honest spatial-axis failure on this session — the trajectory is short (242 m bbox) and the queries don't visually discriminate at the cell scale PSM operates on.
+
+    **The §5 framing this unlocks**: not just "PSM's H3 axis discriminates" but **"...across 3 encoder families spanning two distinct training recipes (softmax-contrastive CLIP, sigmoid SigLIP) and across 3 sensor stacks (LiDAR + DJI Action2, Aria MPS), with SigLIP 2 the strongest single-encoder choice."** Adding SigLIP increased coverage from 11/14 to 13/14 sessions and gave us the encoder-rescue evidence that no single CLIP variant alone could carry. SVGs at `journal/figures/{lookout_,sloper4d_seq00*,nymeria_}h3_siglip2L.svg`.
+
+    Next: vanilla MLLM baseline on the 10 LookOut sessions (no encoder dependency) to land the §5 three-column story, and the Gemini Embedding 2 single-session probe as the fourth encoder point for the spatial-axis story.

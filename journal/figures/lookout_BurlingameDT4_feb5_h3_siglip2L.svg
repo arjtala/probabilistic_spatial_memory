@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 840" font-family="Helvetica, Arial, sans-serif">
+<text x="270.0" y="28" text-anchor="middle" font-size="15" font-weight="600" fill="#1a1a1a">PSM hyperparameter sensitivity (siglip2L)</text>
+<text x="270.0" y="46" text-anchor="middle" font-size="11" fill="#555">3 sessions × 5 seeds × 20 questions; one axis varied at a time, others held at v2 defaults</text>
+<text x="285" y="88" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a1a">H3 resolution</text>
+<line x1="70" y1="110" x2="70" y2="250" stroke="#333" stroke-width="1.2"/>
+<line x1="66" y1="250.0" x2="70" y2="250.0" stroke="#666" stroke-width="1"/>
+<text x="62" y="254.0" text-anchor="end" font-size="10" fill="#666">50%</text>
+<line x1="70" y1="250.0" x2="500" y2="250.0" stroke="#e5e5e5" stroke-width="0.5"/>
+<line x1="66" y1="222.0" x2="70" y2="222.0" stroke="#666" stroke-width="1"/>
+<text x="62" y="226.0" text-anchor="end" font-size="10" fill="#666">60%</text>
+<line x1="70" y1="222.0" x2="500" y2="222.0" stroke="#e5e5e5" stroke-width="0.5"/>
+<line x1="66" y1="194.0" x2="70" y2="194.0" stroke="#666" stroke-width="1"/>
+<text x="62" y="198.0" text-anchor="end" font-size="10" fill="#666">70%</text>
+<line x1="70" y1="194.0" x2="500" y2="194.0" stroke="#e5e5e5" stroke-width="0.5"/>
+<line x1="66" y1="166.0" x2="70" y2="166.0" stroke="#666" stroke-width="1"/>
+<text x="62" y="170.0" text-anchor="end" font-size="10" fill="#666">80%</text>
+<line x1="70" y1="166.0" x2="500" y2="166.0" stroke="#e5e5e5" stroke-width="0.5"/>
+<line x1="66" y1="138.0" x2="70" y2="138.0" stroke="#666" stroke-width="1"/>
+<text x="62" y="142.0" text-anchor="end" font-size="10" fill="#666">90%</text>
+<line x1="70" y1="138.0" x2="500" y2="138.0" stroke="#e5e5e5" stroke-width="0.5"/>
+<line x1="66" y1="110.0" x2="70" y2="110.0" stroke="#666" stroke-width="1"/>
+<text x="62" y="114.0" text-anchor="end" font-size="10" fill="#666">100%</text>
+<line x1="70" y1="110.0" x2="500" y2="110.0" stroke="#e5e5e5" stroke-width="0.5"/>
+<text x="20" y="180" text-anchor="middle" font-size="11" fill="#333" transform="rotate(-90 20 180)">exemplar Hit @5</text>
+<line x1="70" y1="250" x2="500" y2="250" stroke="#333" stroke-width="1.2"/>
+<line x1="113.0" y1="250" x2="113.0" y2="254" stroke="#666" stroke-width="1"/>
+<text x="113.0" y="266" text-anchor="middle" font-size="10" fill="#666">8</text>
+<line x1="199.0" y1="250" x2="199.0" y2="254" stroke="#666" stroke-width="1"/>
+<text x="199.0" y="266" text-anchor="middle" font-size="10" fill="#666">9</text>
+<line x1="285.0" y1="250" x2="285.0" y2="254" stroke="#666" stroke-width="1"/>
+<text x="285.0" y="266" text-anchor="middle" font-size="10" fill="#666">10</text>
+<line x1="371.0" y1="250" x2="371.0" y2="254" stroke="#666" stroke-width="1"/>
+<text x="371.0" y="266" text-anchor="middle" font-size="10" fill="#666">11</text>
+<line x1="457.0" y1="250" x2="457.0" y2="254" stroke="#666" stroke-width="1"/>
+<text x="457.0" y="266" text-anchor="middle" font-size="10" fill="#666">12</text>
+<line x1="285.0" y1="110" x2="285.0" y2="250" stroke="#a3a3a3" stroke-width="1" stroke-dasharray="4 3"/>
+<text x="289.0" y="122" text-anchor="start" font-size="10" fill="#a3a3a3" font-style="italic">v2 default</text>
+<polyline points="113.0,250.0 199.0,250.0 285.0,250.0 371.0,250.0 457.0,250.0" fill="none" stroke="#1f4e79" stroke-width="1.8" opacity="0.85"/>
+<line x1="113.0" y1="250.0" x2="113.0" y2="250.0" stroke="#1f4e79" stroke-width="1.4"/>
+<line x1="109.0" y1="250.0" x2="117.0" y2="250.0" stroke="#1f4e79" stroke-width="1.4"/>
+<line x1="109.0" y1="250.0" x2="117.0" y2="250.0" stroke="#1f4e79" stroke-width="1.4"/>
+<circle cx="113.0" cy="250.0" r="5" fill="#1f4e79"/>
+<circle cx="199.0" cy="250.0" r="5" fill="#1f4e79"/>
+<line x1="285.0" y1="250.0" x2="285.0" y2="250.0" stroke="#1f4e79" stroke-width="1.4"/>
+<line x1="281.0" y1="250.0" x2="289.0" y2="250.0" stroke="#1f4e79" stroke-width="1.4"/>
+<line x1="281.0" y1="250.0" x2="289.0" y2="250.0" stroke="#1f4e79" stroke-width="1.4"/>
+<circle cx="285.0" cy="250.0" r="5" fill="#1f4e79"/>
+<circle cx="371.0" cy="250.0" r="5" fill="#1f4e79"/>
+<circle cx="457.0" cy="250.0" r="5" fill="#1f4e79"/>
+</svg>
