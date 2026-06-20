@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420" font-family="Helvetica, Arial, sans-serif" font-size="12">
+<text x="360" y="22" text-anchor="middle" font-size="14" font-weight="bold">H3 resolution sensitivity (mean ±1σ across 14 sessions)</text>
+<line x1="80" y1="350" x2="580" y2="350" stroke="black" stroke-width="1"/>
+<line x1="80" y1="50" x2="80" y2="350" stroke="black" stroke-width="1"/>
+<line x1="75" y1="350.0" x2="80" y2="350.0" stroke="black" stroke-width="1"/>
+<text x="70" y="354.0" text-anchor="end">0%</text>
+<line x1="80" y1="350.0" x2="580" y2="350.0" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
+<line x1="75" y1="316.7" x2="80" y2="316.7" stroke="black" stroke-width="1"/>
+<text x="70" y="320.7" text-anchor="end">5%</text>
+<line x1="80" y1="316.7" x2="580" y2="316.7" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
+<line x1="75" y1="283.3" x2="80" y2="283.3" stroke="black" stroke-width="1"/>
+<text x="70" y="287.3" text-anchor="end">10%</text>
+<line x1="80" y1="283.3" x2="580" y2="283.3" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
+<line x1="75" y1="250.0" x2="80" y2="250.0" stroke="black" stroke-width="1"/>
+<text x="70" y="254.0" text-anchor="end">15%</text>
+<line x1="80" y1="250.0" x2="580" y2="250.0" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
+<line x1="75" y1="216.7" x2="80" y2="216.7" stroke="black" stroke-width="1"/>
+<text x="70" y="220.7" text-anchor="end">20%</text>
+<line x1="80" y1="216.7" x2="580" y2="216.7" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
+<line x1="75" y1="183.3" x2="80" y2="183.3" stroke="black" stroke-width="1"/>
+<text x="70" y="187.3" text-anchor="end">25%</text>
+<line x1="80" y1="183.3" x2="580" y2="183.3" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
+<line x1="75" y1="150.0" x2="80" y2="150.0" stroke="black" stroke-width="1"/>
+<text x="70" y="154.0" text-anchor="end">30%</text>
+<line x1="80" y1="150.0" x2="580" y2="150.0" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
+<line x1="75" y1="116.7" x2="80" y2="116.7" stroke="black" stroke-width="1"/>
+<text x="70" y="120.7" text-anchor="end">35%</text>
+<line x1="80" y1="116.7" x2="580" y2="116.7" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
+<line x1="75" y1="83.3" x2="80" y2="83.3" stroke="black" stroke-width="1"/>
+<text x="70" y="87.3" text-anchor="end">40%</text>
+<line x1="80" y1="83.3" x2="580" y2="83.3" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
+<line x1="75" y1="50.0" x2="80" y2="50.0" stroke="black" stroke-width="1"/>
+<text x="70" y="54.0" text-anchor="end">45%</text>
+<line x1="80" y1="50.0" x2="580" y2="50.0" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
+<line x1="80.0" y1="350" x2="80.0" y2="355" stroke="black" stroke-width="1"/>
+<text x="80.0" y="370" text-anchor="middle">r8</text>
+<line x1="205.0" y1="350" x2="205.0" y2="355" stroke="black" stroke-width="1"/>
+<text x="205.0" y="370" text-anchor="middle">r9</text>
+<line x1="330.0" y1="350" x2="330.0" y2="355" stroke="black" stroke-width="1"/>
+<text x="330.0" y="370" text-anchor="middle">r10</text>
+<line x1="455.0" y1="350" x2="455.0" y2="355" stroke="black" stroke-width="1"/>
+<text x="455.0" y="370" text-anchor="middle">r11</text>
+<line x1="580.0" y1="350" x2="580.0" y2="355" stroke="black" stroke-width="1"/>
+<text x="580.0" y="370" text-anchor="middle">r12</text>
+<text x="330" y="400" text-anchor="middle" font-size="13">H3 resolution (finer →)</text>
+<text x="20" y="200" text-anchor="middle" font-size="13" transform="rotate(-90 20 200)">exemplar Hit @ 5 (%)</text>
+<polygon points="80.0,246.7 205.0,214.7 330.0,175.7 455.0,151.5 580.0,110.3 580.0,255.5 455.0,277.1 330.0,297.1 205.0,315.0 80.0,308.6" fill="#1f77b4" fill-opacity="0.15" stroke="none"/>
+<path d="M 80.0 277.6 L 205.0 264.9 L 330.0 236.4 L 455.0 214.3 L 580.0 182.9" stroke="#1f77b4" stroke-width="2" fill="none"/>
+<circle cx="80.0" cy="277.6" r="3" fill="#1f77b4" stroke="white" stroke-width="1"/>
+<circle cx="205.0" cy="264.9" r="3" fill="#1f77b4" stroke="white" stroke-width="1"/>
+<circle cx="330.0" cy="236.4" r="3" fill="#1f77b4" stroke="white" stroke-width="1"/>
+<circle cx="455.0" cy="214.3" r="3" fill="#1f77b4" stroke="white" stroke-width="1"/>
+<circle cx="580.0" cy="182.9" r="3" fill="#1f77b4" stroke="white" stroke-width="1"/>
+<polygon points="80.0,224.5 205.0,191.8 330.0,139.2 455.0,102.2 580.0,74.2 580.0,252.0 455.0,261.7 330.0,282.6 205.0,299.9 80.0,299.8" fill="#ff7f0e" fill-opacity="0.15" stroke="none"/>
+<path d="M 80.0 262.1 L 205.0 245.8 L 330.0 210.9 L 455.0 181.9 L 580.0 163.1" stroke="#ff7f0e" stroke-width="2" fill="none"/>
+<circle cx="80.0" cy="262.1" r="3" fill="#ff7f0e" stroke="white" stroke-width="1"/>
+<circle cx="205.0" cy="245.8" r="3" fill="#ff7f0e" stroke="white" stroke-width="1"/>
+<circle cx="330.0" cy="210.9" r="3" fill="#ff7f0e" stroke="white" stroke-width="1"/>
+<circle cx="455.0" cy="181.9" r="3" fill="#ff7f0e" stroke="white" stroke-width="1"/>
+<circle cx="580.0" cy="163.1" r="3" fill="#ff7f0e" stroke="white" stroke-width="1"/>
+<polygon points="80.0,240.4 205.0,208.7 330.0,164.1 455.0,117.5 580.0,71.6 580.0,212.1 455.0,240.7 330.0,287.1 205.0,300.2 80.0,302.2" fill="#2ca02c" fill-opacity="0.15" stroke="none"/>
+<path d="M 80.0 271.3 L 205.0 254.5 L 330.0 225.6 L 455.0 179.1 L 580.0 141.8" stroke="#2ca02c" stroke-width="2" fill="none"/>
+<circle cx="80.0" cy="271.3" r="3" fill="#2ca02c" stroke="white" stroke-width="1"/>
+<circle cx="205.0" cy="254.5" r="3" fill="#2ca02c" stroke="white" stroke-width="1"/>
+<circle cx="330.0" cy="225.6" r="3" fill="#2ca02c" stroke="white" stroke-width="1"/>
+<circle cx="455.0" cy="179.1" r="3" fill="#2ca02c" stroke="white" stroke-width="1"/>
+<circle cx="580.0" cy="141.8" r="3" fill="#2ca02c" stroke="white" stroke-width="1"/>
+<text x="600" y="68" font-weight="bold">Encoder</text>
+<line x1="600" y1="80" x2="620" y2="80" stroke="#1f77b4" stroke-width="3"/>
+<circle cx="610" cy="80" r="3" fill="#1f77b4" stroke="white" stroke-width="1"/>
+<text x="626" y="84">CLIP ViT-L</text>
+<line x1="600" y1="102" x2="620" y2="102" stroke="#ff7f0e" stroke-width="3"/>
+<circle cx="610" cy="102" r="3" fill="#ff7f0e" stroke="white" stroke-width="1"/>
+<text x="626" y="106">CLIP ViT-bigG</text>
+<line x1="600" y1="124" x2="620" y2="124" stroke="#2ca02c" stroke-width="3"/>
+<circle cx="610" cy="124" r="3" fill="#2ca02c" stroke="white" stroke-width="1"/>
+<text x="626" y="128">SigLIP 2 large</text>
+<text x="710" y="408" text-anchor="end" font-size="10" fill="#666">aggregated across 14 sessions (3 corpora)</text>
+</svg>

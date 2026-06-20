@@ -386,6 +386,22 @@ scale \psm{} operates on.}
 \label{tab:multi-corpus-h3}
 \end{table*}
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/f3_multi_corpus_h3.pdf}
+\caption{H3 resolution sensitivity aggregated across the 14
+v1 street-scale sessions (3 corpora) and 3 encoder families.
+Lines = corpus-mean Hit@5 at each resolution; shaded bands =
+±1$\sigma$ across sessions. All three encoders monotone on the
+mean (10.9$\to$25.1\,\% on \texttt{clipL}, 13.2$\to$28.0\,\% on
+\texttt{bigG}, 11.8$\to$31.2\,\% on \texttt{siglip2L} from
+$r{=}8$ to $r{=}12$). At the $r{=}12$ operating point
+\texttt{siglip2L} is the best single encoder (31.2\,\% vs
+28.0\,\% / 25.1\,\%), consistent with its per-session lead in
+Table~\ref{tab:multi-corpus-h3} (11/14 PASS).}
+\label{fig:f3-multi-corpus}
+\end{figure}
+
 Three patterns visible in Table~\ref{tab:multi-corpus-h3}.
 (a)~\textbf{Cross-corpus robustness}: the spatial-axis result
 replicates on every corpus we tested --- SLOPER4D 3/3, Nymeria
