@@ -61,7 +61,7 @@ def evaluate(captures: Path, sequence: str, abs_lift_pp: float,
         capable on a given corpus.
     """
     fname_re = re.compile(
-        rf"^h3_res_(?P<label>\d+)_{re.escape(sequence)}_(?P<enc>clipL|bigG)_s(?P<seed>\d+)\.json$"
+        rf"^h3_res_(?P<label>\d+)_{re.escape(sequence)}_(?P<enc>[A-Za-z][A-Za-z0-9]*)_s(?P<seed>\d+)\.json$"
     )
     by_cell: dict[tuple[str, int], list[float]] = defaultdict(list)
     for p in sorted(captures.glob("h3_res_*.json")):
@@ -76,7 +76,18 @@ def evaluate(captures: Path, sequence: str, abs_lift_pp: float,
     report: dict[str, dict] = {}
     enc_pass_flags: dict[str, bool] = {}
     n_missing_or_empty = 0
-    for enc in ("clipL", "bigG"):
+    # Discover encoders dynamically from the capture filenames so that
+    # adding a third (e.g. siglip2L) doesn't require an h3_acceptance.py
+    # change. Sort known encoders first (clipL, bigG) for stable output
+    # ordering, then any newer ones in alphabetical order.
+    discovered = sorted({enc for enc, _ in by_cell.keys()})
+    known_order = ["clipL", "bigG", "siglip2L"]
+    encoders = [e for e in known_order if e in discovered] + [
+        e for e in discovered if e not in known_order
+    ]
+    if not encoders:
+        return False, {}
+    for enc in encoders:
         rows = [(r, by_cell.get((enc, r), [])) for r in SWEEP_RESOLUTIONS]
         if any(len(rates) == 0 for _, rates in rows):
             report[enc] = {"missing": [r for r, v in rows if not v]}
@@ -140,17 +151,17 @@ def main() -> int:
     )
 
     header_cells = "  ".join(f"r{r:>2d} mean" for r in SWEEP_RESOLUTIONS)
-    print(f"{'encoder':6s}  {header_cells}  {'mono':6s}  {'lift10→12':9s}  verdict")
-    print("-" * (16 + 9 * len(SWEEP_RESOLUTIONS) + 30))
-    for enc in ("clipL", "bigG"):
+    print(f"{'encoder':9s}  {header_cells}  {'mono':6s}  {'lift10→12':9s}  verdict")
+    print("-" * (19 + 9 * len(SWEEP_RESOLUTIONS) + 30))
+    for enc in report.keys():
         info = report.get(enc, {})
         if "missing" in info:
-            print(f"{enc:6s}  MISSING resolutions: {info['missing']}")
+            print(f"{enc:9s}  MISSING resolutions: {info['missing']}")
             continue
         cells = "  ".join(f"{info['means'][r]*100:6.1f}%" for r in SWEEP_RESOLUTIONS)
         mono_s = "yes" if info["monotone"] else "no"
         verdict = "PASS" if info["pass"] else "FAIL"
-        print(f"{enc:6s}  {cells}  {mono_s:6s}  {info['lift_pp']:+5.1f}pp   {verdict}")
+        print(f"{enc:9s}  {cells}  {mono_s:6s}  {info['lift_pp']:+5.1f}pp   {verdict}")
     print()
     mode = "all encoders" if args.strict else "at least one encoder"
     if all_pass:
