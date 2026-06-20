@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 460" font-family="Helvetica, Arial, sans-serif" font-size="12">
+<text x="450" y="22" text-anchor="middle" font-size="14" font-weight="bold">PSM vs vanilla MLLM (Hit @ 5, K=8 candidates)</text>
+<line x1="80" y1="350" x2="700" y2="350" stroke="black" stroke-width="1"/>
+<line x1="80" y1="50" x2="80" y2="350" stroke="black" stroke-width="1"/>
+<line x1="75" y1="350.0" x2="80" y2="350.0" stroke="black" stroke-width="1"/>
+<text x="70" y="354.0" text-anchor="end">0%</text>
+<line x1="80" y1="350.0" x2="700" y2="350.0" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
+<line x1="75" y1="300.0" x2="80" y2="300.0" stroke="black" stroke-width="1"/>
+<text x="70" y="304.0" text-anchor="end">5%</text>
+<line x1="80" y1="300.0" x2="700" y2="300.0" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
+<line x1="75" y1="250.0" x2="80" y2="250.0" stroke="black" stroke-width="1"/>
+<text x="70" y="254.0" text-anchor="end">10%</text>
+<line x1="80" y1="250.0" x2="700" y2="250.0" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
+<line x1="75" y1="200.0" x2="80" y2="200.0" stroke="black" stroke-width="1"/>
+<text x="70" y="204.0" text-anchor="end">15%</text>
+<line x1="80" y1="200.0" x2="700" y2="200.0" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
+<line x1="75" y1="150.0" x2="80" y2="150.0" stroke="black" stroke-width="1"/>
+<text x="70" y="154.0" text-anchor="end">20%</text>
+<line x1="80" y1="150.0" x2="700" y2="150.0" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
+<line x1="75" y1="100.0" x2="80" y2="100.0" stroke="black" stroke-width="1"/>
+<text x="70" y="104.0" text-anchor="end">25%</text>
+<line x1="80" y1="100.0" x2="700" y2="100.0" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
+<line x1="75" y1="50.0" x2="80" y2="50.0" stroke="black" stroke-width="1"/>
+<text x="70" y="54.0" text-anchor="end">30%</text>
+<line x1="80" y1="50.0" x2="700" y2="50.0" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
+<rect x="99.2" y="216.7" width="54.2" height="133.3" fill="#1f77b4" />
+<rect x="157.5" y="283.3" width="54.2" height="66.7" fill="#d62728" />
+<text x="126.4" y="212.7" text-anchor="middle" font-size="10" fill="#1f77b4" font-weight="bold">13%</text>
+<text x="184.6" y="279.3" text-anchor="middle" font-size="10" fill="#d62728" font-weight="bold">7%</text>
+<text x="157.5" y="368.0" text-anchor="end" font-size="10" transform="rotate(-35 157.5 368.0)">seq003_street_002</text>
+<text x="157.5" y="428.0" text-anchor="middle" font-size="8" fill="#666">SLOPER4D</text>
+<rect x="254.2" y="50.0" width="54.2" height="300.0" fill="#1f77b4" />
+<rect x="312.5" y="283.3" width="54.2" height="66.7" fill="#d62728" />
+<text x="281.4" y="46.0" text-anchor="middle" font-size="10" fill="#1f77b4" font-weight="bold">30%</text>
+<text x="339.6" y="279.3" text-anchor="middle" font-size="10" fill="#d62728" font-weight="bold">7%</text>
+<text x="312.5" y="368.0" text-anchor="end" font-size="10" transform="rotate(-35 312.5 368.0)">seq008_running_001</text>
+<text x="312.5" y="428.0" text-anchor="middle" font-size="8" fill="#666">SLOPER4D</text>
+<rect x="409.2" y="171.4" width="54.2" height="178.6" fill="#1f77b4" />
+<rect x="467.5" y="278.6" width="54.2" height="71.4" fill="#d62728" />
+<text x="436.4" y="167.4" text-anchor="middle" font-size="10" fill="#1f77b4" font-weight="bold">18%</text>
+<text x="494.6" y="274.6" text-anchor="middle" font-size="10" fill="#d62728" font-weight="bold">7%</text>
+<text x="467.5" y="368.0" text-anchor="end" font-size="10" transform="rotate(-35 467.5 368.0)">seq009_running_002</text>
+<text x="467.5" y="428.0" text-anchor="middle" font-size="8" fill="#666">SLOPER4D</text>
+<rect x="564.2" y="274.1" width="54.2" height="75.9" fill="#1f77b4" />
+<rect x="622.5" y="350.0" width="54.2" height="0.0" fill="#d62728" />
+<text x="591.4" y="270.1" text-anchor="middle" font-size="10" fill="#1f77b4" font-weight="bold">8%</text>
+<text x="649.6" y="346.0" text-anchor="middle" font-size="10" fill="#d62728" font-weight="bold">0%</text>
+<text x="622.5" y="368.0" text-anchor="end" font-size="10" transform="rotate(-35 622.5 368.0)">shelby_arroyo_act0</text>
+<text x="622.5" y="428.0" text-anchor="middle" font-size="8" fill="#666">Nymeria</text>
+<text x="730" y="68" font-weight="bold">Method</text>
+<rect x="730" y="72" width="14" height="12" fill="#1f77b4" />
+<text x="750" y="82">PSM</text>
+<text x="750" y="96" font-size="10" fill="#666">clipL @ H3 r12, top-5</text>
+<rect x="730" y="108" width="14" height="12" fill="#d62728" />
+<text x="750" y="118">vanilla MLLM</text>
+<text x="750" y="132" font-size="10" fill="#666">Gemini 3.1 Pro, K=8</text>
+<text x="22" y="200" text-anchor="middle" font-size="13" transform="rotate(-90 22 200)">exemplar Hit @ 5 (%)</text>
+<text x="80" y="448" font-size="9" fill="#666">10 session(s) omitted (no MLLM baseline yet): Mainquad, Sanmateopark_garage, Fostersquare1, BurlingameDT5, SanmateoDT2, Gates_to_mainquad, Huang_Gates, BurlingameDT4, SSC3, Hillsdale6</text>
+</svg>
