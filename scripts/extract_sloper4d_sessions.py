@@ -157,6 +157,22 @@ def main() -> int:
         # Clean up temporary sidecar
         sidecar_path.unlink(missing_ok=True)
 
+        # Normalize H5 group name to "clip" regardless of encoder family.
+        # The orchestrator names the group by --models family ("siglip"
+        # for SigLIP runs), but all downstream eval scripts default to
+        # `--group clip`. Renaming in-place keeps the harness uniform.
+        if out_h5.exists():
+            try:
+                import h5py
+                with h5py.File(out_h5, "a") as h:
+                    for g in list(h.keys()):
+                        if g != "clip" and g not in ("imu", "gps") and "embeddings" in h[g]:
+                            h.move(g, "clip")
+                            print(f"  normalized H5 group: {g} -> clip", file=sys.stderr)
+                            break
+            except Exception as e:
+                print(f"  WARN: could not normalize H5 group: {e}", file=sys.stderr)
+
         print(f"  ✓ {out_h5}", file=sys.stderr)
 
     return 0
