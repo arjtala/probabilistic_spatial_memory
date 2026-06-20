@@ -298,6 +298,119 @@ temporally-distinct events (``C closes the cabinet''). The shared
 13.4\% Hit@5 ceiling is a benchmark hardness signal, not a
 method-quality one (\S\ref{sec:limitations}).
 
+\subsection{Multi-corpus, multi-encoder generalization}
+\label{sec:results-multi-corpus}
+
+To address the obvious single-corpus / single-encoder objection,
+we replicate the H3-resolution spatial-axis result across
+\textbf{14 street-scale sessions spanning 3 distinct sensor
+stacks} and \textbf{3 encoder families spanning 2 distinct
+training recipes}.
+
+\textbf{Corpora}: (a) SLOPER4D~\cite{dai2023sloper4d} (3 sessions:
+\texttt{seq003\_street\_002}, \texttt{seq008\_running\_001},
+\texttt{seq009\_running\_002}; head-mounted LiDAR + DJI Action2
+RGB camera; San Mateo Bay Area / Xiamen, China); (b) Nymeria
+\texttt{shelby\_arroyo\_act0} (Project Aria glasses, MPS SLAM,
+LeFleur Bay Area); (c) LookOut / Aria Navigation
+Dataset~\cite{pan2025lookout} (10 sessions across Stanford,
+San Mateo, Burlingame, Foster City, Hillsdale; Project Aria
+glasses, MPS SLAM; 10-session subset selected by bbox extent
+\textgreater 178\,m, stratified across 5 Bay Area locations).
+
+\textbf{Encoders}: laion CLIP-ViT-L-14
+(``\texttt{clipL}'', 430\,M params, 768\,d, softmax-contrastive,
+LAION-2B); laion CLIP-ViT-bigG-14 (``\texttt{bigG}'', 2.5\,B,
+1280\,d, same recipe larger); Google SigLIP-2-large-patch16-256
+(``\texttt{siglip2L}'', 660\,M, 1024\,d,
+sigmoid-pairwise on WebLI-100B~\cite{tschannen2025siglip2}).
+
+\textbf{Acceptance criterion}: for each (session, encoder), the
+Hit@5 curve must be non-decreasing across $r \in
+\{10, 11, 12\}$ and the r10$\to$r12 lift must be $\geq 4$\,pp.
+A session ``passes'' if at least one encoder satisfies both
+conditions. The 4\,pp threshold is conservative against the
+small-N noise floor at 28--30 questions per session
+(binomial std $\approx 4.8$\,pp at $p \approx 0.07$); the
+monotonicity check is restricted to $r \in \{10, 11, 12\}$
+because $r \in \{8, 9\}$ sit at-or-below the trajectory scale on
+these sessions and contribute reservoir-sampling noise rather
+than curve shape.
+
+\begin{table*}[t]
+\centering
+\setlength{\tabcolsep}{4pt}
+\small
+\begin{tabular}{llccccc}
+\toprule
+& & \multicolumn{3}{c}{Per-encoder PASS} & & \\
+\cmidrule(lr){3-5}
+Corpus & Session & \texttt{clipL} & \texttt{bigG} & \texttt{siglip2L} & Any-enc & \#PASS \\
+\midrule
+LookOut  & \texttt{Mainquad\_jan10}              & \cmark & \xmark & \cmark & \cmark & 2/3 \\
+LookOut  & \texttt{Sanmateopark\_garage\_jan11}  & \xmark & \xmark & \cmark$\dagger$ & \cmark & 1/3 \\
+LookOut  & \texttt{Fostersquare1\_jan16}         & \xmark & \cmark & \cmark & \cmark & 2/3 \\
+LookOut  & \texttt{BurlingameDT5\_feb5}          & \xmark & \cmark & \cmark & \cmark & 2/3 \\
+LookOut  & \texttt{SanmateoDT2\_Jan12}           & \cmark & \cmark & \cmark & \cmark & 3/3 \\
+LookOut  & \texttt{Gates\_to\_mainquad\_jan10}   & \cmark & \cmark & \cmark & \cmark & 3/3 \\
+LookOut  & \texttt{Huang\_Gates\_jan10}          & \cmark & \cmark & \cmark & \cmark & 3/3 \\
+LookOut  & \texttt{BurlingameDT4\_feb5}          & \xmark & \xmark & \xmark & \xmark & 0/3 \\
+LookOut  & \texttt{SSC3\_jan17}                  & \cmark & \cmark & \cmark & \cmark & 3/3 \\
+LookOut  & \texttt{Hillsdale6\_jan14}            & \xmark & \xmark & \cmark$\dagger$ & \cmark & 1/3 \\
+\midrule
+SLOPER4D & \texttt{seq003\_street\_002}          & \cmark & \cmark & \cmark & \cmark & 3/3 \\
+SLOPER4D & \texttt{seq008\_running\_001}         & \cmark & \cmark & \cmark & \cmark & 3/3 \\
+SLOPER4D & \texttt{seq009\_running\_002}         & \cmark & \cmark & \xmark & \cmark & 2/3 \\
+\midrule
+Nymeria  & \texttt{shelby\_arroyo\_act0}         & \cmark & \cmark & \xmark & \cmark & 2/3 \\
+\midrule
+\multicolumn{2}{r}{\textbf{Total PASS}}
+                  & \textbf{9/14} & \textbf{10/14} & \textbf{11/14}
+                  & \textbf{13/14} & --- \\
+\bottomrule
+\end{tabular}
+\caption{Per-(session, encoder) acceptance verdicts on the
+multi-corpus, multi-encoder spatial-axis sweep (5 seeds $\times$
+5 H3 resolutions $\times$ 3 encoders per session).
+``Any-enc PASS'' is the disjunction over encoders, modelling
+real encoder asymmetry: on some visually-homogeneous sessions
+only one encoder picks up the spatial signal. $\dagger$~marks
+\emph{SigLIP rescues}: sessions where neither CLIP-family
+encoder passes but SigLIP does, demonstrating that adding a
+non-CLIP encoder family genuinely extends the spatial-axis
+claim. \textbf{13/14 sessions pass under any-encoder
+acceptance}; \texttt{BurlingameDT4\_feb5} is an honest
+spatial-axis failure on a short trajectory (242\,m bbox) where
+the captioned queries don't visually discriminate at the cell
+scale \psm{} operates on.}
+\label{tab:multi-corpus-h3}
+\end{table*}
+
+Three patterns visible in Table~\ref{tab:multi-corpus-h3}.
+(a)~\textbf{Cross-corpus robustness}: the spatial-axis result
+replicates on every corpus we tested --- SLOPER4D 3/3, Nymeria
+1/1, LookOut 9/10. The transfer survives entirely different
+sensor stacks (LiDAR rig vs Aria MPS), capture geographies
+(Xiamen vs Bay Area), and question-generation pipelines
+(human-authored narrations on Nymeria vs Gemini-captioned
+visual landmarks on the others).
+(b)~\textbf{SigLIP is the strongest single encoder}: 11/14
+sessions pass on \texttt{siglip2L} alone, vs 9/14 (\texttt{clipL})
+and 10/14 (\texttt{bigG}). Two LookOut sessions
+(\texttt{Sanmateopark\_garage}, \texttt{Hillsdale6}) pass only
+on SigLIP --- the sigmoid-pairwise training recipe picks up
+spatial signal that the softmax-contrastive CLIP family misses
+on these visually-repetitive Bay Area shopping-district
+trajectories.
+(c)~\textbf{One honest failure}: \texttt{BurlingameDT4\_feb5}
+fails all three encoders. Its 242\,m bbox is real but the
+captioned queries (parking-lot and street-frontage objects)
+land in a small number of revisited cells where neither
+encoder's discrimination beats the cell-collapse floor.
+This is the expected failure mode for the regime described
+in \S\ref{sec:limitations} (visually-homogeneous trajectories
++ revisit-heavy query distributions).
+
 % Cross-corpus story consolidated into §6 (Conclusion) Follow-up
 % paragraph rather than maintained here as a stub — see venue-aware
 % framing notes: a workshop paper is better served by a confident

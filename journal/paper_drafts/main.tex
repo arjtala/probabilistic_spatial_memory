@@ -39,10 +39,16 @@
 \usepackage{xcolor}
 \usepackage[hidelinks]{hyperref}
 \usepackage{xspace}
+\usepackage{pifont}
 
 % Macros used across sections.
 \newcommand{\psm}{\textsc{PSM}\xspace}
 \newcommand{\caponek}{\texttt{per\_cell\_cap}\xspace}
+% Per-cell PASS / FAIL marks for the multi-corpus acceptance table.
+% pifont's \ding chars match the LNCS body font weight better than
+% amssymb \checkmark / $\times$ at the cell sizes used in tables.
+\newcommand{\cmark}{\ding{51}}
+\newcommand{\xmark}{\ding{55}}
 
 \title{Probabilistic Spatial Memory: A Bounded-Memory Retrieval
 Substrate for Wearable Look-Back Question Answering}
