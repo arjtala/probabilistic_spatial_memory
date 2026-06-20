@@ -301,13 +301,19 @@ def main() -> int:
     # Late import: keeps the script lightweight when only --help is asked.
     from psm_extraction.models import make_runner
 
+    # Auto-dispatch the model family from the checkpoint string. clipL /
+    # bigG / clip all live under family "clip"; SigLIP checkpoints route
+    # to family "siglip". Keeps the existing --clip-checkpoint flag name
+    # for backwards compatibility despite it now accepting non-CLIP
+    # checkpoints — renaming would break every caller in scripts/.
+    family = "siglip" if "siglip" in args.clip_checkpoint.lower() else "clip"
     runner = make_runner(
-        "clip",
+        family,
         checkpoint=args.clip_checkpoint,
         backend="auto",
         device=args.clip_device,
     )
-    print(f"[eval] CLIP runner: {runner.backend}", file=sys.stderr)
+    print(f"[eval] {family} runner: {runner.backend}", file=sys.stderr)
 
     records: list[dict] = []
     tmp_dir = Path(tempfile.mkdtemp(prefix="psm-eval-"))

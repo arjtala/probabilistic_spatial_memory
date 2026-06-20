@@ -56,18 +56,20 @@ DEFAULT_EXEMPLARS=128
 # Encoder -> (features basename, checkpoint) maps mirror eval_baselines_all.sh.
 encoder_features() {
   case "$1" in
-    bigG)  echo "clip_bigg_features.h5" ;;
-    clipL) echo "clip_l_features.h5" ;;
-    clip)  echo "clip_features.h5" ;;
-    *)     echo "" ;;
+    bigG)     echo "clip_bigg_features.h5" ;;
+    clipL)    echo "clip_l_features.h5" ;;
+    clip)     echo "clip_features.h5" ;;
+    siglip2L) echo "siglip2_l_features.h5" ;;
+    *)        echo "" ;;
   esac
 }
 encoder_checkpoint() {
   case "$1" in
-    bigG)  echo "laion/CLIP-ViT-bigG-14-laion2B-39B-b160k" ;;
-    clipL) echo "laion/CLIP-ViT-L-14-laion2B-s32B-b82K" ;;
-    clip)  echo "openai/clip-vit-base-patch32" ;;
-    *)     echo "" ;;
+    bigG)     echo "laion/CLIP-ViT-bigG-14-laion2B-39B-b160k" ;;
+    clipL)    echo "laion/CLIP-ViT-L-14-laion2B-s32B-b82K" ;;
+    clip)     echo "openai/clip-vit-base-patch32" ;;
+    siglip2L) echo "google/siglip2-large-patch16-256" ;;
+    *)        echo "" ;;
   esac
 }
 
