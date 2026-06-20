@@ -118,24 +118,76 @@ def _pick_uniform_from_cache(
     JPEGs and the H5 are produced together at the same sample_fps,
     so frame_i ↔ ts_i is the natural mapping.
     """
-    all_frames = sorted(frames_dir.glob("frame_*.jpg"))
-    if not all_frames:
-        # Fall back to any *.jpg if the naming doesn't match.
-        all_frames = sorted(frames_dir.glob("*.jpg"))
-    if not all_frames:
-        raise SystemExit(f"no JPEGs found under {frames_dir}")
-    # Length parity is required for ts ↔ frame mapping to be honest.
-    if len(all_frames) != len(h5_ts):
-        # Tolerate a small off-by-one (orchestrator sometimes drops the
-        # last frame); use min(len) and warn.
-        n = min(len(all_frames), len(h5_ts))
-        print(
-            f"[mllm-baseline] WARN: {len(all_frames)} JPEGs vs {len(h5_ts)} H5 ts; "
-            f"truncating to {n}",
-            file=sys.stderr,
+def _pick_uniform_from_cache(
+    frames_dir: Path,
+    n_frames: int,
+    h5_ts: np.ndarray,
+) -> list[tuple[float, Path]]:
+    """Pick `n_frames` evenly-spaced frames from an existing JPEG/PNG cache.
+
+    Two layouts handled:
+
+      1. **LookOut layout** (rgb_info.pkl exists at frames_dir.parent):
+         the frames dir holds the FULL 20-fps PNGs (e.g. 12,824 frames
+         for Mainquad_jan10), but the H5 only has 624 entries because
+         the extractor subsampled to 1 fps. We redo the same greedy
+         1-fps subsample of rgb_info.pkl's timestamps so the kept PNGs
+         align 1:1 with the H5 timestamps before picking N from those.
+         Same logic as scripts/aria_generate_questions.py.
+
+      2. **Aria/orchestrator layout** (no rgb_info.pkl): the frames
+         dir holds frames already at H5 cadence. Sorted-list position
+         maps 1:1 to H5 timestamps.
+
+    Returns (h5_clock_ts, path) tuples for N evenly-spaced selections.
+    """
+    # LookOut layout detection: rgb_info.pkl sibling to the frames dir.
+    rgb_info_path = frames_dir.parent / "rgb_info.pkl"
+    if rgb_info_path.exists():
+        import pickle
+        with rgb_info_path.open("rb") as f:
+            rgb_info = pickle.load(f)
+        full_ts_ns = np.array([int(r[1]) for r in rgb_info], dtype=np.int64)
+        full_ts_s = (full_ts_ns - full_ts_ns[0]) / 1e9
+        target_fps = 1.0
+        period = 1.0 / target_fps
+        kept_idx = [0]
+        next_t = float(full_ts_s[0]) + period
+        for i in range(1, len(full_ts_s)):
+            if float(full_ts_s[i]) >= next_t:
+                kept_idx.append(i)
+                next_t = float(full_ts_s[i]) + period
+        all_frames = [
+            frames_dir / f"{idx}_undistorted_512_243.png" for idx in kept_idx
+        ]
+        # Use H5 timestamps directly (they should match what kept_idx
+        # produces up to a few-frame off-by-one at the tail).
+        # Truncate to min length defensively.
+        n_common = min(len(all_frames), len(h5_ts))
+        all_frames = all_frames[:n_common]
+        h5_ts = h5_ts[:n_common]
+    else:
+        # Aria/orchestrator layout: any extension, sorted by name.
+        all_frames = (
+            sorted(frames_dir.glob("frame_*.jpg"))
+            or sorted(frames_dir.glob("frame_*.png"))
+            or sorted(frames_dir.glob("*.jpg"))
+            or sorted(frames_dir.glob("*.png"))
         )
-        all_frames = all_frames[:n]
-        h5_ts = h5_ts[:n]
+        if not all_frames:
+            raise SystemExit(f"no JPEG/PNG frames found under {frames_dir}")
+        if len(all_frames) != len(h5_ts):
+            n = min(len(all_frames), len(h5_ts))
+            print(
+                f"[mllm-baseline] WARN: {len(all_frames)} frames vs "
+                f"{len(h5_ts)} H5 ts; truncating to {n}",
+                file=sys.stderr,
+            )
+            all_frames = all_frames[:n]
+            h5_ts = h5_ts[:n]
+
+    if not all_frames:
+        raise SystemExit(f"no frames available under {frames_dir}")
     if n_frames > len(all_frames):
         n_frames = len(all_frames)
     idx = np.linspace(0, len(all_frames) - 1, n_frames, dtype=np.int64)
