@@ -53,8 +53,10 @@ from psm_extraction.io.lookout import (  # noqa: E402
 
 
 _ENCODER_MAP = {
-    "clipL": ("laion/CLIP-ViT-L-14-laion2B-s32B-b82K", 768, "clip_l_features.h5"),
-    "bigG": ("laion/CLIP-ViT-bigG-14-laion2B-39B-b160k", 1280, "clip_bigg_features.h5"),
+    # (family, checkpoint, embedding_dim, h5_basename, track_mode label)
+    "clipL": ("clip", "laion/CLIP-ViT-L-14-laion2B-s32B-b82K", 768, "clip_l_features.h5"),
+    "bigG": ("clip", "laion/CLIP-ViT-bigG-14-laion2B-39B-b160k", 1280, "clip_bigg_features.h5"),
+    "siglip2L": ("siglip", "google/siglip2-large-patch16-256", 1024, "siglip2_l_features.h5"),
 }
 
 
@@ -97,7 +99,7 @@ def extract_one(
 ) -> Path:
     """Extract one LookOut sequence. Returns path to written H5."""
     seq_name = sequence_dir.name
-    checkpoint, embed_dim, h5_name = _ENCODER_MAP[encoder]
+    family, checkpoint, embed_dim, h5_name = _ENCODER_MAP[encoder]
     out_sess = out_dir / seq_name
     out_sess.mkdir(parents=True, exist_ok=True)
     out_h5 = out_sess / h5_name
@@ -154,9 +156,9 @@ def extract_one(
         )
 
     # Embed.
-    from psm_extraction.models.clip_pytorch import CLIPPyTorchRunner
-    print(f"  loading CLIP ({checkpoint})", file=sys.stderr)
-    runner = CLIPPyTorchRunner(checkpoint=checkpoint)
+    from psm_extraction.models.registry import make_runner
+    print(f"  loading {family} ({checkpoint})", file=sys.stderr)
+    runner = make_runner(family, checkpoint=checkpoint)
     print(f"  embedding on {runner.backend}", file=sys.stderr)
 
     n = len(png_paths)
@@ -190,12 +192,12 @@ def extract_one(
         g.create_dataset("lat", data=lat.astype(np.float64))
         g.create_dataset("lng", data=lng.astype(np.float64))
         g.create_dataset("timestamps", data=kept_ts.astype(np.float64))
-        g.attrs["model"] = "openai/clip"
+        g.attrs["model"] = runner.model_id
         g.attrs["checkpoint"] = checkpoint
         g.attrs["embedding_dim"] = int(embed_dim)
         g.attrs["sample_fps"] = float(target_fps)
         g.attrs["sampling"] = f"video_fps={target_fps}"
-        g.attrs["preprocess"] = "clip_default(resize=224,center_crop=224,normalize=clip)"
+        g.attrs["preprocess"] = runner.preprocess
         g.attrs["normalized"] = True
         g.attrs["interpolation"] = "linear,clipped_at_edges,from=lookout_slam"
         g.attrs["track_mode"] = "lookout_aria_slam"

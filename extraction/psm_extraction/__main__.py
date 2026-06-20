@@ -64,7 +64,7 @@ def _build_parser() -> argparse.ArgumentParser:
     extract.add_argument(
         "--models",
         default="clip",
-        help="Comma-separated model family names. Supported: clip, dino, jepa.",
+        help="Comma-separated model family names. Supported: clip, siglip, longclip, dino, jepa.",
     )
     extract.add_argument(
         "--checkpoint",

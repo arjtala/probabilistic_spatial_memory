@@ -67,7 +67,7 @@ def resolve_backend(requested: str) -> str:
     )
 
 
-SUPPORTED_FAMILIES = ("clip", "longclip", "dino", "jepa")
+SUPPORTED_FAMILIES = ("clip", "longclip", "siglip", "dino", "jepa")
 
 
 def make_runner(
@@ -118,6 +118,19 @@ def make_runner(
 
         return LongCLIPPyTorchRunner(
             checkpoint=checkpoint,
+            device="cpu" if chosen == "cpu" else device,
+            **kwargs,
+        )
+
+    if name == "siglip":
+        if chosen == "mlx":
+            raise NotImplementedError(
+                "MLX-native SigLIP runner is not implemented; use backend='pytorch'."
+            )
+        from .siglip_pytorch import SiglipPyTorchRunner
+
+        return SiglipPyTorchRunner(
+            checkpoint=checkpoint or "google/siglip2-large-patch16-256",
             device="cpu" if chosen == "cpu" else device,
             **kwargs,
         )

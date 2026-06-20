@@ -29,6 +29,11 @@ def main() -> int:
     ap.add_argument("--fps", type=float, default=1.0)
     ap.add_argument("--origin-lat", type=float, default=24.4381)
     ap.add_argument("--origin-lng", type=float, default=118.0992)
+    ap.add_argument("--model-family", type=str, default="clip",
+                     choices=["clip", "siglip"],
+                     help="Encoder family — routes through psm_extraction.models "
+                          "registry. clip covers laion ViT-L / bigG; siglip is "
+                          "google/siglip2-large-patch16-256 (or override --checkpoint).")
     ap.add_argument("--checkpoint", type=str,
                      default="laion/CLIP-ViT-L-14-laion2B-s32B-b82K")
     ap.add_argument("--sequences", nargs="*", default=None,
@@ -55,13 +60,15 @@ def main() -> int:
 
     print(f"[sloper4d] {len(all_seqs)} sequences to extract", file=sys.stderr)
 
-    # Derive output filename from checkpoint so clipL and bigG land in
-    # different H5 files alongside each other (matches the convention
+    # Derive output filename from checkpoint so different encoders land
+    # in different H5 files alongside each other (matches the convention
     # used by Aria / Nymeria extraction).
     if "ViT-L-14" in args.checkpoint:
         h5_basename = "clip_l_features.h5"
     elif "bigG-14" in args.checkpoint:
         h5_basename = "clip_bigg_features.h5"
+    elif "siglip2-large" in args.checkpoint:
+        h5_basename = "siglip2_l_features.h5"
     else:
         # Fallback: derive a sanitized name from the last path segment.
         slug = args.checkpoint.rsplit("/", 1)[-1].lower().replace("-", "_")
@@ -119,6 +126,8 @@ def main() -> int:
             frames_dir = out_dir / "frames_bigg"
         elif "ViT-L-14" in args.checkpoint:
             frames_dir = out_dir / "frames_clipl"
+        elif "siglip" in args.checkpoint:
+            frames_dir = out_dir / "frames_siglip"
         else:
             frames_dir = out_dir / f"frames_{h5_basename.rsplit('.', 1)[0]}"
 
@@ -128,8 +137,8 @@ def main() -> int:
             sys.executable, "-m", "psm_extraction", "extract",
             "--video", str(video),
             "--output", str(out_h5),
-            "--models", "clip",
-            "--checkpoint", f"clip:{args.checkpoint}",
+            "--models", args.model_family,
+            "--checkpoint", f"{args.model_family}:{args.checkpoint}",
             "--sample-fps", str(args.fps),
             "--segment-sec", "1",
             "--session-id", name,

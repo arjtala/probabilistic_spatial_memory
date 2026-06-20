@@ -50,13 +50,19 @@ SEQUENCES="${SEQUENCES:-$DEFAULT_SEQS}"
 
 case "$MODEL" in
   clip_l)
+    FAMILY="clip"
     CHECKPOINT="laion/CLIP-ViT-L-14-laion2B-s32B-b82K"
     ;;
   clip_bigg)
+    FAMILY="clip"
     CHECKPOINT="laion/CLIP-ViT-bigG-14-laion2B-39B-b160k"
     ;;
+  siglip2_l)
+    FAMILY="siglip"
+    CHECKPOINT="google/siglip2-large-patch16-256"
+    ;;
   *)
-    echo "[slurm] ERR: unknown MODEL=$MODEL (expected clip_l|clip_bigg)" >&2
+    echo "[slurm] ERR: unknown MODEL=$MODEL (expected clip_l|clip_bigg|siglip2_l)" >&2
     exit 1
     ;;
 esac
@@ -92,6 +98,7 @@ python scripts/extract_sloper4d_sessions.py \
   --fps "$FPS" \
   --origin-lat "$ORIGIN_LAT" \
   --origin-lng "$ORIGIN_LNG" \
+  --model-family "$FAMILY" \
   --checkpoint "$CHECKPOINT" \
   --sequences "$NAME"
 

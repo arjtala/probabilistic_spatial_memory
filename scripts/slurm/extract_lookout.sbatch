@@ -65,8 +65,11 @@ case "$MODEL" in
   clip_bigg)
     ENCODER="bigG"
     ;;
+  siglip2_l)
+    ENCODER="siglip2L"
+    ;;
   *)
-    echo "[slurm] ERR: unknown MODEL=$MODEL (expected clip_l|clip_bigg)" >&2
+    echo "[slurm] ERR: unknown MODEL=$MODEL (expected clip_l|clip_bigg|siglip2_l)" >&2
     exit 1
     ;;
 esac

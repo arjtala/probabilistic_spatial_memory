@@ -74,8 +74,13 @@ case "$MODEL" in
     CHECKPOINT="laion/CLIP-ViT-bigG-14-laion2B-39B-b160k"
     DEFAULT_OUT="clip_bigg_features.h5"
     ;;
+  siglip2_l)
+    FAMILY="siglip"
+    CHECKPOINT="google/siglip2-large-patch16-256"
+    DEFAULT_OUT="siglip2_l_features.h5"
+    ;;
   *)
-    echo "[slurm] ERR: unknown MODEL=$MODEL (expected clip|clip_l|clip_bigg)" >&2
+    echo "[slurm] ERR: unknown MODEL=$MODEL (expected clip|clip_l|clip_bigg|siglip2_l)" >&2
     exit 1
     ;;
 esac
