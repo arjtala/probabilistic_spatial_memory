@@ -28,7 +28,23 @@ vector, the configured \texttt{per\_cell\_cap}, and $K = 5$. The
 call returns 5 candidate $(t_i, t_{\min,i}, t_{\max,i},
 \mathrm{cell}_i)$ tuples, sorted by cosine similarity descending.
 This stage runs sub-millisecond per query
-(\S\ref{sec:results-memory-latency}).
+(\S\ref{sec:results-memory-latency}). Encoder choice is a pipeline
+knob, not an architectural commitment: the same Stage~1 path is used
+unchanged across the three encoder families in our evaluation --- laion
+CLIP-L (\texttt{clipL}, 430\,M, 768\,d), laion CLIP-bigG
+(\texttt{bigG}, 2.5\,B, 1280\,d), and Google SigLIP-2-large-patch16-256
+(\texttt{siglip2L}~\cite{tschannen2025siglip2}, 660\,M, 1024\,d) ---
+via a single \texttt{make\_runner(family, checkpoint)} factory in the
+Python ingest harness; the C engine sees only a $D$-dimensional
+float vector and is encoder-agnostic. The per-corpus extractors
+write one HDF5 group per encoder, so the multi-corpus, multi-encoder
+sweep in \S\ref{sec:results-multi-corpus} is the same binary plus
+$3\times 14$ ingest calls. CLIP-L remains the default for the deep
+single-session analyses (Table~\ref{tab:headline}, the \caponek{}
+sweep, the brute-force comparison) so the operating-point claim is
+stated on the most-studied encoder; the cross-encoder generalization
+in \S\ref{sec:results-multi-corpus} shows the spatial-axis behavior
+is not a CLIP-L artifact.
 
 \paragraph{Stage 2: Frame fetch.} Each candidate $t_i$ identifies a
 single frame in the original recording. We decode that frame

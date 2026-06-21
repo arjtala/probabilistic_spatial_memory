@@ -79,3 +79,42 @@ the federated-memory extension we discuss in
 sampling~\cite{vitter1985reservoir}) is standard; the contribution
 is in how the two compose with the H3 tessellation under the
 \caponek{} query knob.
+
+\paragraph{Vision-language encoders and the choice of substrate
+input.} The retrieval quality of any embedding-bank approach,
+including \psm{}, depends on the input encoder. We evaluate three
+families that span the dominant pretraining recipes: laion's CLIP
+ViT-L and ViT-bigG~\cite{cherti2023scaling} (softmax contrastive on
+LAION-2B), and Google's SigLIP~2~\cite{tschannen2025siglip2}
+(sigmoid pairwise on WebLI-100B, with explicit
+localization-awareness training). Long-context CLIP
+variants~\cite{zhang2024longclip}, denser-data
+recipes~\cite{xu2023metaclip}, and ultra-scale variants such as
+EVA-CLIP-18B~\cite{sun2024evaclip18b} are natural future swaps but
+do not change the substrate. Dense visual encoders such as
+DINOv2~\cite{oquab2024dinov2} and video-native encoders such as
+V-JEPA~2~\cite{assran2025vjepa2} are complementary rerankers
+when text--image similarity and visual salience disagree;
+embedding-retrieval dimensionality limits~\cite{weller2025limit}
+upper-bound any single-encoder substrate. We treat the encoder as
+a swappable input (\S\ref{sec:pipeline}); the cross-encoder
+generalization in \S\ref{sec:results-multi-corpus} shows the
+spatial-axis claim is not a CLIP-family artifact.
+
+\paragraph{Egocentric outdoor and street-scale corpora.}
+Most egocentric benchmarks are indoor and short-trajectory; the
+sensor stacks and outdoor capture needed for street-scale
+spatial-memory evaluation are recent. Aria Gen~1 / Gen~2
+glasses~\cite{engel2024aria,aria-gen2-pilot} ship with MPS SLAM
+trajectories that we use as the geographic ground truth for the
+Nymeria~\cite{ma2024nymeria} narrative-action sessions and for the
+LookOut~\cite{pan2025lookout} pedestrian-navigation corpus
+(downtown Burlingame / San Mateo / Foster City / Hillsdale /
+Stanford walks). SLOPER4D~\cite{dai2023sloper4d} provides a
+LiDAR-rigged head-mounted alternative with $\sim$300\,m urban
+trajectories and frame-aligned RGB. Together these three corpora
+cover the two dominant wearable-sensor stacks (Aria-style MPS,
+helmet-LiDAR) and the street-scale mobility tier required to
+exercise H3 resolutions 10--12; their licences
+(CC~BY 4.0 / CC~BY-NC 4.0 / CC~BY-NC-SA 4.0 respectively)
+permit research evaluation but restrict commercial use.
