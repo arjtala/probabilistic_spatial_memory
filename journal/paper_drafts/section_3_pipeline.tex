@@ -18,7 +18,10 @@ picks the localized answer.
 \label{sec:pipeline-stages}
 
 The pipeline has three stages, each addressing a distinct failure
-mode of the alternatives.
+mode of the alternatives. Figure~\ref{fig:f1-architecture} sketches
+the end-to-end flow.
+
+\input{figures/f1_architecture.tex}
 
 \paragraph{Stage 1: PSM top-$K$ retrieval.} Given the question
 text $q$, embed it with the same encoder used for ingest

@@ -1,0 +1,180 @@
+% F1 — PSM architecture overview.
+% Three-stage left-to-right pipeline: streaming input -> PSM ingest
+% (H3 cells with per-cell ring-buffer-of-HLLs + reservoir exemplars)
+% -> top-K retrieval (per_cell_cap gate) -> MLLM rerank.
+% Pure TikZ; requires \usetikzlibrary{positioning,arrows.meta,fit,
+% calc,shapes.geometric,backgrounds} loaded in main.tex.
+\begin{figure}[t]
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+    >={Stealth[length=2mm,width=1.6mm]},
+    font=\scriptsize,
+    node distance=2mm and 3mm,
+    box/.style={draw, rounded corners=1pt, align=center,
+                inner sep=2pt, minimum height=5mm, fill=white},
+    iobox/.style={box, fill=gray!8},
+    stage/.style={draw, dashed, rounded corners=2pt,
+                  inner sep=3pt, gray!70},
+    stagelbl/.style={font=\scriptsize\bfseries, gray!60!black},
+    hex/.style={draw, regular polygon, regular polygon sides=6,
+                minimum size=6mm, inner sep=0pt, rotate=30,
+                fill=gray!5},
+    hexhi/.style={hex, fill=blue!12, draw=blue!60!black, very thick},
+    hllbox/.style={draw, minimum width=2.2mm, minimum height=2.2mm,
+                   inner sep=0pt, fill=orange!25, draw=orange!70!black},
+    hllold/.style={hllbox, fill=orange!8, draw=orange!30},
+    resvslot/.style={draw, minimum width=2.2mm, minimum height=2.2mm,
+                     inner sep=0pt, fill=blue!15, draw=blue!60!black},
+    flow/.style={->, thick, gray!60!black},
+    smallflow/.style={->, semithick, gray!60!black},
+]
+
+% ============== Stage 0: streaming input ==============
+\node[iobox] (frames)
+    {Video frames\\\@ 1\,fps};
+\node[iobox, below=2mm of frames] (slam)
+    {SLAM trajectory\\$(\text{lat},\text{lng},t)$};
+
+% ============== Stage 1: PSM ingest ==============
+% Encoder
+\node[box, right=8mm of frames] (enc)
+    {VLM encoder\\\textit{(CLIP-L / bigG /}\\\textit{SigLIP\,2)}};
+\node[box, right=3mm of enc, fill=blue!8] (emb)
+    {$\mathbf{e}\in\mathbb{R}^{D}$};
+
+% H3 lookup
+\node[box, right=8mm of slam, fill=gray!8] (h3lookup)
+    {H3 lookup\\(res.\ $r{=}12$)};
+
+% H3 hex grid (cluster of 7 hexes -- 1 center + 6 ring)
+\coordinate (hexcenter) at ($(emb.east) + (16mm, -5mm)$);
+% Hex geometry: pointy-top via rotate=30. Use side-to-side offsets.
+\pgfmathsetmacro{\hs}{3.0mm}  % side length proxy; controlled by minimum size
+% Place 7 hexes manually around (hexcenter). With minimum size 6mm
+% and rotate=30 we get pointy-top; horizontal spacing ~5.2mm,
+% vertical step ~3.0mm between offset rows.
+\node[hex] (h0) at ($(hexcenter) + (-5.2mm, 3.0mm)$) {};
+\node[hex] (h1) at ($(hexcenter) + ( 0mm,    6.0mm)$) {};
+\node[hex] (h2) at ($(hexcenter) + ( 5.2mm, 3.0mm)$) {};
+\node[hexhi] (hC) at (hexcenter) {};
+\node[hex] (h4) at ($(hexcenter) + (-5.2mm,-3.0mm)$) {};
+\node[hex] (h5) at ($(hexcenter) + ( 0mm,   -6.0mm)$) {};
+\node[hex] (h6) at ($(hexcenter) + ( 5.2mm,-3.0mm)$) {};
+
+\node[font=\scriptsize, below=0.5mm of h5] {H3 hex cells};
+
+% Per-cell state pop-out (for highlighted hex hC)
+\coordinate (cellAnchor) at ($(hexcenter) + (18mm, 0mm)$);
+
+% Ring buffer of HLL sketches: 6 small boxes in a row, decayed shading
+\node[hllold]  (hll1) at ($(cellAnchor) + (-4.0mm, 5.0mm)$) {};
+\node[hllold]  (hll2) at ($(cellAnchor) + (-1.6mm, 5.0mm)$) {};
+\node[hllbox]  (hll3) at ($(cellAnchor) + ( 0.8mm, 5.0mm)$) {};
+\node[hllbox]  (hll4) at ($(cellAnchor) + ( 3.2mm, 5.0mm)$) {};
+\node[hllbox]  (hll5) at ($(cellAnchor) + ( 5.6mm, 5.0mm)$) {};
+\node[hllbox]  (hll6) at ($(cellAnchor) + ( 8.0mm, 5.0mm)$) {};
+\node[font=\scriptsize, right=0.5mm of hll6, anchor=west]
+     (hlllbl) {ring of $C$\\HLL sketches\\\textit{(time-decay)}};
+
+% Reservoir: 5 small slots in a row
+\node[resvslot] (r1) at ($(cellAnchor) + (-4.0mm, 0mm)$) {};
+\node[resvslot] (r2) at ($(cellAnchor) + (-1.6mm, 0mm)$) {};
+\node[resvslot] (r3) at ($(cellAnchor) + ( 0.8mm, 0mm)$) {};
+\node[resvslot] (r4) at ($(cellAnchor) + ( 3.2mm, 0mm)$) {};
+\node[resvslot] (r5) at ($(cellAnchor) + ( 5.6mm, 0mm)$) {};
+\node[font=\scriptsize] at ($(r5.east)+(1.0mm,0)$) [anchor=west]
+     (rlbl) {$\cdots$};
+\node[resvslot] (rR) at ($(cellAnchor) + ( 9.0mm, 0mm)$) {};
+\node[font=\scriptsize, right=0.5mm of rR, anchor=west]
+     (rsvlbl) {reservoir of $R$\\exemplar embeddings};
+
+% Bound-emphasis label
+\node[font=\scriptsize\itshape, below=4mm of r3, align=center,
+      gray!60!black] (boundlbl)
+     {bounded per-cell state};
+
+% Connector from highlighted hex to pop-out block
+\draw[smallflow, dashed, blue!50!black]
+     (hC.east) -- ($(hll1.west) + (-1mm, -2.5mm)$);
+
+% Stage-1 flow arrows
+\draw[flow] (frames.east) -- (enc.west);
+\draw[flow] (enc.east)    -- (emb.west);
+\draw[flow] (slam.east)   -- (h3lookup.west);
+\draw[flow] (emb.east) -- ++(3mm,0) |- (hC.west);
+\draw[flow] (h3lookup.east) -- ++(3mm,0) |- (h4.west);
+
+% ============== Stage 2: top-K retrieval ==============
+\node[iobox, right=22mm of rsvlbl, align=center] (query)
+    {Question\\\textit{``where did I}\\\textit{leave my keys?''}};
+\node[box, below=2mm of query] (qenc)
+    {same VLM\\encoder};
+\node[box, right=4mm of qenc, fill=blue!8] (qemb)
+    {$\mathbf{q}$};
+
+\node[box, below=6mm of qemb, align=center, fill=orange!10,
+      draw=orange!70!black] (topk)
+    {top-$K$ retrieval\\(cosine sim.)\\\textit{per\_cell\_cap gate}};
+
+% Output candidate list
+\node[box, below=4mm of topk, align=center, fill=blue!5] (cands)
+    {$K{=}5$ candidates\\$(t,\text{cell},\text{lat},\text{lng},\mathbf{e})$\\\textit{sub-ms}};
+
+\draw[flow] (query.south) -- (qenc.north);
+\draw[flow] (qenc.east)   -- (qemb.west);
+\draw[flow] (qemb.south)  |- (topk.east);
+% Reservoir -> top-K (cosine search target)
+\draw[flow] (rR.east) -- ++(2mm,0) -- ++(0,-7mm) -| (topk.west);
+\draw[flow] (topk.south) -- (cands.north);
+
+% ============== Stage 3: MLLM rerank ==============
+\node[box, right=10mm of cands, align=center,
+      fill=green!8, draw=green!50!black] (fetch)
+    {fetch $K$\\frames\\\textit{(buffer)}};
+\node[box, right=3mm of fetch, align=center,
+      fill=green!12, draw=green!50!black] (mllm)
+    {MLLM rerank\\\textit{Gemini\,3.1\,Pro}};
+\node[iobox, right=3mm of mllm, align=center] (ans)
+    {answer\\$(t, \text{frame})$};
+
+\draw[flow] (cands.east) -- (fetch.west);
+\draw[flow] (fetch.east) -- (mllm.west);
+\draw[flow] (mllm.east)  -- (ans.west);
+
+% ============== Stage bounding boxes ==============
+\begin{pgfonlayer}{background}
+\node[stage, fit=(frames)(slam),
+      label={[stagelbl, anchor=south]above:Stage 0: stream}] {};
+\node[stage, fit=(enc)(emb)(h3lookup)(h0)(h2)(h5)(rsvlbl)(boundlbl),
+      label={[stagelbl, anchor=south]above:Stage 1: PSM ingest}] {};
+\node[stage, fit=(query)(qenc)(qemb)(topk)(cands),
+      label={[stagelbl, anchor=south]above:Stage 2: PSM top-$K$}] {};
+\node[stage, fit=(fetch)(mllm)(ans),
+      label={[stagelbl, anchor=south]above:Stage 3: MLLM rerank}] {};
+\end{pgfonlayer}
+
+\end{tikzpicture}%
+}
+\caption{\textbf{PSM architecture.}
+Stage~0: streaming egocentric frames at 1\,fps plus the wearer's
+SLAM trajectory.
+Stage~1 (\emph{ingest}): each frame is encoded by a swappable
+vision--language encoder (CLIP-L / CLIP-bigG / SigLIP\,2) and
+deposited into the H3 hex cell containing its $(\text{lat},
+\text{lng})$. Per-cell state is \emph{bounded}: a ring buffer of $C$
+HyperLogLog sketches (orange; older sketches faded) gives a
+time-decayed unique-event cardinality and the
+$(t_{\min}, t_{\max})$ envelope; a reservoir of $R$
+sampled embeddings (blue) is the bounded-memory substitute for the
+linearly-growing CLIP bank.
+Stage~2 (\emph{retrieval}): the query text is encoded with the same
+encoder and cosine-similarity-searched against the reservoir union;
+\caponek{} bounds how many of the $K{=}5$ slots a single cell may
+fill, returning candidate $(t, \text{cell}, \text{lat}, \text{lng},
+\mathbf{e})$ tuples in sub-millisecond C-side wall time.
+Stage~3 (\emph{rerank}): the $K{=}5$ frames are fetched from the
+device frame buffer and shipped to a frontier MLLM (Gemini\,3.1\,Pro),
+which picks the single best frame index --- the localized answer.}
+\label{fig:f1-architecture}
+\end{figure}
