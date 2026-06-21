@@ -65,14 +65,36 @@ retrieval. Other long-context encoders (1024-token CLIP variants,
 SigLIP~2~\cite{tschannen2025siglip2}) may behave differently; we
 leave that broader sweep to future work.
 
-\paragraph{Single corpus.} Headline numbers are Nymeria indoor
-recordings (4-session detail + 30-session aggregate in
-\S\ref{sec:results-multisession}); absolute Hit@5 varies with
-session character ($10.6$--$18.2\%$ at \texttt{cap}=$K$ across the
-4-session detail). Outdoor street-scale evaluation on the Aria
-Gen 2 Pilot Dataset~\cite{aria-gen2-pilot} ($\sim$300\,m wearer
-trajectories with real GPS) is the natural extension
-(\S\ref{sec:conclusion}).
+\paragraph{Multi-corpus coverage.} The deepest single-session
+analysis (Table~\ref{tab:headline}, the \caponek{} sweep,
+the brute-force comparison) remains on Nymeria
+\texttt{shelby\_arroyo\_act0}. The multi-corpus generalization
+in \S\ref{sec:results-multi-corpus} (14 street-scale sessions
+across SLOPER4D, Nymeria, LookOut $\times$ 3 encoder families)
+addresses the obvious single-corpus / single-encoder objection
+but uses Hit\,@\,5 as its sole metric --- we do not yet
+report mIoU / counting / encoder-bypass numbers across the
+full multi-corpus set. Per-session reservoir-size and
+retention-horizon sweeps are also Nymeria-only at submission
+time; replicating them across the 14-session set is a
+straightforward follow-up that the engine and harness already
+support.
+
+\paragraph{One honest spatial-axis failure.}
+Of the 14 street-scale sessions in
+\S\ref{sec:results-multi-corpus}, \texttt{BurlingameDT4\_feb5}
+(LookOut, 242\,m bbox) is the single session where \emph{all
+three} encoders fail the monotone-r10$\to$r12, $\geq$4\,pp lift
+acceptance. The trajectory is a short walk down a
+parking-lot-flanked street where the captioned queries
+(parked vehicles and street signage at small distances from
+the wearer's path) collapse onto a handful of revisited cells
+that no encoder discriminates above floor at the cell
+granularity \psm{} operates on. This is the expected failure
+mode of visually-homogeneous trajectories with
+revisit-heavy query distributions; \psm{}'s spatial axis
+is not magic and we report the negative case rather than
+hide it.
 
 \paragraph{Latency from synthetic workload.}
 \psm{}'s reported $\sim$700\,$\mu$s per-query latency is from a

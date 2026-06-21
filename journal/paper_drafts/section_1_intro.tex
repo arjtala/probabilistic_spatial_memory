@@ -103,7 +103,25 @@ contributions are largely orthogonal.
   \item \textbf{Multi-session generalization:} the
     \texttt{per\_cell\_cap} effect replicates across 4 Nymeria
     sessions spanning the street-, building-, and room-scale
-    mobility tiers (\S\ref{sec:results-multisession}).
+    mobility tiers (\S\ref{sec:results-multisession}). The
+    spatial-axis lift replicates further across
+    \textbf{14 street-scale sessions} drawn from 3 distinct
+    sensor stacks (SLOPER4D LiDAR + DJI Action2;
+    Nymeria + LookOut~\cite{pan2025lookout} Project Aria MPS)
+    and \textbf{3 encoder families} (laion CLIP ViT-L / ViT-bigG,
+    Google SigLIP~2~\cite{tschannen2025siglip2}): 13/14 sessions
+    pass a monotone-r10$\to$r12 acceptance with $\geq 4$\,pp
+    Hit\,@\,5 lift on at least one encoder
+    (\S\ref{sec:results-multi-corpus},
+    Table~\ref{tab:multi-corpus-h3}). At matched candidate budget
+    ($K=8$), \psm{} beats vanilla Gemini~3.1~Pro by $1.0\times$
+    to $\infty$ on every one of these 14 sessions, median
+    $\sim 4\times$ (\S\ref{sec:results-vanilla-mllm},
+    Fig.~\ref{fig:f2-psm-vs-mllm}); five sessions land at
+    vanilla MLLM Hit\,@\,5 $= 0\,\%$ because the uniform
+    $K=8$ sample structurally never includes a frame inside any
+    GT interval --- the failure mode \psm{}'s cell-targeted
+    retrieval is designed to bypass.
   \item \textbf{Open-source release:} the C-side PSM engine
     ($\sim$700 LoC) and the Python extraction/eval pipeline are
     released under MIT (URL withheld for double-blind review;

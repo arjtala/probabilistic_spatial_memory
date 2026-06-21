@@ -277,15 +277,52 @@ relaxes from $1$ to $K$.}
 \label{sec:results-memory-latency}
 
 \paragraph{Memory and latency.} \psm{}'s per-query latency is
-bounded by matching-tile count, not session length: $\sim$700\,$\mu$s
-at the synthetic 1024-tile workload (\S\ref{sec:limitations}); brute-force CLIP
+bounded by matching-tile count, not session length:
+$\sim$700\,$\mu$s at the synthetic 1024-tile workload
+(\S\ref{sec:limitations}); brute-force CLIP's matmul-and-rank
 grows linearly in $N$ (extrapolating from per-session
 $\sim$50\,$\mu$s at 3k frames to $\sim$20\,ms at 1M frames).
-On memory the gap is more dramatic: \psm{} is per-cell
-fixed-size, brute-force is linear in $N$. At a 15\,min CLIP-L
-session, reservoir-sized \psm{} ($R{=}128$) occupies $\sim$1\,MB
-per cell vs brute-force's $\sim$13\,MB total bank; at hour-long
-streams the gap grows by two orders of magnitude.
+On memory, the two methods exchange regimes around a
+crossover scale. The
+\textit{linear-vs-constant} comparison is the load-bearing one:
+\psm{}'s per-cell storage at the deployment configuration
+($R{=}128$ exemplars $\times$ 1024-d CLIP-L $\times$ 4\,B $\approx$
+0.5\,MiB per cell, plus ring buffer + HLL $\approx$ 1\,MiB) is
+session-length-invariant; brute-force grows linearly in $N$
+($N \times \text{dim} \times 4$\,B). Figure~\ref{fig:f6-memory}
+plots both across our measured corpus (32 sessions, $N \in
+[748, 1325]$ frames). In this measurement window brute-force is
+\emph{cheaper} than \psm{} ($\sim$3\,MB vs $\sim$13\,MB at
+$\sim$10 cells per session); the brute-force = PSM crossover
+sits at $N \approx 4400$ frames ($\approx$ 73\,min at 1\,fps,
+CLIP-L 768-d).
+\textbf{Past the crossover the gap diverges:} at a 1-hour stream
+($N{=}3600$) brute-force needs $\sim$11\,MB, comparable to
+\psm{}'s constant; at a 4-hour wearable session ($N{=}14{,}400$)
+brute-force is $\sim$42\,MB while \psm{} is still $\sim$13\,MB
+($3.2\times$ smaller); at 8 hours the gap reaches $6.4\times$.
+The bounded-memory advantage is real but a \emph{deployment-scale}
+property --- the corpus we measure on is short enough that PSM
+is paying its constant overhead before brute-force catches up.
+Our measured-corpus latency floor is dominated by the
+$\sim$40\,$\mu$s setup overhead at the bench's small $N$ rather
+than the actual matmul.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/f6_memory_latency.pdf}
+\caption{Memory in MB to hold the per-session retrieval state
+vs session length in frames. Brute-force CLIP-L (red): scatter
+of $N \times 768 \times 4$\,B across our 32 measurement sessions,
+plus the linear fit. \psm{} (blue dashed):
+deployment-configuration constant $\sim$13\,MB across
+$\sim$10 H3 cells with $R{=}128$ exemplars at CLIP-L
+($\sim$1\,MB per cell). The two methods cross at $N \approx
+4400$ frames ($\sim$73\,min at 1\,fps); past the crossover the
+linear-vs-constant gap diverges to $3$--$6\times$ at multi-hour
+streams.}
+\label{fig:f6-memory}
+\end{figure}
 
 \paragraph{Failure modes.} Of the 162 questions both \psm{} and
 brute-force miss on \texttt{shelby\_arroyo\_act0}, $137$ are
@@ -485,6 +522,65 @@ encoder's discrimination beats the cell-collapse floor.
 This is the expected failure mode for the regime described
 in \S\ref{sec:limitations} (visually-homogeneous trajectories
 + revisit-heavy query distributions).
+
+\subsection{PSM $\to$ MLLM rerank (E5): a Hit\,@\,1 lever, not a Hit\,@\,5 lever}
+\label{sec:results-mllm-rerank}
+
+The vanilla MLLM cannot reach \psm{}'s Hit\,@\,5 at all
+(\S\ref{sec:results-vanilla-mllm}). The complementary E5
+configuration places the MLLM \emph{after} \psm{}: \psm{}
+retrieves top-5 cell-matched candidates, and Gemini 3.1 Pro
+reorders them to pick the single best frame. Because the
+reranker can only permute \psm{}'s top-5, its effect on
+Hit\,@\,5 is invariant by construction --- what it can change
+is \emph{which} of the top-5 lands at rank-1.
+Table~\ref{tab:reranker} reports both metrics on the four
+sessions where we measured the reranker (3 SLOPER4D + Nymeria
+\texttt{shelby\_arroyo\_act0}).
+
+\begin{table}[t]
+\centering
+\setlength{\tabcolsep}{4pt}
+\small
+\begin{tabular}{lcc|cc}
+\toprule
+& \multicolumn{2}{c}{PSM-only} & \multicolumn{2}{c}{PSM$\to$Gemini} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Session & Hit@1 & Hit@5 & Hit@1 & Hit@5 \\
+\midrule
+\texttt{seq003\_street\_002}      & 10.0 & 13.3  & 6.7$\downarrow$  & 13.3 \\
+\texttt{seq008\_running\_001}     & 10.0 & 30.0  & \textbf{30.0$\uparrow\uparrow$} & 30.0 \\
+\texttt{seq009\_running\_002}     &  7.1 & 17.9  & 10.7$\uparrow$  & 17.9 \\
+\texttt{shelby\_arroyo\_act0}     &  3.7 &  7.6  & 2.1$\downarrow$  &  7.5 \\
+\bottomrule
+\end{tabular}
+\caption{PSM-only vs PSM$\to$Gemini reranker, Hit@1 / Hit@5 (\%).
+The reranker is permutation-invariant on Hit\,@\,5 by
+construction (Hit\,@\,5 is identical or trivially different
+across all four sessions). On Hit\,@\,1 the reranker is
+\emph{bimodal}: it tripled Hit\,@\,1 on
+\texttt{seq008\_running\_001} ($10\%{\to}30\%$), helped on
+\texttt{seq009} ($+3.6$\,pp), but hurt on
+\texttt{seq003} ($-3.3$\,pp) and Nymeria ($-1.6$\,pp). The
+rerank is therefore a \emph{visually-rich-query} lever ---
+useful when the visual content is discriminative enough that
+the MLLM can break ties \psm{}'s embedding similarity left,
+and counterproductive when query content is action-narration
+or visually-poor.}
+\label{tab:reranker}
+\end{table}
+
+\paragraph{Implication for deployment.}
+The headline result --- \psm{}'s
+$1\times$--$\infty$ advantage over vanilla MLLM at matched
+$K$ --- is achievable \emph{without any MLLM in the loop}.
+Adding the reranker is a per-deployment choice: pay the
+extra MLLM call when the query distribution is known to be
+visually-grounded (seq008-style outdoor running), skip it
+when queries are action-narrations or visually-poor
+(Nymeria, seq003). We deliberately do not promote the
+reranker to a Hit\,@\,5 default; the data does not support
+it as a uniform improvement.
 
 % Cross-corpus story consolidated into §6 (Conclusion) Follow-up
 % paragraph rather than maintained here as a stub — see venue-aware

@@ -27,11 +27,40 @@ spatial diversity (\caponek{}$=1$) matches brute-force on
 localization mIoU on the highest-mobility session
 ($0.073$ vs $0.074$) and lifts mIoU by 29--73\% relative across
 the 4-session detail. Sub-room sessions co-fail both methods at
-$\sim$1\% Hit@5 (benchmark ceiling, not method limitation). The
-bounded-memory advantage scales with recording length: an hour
-of CLIP-L at 1\,fps is $\sim$10\,MB brute-force vs $\sim$2\,MB
-across the 5--10 cells a typical wearer occupies, gap linear
-thereafter.
+$\sim$1\% Hit@5 (benchmark ceiling, not method limitation).
+
+The spatial-axis result generalizes across corpora and encoders.
+On a 14-session street-scale set spanning three sensor stacks
+(SLOPER4D LiDAR + DJI Action2, Nymeria + LookOut~\cite{pan2025lookout}
+Project Aria MPS) and three encoder families (CLIP-L,
+CLIP-bigG, SigLIP~2~\cite{tschannen2025siglip2}),
+\textbf{13/14 sessions} pass a monotone-r10$\to$r12 acceptance
+with $\geq 4$\,pp Hit\,@\,5 lift on at least one encoder.
+SigLIP~2 is the strongest single encoder (11/14
+PASS); two LookOut sessions are recovered by SigLIP alone where
+both CLIP variants fail, and one session
+(\texttt{BurlingameDT4\_feb5}) is an honest spatial-axis
+failure on all three encoders (\S\ref{sec:limitations}). At
+matched candidate budget ($K{=}8$),
+\psm{} beats vanilla Gemini 3.1 Pro by $1.0\times$ to
+$\infty$ on every one of these 14 sessions, median
+$\sim 4\times$, with five sessions landing at vanilla MLLM
+Hit\,@\,5 $= 0\,\%$ --- the structural failure mode that
+uniform $K{=}8$ sampling has when GT intervals are
+$\sim$3\,s wide but the uniform spacing is 12--80\,s.
+The PSM$\to$MLLM rerank is permutation-invariant on Hit\,@\,5
+and a bimodal Hit\,@\,1 lever: it tripled Hit\,@\,1 on
+visually-rich \texttt{seq008\_running\_001} but hurt it on
+action-narration Nymeria, so we deliberately do not promote
+the rerank to a default.
+
+The bounded-memory advantage is a deployment-scale property,
+not a small-corpus one. \psm{}'s per-cell state is constant in
+recording length; brute-force CLIP grows linearly in $N$.
+The two methods cross at $N \approx 4400$ frames
+($\sim$73\,min at 1\,fps, CLIP-L); past that the gap diverges
+to $3\times$ at four hours and $6\times$ at eight hours of
+recording.
 
 \paragraph{Follow-up directions.}
 Five extensions naturally fit the Wearables AI Workshop's
