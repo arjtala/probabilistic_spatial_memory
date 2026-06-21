@@ -58,7 +58,12 @@ require re-running the LLM on the compressed state; \psm{} runs
 upstream of any MLLM, returning a top-$K$ candidate set that the
 downstream model reranks without retraining. The two approaches are
 complementary: \psm{} as front-end retrieval, token-space methods
-as MLLM-internal compression.
+as MLLM-internal compression. Emerging smart-glasses agent
+frameworks such as Egocentric Co-Pilot~\cite{yang2026egocopilot}
+combine temporal chain-of-thought with hierarchical context
+compression for long-horizon first-person QA; \psm{}'s
+bounded-memory index is the natural retrieval frontend such
+agents query before invoking their MLLM reasoning stage.
 
 \paragraph{Streaming search and spatial indexing.}
 DiskANN~\cite{jayaram2019diskann} and SPANN~\cite{chen2021spann}

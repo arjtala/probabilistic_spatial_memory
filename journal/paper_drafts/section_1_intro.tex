@@ -17,7 +17,11 @@ A wearable AI assistant sees the world through the user's eyes,
 continuously, for hours per day. To answer a look-back question
 ---``where did I leave my keys?'', ``what was that street sign?'',
 ``when did I last see Maria?''--- the assistant needs to find the
-relevant moments from its own past. The straightforward solution is
+relevant moments from its own past. System-architecture work on
+always-on wearable contextual AI~\cite{lee2025aria2} identifies a
+persistent spatial-temporal index as a first-class system
+component; \psm{} is a concrete implementation of that component.
+The straightforward solution is
 to embed every frame the camera saw with a vision--language encoder
 (CLIP, SigLIP, EVA) and run a top-$K$ cosine-similarity retrieval
 over the resulting embedding bank. This works, but the embedding
