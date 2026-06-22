@@ -26,12 +26,7 @@ texput.log
 *.log
 *.out
 
-# ECCV 2026 author kit (untracked — clone of the upstream template;
-# its .cls/.sty files are symlinked into journal/paper_drafts/ for builds).
+# ECCV 2026 author kit (untracked upstream clone — the kit files
+# themselves are vendored into journal/paper_drafts/ and tracked so
+# the build is portable across machines without a re-clone).
 journal/paper-template/
-journal/paper_drafts/eccv.sty
-journal/paper_drafts/eccvabbrv.sty
-journal/paper_drafts/llncs.cls
-journal/paper_drafts/splncs04.bst
-journal/paper_drafts/eijkel2.eps
-journal/paper_drafts/eijkel2.pdf
