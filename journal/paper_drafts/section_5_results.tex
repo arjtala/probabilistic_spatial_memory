@@ -12,8 +12,7 @@ We evaluate \psm{} against a brute-force CLIP oracle, retrieval baselines, and a
 \subsection{Setup}
 \label{sec:results-setup}
 
-We evaluate on the Nymeria atomic-action benchmark~\cite{ma2024nymeria}, 30 sessions (${\sim}5{,}600$ narrations) collected with Project Aria Gen~1 headsets~\cite{engel2024aria}.
-Each narration's $[t_\text{start}, t_\text{end}]$ interval serves as retrieval ground truth---a proxy benchmark, since the narrations are third-person action descriptions, not natural look-back questions (\S\ref{sec:conclusion}).
+We evaluate on the Nymeria atomic-action benchmark~\cite{ma2024nymeria}, 30 sessions (${\sim}5{,}600$ narrations) collected with Project Aria Gen~1 headsets~\cite{engel2024aria}; each narration's $[t_\text{start}, t_\text{end}]$ interval serves as retrieval ground truth---a proxy benchmark, since the narrations are third-person action descriptions, not natural look-back questions (\S\ref{sec:conclusion}).
 Primary results use \texttt{shelby\_arroyo\_act0} (187 narrations, 69\,m bbox).
 The encoder is CLIP-L~\cite{clip-l-laion,radford2021clip}, 768-d, 1\,fps, 11.6\,ms per query on CPU.
 \psm{} runs at H3 resolution~12 (${\sim}9.4$\,m hexes), time window 30\,s, ring-buffer capacity 60, reservoir $R{=}128$ exemplars per cell; we also report an oracle row at $R{=}1024$ to isolate reservoir eviction from the \caponek{} effect.
@@ -147,14 +146,14 @@ Three patterns: (a)~Cross-corpus robustness holds---SLOPER4D 3/3, Nymeria 1/1, L
 \centering
 \includegraphics[width=\linewidth]{figures/f2_psm_vs_mllm.pdf}
 \caption{Vanilla Gemini 3.1 Pro at $K{=}8$ uniform frames (red) vs \psm{} \texttt{clipL@r12} top-5 (blue) on every v1 session.
-\psm{}'s query-guided retrieval reaches every session the uniform baseline misses; five sessions land at vanilla MLLM $= 0\%$ because the $K{=}8$ uniform frames never include a GT-interval frame.}
+\psm{}'s query-guided retrieval reaches every session the uniform baseline misses; four sessions land at vanilla MLLM $= 0\%$ because the $K{=}8$ uniform frames never include a GT-interval frame.}
 \label{fig:f2-psm-vs-mllm}
 \end{figure}
 
 We run Gemini 3.1 Pro on all 14 sessions at $K{=}8$ uniformly-sampled frames per question (Figure~\ref{fig:f2-psm-vs-mllm}).
 The comparison isolates the retrieval substrate: given the same candidate budget, does query-guided cell-targeted retrieval provide candidates that uniform temporal sampling cannot?
 On every session \psm{} matches or exceeds the MLLM's Hit@5, with a median ${\sim}4\times$ advantage.
-Five sessions land at vanilla MLLM $= 0\%$ because the $K{=}8$ uniform frames never include a frame inside the ${\sim}3$\,s GT intervals---the structural coverage gap that \psm{}'s spatial-temporal prefilter is designed to close.
+Four sessions land at vanilla MLLM $= 0\%$ because the $K{=}8$ uniform frames never include a frame inside the ${\sim}3$\,s GT intervals---the structural coverage gap that \psm{}'s spatial-temporal prefilter is designed to close.
 
 The root cause is temporal coverage: with session durations of 100--640\,s, the gap between uniform frames is 12--80\,s, yielding ${\sim}4\%$ probability of \emph{seeing} the right frame before any discrimination kicks in.
 The failure is architectural, not a matter of model scale: at $K{=}32$ the oracle upper bound reaches $21.4\%$ but Gemini's actual pick rate stays at $7.1\%$---a $3\times$ discrimination gap that compounds the coverage gap.
