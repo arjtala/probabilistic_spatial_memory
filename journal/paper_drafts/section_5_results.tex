@@ -14,7 +14,7 @@ We evaluate \psm{} against a brute-force CLIP oracle, retrieval baselines, and a
 
 We evaluate on the Nymeria atomic-action benchmark~\cite{ma2024nymeria}, 30 sessions (${\sim}5{,}600$ narrations) collected with Project Aria Gen~1 headsets~\cite{engel2024aria}; each narration's $[t_\text{start}, t_\text{end}]$ interval serves as a look-back retrieval ground truth---a proxy benchmark, since the narrations are third-person action descriptions, not natural look-back questions (\S\ref{sec:conclusion}).
 Primary results use \texttt{shelby\_arroyo\_act0} (187 narrations, 69\,m bbox).
-The encoder is CLIP-L (\texttt{laion/CLIP-ViT-L-14-laion2B-s32B-b82K})~\cite{clip-l-laion,radford2021clip}, 768-d, 1\,fps, 11.6\,ms per query on CPU.
+The encoder is CLIP-L~\cite{clip-l-laion,radford2021clip}, 768-d, 1\,fps, 11.6\,ms per query on CPU.
 \psm{} runs at H3 resolution~12 (${\sim}9.4$\,m hexes), time window 30\,s, ring-buffer capacity 60, reservoir $R{=}128$ exemplars per cell; we also report an oracle row at $R{=}1024$ to isolate reservoir eviction from the \caponek{} effect.
 The baseline is brute-force CLIP top-5 over the full $N$-frame embedding bank (no spatial structure, no capping).
 We report three top-5 metrics: Hit@5 (did any exemplar timestamp fall inside a GT interval), exemplar mIoU@5 (mean IoU between exemplar $\pm1.5$\,s windows and GT), and bucket mIoU@5 (mean IoU between each cell's $[t_\text{min}, t_\text{max}]$ envelope and GT).
@@ -61,12 +61,10 @@ At \caponek{}$=1$+rerank, exemplar mIoU $= 0.069$ is statistically indistinguish
 The bounded-memory operating point matches the full embedding bank within sampling noise while preserving strict spatial diversity.
 
 Four additional patterns from ablations and baselines:
-\begin{enumerate}[nosep,leftmargin=*]
-\item \emph{Operating-point Pareto}: as \caponek{} sweeps from 1 to $K$, Hit@5 rises and bucket mIoU falls monotonically.
-\item \emph{Retrieval baselines}: sliding-window CLIP @ $\ell{=}10$\,s exceeds \psm{} \caponek{}$=K$ by $+1.6$\,pp Hit@5 ($15.0\%$ vs $13.4\%$) by averaging out per-frame variance, but requires the full $N$-frame bank; uniform-sample forms the floor at $4.3$--$8.6\%$.
-\item \emph{Memory ablation}: tightening the reservoir from 1024 to 128 exemplars costs $2.2$\,pp Hit@5 at \caponek{}$=K$; H3 resolution barely moves Hit@5 ($\pm 0.5$\,pp across $r \in \{10,11,12,13\}$) but moves bucket mIoU monotonically ($0.004 \to 0.019$).
-\item \emph{30-session monotonicity}: across all 30 Nymeria sessions, mean Hit@5 climbs monotonically from $3.26\%$ at \caponek{}$=1$ through $5.69\%$ and $7.08\%$ to $8.92\%$ at \caponek{}$=K$, matching brute-force exactly at \caponek{}$=K$; sliding-window CLIP exceeds both by $+1.0$\,pp.
-\end{enumerate}
+(1)~\emph{Operating-point Pareto}: as \caponek{} sweeps from 1 to $K$, Hit@5 rises and bucket mIoU falls monotonically.
+(2)~\emph{Retrieval baselines}: sliding-window CLIP @ $\ell{=}10$\,s exceeds \psm{} \caponek{}$=K$ by $+1.6$\,pp Hit@5 ($15.0\%$ vs $13.4\%$) by averaging out per-frame variance, but requires the full $N$-frame bank; uniform-sample forms the floor at $4.3$--$8.6\%$.
+(3)~\emph{Memory ablation}: tightening the reservoir from 1024 to 128 exemplars costs $2.2$\,pp Hit@5 at \caponek{}$=K$; H3 resolution barely moves Hit@5 (${\pm}0.5$\,pp across $r \in \{10,11,12,13\}$) but moves bucket mIoU monotonically ($0.004 \to 0.019$).
+(4)~\emph{30-session monotonicity}: across all 30 Nymeria sessions, mean Hit@5 climbs monotonically from $3.26\%$ at \caponek{}$=1$ through $5.69\%$ and $7.08\%$ to $8.92\%$ at \caponek{}$=K$, matching brute-force exactly at \caponek{}$=K$; sliding-window CLIP exceeds both by $+1.0$\,pp.
 
 \subsection{Memory, latency, and failure modes}
 \label{sec:results-memory-latency}
