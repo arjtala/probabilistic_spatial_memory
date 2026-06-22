@@ -1,34 +1,45 @@
 % PSM: Probabilistic Spatial Memory for Wearable Look-Back QA
 % ECCV 2026 Wearables AI Workshop submission.
 %
-% NOTE: Currently uses generic Springer LNCS (\documentclass{llncs})
-% as a stand-in. Before submission, swap to the ECCV 2026 Author Kit
-% .cls when it lands; the body content is template-agnostic.
+% Build: pdflatex main && bibtex main && pdflatex main && pdflatex main
+% Kit files (eccv.sty, eccvabbrv.sty, llncs.cls, splncs04.bst,
+% eijkel2.{eps,pdf}) are symlinked from ../paper-template/ and
+% are gitignored alongside the template clone.
 %
-% To compile locally:
-%   cd journal/paper_drafts
-%   pdflatex main.tex && bibtex main && pdflatex main.tex && pdflatex main.tex
+% TODO REVIEW: replace ID=***** with the OpenReview submission ID
+% TODO FINAL : swap `\usepackage[review,...]{eccv}` for `\usepackage{eccv}`
+%              and the pagebackref hyperref line below.
 
-% Springer LNCS template (placeholder for the ECCV 2026 Author Kit).
 \documentclass[runningheads]{llncs}
 
+% ECCV 2026 author-kit package (rides on top of llncs.cls).
+% The `review` option enables line numbering + paper-ID watermark.
+\usepackage[review,year=2026,ID=*****]{eccv}
+% ECCV-standard abbreviation macros (\eg, \ie, \etc, \cf, \etal).
+\usepackage{eccvabbrv}
+
+% Body packages. Keep this list short; the kit forbids any package
+% that alters layout (textheight, vspace, baselinestretch, etc.).
+% eccv.sty already loads: fontenc[T1], amsmath, amssymb, xcolor[dvipsnames],
+% cite, xspace, url[hyphens], lineno, caption, subcaption — don't re-load.
 \usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
 \usepackage{microtype}
 \usepackage{graphicx}
 % Figure PDFs (F2/F3/F6/F7) are generated in journal/figures/ by
 % scripts/plot_f*.py; symlinks in paper_drafts/figures/ point there
 % so \includegraphics{figures/...} resolves without \graphicspath.
 \usepackage{booktabs}
-\usepackage{amsmath}
-\usepackage{amssymb}
-\usepackage{xcolor}
-\usepackage[hidelinks]{hyperref}
-\usepackage{xspace}
+% Accessibility tagging — required by the ECCV 2026 author kit.
+\usepackage[accsupp]{axessibility}
 \usepackage{pifont}
 \usepackage{tikz}
 \usetikzlibrary{positioning, arrows.meta, fit, calc,
                 shapes.geometric, backgrounds}
+
+% Hyperref — review version uses pagebackref so reviewers can jump
+% from a bibliography entry back to citing pages.
+% TODO FINAL: swap for plain `\usepackage{hyperref}` in camera-ready.
+\usepackage[pagebackref,breaklinks,colorlinks,citecolor=eccvblue]{hyperref}
 
 % Macros used across sections.
 \newcommand{\psm}{\textsc{PSM}\xspace}
@@ -43,8 +54,9 @@
 Substrate for Wearable Look-Back Question Answering}
 \titlerunning{Probabilistic Spatial Memory for Wearable Look-Back QA}
 
-% Author block intentionally blank for double-blind review.
+% TODO FINAL: replace Anonymous block with author list + ORCIDs.
 \author{Anonymous}
+\authorrunning{Anonymous}
 \institute{Anonymous Institution\\\email{anon@example.com}}
 
 \begin{document}
@@ -100,7 +112,7 @@ Look-back QA \and Retrieval substrate \and Wearable AI.}
 % Folded into a footnote below to save vertical space.
 
 % ---- Bibliography -------------------------------------------------
-\bibliographystyle{plain}
+\bibliographystyle{splncs04}
 \bibliography{references}
 
 \end{document}
