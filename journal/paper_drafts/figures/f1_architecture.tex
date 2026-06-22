@@ -6,8 +6,14 @@
 % calc,shapes.geometric,backgrounds} loaded in main.tex.
 \begin{figure}[t]
 \centering
-\resizebox{\linewidth}{!}{%
+% TikZ-native scaling (scale + transform shape) rather than
+% \resizebox{\linewidth}{!}{...}; the latter measures the picture
+% in an \hbox, which is incompatible with the fit library + multi-
+% line label nodes used below (triggers "Not allowed in LR mode"
+% at the close of the resizebox). 0.78 fits the LNCS single-column
+% linewidth comfortably; bump if the journal style is wider.
 \begin{tikzpicture}[
+    scale=0.78, transform shape,
     >={Stealth[length=2mm,width=1.6mm]},
     font=\scriptsize,
     node distance=2mm and 3mm,
@@ -158,8 +164,7 @@
 \node[stage, fit=(fetch)(mllm)(ans),
       label={[stagelbl, anchor=south]above:Stage 3: MLLM rerank}] {};
 
-\end{tikzpicture}%
-}
+\end{tikzpicture}
 \caption{\textbf{PSM architecture.}
 Stage~0: streaming egocentric frames at 1\,fps plus the wearer's
 SLAM trajectory.
