@@ -33,7 +33,7 @@ sketches~\cite{flajolet2007hyperloglog} that rotate on a
 configurable time-window cadence (default 30\,s). Ingesting a
 tuple hashes the frame's embedding into the current sketch;
 when the window elapses the pointer advances and old sketches
-expire as the ring wraps, enforcing strict bounded-time retention.
+expire as the ring wraps, enforcing bounded-time retention.
 The sketches serve two roles: they provide cardinality estimates
 of distinct events per cell and they expose the cell's
 \emph{temporal envelope}
