@@ -32,7 +32,7 @@
 
 % ============== Stage 0: streaming input ==============
 \node[iobox] (frames)
-    {Video frames\\\@ 1\,fps};
+    {Video frames\\@ 1\,fps};
 \node[iobox, below=2mm of frames] (slam)
     {SLAM trajectory\\$(\text{lat},\text{lng},t)$};
 
@@ -143,7 +143,12 @@
 \draw[flow] (mllm.east)  -- (ans.west);
 
 % ============== Stage bounding boxes ==============
-\begin{pgfonlayer}{background}
+% Drawn last (not via pgfonlayer{background}, which is incompatible
+% with the enclosing \resizebox{\linewidth}{!}{...} — pgfonlayer
+% emits vertical-mode primitives that are illegal in LR mode).
+% Since `stage` is a transparent dashed outline at the perimeter of
+% the fit region, drawing it on top of content rather than behind
+% is visually identical.
 \node[stage, fit=(frames)(slam),
       label={[stagelbl, anchor=south]above:Stage 0: stream}] {};
 \node[stage, fit=(enc)(emb)(h3lookup)(h0)(h2)(h5)(rsvlbl)(boundlbl),
@@ -152,7 +157,6 @@
       label={[stagelbl, anchor=south]above:Stage 2: PSM top-$K$}] {};
 \node[stage, fit=(fetch)(mllm)(ans),
       label={[stagelbl, anchor=south]above:Stage 3: MLLM rerank}] {};
-\end{pgfonlayer}
 
 \end{tikzpicture}%
 }
