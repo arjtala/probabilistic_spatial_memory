@@ -11,7 +11,7 @@
 #
 # What this script DOES NOT do (and cannot, without external resources):
 #   - Encoder feature extraction. The CLIP-L/CLIP-bigG/SigLIP-2L feature
-#     H5s under /checkpoint/dream/arjangt/video_retrieval/... require a
+#     H5s under $PSM_FEATURE_ROOT (default: ./features/) require a
 #     cluster GPU pass (~12 GPU-hours wall for the full 14-session set).
 #   - MLLM baseline rerun. captures/mllm_baseline/*_gemini.json each
 #     embed ~30 Gemini 3.1 Pro completions; regenerating them needs
@@ -47,22 +47,26 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
 
-# Resolve python: prefer the user-active `python` only if it's the psm env,
-# otherwise fall back to the absolute psm-env interpreter.
-PSM_PY_FALLBACK="/home/arjangt/.conda/envs/psm/bin/python"
-if command -v python >/dev/null 2>&1; then
+# Resolve python: prefer $PSM_PY env var (operator override), else the
+# user-active `python` if it looks like the psm env, else `python` on
+# PATH and trust the user to have requirements-paper.txt installed.
+if [[ -n "${PSM_PY:-}" ]]; then
+  PY="$PSM_PY"
+elif command -v python >/dev/null 2>&1; then
   PY_PATH="$(command -v python)"
   case "$PY_PATH" in
     *"/envs/psm/"*) PY="$PY_PATH" ;;
-    *) PY="$PSM_PY_FALLBACK" ;;
+    *)              PY="$PY_PATH" ;;
   esac
 else
-  PY="$PSM_PY_FALLBACK"
+  printf '[FATAL] No python interpreter on PATH.\n' >&2
+  printf '         Activate a Python 3.12 env with requirements-paper.txt installed,\n' >&2
+  printf '         or set PSM_PY=/abs/path/to/python.\n' >&2
+  exit 2
 fi
 
 if [[ ! -x "$PY" ]]; then
-  printf '[FATAL] No usable python interpreter found (tried %s).\n' "$PY" >&2
-  printf '         Activate the psm conda env: `conda activate psm`.\n' >&2
+  printf '[FATAL] $PSM_PY=%s is not executable.\n' "$PY" >&2
   exit 2
 fi
 

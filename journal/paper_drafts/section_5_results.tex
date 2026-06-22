@@ -1,9 +1,8 @@
 % Section 5 — Results
-% Status: v1 draft against locked Nymeria numbers (2026-06-04).
-% Multi-session sweep + Aria Gen 2 results land later — leave the
-% per-session-table TODO marker in place until then.
-% Citation keys (\cite{...}) and figure refs (\ref{fig:...}) are
-% placeholders until the bib + main.tex assemble.
+% Status: full v1+. Headline single-session table (§5.2), multi-session
+% sweep (§5.5), multi-corpus / multi-encoder generalization (§5.6),
+% vanilla-MLLM baseline (§5.8), memory + latency (§5.7), MLLM rerank
+% (§5.9), F2/F3/F6/F7 figures all landed.
 
 \section{Results}
 \label{sec:results}
@@ -292,8 +291,8 @@ On memory, the two methods exchange regimes around a
 crossover scale. The
 \textit{linear-vs-constant} comparison is the load-bearing one:
 \psm{}'s per-cell storage at the deployment configuration
-($R{=}128$ exemplars $\times$ 1024-d CLIP-L $\times$ 4\,B $\approx$
-0.5\,MiB per cell, plus ring buffer + HLL $\approx$ 1\,MiB) is
+($R{=}128$ exemplars $\times$ 768-d CLIP-L $\times$ 4\,B $\approx$
+0.4\,MiB per cell, plus ring buffer + HLL $\approx$ 1\,MiB) is
 session-length-invariant; brute-force grows linearly in $N$
 ($N \times \text{dim} \times 4$\,B). Figure~\ref{fig:f6-memory}
 plots both across our measured corpus (32 sessions, $N \in
