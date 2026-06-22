@@ -91,6 +91,7 @@ The shared $13.4\%$ ceiling is benchmark hardness, not method quality (\S\ref{se
 \label{sec:results-multi-corpus}
 
 To address the single-corpus / single-encoder objection, we replicate the spatial-axis result across 14 street-scale sessions spanning 3 sensor stacks (SLOPER4D~\cite{dai2023sloper4d}: head-mounted LiDAR + DJI Action2; Nymeria: Project Aria + MPS SLAM; LookOut~\cite{pan2025lookout}: Project Aria across 5 Bay Area locations) and 3 encoder families (CLIP-L 768-d, CLIP-bigG 1280-d, SigLIP-2-large 1024-d~\cite{tschannen2025siglip2}).
+To our knowledge, no existing egocentric benchmark combines outdoor spatial trajectories with temporally-grounded text annotations; the three-corpus evaluation set we assemble---with per-corpus extractors for LiDAR-SLAM, Aria MPS, and Aria VRS trajectories---is itself a contribution.
 Acceptance criterion: for each (session, encoder), Hit@5 must be non-decreasing across $r \in \{10,11,12\}$ with $\geq 4$\,pp lift from $r{=}10$ to $r{=}12$; a session passes if any encoder satisfies both conditions.
 The $4$\,pp threshold is conservative against binomial noise at 28--30 questions per session.
 Table~\ref{tab:multi-corpus-h3} reports per-(session, encoder) verdicts.
