@@ -31,8 +31,14 @@
 #   - benchmarks/nymeria/         scripts/bench_brute_force_clip.py (30 sess.)
 #
 # Usage:
-#   conda activate psm
+#   conda activate psm                      # or any Python 3.12 env with
+#                                           # `pip install -r requirements-paper.txt`
 #   bash scripts/reproduce_paper.sh
+#
+# Dependencies for this driver are pinned in requirements-paper.txt at
+# the repo root (numpy / h3 / h5py). The full extraction-side stack
+# (torch, transformers, projectaria-tools, ...) lives in
+# extraction/pyproject.toml and is only needed to regenerate captures.
 #
 # Idempotent: re-running overwrites the generated PDFs/SVGs in place.
 
