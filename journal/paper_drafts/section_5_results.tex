@@ -588,6 +588,30 @@ when queries are action-narrations or visually-poor
 reranker to a Hit\,@\,5 default; the data does not support
 it as a uniform improvement.
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/f7_qualitative.pdf}
+\caption{Qualitative top-5 PSM candidates on three
+\texttt{shelby\_arroyo\_act0} queries at the headline
+\caponek{}$=K$+Gemini operating point. Green borders mark
+candidates whose exemplar timestamp falls inside a ground-truth
+interval; red borders mark non-hits; the gold badge marks the
+single candidate Gemini's rerank selected. \emph{Row 1 (q96,
+car gear-shifter)} is the success case: one of five candidates
+hits GT and Gemini picks it, lifting both Hit@5 and Hit@1.
+\emph{Row 2 (q31, ``closes the cabinet'')} shows the bimodal
+Hit@1 limitation from §\ref{sec:results-mllm-rerank}: two of
+five candidates hit but Gemini chose a visually-plausible
+non-hit, leaving Hit@5 invariant while losing Hit@1.
+\emph{Row 3 (q1, revisit-heavy living-room narration)} is the
+honest failure mode behind the $13.4\%$ benchmark ceiling
+(§\ref{sec:results-memory-latency}): all five candidates land
+in the same H3 cell at different timestamps and look
+indistinguishable to CLIP cosine, so neither PSM nor the
+reranker can recover the 298--303\,s GT window.}
+\label{fig:f7-qualitative}
+\end{figure}
+
 % Cross-corpus story consolidated into §6 (Conclusion) Follow-up
 % paragraph rather than maintained here as a stub — see venue-aware
 % framing notes: a workshop paper is better served by a confident
