@@ -13,8 +13,6 @@ Two panels (or one combined plot):
 Inputs:
   - benchmarks/nymeria/*.json: 30 Nymeria sessions, brute-force
     CLIP-L median+p99 latency + bytes_in_ram per session.
-  - benchmarks/bench_brute_force_clip_{l,bigg}_features.json: 2
-    Aria-internal sessions.
   - PSM reference: hardcoded ~1 MB/cell × ~10 cells ≈ 13 MB
     at the deployment configuration (R=128 exemplars × 1024-d ×
     4 bytes ≈ 0.5 MB per cell; with ring buffer + HLL ~1 MB
@@ -48,17 +46,6 @@ def _load_bench(repo_root: Path) -> list[dict]:
             "dim": d["dim"],
             "src": "Nymeria",
         })
-    for f in ("bench_brute_force_clip_l_features.json", "bench_brute_force_clip_bigg_features.json"):
-        p = repo_root / "benchmarks" / f
-        if p.exists():
-            d = json.loads(p.read_text())
-            rows.append({
-                "n_frames": d["n_frames"],
-                "median_us": d["median_us"],
-                "bytes_in_ram": d["bytes_in_ram"],
-                "dim": d["dim"],
-                "src": "Aria",
-            })
     return rows
 
 
@@ -174,7 +161,7 @@ def _render_svg(rows: list[dict]) -> str:
     for r in rows:
         bx = x_pos(r["n_frames"])
         by = y_pos(r["bytes_in_ram"] / 1024 / 1024)
-        color = "#d62728" if r["src"] == "Nymeria" else "#ff7f0e"
+        color = "#d62728"
         lines.append(
             f'<circle cx="{bx:.1f}" cy="{by:.1f}" r="3.5" fill="{color}" '
             f'fill-opacity="0.7" stroke="white" stroke-width="0.8"/>'
@@ -221,7 +208,7 @@ def _render_svg(rows: list[dict]) -> str:
     # Note at bottom.
     lines.append(
         f'<text x="{_W - 10}" y="{_H - 12}" text-anchor="end" font-size="10" fill="#666">'
-        f'{len(rows)} Nymeria + Aria CLIP-L bench JSONs</text>'
+        f'{len(rows)} Nymeria CLIP-L bench JSONs</text>'
     )
 
     lines.append('</svg>')

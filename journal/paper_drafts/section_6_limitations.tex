@@ -1,139 +1,57 @@
 % Section 6 — Limitations
-% Status: v1+ draft. Limitations worth surfacing explicitly:
+% Status: v2, compressed to ~1.0–1.5 LNCS pages.
+% Retained items:
 %   (1) Revisit-heavy long-narration ceiling
-%   (2) Sub-room mobility exclusion (benchmark, not method)
-%   (3) CLIP-77-token text truncation under-reports long-narration accuracy
-%   (4) Multi-corpus coverage scope (some deep ablations still Nymeria-only)
-%   (5) One honest spatial-axis failure (BurlingameDT4)
-%   (6) Latency claim from synthetic workload
-%   (7) Query-time pooling didn't generalize
-%   + closing "What this paper does not claim" paragraph.
+%   (2) One honest spatial-axis failure (BurlingameDT4)
+%   (3) Latency claim from synthetic workload
+%   (4) Multi-corpus coverage scope
 
 \section{Limitations}
 \label{sec:limitations}
 
-We surface five limitations of the v1 results so they are not
-mistaken for stronger claims than they support.
-
 \paragraph{Benchmark ceiling on revisit-heavy narrations.}
-Both PSM and brute-force CLIP plateau at 13.4\% Hit@5 on the
-\texttt{shelby\_arroyo\_act0} session (\S\ref{sec:results-main}),
-and at similar single-digit values on the lower-mobility sessions
-(\S\ref{sec:results-multisession}). The dominant failure mode is
-\emph{revisit-heavy long narration}: the wearer enters the living
-room many times during the recording, and each entry is
-visually nearly identical, so the annotator's chosen ground-truth
-interval is one of many indistinguishable matching frames. Both
-methods converge on the visually-most-similar frame, which is
-rarely the annotator's pick.
-\emph{This is a benchmark hardness ceiling, not a method-quality
-signal:} PSM and brute-force CLIP agree on the 25/187 questions
-that \emph{are} groundable (\S\ref{sec:results-memory-latency}) and
-disagree only on the inherently ambiguous remainder. Subsequent
-benchmarks should either (a) include only narrations whose
-ground-truth interval is the unique visual match in the recording,
-or (b) score against \emph{any} acceptable revisit window rather
-than the single one the annotator chose.
-
-\paragraph{Sub-room mobility is excluded.}
-Nymeria sessions with wearer bounding-box extent $<5$\,m
-($\sim$13\% of our 30 candidate sessions; the
-\texttt{nymeria\_slam\_displacement.py} probe gates this) are
-excluded from the main result. On such sessions both \psm{} and
-brute-force CLIP plateau near $1\%$ Hit@5 because the narrations
-describe a space the wearer never left and the text--image
-alignment cannot distinguish among visually indistinguishable
-indoor frames. We treat sub-room mobility as a corpus
-characteristic rather than a method limitation.
-
-\paragraph{CLIP text encoder caps at 77 tokens.}
-Nymeria \texttt{atomic\_action} narrations are full-sentence
-descriptions (``C is walking forward in the hallway and turns left
-toward the laundry closet, then opens the door with her right
-hand''). Many tokenize to 80--120 tokens, exceeding the CLIP-L
-text encoder's 77-token positional limit. We truncate at 77 tokens
-at the tokenizer level; this drops trailing context that the
-brute-force CLIP and \psm{} baselines both lose access to.
-We tested whether a non-truncating text encoder would close this
-gap, swapping in Long-CLIP-L~\cite{zhang2024longclip} (the same
-ViT-L/14 architecture as CLIP-L, with positional embeddings
-stretched from 77 to 248 tokens) and re-extracting both text and
-image features on the headline session. The Long-CLIP swap
-\emph{degraded} Hit@5 by $2.2$\,pp ($13.4\%\to11.2\%$), suggesting
-that the truncated trailing context is auxiliary description that
-adds noise rather than signal on this benchmark, and that
-Long-CLIP's fine-tuning on long-caption COCO/Flickr-style pairs
-shifts the embedding space away from what works for short-action
-retrieval. Other long-context encoders (1024-token CLIP variants,
-SigLIP~2~\cite{tschannen2025siglip2}) may behave differently; we
-leave that broader sweep to future work.
-
-\paragraph{Multi-corpus coverage.} The deepest single-session
-analysis (Table~\ref{tab:headline}, the \caponek{} sweep,
-the brute-force comparison) remains on Nymeria
-\texttt{shelby\_arroyo\_act0}. The multi-corpus generalization
-in \S\ref{sec:results-multi-corpus} (14 street-scale sessions
-across SLOPER4D, Nymeria, LookOut $\times$ 3 encoder families)
-addresses the obvious single-corpus / single-encoder objection
-but uses Hit\,@\,5 as its sole metric --- we do not yet
-report mIoU / counting / encoder-bypass numbers across the
-full multi-corpus set. Per-session reservoir-size and
-retention-horizon sweeps are also Nymeria-only at submission
-time; replicating them across the 14-session set is a
-straightforward follow-up that the engine and harness already
-support.
+Both \psm and brute-force CLIP plateau at 13.4\% Hit@5 on the
+headline session (\S\ref{sec:results-main}).
+The dominant failure mode is revisit-heavy long narrations:
+162 of the 187 narrations describe rooms the wearer enters
+many times during the recording, and each entry produces
+visually near-identical frames.
+Both methods converge on the most similar frame, which is
+rarely the single interval the annotator chose as ground truth.
+This is a benchmark hardness ceiling, not a method-quality
+signal---\psm and brute-force CLIP agree on the 25 questions
+that \emph{are} uniquely groundable and disagree only on the
+inherently ambiguous remainder.
+Future benchmarks should score against \emph{any} acceptable
+revisit window rather than the one the annotator selected.
 
 \paragraph{One honest spatial-axis failure.}
 Of the 14 street-scale sessions in
-\S\ref{sec:results-multi-corpus}, \texttt{BurlingameDT4\_feb5}
-(LookOut, 242\,m bbox) is the single session where \emph{all
-three} encoders fail the monotone-r10$\to$r12, $\geq$4\,pp lift
-acceptance. The trajectory is a short walk down a
-parking-lot-flanked street where the captioned queries
-(parked vehicles and street signage at small distances from
-the wearer's path) collapse onto a handful of revisited cells
-that no encoder discriminates above floor at the cell
-granularity \psm{} operates on. This is the expected failure
-mode of visually-homogeneous trajectories with
-revisit-heavy query distributions; \psm{}'s spatial axis
-is not magic and we report the negative case rather than
-hide it.
+\S\ref{sec:results-multi-corpus},
+\texttt{BurlingameDT4\_feb5} (LookOut, 242\,m bounding box)
+is the only session where all three encoders fail the
+monotone-\caponek lift acceptance criterion.
+The trajectory is a short, visually homogeneous walk along a
+parking-lot-flanked street; the captioned queries---parked
+vehicles and signage at small distances from the wearer's
+path---collapse onto a handful of cells no encoder
+discriminates above floor.
+This is the expected failure mode for such trajectories, and we
+report it rather than hide it.
 
 \paragraph{Latency from synthetic workload.}
-\psm{}'s reported $\sim$700\,$\mu$s per-query latency is from a
-1024-tile dim-128 synthetic benchmark on H200; real Nymeria
-sessions ($\sim$10 tiles at dim 1280, 128 exemplars) shift the
-constants. The asymptotic frame-count independence claim holds
-on both, but a real-session micro-benchmark is a follow-up.
+\psm's reported ${\sim}700\,\mu$s per-query latency derives
+from a 1024-tile, dim-128 synthetic benchmark on H200.
+Real Nymeria sessions use ${\sim}$10 tiles at dim\,1280 with
+128 exemplars; the constants differ, but the frame-count
+independence property holds on both workloads.
 
-\paragraph{Query-time pooling does not generalize.}
-During method development, we explored a query-time reranking approach (\texttt{W=30} pooling) that averaged the embeddings of the $W$ frames surrounding each top-$K$ candidate before final selection. While this recovered performance on a small early-validation split, it failed to generalize across the 30-session corpus, behaving essentially as random noise relative to the per-frame baseline. We report this negative result to confirm that spatial-temporal smoothing must happen structurally at ingest time (via reservoir or ring buffer), not heuristically at query time.
-
-\paragraph{What this paper does not claim.}
-For clarity, we note five claims this work does \emph{not} make.
-(a) We do not claim PSM is a generic MLLM grounding method;
-PSM is a retrieval substrate, the MLLM does the grounding.
-(b) We do not claim PSM solves the counting question class;
-the time-decayed HLL sketches are diagnostic-only until the
-real-counting scorer lands in a follow-up.
-(c) We do not claim PSM is the only architecture for this
-problem; we propose one shape, not the only one. (d) We do not
-claim that per-frame brute-force CLIP is the strongest possible
-CLIP-only baseline. Sliding-window CLIP at the GT-interval
-width modestly exceeds both brute-force and \psm{} at \texttt{cap}=$K$
-by mean $+1.0$\,pp Hit@5 across our 30-session corpus (with the
-gap closing or inverting on 14 of those 30 sessions). This
-encoder-stage smoothing benefit is real but small, and \psm{} does
-not currently absorb it at its bounded-memory operating point ---
-ingest-time embedding smoothing is the natural follow-up.
-(e) We do not claim that CLIP-L is the strongest possible
-encoder. Larger CLIP variants (bigG~\cite{cherti2023scaling},
-EVA-CLIP-18B~\cite{sun2024evaclip18b}) and better-curated training
-data (MetaCLIP~\cite{xu2023metaclip}) would shift absolute Hit@5
-upward; localization-aware encoders such as
-SigLIP~2~\cite{tschannen2025siglip2} are the natural next encoder
-swap. Dense visual encoders such as DINOv2~\cite{oquab2024dinov2}
-and video-native encoders such as V-JEPA~2~\cite{assran2025vjepa2}
-are natural future re-rankers for cases where text--image
-similarity and visual salience disagree, but the architectural
-claim is encoder-agnostic.
+\paragraph{Multi-corpus coverage.}
+The deepest single-session analysis
+(Table~\ref{tab:headline}, the \caponek sweep, the
+brute-force comparison) remains on Nymeria
+\texttt{shelby\_arroyo\_act0}.
+The multi-corpus sweep (\S\ref{sec:results-multi-corpus})
+covers 14 sessions across three corpora and three encoder
+families but reports Hit@5 only; mIoU and counting metrics
+across the full 14-session set are a straightforward follow-up.

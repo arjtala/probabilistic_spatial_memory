@@ -8,118 +8,55 @@
 \label{sec:related}
 
 \paragraph{Egocentric video understanding and episodic memory.}
-Ego4D~\cite{grauman2022ego4d} and its Natural Language Queries
-benchmark established the look-back QA task on egocentric video at
-3{,}000-hour scale; EgoSchema~\cite{mangalam2023egoschema}
-contributed a long-form MCQ diagnostic that exposed the temporal-
-grounding collapse motivating our PSM-as-prefilter pipeline. The
-literal use case (``where did I leave my keys?'') was articulated
-in earlier workshop work~\cite{barmann2022keys}; Di and
-Xie~\cite{di2024grounded} introduced unified grounded-QA over long
-egocentric videos with end-to-end neural grounding, and later
-multi-hop variants make the same temporal localization pressure
-explicit~\cite{chen2025groundedmultihop}. Recent egocentric
-grounding work strengthens the case for a persistent spatial
-substrate: Plizzari et al.~\cite{plizzari2025spatial} find that
-spatial cognition is critical for locating objects across short and
-long time scales, while fine-grained egocentric grounding benchmarks
-such as EgoMask~\cite{liang2025egomask} expose the pixel- and
-spatiotemporal-grounding challenges specific to first-person video.
-Closest to our online setting, ESOM~\cite{manigrasso2026esom}
-maintains a streaming object memory for episodic visual query
-localization; its object-level memory is complementary to \psm{}'s
-place-level H3 memory, and its reported 4\% online success rate
-underscores the hardness of egocentric streaming retrieval. Our
-contribution is structurally orthogonal: we provide a bounded-memory
-spatial-temporal
-substrate that any of these MLLM grounding methods can rerank, rather
-than retraining a new grounding head. This PSM$\to$MLLM composition
-is an instance of the video retrieval-augmented generation (VideoRAG)
-pattern~\cite{jeong2025videorag}.
+Ego4D~\cite{grauman2022ego4d} established look-back QA at
+3{,}000-hour scale; EgoSchema~\cite{mangalam2023egoschema} exposed
+the temporal-grounding collapse that motivates our prefilter pipeline.
+The literal ``where did I leave my keys?'' task was posed by
+Barmann et al.~\cite{barmann2022keys}; Di and Xie~\cite{di2024grounded}
+unified grounded QA over long egocentric video, and Chen et
+al.~\cite{chen2025groundedmultihop} extended it to multi-hop chains.
+Plizzari et al.~\cite{plizzari2025spatial} show spatial cognition is
+critical for object localization across time scales,
+EgoMask~\cite{liang2025egomask} benchmarks fine-grained
+spatiotemporal grounding in first-person video, and
+ESOM~\cite{manigrasso2026esom} maintains a streaming object memory
+whose 4\% online success rate underscores the hardness of egocentric
+streaming retrieval. \psm{} is structurally orthogonal: it provides a
+bounded-memory spatial-temporal substrate that any MLLM grounding
+method can rerank, without retraining a new grounding head---an
+instance of the VideoRAG pattern~\cite{jeong2025videorag}.
 
 \paragraph{Memory-augmented video LLMs.}
 MovieChat~\cite{song2024moviechat}, MA-LMM~\cite{he2024malmm},
 Flash-VStream~\cite{zhang2024flashvstream}, and
-LifelongMemory~\cite{wang2024lifelongmemory} all address bounded-
-memory long-video understanding. More recent work tightens the bound:
-HERMES~\cite{zhang2026hermes} arranges the KV cache itself as
-hierarchical memory, InfiniPot-V~\cite{kim2025infinipotv} imposes a
-training-free hard memory cap with 94\% reduction, and
-SAVEMem~\cite{wu2025savemem} introduces a 3-tier semantic-aware
-retention structure. These operate inside the MLLM's token space;
-\psm{} operates upstream of it. They differ from \psm{} in two
-important ways. First, they bound memory in \emph{token} space:
-dense-to-sparse merging inside the LLM forward pass, KV-cache
-compression, or recurrent state. \psm{} bounds memory in
-\emph{geographic} space (H3 hex cells) and is therefore queryable
-along a spatial axis that token-space memory cannot answer
-(``what was I doing near here?''). Second, the token-space methods
-require re-running the LLM on the compressed state; \psm{} runs
-upstream of any MLLM, returning a top-$K$ candidate set that the
-downstream model reranks without retraining. The two approaches are
-complementary: \psm{} as front-end retrieval, token-space methods
-as MLLM-internal compression. Emerging smart-glasses agent
-frameworks such as Egocentric Co-Pilot~\cite{yang2026egocopilot}
-combine temporal chain-of-thought with hierarchical context
-compression for long-horizon first-person QA; \psm{}'s
-bounded-memory index is the natural retrieval frontend such
-agents query before invoking their MLLM reasoning stage.
+LifelongMemory~\cite{wang2024lifelongmemory} tackle bounded-memory
+long-video understanding; more recently,
+HERMES~\cite{zhang2026hermes} arranges the KV cache as hierarchical
+memory, InfiniPot-V~\cite{kim2025infinipotv} imposes a training-free
+hard cap with 94\% reduction, and SAVEMem~\cite{wu2025savemem}
+adds 3-tier semantic-aware retention.
+All bound memory in \emph{token} space---dense-to-sparse merging,
+KV-cache compression, or recurrent state---whereas \psm{} bounds
+memory in \emph{geographic} space (H3 hex cells), enabling a spatial
+query axis (``what was I doing near here?'') that token-space methods
+cannot answer.
+Because \psm{} runs upstream of any MLLM, returning a top-$K$
+candidate set the downstream model reranks without retraining, the two
+are complementary: \psm{} as front-end retrieval, token-space methods
+as MLLM-internal compression.
 
 \paragraph{Streaming search and spatial indexing.}
-DiskANN~\cite{jayaram2019diskann} and SPANN~\cite{chen2021spann}
-deliver billion-point ANN with bounded per-query cost over
-near-static corpora; locally-adaptive vector
-quantization~\cite{aguerrebere2024lvq} extends the streaming case
-with per-vector compression. \psm{} differs in two ways: queries
-optionally constrain to an H3 $k$-ring neighborhood (the
-``near here'' spatial axis ANN does not expose), and ingestion is
-fully streaming with bounded per-cell state that ages out via the
-ring buffer. The H3 hex grid~\cite{brodsky2018h3} is a regular-grid
-alternative to R-tree-style data-driven subdivisions~\cite{guttman1984rtrees};
-its hexagonal geometry provides equidistant neighbors and a
-globally-stable cell-id scheme, the latter being the basis for
-the federated-memory extension we discuss in
-\S\ref{sec:conclusion}. The probabilistic substrate
+DiskANN~\cite{jayaram2019diskann}, SPANN~\cite{chen2021spann}, and
+locally-adaptive vector quantization~\cite{aguerrebere2024lvq}
+deliver billion-point ANN with bounded per-query cost, but target
+near-static corpora with no spatial constraint.
+\psm{} adds two capabilities: queries optionally restrict to an H3
+$k$-ring neighborhood---the ``near here'' axis ANN does not
+expose---and ingestion is fully streaming, with bounded per-cell state
+aged out by the ring buffer.
+The H3 hex grid~\cite{brodsky2018h3} replaces R-tree-style
+data-driven subdivisions~\cite{guttman1984rtrees} with equidistant
+neighbors and globally-stable cell ids; the probabilistic primitives
 (HyperLogLog~\cite{flajolet2007hyperloglog}, reservoir
-sampling~\cite{vitter1985reservoir}) is standard; the contribution
-is in how the two compose with the H3 tessellation under the
-\caponek{} query knob.
-
-\paragraph{Vision-language encoders and the choice of substrate
-input.} The retrieval quality of any embedding-bank approach,
-including \psm{}, depends on the input encoder. We evaluate three
-families that span the dominant pretraining recipes: laion's CLIP
-ViT-L and ViT-bigG~\cite{cherti2023scaling} (softmax contrastive on
-LAION-2B), and Google's SigLIP~2~\cite{tschannen2025siglip2}
-(sigmoid pairwise on WebLI-100B, with explicit
-localization-awareness training). Long-context CLIP
-variants~\cite{zhang2024longclip}, denser-data
-recipes~\cite{xu2023metaclip}, and ultra-scale variants such as
-EVA-CLIP-18B~\cite{sun2024evaclip18b} are natural future swaps but
-do not change the substrate. Dense visual encoders such as
-DINOv2~\cite{oquab2024dinov2} and video-native encoders such as
-V-JEPA~2~\cite{assran2025vjepa2} are complementary rerankers
-when text--image similarity and visual salience disagree;
-embedding-retrieval dimensionality limits~\cite{weller2025limit}
-upper-bound any single-encoder substrate. We treat the encoder as
-a swappable input (\S\ref{sec:pipeline}); the cross-encoder
-generalization in \S\ref{sec:results-multi-corpus} shows the
-spatial-axis claim is not a CLIP-family artifact.
-
-\paragraph{Egocentric outdoor and street-scale corpora.}
-Most egocentric benchmarks are indoor and short-trajectory; the
-sensor stacks and outdoor capture needed for street-scale
-spatial-memory evaluation are recent. Aria Gen~1 / Gen~2
-glasses~\cite{engel2024aria,aria-gen2-pilot} ship with MPS SLAM
-trajectories that we use as the geographic ground truth for the
-Nymeria~\cite{ma2024nymeria} narrative-action sessions and for the
-LookOut~\cite{pan2025lookout} pedestrian-navigation corpus
-(downtown Burlingame / San Mateo / Foster City / Hillsdale /
-Stanford walks). SLOPER4D~\cite{dai2023sloper4d} provides a
-LiDAR-rigged head-mounted alternative with $\sim$300\,m urban
-trajectories and frame-aligned RGB. Together these three corpora
-cover the two dominant wearable-sensor stacks (Aria-style MPS,
-helmet-LiDAR) and the street-scale mobility tier required to
-exercise H3 resolutions 10--12; their licences
-(CC~BY 4.0 / CC~BY-NC 4.0 / CC~BY-NC-SA 4.0 respectively)
-permit research evaluation but restrict commercial use.
+sampling~\cite{vitter1985reservoir}) are standard---the contribution
+is their composition under the \caponek{} query knob.

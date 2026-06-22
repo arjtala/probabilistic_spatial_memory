@@ -6,109 +6,60 @@
 \section{Method: PSM as MLLM Prefilter}
 \label{sec:pipeline}
 
-The PSM substrate of \S\ref{sec:method} returns a top-$K$
-candidate set for a query, but the candidates are
+\psm{} (\S\ref{sec:method}) returns ranked
 $(t, \mathrm{cell}, \mathrm{lat}, \mathrm{lng}, \mathbf{e})$
-tuples --- not natural-language answers. For look-back QA
-applications, we use PSM as a \emph{prefilter} that narrows the
-search space, and a frontier MLLM as the \emph{reranker} that
-picks the localized answer.
+tuples---not natural-language answers.
+For look-back QA we therefore use \psm{} as a \emph{prefilter}
+that narrows the search space, and a frontier MLLM as the
+\emph{reranker} that picks the localized answer.
 
 \subsection{Pipeline}
 \label{sec:pipeline-stages}
 
-The pipeline has three stages, each addressing a distinct failure
-mode of the alternatives. Figure~\ref{fig:f1-architecture} sketches
-the end-to-end flow.
+Three stages address distinct failure modes.
+Figure~\ref{fig:f1-architecture} sketches the end-to-end flow.
 
 \input{figures/f1_architecture.tex}
 
-\paragraph{Stage 1: PSM top-$K$ retrieval.} Given the question
-text $q$, embed it with the same encoder used for ingest
-(CLIP-L for our experiments) and call
-\texttt{SpatialMemory\_query\_similar} with the embedding as query
-vector, the configured \texttt{per\_cell\_cap}, and $K = 5$. The
-call returns 5 candidate $(t_i, t_{\min,i}, t_{\max,i},
-\mathrm{cell}_i)$ tuples, sorted by cosine similarity descending.
-This stage runs sub-millisecond per query
-(\S\ref{sec:results-memory-latency}). Encoder choice is a pipeline
-knob, not an architectural commitment: the same Stage~1 path is used
-unchanged across the three encoder families in our evaluation --- laion
-CLIP-L (\texttt{clipL}, 430\,M, 768\,d), laion CLIP-bigG
-(\texttt{bigG}, 2.5\,B, 1280\,d), and Google SigLIP-2-large-patch16-256
-(\texttt{siglip2L}~\cite{tschannen2025siglip2}, 660\,M, 1024\,d) ---
-via a single \texttt{make\_runner(family, checkpoint)} factory in the
-Python ingest harness; the C engine sees only a $D$-dimensional
-float vector and is encoder-agnostic. The per-corpus extractors
-write one HDF5 group per encoder, so the multi-corpus, multi-encoder
-sweep in \S\ref{sec:results-multi-corpus} is the same binary plus
-$3\times 14$ ingest calls. CLIP-L remains the default for the deep
-single-session analyses (Table~\ref{tab:headline}, the \caponek{}
-sweep, the brute-force comparison) so the operating-point claim is
-stated on the most-studied encoder; the cross-encoder generalization
-in \S\ref{sec:results-multi-corpus} shows the spatial-axis behavior
-is not a CLIP-L artifact.
+\paragraph{Stage~1: PSM top-$K$ retrieval.}
+Embed the question $q$ with the ingest encoder and call
+\texttt{SpatialMemory\_query\_similar} with the configured
+\caponek{} and $K{=}5$.
+The call returns five candidates sorted by cosine similarity in
+sub-millisecond time (\S\ref{sec:results-memory-latency}).
+Encoder choice is a pipeline knob, not an architectural commitment:
+the same path serves three families---CLIP-L (430\,M, 768\,d),
+CLIP-bigG (2.5\,B, 1280\,d), and
+SigLIP-2-large~\cite{tschannen2025siglip2}
+(660\,M, 1024\,d)---via a single factory;
+the C engine sees only a $D$-dimensional float vector and is
+encoder-agnostic.
+Cross-encoder generalization in \S\ref{sec:results-multi-corpus}
+confirms the spatial-axis behavior is not a CLIP-L artifact.
 
-\paragraph{Stage 2: Frame fetch.} Each candidate $t_i$ identifies a
-single frame in the original recording. We decode that frame
-on-demand from the source video stream
-(\texttt{aria01\_214-1.mp4} for Aria Gen 2, \texttt{data.vrs}'s
-RGB stream for Nymeria) using either ffmpeg keyframe-seek (for
-MP4 sources) or \texttt{projectaria-tools}'s indexed VRS reader
-(for VRS sources). Frames are JPEG-encoded at quality 90 and
-base64-embedded as \texttt{data:image/jpeg} URIs for the MLLM call.
+\paragraph{Stage~2: Frame fetch.}
+Each candidate $t_i$ identifies a frame decoded on-demand from the
+source MP4 or VRS stream; in deployment the frame already resides
+in the device cache, so the cost reduces to a memcpy rather than a
+video seek.
 
-The frame-fetch stage is the latency bottleneck of the eval
-pipeline (1--5\,s/frame for VRS, 50--200\,ms/frame for MP4)
-because it pays a video-seek cost per candidate. For a deployed
-wearable assistant the stage would dissolve: the wearer's frames
-are already in the device's frame buffer or in the local cache
-that fed the PSM ingest loop, so the cost would be a memcpy
-rather than a video decode. Our reported wall-clock numbers
-should be read as eval-infrastructure overhead, not deployment
-overhead.
+\paragraph{Stage~3: MLLM rerank.}
+The five base64-encoded frames plus the question are sent in one
+API call to Gemini 3.1 Pro~\cite{google2026gemini}.
+The frozen prompt asks the MLLM to select the single frame index
+from the $K$ candidates that best answers the question.
+The parsed integer reorders \psm{}'s top-$K$ so the chosen frame
+occupies position~1 and the remaining four fill positions 2--$K$.
 
-\paragraph{Stage 3: MLLM rerank.} The 5 base64 frames plus the
-question text are sent in a single API call to the frontier MLLM
-(Gemini 3.1 Pro~\cite{google2026gemini} for the main results; the
-same harness supports Claude 4.6 Opus by changing one flag, on the
-same OpenAI-compatible proxy endpoint). The frozen prompt:
-
-\begin{quote}\small\ttfamily
-You are shown \{K\} candidate frames from a wearable camera
-recording, numbered 1 to \{K\}. They are PSM-retrieved
-candidates for the following look-back question:
-
-  "\{question\}"
-
-Pick the SINGLE frame number that best answers the question.
-Respond with just the number (e.g.\ "3"). If none of the frames
-clearly answer the question, respond with the number of the
-frame you find most plausible --- do not refuse to choose.
-\end{quote}
-
-The prompt is the same across all sessions, all questions, both
-MLLMs. We chose ``pick the index'' over ``write the answer''
-because the eval metric is a temporal localization
-(exemplar Hit@5 / mIoU), not free-text QA --- the MLLM's job is to
-disambiguate among PSM's candidates, not to compose an answer.
-The parsed integer reorders PSM's top-$K$ so the chosen frame is
-in position 1 and the remaining four PSM candidates fill 2--$K$.
-
-\subsection{Architectural decomposition}
+\subsection{Architectural Decomposition}
 \label{sec:pipeline-rationale}
 
-PSM and the MLLM contribute orthogonal properties:
-\psm{} contributes \emph{recall} (at \caponek{}=$K$ its top-5
-contains the answer for the same 25 of 187 Nymeria narrations
-brute-force CLIP's top-5 does, \S\ref{sec:results-main}); the
-MLLM contributes \emph{localization precision} (PSM\,$\to$\,Gemini
-at \caponek{}=$K$ keeps that 13.4\% Hit@5 but lifts exemplar
-mIoU@5 by 37\% relative, $0.074 \to 0.101$). At \caponek{}=1 +
-Gemini the composition is statistically indistinguishable from
-brute-force CLIP on mIoU ($0.069$ vs $0.074$; paired bootstrap
-$\Delta = -0.005$, 95\% CI $[-0.032, +0.021]$, $n=187$) while
-keeping strict spatial diversity ---
-the bounded-memory substrate plus a single MLLM call substitutes
-for the full embedding bank plus a fine-grained search on the
-metric a downstream MLLM consumer cares about.
+\psm{} contributes \emph{recall}: its top-5 contains the answer
+for the same narrations brute-force CLIP's top-5 does
+(\S\ref{sec:results-main}).
+The MLLM contributes \emph{localization precision}: adding Gemini
+at \caponek{}=$K$ lifts exemplar mIoU@5 by 37\,\% relative.
+At \caponek{}=1 + Gemini, mIoU reaches 0.069---statistically
+indistinguishable from brute-force 0.074
+(paired bootstrap $\Delta{=}{-0.005}$, 95\,\% CI
+$[-0.032,\,+0.021]$, $n{=}187$).

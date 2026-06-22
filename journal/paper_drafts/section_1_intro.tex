@@ -13,130 +13,72 @@
 \section{Introduction}
 \label{sec:intro}
 
-A wearable AI assistant sees the world through the user's eyes,
-continuously, for hours per day. To answer a look-back question
----``where did I leave my keys?'', ``what was that street sign?'',
-``when did I last see Maria?''--- the assistant needs to find the
-relevant moments from its own past. System-architecture work on
-always-on wearable contextual AI~\cite{lee2025aria2} identifies a
-persistent spatial-temporal index as a first-class system
-component; \psm{} is a concrete implementation of that component.
-The straightforward solution is
-to embed every frame the camera saw with a vision--language encoder
-(CLIP, SigLIP, EVA) and run a top-$K$ cosine-similarity retrieval
-over the resulting embedding bank. This works, but the embedding
-bank grows linearly in recording duration: at a 1\,fps sampling and
-CLIP-L's 768-dim float32 embeddings, an hour of egocentric video
-occupies $\sim$10\,MB; a typical day, $\sim$200\,MB; the wearable's
-on-device limit binds in days, not weeks. The substrate is not
-appropriate for a bounded-memory streaming setting.
+A wearable AI assistant sees the world through the user's eyes for hours
+per day. To answer look-back questions---``where did I leave my keys?'',
+``what was that street sign?''---it must retrieve relevant moments from
+its own past. The straightforward approach embeds every frame with a
+vision--language encoder (CLIP, SigLIP, EVA) and runs cosine-similarity
+retrieval over the resulting bank. This bank, however, grows linearly in
+recording duration: at 1\,fps with CLIP-L 768-dim float32 vectors, one
+hour costs ${\sim}10$\,MB and a full day ${\sim}200$\,MB; on-device
+limits bind in days. Although system-architecture work on always-on
+wearable AI~\cite{lee2025aria2} identifies a persistent
+spatial-temporal index as a first-class component, no bounded-memory
+implementation exists for egocentric look-back retrieval.
 
-\paragraph{The architectural question.} What does the right
-retrieval substrate look like for a wearable AI assistant? Three
-properties matter. First, \emph{bounded memory}: per-cell state
-that does not grow with recording duration. Second, \emph{spatial
-locality}: the assistant should be able to answer
-``what places did I visit?'' as cleanly as it answers ``what
-moments matter?''; the index should reflect the user's actual
-trajectory through physical space. Third, \emph{streaming
-ingestion}: frames arrive one at a time, the index updates
-in-place, and queries can be served at any time without
-re-indexing.
+\paragraph{The architectural question.}
+Three properties define the right retrieval substrate for a wearable
+assistant: \emph{bounded memory}---per-cell state independent of
+recording duration; \emph{spatial locality}---the index reflects the
+user's physical trajectory, answering ``what places?'' as naturally as
+``what moments?''; and \emph{streaming ingestion}---frames arrive
+one-at-a-time, the index updates in-place, and queries are served
+without re-indexing.
 
 \paragraph{Probabilistic Spatial Memory.}
-We propose \textbf{PSM}, a streaming spatial-temporal index for
-egocentric look-back retrieval. PSM combines three probabilistic
-data structures over an H3 hex-grid tessellation of the wearer's
-geographic trajectory:
-(1) \emph{reservoir-sampled exemplars} per H3 cell preserve a
-fixed-size sample of the CLIP embeddings the wearer captured in
-that place;
-(2) a \emph{time-decayed ring buffer of HyperLogLog sketches} per
-cell tracks unique-event cardinality over recent time windows; and
-(3) a \emph{per-cell capacity bound} (\texttt{per\_cell\_cap})
-governs how many top-$K$ retrieval slots a single H3 cell may fill,
-implementing strict spatial diversity at \texttt{cap}=1 and
-permissive top-$K$-across-all-exemplars at \texttt{cap}=$K$.
-The substrate is bounded in memory (fixed per cell, even as
-recording duration grows unboundedly), streaming
-(per-frame ingest, no global re-indexing), and trivially
-queryable: a top-$K$ search returns $K$ candidate $(t, \mathrm{lat},
-\mathrm{lng})$ triples in sub-millisecond C-side wall-time.
+We propose \textbf{\psm{}}, a streaming spatial-temporal index for
+egocentric look-back retrieval built on three data structures over an H3
+hex-grid tessellation: (1)~\emph{reservoir-sampled exemplars} per cell
+retain a fixed-size embedding sample; (2)~a \emph{time-decayed ring
+buffer of HyperLogLog sketches} per cell tracks unique-event cardinality
+over recent windows; (3)~a \emph{per-cell capacity bound}
+(\caponek{}) limits how many top-$K$ slots one cell may fill---enforcing
+strict spatial diversity at $\texttt{cap}{=}1$ and recovering
+unconstrained top-$K$ at $\texttt{cap}{=}K$. Memory is bounded per cell,
+ingestion is streaming, and top-$K$ search returns $K$ candidate
+$(t,\mathrm{lat},\mathrm{lng})$ triples in sub-millisecond wall-time.
 
 \paragraph{The PSM--MLLM prefilter pipeline.}
-Modern multimodal LLMs (Gemini~3, Claude~4, GPT-4o) achieve strong
-single-frame visual grounding but remain brittle on egocentric
-video reasoning and temporal grounding over long-context
+Multimodal LLMs (Gemini~3, Claude~4, GPT-4o) achieve strong
+single-frame grounding yet remain brittle on egocentric temporal
+grounding over long
 video~\cite{cheng2024videgothink,chen2025groundedmultihop,xu2026tgpo}.
-For wearable look-back, this is exactly the failure mode: the
-question asks ``when?'' and the MLLM cannot answer reliably without
-seeing every frame, which the wearable cannot afford to ship to a
-remote API. We propose PSM as a \emph{prefilter} for the MLLM:
-PSM returns its top-$K$ spatial-temporal candidates over the
-bounded-memory index; the MLLM reranks the $K$ candidate frames
-and emits the localized answer. The architecture composes
-multiplicatively: PSM provides the candidate set (recall), the
-MLLM provides localization precision within the set, and the two
-contributions are largely orthogonal.
+We compose \psm{} as a \emph{prefilter}: it returns top-$K$
+spatial-temporal candidates from its bounded index; the MLLM reranks
+these $K$ frames and emits the localized answer. The two contributions
+are largely orthogonal---\psm{} supplies recall, the MLLM supplies
+localization precision.
 
 \paragraph{Contributions.}
 \begin{itemize}
-  \item \textbf{Probabilistic Spatial Memory:} a streaming
-    bounded-memory spatial-temporal index for egocentric video,
-    combining H3 cells, time-decayed ring-buffer HLL sketches, and
-    reservoir-sampled exemplars (\S\ref{sec:method}).
-  \item \textbf{The \texttt{per\_cell\_cap} knob:} a new
-    operating-point parameter that smoothly trades strict spatial
-    diversity for embedding-similarity precision between two
-    endpoints (\texttt{cap}=1 vs \texttt{cap}=$K$), reducing to
-    plain top-$K$-over-all-exemplars at \texttt{cap}=$K$.
-    Empirically, \texttt{cap}=$K$ recovers brute-force CLIP
-    retrieval accuracy exactly on a 187-question Nymeria
-    benchmark; \texttt{cap}=1 trades 5.4 percentage points of
-    Hit@5 for spatial diversity (\S\ref{sec:results-main}).
-  \item \textbf{PSM\,$\rightarrow$\,Gemini at \texttt{cap}=1 matches
-    brute-force CLIP on localization mIoU on the highest-mobility
-    session.} On \texttt{shelby\_arroyo\_act0} the bounded-memory
-    operating point paired with a single Gemini-3.1-Pro rerank
-    achieves exemplar mIoU@5 of 0.069, statistically indistinguishable
-    from brute-force CLIP's 0.074 (paired bootstrap on the $187$
-    per-question scores: $\Delta\text{mIoU} = -0.005$, 95\% CI
-    $[-0.032, +0.021]$). On lower-mobility sessions the
-    permissive \texttt{cap}=$K$ operating point retains a margin
-    (Table~\ref{tab:multisession}); the MLLM rerank lifts
-    exemplar mIoU 30--60\% relative across all four sessions
-    (\S\ref{sec:results-main}).
-  \item \textbf{Multi-session generalization:} the
-    \texttt{per\_cell\_cap} effect replicates across 4 Nymeria
-    sessions spanning the street-, building-, and room-scale
-    mobility tiers (\S\ref{sec:results-multisession}). The
-    spatial-axis lift replicates further across
-    \textbf{14 street-scale sessions} drawn from 3 distinct
-    sensor stacks (SLOPER4D LiDAR + DJI Action2;
-    Nymeria + LookOut~\cite{pan2025lookout} Project Aria MPS)
-    and \textbf{3 encoder families} (laion CLIP ViT-L / ViT-bigG,
-    Google SigLIP~2~\cite{tschannen2025siglip2}): 13/14 sessions
-    pass a monotone-r10$\to$r12 acceptance with $\geq 4$\,pp
-    Hit\,@\,5 lift on at least one encoder
-    (\S\ref{sec:results-multi-corpus},
-    Table~\ref{tab:multi-corpus-h3}). At matched candidate budget
-    ($K=8$), \psm{} beats vanilla Gemini~3.1~Pro by $1.0\times$
-    to $\infty$ on every one of these 14 sessions, median
-    $\sim 4\times$ (\S\ref{sec:results-vanilla-mllm},
-    Fig.~\ref{fig:f2-psm-vs-mllm}); four sessions land at
-    vanilla MLLM Hit\,@\,5 $= 0\,\%$ because the uniform
-    $K=8$ sample structurally never includes a frame inside any
-    GT interval --- the failure mode \psm{}'s cell-targeted
-    retrieval is designed to bypass.
-  \item \textbf{Open-source release:} the C-side PSM engine
-    ($\sim$700 LoC) and the Python extraction/eval pipeline are
-    released under MIT (URL withheld for double-blind review;
-    \S\ref{sec:conclusion} footnote).
-\end{itemize}
+  \item \textbf{\psm{} architecture:} a bounded-memory streaming
+    spatial-temporal index combining H3 cells, time-decayed HLL ring
+    buffers, and reservoir-sampled exemplars
+    (\S\ref{sec:method}).
 
-The work touches three of the Wearables AI Workshop's areas:
-Long-Context \& Real-Time Interactions (bounded per-query state),
-Persistent Scene and Object Memory from Video (time-aware
-spatial representation), and Efficient AI / Edge Computing (a
-TurboQuant 2/3/4-bit exemplar codec compresses per-cell storage
-5--10$\times$ at no Hit@5 cost, suitable for on-device deployment).
+  \item \textbf{\caponek{} knob + mIoU parity:}
+    $\texttt{cap}{=}K$ recovers brute-force accuracy exactly;
+    $\texttt{cap}{=}1$ paired with Gemini rerank achieves mIoU\,0.069,
+    statistically indistinguishable from brute-force 0.074
+    (bootstrap $\Delta{=}{-}0.005$, 95\,\% CI
+    $[-0.032,{+}0.021]$) (\S\ref{sec:results-main}).
+
+  \item \textbf{Multi-corpus generalization + vanilla-MLLM baseline:}
+    13/14 street-scale sessions across 3 sensor stacks and 3 encoders
+    pass monotone acceptance; \psm{} beats vanilla Gemini by
+    $1{\times}$--$\infty$ on all 14 sessions, median ${\sim}4{\times}$
+    (\S\ref{sec:results-multi-corpus},
+    \S\ref{sec:results-vanilla-mllm},
+    Fig.~\ref{fig:f2-psm-vs-mllm}).
+    Open-source under MIT (\S\ref{sec:conclusion} footnote).
+\end{itemize}
