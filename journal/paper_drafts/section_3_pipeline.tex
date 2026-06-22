@@ -105,8 +105,10 @@ brute-force CLIP's top-5 does, \S\ref{sec:results-main}); the
 MLLM contributes \emph{localization precision} (PSM\,$\to$\,Gemini
 at \caponek{}=$K$ keeps that 13.4\% Hit@5 but lifts exemplar
 mIoU@5 by 37\% relative, $0.074 \to 0.101$). At \caponek{}=1 +
-Gemini the composition matches brute-force CLIP on mIoU
-($0.073$ vs $0.074$) while keeping strict spatial diversity ---
+Gemini the composition is statistically indistinguishable from
+brute-force CLIP on mIoU ($0.069$ vs $0.074$; paired bootstrap
+$\Delta = -0.005$, 95\% CI $[-0.032, +0.021]$, $n=187$) while
+keeping strict spatial diversity ---
 the bounded-memory substrate plus a single MLLM call substitutes
 for the full embedding bank plus a fine-grained search on the
 metric a downstream MLLM consumer cares about.

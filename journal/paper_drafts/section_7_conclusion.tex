@@ -23,10 +23,11 @@ On 30 Nymeria sessions, \psm{} at \caponek{}$=K$ matches per-frame
 brute-force CLIP exactly by construction (mean Hit@5 $8.92\%$);
 sliding-window CLIP at the GT-interval width modestly exceeds
 both ($+1$\,pp). Paired with a Gemini-3.1-Pro rerank, strict
-spatial diversity (\caponek{}$=1$) matches brute-force on
-localization mIoU on the highest-mobility session
-($0.073$ vs $0.074$) and lifts mIoU by 29--73\% relative across
-the 4-session detail. Sub-room sessions co-fail both methods at
+spatial diversity (\caponek{}$=1$) is statistically indistinguishable
+from brute-force on localization mIoU on the highest-mobility
+session ($0.069$ vs $0.074$, paired bootstrap $\Delta = -0.005$,
+95\% CI $[-0.032, +0.021]$) and lifts mIoU by 29--73\% relative
+across the 4-session detail. Sub-room sessions co-fail both methods at
 $\sim$1\% Hit@5 (benchmark ceiling, not method limitation).
 
 The spatial-axis result generalizes across corpora and encoders.
