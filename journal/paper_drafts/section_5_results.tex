@@ -155,7 +155,8 @@ On every session \psm{} matches or exceeds the MLLM's Hit@5, with a median ${\si
 Four sessions land at vanilla MLLM $= 0\%$ because the $K{=}8$ uniform frames never include a frame inside the ${\sim}3$\,s GT intervals---the structural coverage gap that \psm{}'s spatial-temporal prefilter is designed to close.
 
 The root cause is temporal coverage: with session durations of 100--640\,s, the gap between uniform frames is 12--80\,s, yielding ${\sim}4\%$ probability of \emph{seeing} the right frame before any discrimination kicks in.
-At $K{=}32$ (four times the deployment budget) the oracle upper bound climbs to $21.4\%$ but Gemini's actual pick rate stays at $7.1\%$---a $3\times$ discrimination gap on top of the coverage gap.
+The failure is architectural, not a matter of model scale: at $K{=}32$ the oracle upper bound reaches $21.4\%$ but Gemini's actual pick rate stays at $7.1\%$---a $3\times$ discrimination gap that compounds the coverage gap.
+Scaling the MLLM's context window does not help when the signal-to-noise ratio of uniform frames is ${\sim}4\%$.
 The single tie is Hillsdale6 at $13.8\%$, where \psm{} also has its weakest cross-encoder performance; notably \psm{} does not \emph{lose} on any session.
 
 \subsection{PSM $\to$ MLLM rerank}

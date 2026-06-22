@@ -86,11 +86,11 @@ monotone-r10$\to$r12 Hit\,@\,5 acceptance with $\geq 4$\,pp lift on
 at least one encoder. Because \psm{} retrieves candidates from
 query-matched H3 cells rather than uniform time slices, it provides
 the spatial-temporal prefilter that frontier MLLMs currently
-lack: at matched candidate budget ($K{=}8$), \psm{}'s cell-targeted
-retrieval reaches every session that vanilla Gemini~3.1~Pro
-uniform-sampling misses, including 4 sessions where the uniform
-$K{=}8$ frames structurally never land in a $\sim$3\,s GT interval.
-The C engine ($\sim$700 LoC) and
+lack: on four of these sessions, uniform $K{=}8$ sampling yields
+Hit\,@\,5 $= 0\%$---the frontier MLLM never sees a ground-truth
+frame, regardless of its reasoning capability.
+\psm{}'s cell-targeted retrieval eliminates this structural blind
+spot. The C engine ($\sim$700 LoC) and
 Python eval harness are released under MIT.
 
 \keywords{Egocentric video \and Spatial memory \and Bounded memory \and
