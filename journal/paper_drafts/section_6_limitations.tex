@@ -26,24 +26,17 @@ Future benchmarks should score against \emph{any} acceptable
 revisit window rather than the one the annotator selected.
 
 \paragraph{One honest spatial-axis failure.}
-Of the 14 street-scale sessions in
-\S\ref{sec:results-multi-corpus},
-\texttt{BurlingameDT4\_feb5} (LookOut, 242\,m bounding box)
-is the only session where all three encoders fail the
-monotone-\caponek lift acceptance criterion.
-The trajectory is a short, visually homogeneous walk along a
-parking-lot-flanked street; the captioned queries---parked
-vehicles and signage at small distances from the wearer's
-path---collapse onto a handful of cells no encoder
+Of the 14 street-scale sessions in \S\ref{sec:results-multi-corpus},
+\texttt{BurlingameDT4\_feb5} (LookOut, 242\,m bbox) is the only
+session where all three encoders fail the monotone-\caponek lift
+criterion.
+The trajectory is a visually homogeneous parking-lot-flanked street
+whose captioned queries collapse onto a handful of cells no encoder
 discriminates above floor.
-The same failure mode recurs on Aria Gen
-2~Pilot's~\cite{aria-gen2-pilot} GPS-grounded outdoor walks,
-where visually-monotonic parking-lot content collapses queries
-onto a handful of cells despite ${\sim}300$\,m spatial extent
-and real GPS---confirming the bottleneck is encoder
-discrimination, not trajectory quality.
-This is the expected failure mode for such trajectories, and we
-report it rather than hide it.
+The same failure recurs on Aria Gen~2
+Pilot's~\cite{aria-gen2-pilot} GPS-grounded outdoor walks
+(300\,m extent, real GPS)---confirming the bottleneck is
+encoder discrimination, not trajectory quality.
 
 \paragraph{Latency from synthetic workload.}
 \psm's reported ${\sim}700\,\mu$s per-query latency derives
