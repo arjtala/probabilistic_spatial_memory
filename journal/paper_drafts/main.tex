@@ -74,19 +74,23 @@ cell, and reservoir-sampled CLIP-embedding exemplars. \psm{} exposes
 a novel \caponek{} knob that smoothly trades strict spatial diversity
 for embedding-similarity precision; the permissive endpoint
 (\texttt{cap}=$K$) reduces to brute-force retrieval over all
-in-reservoir exemplars. The
-spatial-axis discrimination generalizes across \textbf{14 street-scale
+in-reservoir exemplars. On the 25 narrations where the ground-truth
+interval is uniquely groundable, \psm{} at \texttt{cap}=$K$ recovers
+all 25 (\emph{conditional accuracy $=100\%$}).
+The spatial-axis discrimination generalizes across \textbf{14 street-scale
 sessions} drawn from \textbf{3 distinct sensor stacks} (SLOPER4D
 head-mounted LiDAR, Nymeria + LookOut~\cite{pan2025lookout} Project
 Aria MPS) and \textbf{3 encoder families} (laion CLIP-L / CLIP-bigG,
 Google SigLIP~2~\cite{tschannen2025siglip2}): 13/14 sessions pass a
 monotone-r10$\to$r12 Hit\,@\,5 acceptance with $\geq 4$\,pp lift on
-at least one encoder. At matched candidate budget ($K{=}8$),
-\psm{} \emph{beats} vanilla Gemini~3.1~Pro retrieval by
-$1{-}\infty\times$ on every one of these 14 sessions (median
-$\sim 4\times$, with 4 sessions where vanilla MLLM Hit\,@\,5 is
-zero because the uniform $K{=}8$ frames structurally never land
-in a $\sim$3\,s GT interval). The C engine ($\sim$700 LoC) and
+at least one encoder. Because \psm{} retrieves candidates from
+query-matched H3 cells rather than uniform time slices, it provides
+the spatial-temporal prefilter that frontier MLLMs currently
+lack: at matched candidate budget ($K{=}8$), \psm{}'s cell-targeted
+retrieval reaches every session that vanilla Gemini~3.1~Pro
+uniform-sampling misses, including 4 sessions where the uniform
+$K{=}8$ frames structurally never land in a $\sim$3\,s GT interval.
+The C engine ($\sim$700 LoC) and
 Python eval harness are released under MIT.
 
 \keywords{Egocentric video \and Spatial memory \and Bounded memory \and

@@ -84,6 +84,10 @@ Setting $\caponek{=}1$ enforces strict spatial diversity (one
 slot per cell); $\caponek{=}K$ reduces to plain top-$K$ over
 all reservoir exemplars; intermediate values trade off smoothly
 (\S\ref{sec:results-main}).
+Per-partition result limits are standard in database query planning;
+the novelty here is the composition of this knob with H3 spatial
+tessellation, time-decayed HLL sketches, and reservoir sampling under
+streaming constraints.
 Ingest is $O(1)$ amortized---H3 lookup, HLL hash, reservoir
 update---at ${\sim}3\,\mu$s per frame; queries run at any time
 after the first ingest (\S\ref{sec:results-memory-latency}).

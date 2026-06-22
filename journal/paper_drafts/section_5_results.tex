@@ -138,20 +138,21 @@ Three patterns: (a)~Cross-corpus robustness holds---SLOPER4D 3/3, Nymeria 1/1, L
 (b)~SigLIP is the strongest single encoder (11/14 vs 9/14 clipL, 10/14 bigG); two SigLIP rescues (\texttt{Sanmateopark\_garage}, \texttt{Hillsdale6}) show the sigmoid-pairwise recipe picks up spatial signal the CLIP family misses on visually-repetitive trajectories.
 (c)~One honest failure: \texttt{BurlingameDT4\_feb5} fails all three encoders---a visually-homogeneous trajectory where captioned queries do not discriminate at \psm{}'s cell scale (\S\ref{sec:limitations}).
 
-\subsection{Vanilla MLLM as retrieval}
+\subsection{Vanilla MLLM as retrieval: why MLLMs need a prefilter}
 \label{sec:results-vanilla-mllm}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/f2_psm_vs_mllm.pdf}
 \caption{Vanilla Gemini 3.1 Pro at $K{=}8$ uniform frames (red) vs \psm{} \texttt{clipL@r12} top-5 (blue) on every v1 session.
-\psm{} wins by $1\times$--$\infty$ on every session; four sessions land at vanilla MLLM $= 0\%$ because the $K{=}8$ uniform frames never include a GT-interval frame.}
+\psm{}'s query-guided retrieval reaches every session the uniform baseline misses; four sessions land at vanilla MLLM $= 0\%$ because the $K{=}8$ uniform frames never include a GT-interval frame.}
 \label{fig:f2-psm-vs-mllm}
 \end{figure}
 
 We run Gemini 3.1 Pro on all 14 sessions at $K{=}8$ uniformly-sampled frames per question (Figure~\ref{fig:f2-psm-vs-mllm}).
-\psm{} beats vanilla MLLM by $1\times$--$\infty$ on every session, with a median advantage of ${\sim}4\times$.
-Four sessions land at vanilla MLLM $= 0\%$ because the $K{=}8$ uniform frames never include a frame inside the ${\sim}3$\,s GT intervals---the structural failure mode \psm{}'s cell-targeted retrieval bypasses.
+The comparison isolates the retrieval substrate: given the same candidate budget, does query-guided cell-targeted retrieval provide candidates that uniform temporal sampling cannot?
+On every session \psm{} matches or exceeds the MLLM's Hit@5, with a median ${\sim}4\times$ advantage.
+Four sessions land at vanilla MLLM $= 0\%$ because the $K{=}8$ uniform frames never include a frame inside the ${\sim}3$\,s GT intervals---the structural coverage gap that \psm{}'s spatial-temporal prefilter is designed to close.
 
 The root cause is temporal coverage: with session durations of 100--640\,s, the gap between uniform frames is 12--80\,s, yielding ${\sim}4\%$ probability of \emph{seeing} the right frame before any discrimination kicks in.
 At $K{=}32$ (four times the deployment budget) the oracle upper bound climbs to $21.4\%$ but Gemini's actual pick rate stays at $7.1\%$---a $3\times$ discrimination gap on top of the coverage gap.
@@ -163,4 +164,4 @@ The single tie is Hillsdale6 at $13.8\%$, where \psm{} also has its weakest cros
 The reranker permutes \psm{}'s top-5, so Hit@5 is invariant by construction.
 On Hit@1 the effect is bimodal: it tripled Hit@1 on \texttt{seq008\_running\_001} ($10\%{\to}30\%$) and helped on \texttt{seq009} ($+3.6$\,pp), but hurt on \texttt{seq003} ($-3.3$\,pp) and Nymeria ($-1.6$\,pp).
 The rerank is a visually-rich-query lever, useful when visual content discriminates beyond \psm{}'s embedding similarity, counterproductive on action-narrations.
-\psm{}'s $1\times$--$\infty$ advantage over vanilla MLLM is achievable without any MLLM in the loop; we do not promote the reranker to a default.
+The headline result---\psm{}'s query-guided retrieval reaching sessions that uniform sampling misses---is achievable without any MLLM in the loop; we do not promote the reranker to a default.

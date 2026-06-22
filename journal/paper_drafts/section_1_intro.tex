@@ -67,7 +67,9 @@ localization precision.
     (\S\ref{sec:method}).
 
   \item \textbf{\caponek{} knob + mIoU parity:}
-    $\texttt{cap}{=}K$ recovers brute-force accuracy exactly;
+    $\texttt{cap}{=}K$ recovers brute-force accuracy exactly
+    (conditional accuracy $100\%$ on the 25 uniquely groundable
+    queries);
     $\texttt{cap}{=}1$ paired with Gemini rerank achieves mIoU\,0.069,
     statistically indistinguishable from brute-force 0.074
     (bootstrap $\Delta{=}{-}0.005$, 95\,\% CI
@@ -75,10 +77,14 @@ localization precision.
 
   \item \textbf{Multi-corpus generalization + vanilla-MLLM baseline:}
     13/14 street-scale sessions across 3 sensor stacks and 3 encoders
-    pass monotone acceptance; \psm{} beats vanilla Gemini by
-    $1{\times}$--$\infty$ on all 14 sessions, median ${\sim}4{\times}$
+    pass monotone acceptance
     (\S\ref{sec:results-multi-corpus},
-    \S\ref{sec:results-vanilla-mllm},
+    Table~\ref{tab:multi-corpus-h3}).
+    \psm{}'s query-guided retrieval provides the spatial-temporal
+    prefilter that uniform-sampling MLLMs lack: at matched $K{=}8$,
+    \psm{} reaches every session that vanilla Gemini misses, including
+    4 where uniform frames never land in a GT interval
+    (\S\ref{sec:results-vanilla-mllm},
     Fig.~\ref{fig:f2-psm-vs-mllm}).
     Open-source under MIT (\S\ref{sec:conclusion} footnote).
 \end{itemize}

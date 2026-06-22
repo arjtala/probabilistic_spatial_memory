@@ -29,9 +29,12 @@ $0.069$---statistically indistinguishable from brute-force $0.074$
 The spatial-axis gain generalises: 13/14 multi-corpus sessions pass
 the monotone acceptance test, with SigLIP~2 strongest at 11/14
 (Table~\ref{tab:multi-corpus-h3}).
-At matched candidate budget ($K{=}8$), \psm beats vanilla
-Gemini~3.1~Pro by $1\times$--$\infty$ on all 14 sessions
-(\S\ref{sec:results-vanilla-mllm}).
+At matched candidate budget ($K{=}8$), \psm{}'s query-guided
+retrieval reaches every session that vanilla Gemini~3.1~Pro
+uniform-sampling misses---including four where the uniform $K{=}8$
+frames never land in any GT interval---demonstrating that frontier
+MLLMs need a spatial-temporal prefilter to cover the look-back
+retrieval gap (\S\ref{sec:results-vanilla-mllm}).
 %
 The MLLM reranker is bimodal on Hit@1---tripling it on one session,
 hurting it on another---so we do not promote it to a default

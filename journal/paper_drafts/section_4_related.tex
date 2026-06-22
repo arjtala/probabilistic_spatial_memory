@@ -37,13 +37,13 @@ hard cap with 94\% reduction, and SAVEMem~\cite{wu2025savemem}
 adds 3-tier semantic-aware retention.
 All bound memory in \emph{token} space---dense-to-sparse merging,
 KV-cache compression, or recurrent state---whereas \psm{} bounds
-memory in \emph{geographic} space (H3 hex cells), enabling a spatial
-query axis (``what was I doing near here?'') that token-space methods
-cannot answer.
-Because \psm{} runs upstream of any MLLM, returning a top-$K$
-candidate set the downstream model reranks without retraining, the two
-are complementary: \psm{} as front-end retrieval, token-space methods
-as MLLM-internal compression.
+memory in \emph{geographic} space (H3 cells) and runs upstream of
+any MLLM, returning a top-$K$ candidate set the downstream model
+reranks without retraining.
+Direct comparison is a category error: these methods compress what
+the MLLM \emph{sees}; \psm{} determines \emph{which frames} the
+MLLM is shown. The two are complementary: \psm{} as front-end
+retrieval, token-space methods as MLLM-internal compression.
 
 \paragraph{Streaming search and spatial indexing.}
 DiskANN~\cite{jayaram2019diskann}, SPANN~\cite{chen2021spann}, and
