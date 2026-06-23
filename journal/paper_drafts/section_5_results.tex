@@ -63,13 +63,14 @@ Four additional patterns from ablations and baselines:
 (1)~\emph{Operating-point Pareto}: as \caponek{} sweeps from 1 to $K$, Hit@5 rises and bucket mIoU falls monotonically.
 (2)~\emph{Retrieval baselines}: sliding-window CLIP @ $\ell{=}10$\,s exceeds \psm{} \caponek{}$=K$ by $+1.6$\,pp Hit@5 ($15.0\%$ vs $13.4\%$) by averaging out per-frame variance, but requires the full $N$-frame bank; uniform-sample forms the floor at $4.3$--$8.6\%$.
 (3)~\emph{Memory ablation}: tightening the reservoir from 1024 to 128 exemplars costs $2.2$\,pp Hit@5 at \caponek{}$=K$; H3 resolution barely moves Hit@5 (${\pm}0.5$\,pp across $r \in \{10,11,12,13\}$) but moves bucket mIoU monotonically ($0.004 \to 0.019$).
-(4)~\emph{30-session monotonicity}: in the $R{=}1024$ full-reservoir sweep, mean Hit@5 climbs monotonically from $3.26\%$ at \caponek{}$=1$ through $5.69\%$ and $7.08\%$ to $8.92\%$ at \caponek{}$=K$, matching brute-force exactly at the eviction-free endpoint; sliding-window CLIP exceeds both by $+1.0$\,pp.
+(4)~\emph{30-session monotonicity}: in the $R{=}1024$ full-reservoir sweep, mean Hit@5 climbs monotonically from $3.26\%$ at \caponek{}$=1$ through $5.69\%$ and $7.08\%$ to $8.92\%$ at \caponek{}$=K$, matching brute-force exactly at the eviction-free endpoint; at the bounded $R{=}128$ deployment point the same monotone shape holds with a ${\sim}2$\,pp reservoir-eviction penalty at \caponek{}$=K$. Sliding-window CLIP exceeds both by $+1.0$\,pp.
 
 \subsection{Memory, latency, and failure modes}
 \label{sec:results-memory-latency}
 
 \psm{}'s per-cell storage at the deployment configuration ($R{=}128$ exemplars $\times$ 768-d $\times$ 4\,B $\approx 0.38$\,MiB, plus a 60-slot $p{=}10$ HLL ring buffer $\approx 0.06$\,MiB) is session-length-invariant; brute-force grows linearly in $N$.
-Figure~\ref{fig:f6-memory} plots both under the observed ${\sim}10$-cell footprint: the brute-force = \psm{} crossover sits at $N \approx 1500$ frames (${\approx}25$\,min at 1\,fps, CLIP-L 768-d).
+On the actual evaluation workload (\texttt{shelby\_arroyo\_act0}), the brute-force dot-product baseline runs at 67\,$\mu$s median per query; \psm{}'s synthetic-benchmark figure is ${\sim}700$\,$\mu$s at 1024 tiles (the real ${\sim}10$-tile workload shifts the constants but preserves frame-count independence; \S\ref{sec:limitations}).
+Figure~\ref{fig:f6-memory} plots memory under the observed ${\sim}10$-cell footprint: the brute-force = \psm{} crossover sits at $N \approx 1500$ frames (${\approx}25$\,min at 1\,fps, CLIP-L 768-d).
 Past the crossover the gap diverges for the same spatial footprint: ${\sim}10\times$ at 4 hours, ${\sim}20\times$ at 8 hours.
 In our measured corpus ($N \in [748, 1325]$), brute-force remains slightly cheaper (${\sim}2.2$--$3.9$\,MiB vs ${\sim}4.3$\,MiB at ${\sim}10$ cells per session); \psm{} pays its constant overhead before brute-force catches up.
 
