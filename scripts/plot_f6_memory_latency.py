@@ -13,10 +13,9 @@ Two panels (or one combined plot):
 Inputs:
   - benchmarks/nymeria/*.json: 30 Nymeria sessions, brute-force
     CLIP-L median+p99 latency + bytes_in_ram per session.
-  - PSM reference: hardcoded ~1 MB/cell × ~10 cells ≈ 13 MB
-    at the deployment configuration (R=128 exemplars × 1024-d ×
-    4 bytes ≈ 0.5 MB per cell; with ring buffer + HLL ~1 MB
-    total). See section_5_results.tex sec:results-memory-latency.
+  - PSM reference: ~10 occupied cells at the deployment configuration
+    (R=128 CLIP-L exemplars × 768-d × 4 bytes plus a C=60, p=10 HLL
+    ring buffer). See section_5_results.tex sec:results-memory-latency.
 
 Usage:
 
@@ -49,10 +48,19 @@ def _load_bench(repo_root: Path) -> list[dict]:
     return rows
 
 
-# PSM bounded-memory deployment reference: 10 cells × ~1 MB/cell at
-# R=128, dim=1024 reservoir + ring buffer + HLL. Matches the §5
-# memory text. Constant in session length.
-_PSM_MB = 13.0
+# PSM bounded-memory deployment reference: 10 cells at the paper config.
+# Per cell: R=128 CLIP-L exemplars (768 float32 values) + C=60 HLL
+# sketches at p=10 (2^10 one-byte registers each). This excludes small
+# allocator/table overhead but matches the state terms discussed in §5.
+_PSM_CELLS = 10
+_PSM_R = 128
+_PSM_DIM = 768
+_PSM_HLL_CAPACITY = 60
+_PSM_HLL_PRECISION = 10
+_PSM_BYTES_PER_CELL = (
+    _PSM_R * _PSM_DIM * 4 + _PSM_HLL_CAPACITY * (1 << _PSM_HLL_PRECISION)
+)
+_PSM_MB = _PSM_CELLS * _PSM_BYTES_PER_CELL / 1024 / 1024
 
 
 # Plot constants — same style as F3.
@@ -75,11 +83,11 @@ def _render_svg(rows: list[dict]) -> str:
     x_max = max(n_vals)
     x_max = int(((x_max + 250) // 250) * 250)
 
-    # Y-axis: MB. PSM constant ~13; brute-force grows up to ~4 MB at
-    # N=1325 for CLIP-L (768d). Scale to nearest 5 MB above max of
-    # PSM line + brute-force max.
+    # Y-axis: MB. PSM constant ~4.3; brute-force grows up to ~4 MB at
+    # N=1325 for CLIP-L (768d). Keep the chart tight enough that the
+    # crossover is visually legible.
     y_max_data = max(_PSM_MB, max(r["bytes_in_ram"] / 1024 / 1024 for r in rows))
-    y_max = max(15.0, round(y_max_data + 2.5))
+    y_max = max(5.0, float(np.ceil(y_max_data + 0.5)))
 
     def x_pos(n: int) -> float:
         return _ML + (n / x_max) * _PW
@@ -188,7 +196,7 @@ def _render_svg(rows: list[dict]) -> str:
     lines.append(f'<text x="{lgx + 30}" y="{lgy + 10}">PSM (bounded)</text>')
     lines.append(
         f'<text x="{lgx + 30}" y="{lgy + 24}" font-size="10" fill="#666">'
-        f'~{_PSM_MB:.0f} MB at R=128, 10 cells</text>'
+        f'~{_PSM_MB:.1f} MB at R=128, 10 cells</text>'
     )
     # Brute-force
     lines.append(
@@ -246,7 +254,7 @@ def main() -> int:
     print()
     n_max = max(r["n_frames"] for r in rows)
     mb_max = max(r["bytes_in_ram"] for r in rows) / 1024 / 1024
-    print(f"PSM constant @ {_PSM_MB} MB; brute-force at N={n_max} uses {mb_max:.2f} MB")
+    print(f"PSM constant @ {_PSM_MB:.2f} MB; brute-force at N={n_max} uses {mb_max:.2f} MB")
     crossover_n = int(_PSM_MB * 1024 * 1024 / (768 * 4))
     print(f"Brute-force=PSM crossover at N ≈ {crossover_n} (CLIP-L 768-d × 4 B)")
 

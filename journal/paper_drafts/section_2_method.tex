@@ -41,8 +41,8 @@ $(t_{\min}, t_{\max})$, which \psm{} returns as the bucket window
 that the downstream MLLM consumes as its time-range hint.
 
 \paragraph{Memory bound.} Each HLL sketch occupies $2^p$ bytes at
-precision $p$ (default $p{=}14 \Rightarrow$ 16\,KiB); a cell's
-ring buffer costs $C \cdot 16\,\mathrm{KiB} = 960\,\mathrm{KiB}$
+precision $p$ (default $p{=}10 \Rightarrow$ 1\,KiB); a cell's
+ring buffer costs $C \cdot 1\,\mathrm{KiB} = 60\,\mathrm{KiB}$
 at $C{=}60$, independent of recording duration.
 
 \subsection{Reservoir-sampled exemplars}
@@ -54,10 +54,10 @@ embeddings needed for cosine scoring. We store embeddings via
 per H3 cell (capacity $R{=}128$): after ingesting $n > R$ frames
 into a cell, the reservoir holds a uniformly random $R$-sized
 subset.
-At $R = 128$ and CLIP-L's $d = 768$, each cell occupies
-$128 \cdot 768 \cdot 4 \approx 384$\,KiB; 100 cells store
-${\sim}38$\,MB vs.\ ${\sim}200$\,MB for a flat embedding bank
-over the same recording. The gap widens with duration:
+At $R = 128$ and CLIP-L's $d = 768$, the raw exemplar payload
+occupies $128 \cdot 768 \cdot 4 \approx 384$\,KiB per cell; with
+the default HLL ring buffer, the retrieval state is ${\sim}444$\,KiB
+per occupied cell before allocator overhead. The gap widens with duration:
 brute-force grows $\Theta(N)$; \psm{} grows
 $\Theta(R \cdot |\mathrm{cells}|)$, bounded by the physical area
 covered, not recording length.
@@ -82,5 +82,6 @@ the novelty here is the composition of this knob with H3 spatial
 tessellation, time-decayed HLL sketches, and reservoir sampling under
 streaming constraints.
 Ingest is $O(1)$ amortized---H3 lookup, HLL hash, reservoir
-update---at ${\sim}3\,\mu$s per frame; queries run at any time
-after the first ingest (\S\ref{sec:results-memory-latency}).
+update---and queries run at any time after the first ingest; the
+reported microsecond constants come from the synthetic systems
+benchmark in \S\ref{sec:results-memory-latency}.

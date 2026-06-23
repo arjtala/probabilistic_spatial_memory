@@ -8,6 +8,7 @@ build/
 compile_commands.json
 phrases/
 targets/
+logs/
 .aider*
 .claude/
 __pycache__/

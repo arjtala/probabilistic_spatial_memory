@@ -72,12 +72,12 @@ memory bounds. We propose \textbf{Probabilistic Spatial Memory}
 tessellation, a time-decayed ring buffer of HyperLogLog sketches per
 cell, and reservoir-sampled CLIP-embedding exemplars. \psm{} exposes
 a novel \caponek{} knob that smoothly trades strict spatial diversity
-for embedding-similarity precision; the permissive endpoint
-(\texttt{cap}=$K$) reduces to brute-force retrieval over all
-in-reservoir exemplars---a substrate-correctness property our
-single-session sanity check confirms ($R{=}1024$ \caponek{}$=K$
-retrieves the same 25 of 187 frames brute-force CLIP does, with
-identical mIoU).
+for embedding-similarity precision: at the bounded deployment point
+($R{=}128$, \texttt{cap}=$K$), it reaches 21/187 Hit@5 on the
+Nymeria proxy session vs.\ brute-force CLIP's 25/187; with reservoir
+eviction removed ($R{=}1024$), the same endpoint recovers the identical
+25/187 hit set, a substrate-correctness sanity check rather than a
+performance claim.
 The spatial-axis discrimination generalizes across \textbf{14 street-scale
 sessions} drawn from \textbf{3 distinct sensor stacks} (SLOPER4D
 head-mounted LiDAR, Nymeria + LookOut~\cite{pan2025lookout} Project
@@ -90,8 +90,8 @@ the spatial-temporal prefilter that frontier MLLMs
 lack: on four of these sessions, uniform $K{=}8$ sampling yields
 Hit\,@\,5 $= 0\%$---the frontier MLLM never sees a ground-truth
 frame, regardless of its reasoning capability.
-\psm{}'s cell-targeted retrieval eliminates this structural blind
-spot. The C engine ($\sim$700 LoC) and
+\psm{}'s cell-targeted retrieval removes this structural blind spot
+in those sessions. The C engine ($\sim$700 LoC) and
 Python eval harness are released under MIT.
 
 \keywords{Egocentric video \and Spatial memory \and Bounded memory \and

@@ -6,9 +6,8 @@
 %   (2) The architecture: PSM as a spatial-temporal index +
 %       reservoir-sampled exemplars + ring-buffer time decay, with
 %       per_cell_cap as the tuneable place-vs-similarity knob.
-%   (3) The contribution: PSM matches brute-force at strict bounded
-%       memory + spatial diversity, MLLM rerank composes with the
-%       index multiplicatively (recall vs localization).
+%   (3) The contribution: bounded PSM approaches brute-force while the
+%       full-reservoir row checks the expected cap=K equivalence.
 
 \section{Introduction}
 \label{sec:intro}
@@ -46,7 +45,7 @@ over recent windows; (3)~a \emph{per-cell capacity bound}
 strict spatial diversity at $\texttt{cap}{=}1$ and recovering
 unconstrained top-$K$ at $\texttt{cap}{=}K$. Memory is bounded per cell,
 ingestion is streaming, and top-$K$ search returns $K$ candidate
-$(t,\mathrm{lat},\mathrm{lng})$ triples in sub-millisecond wall-time
+$(t,\mathrm{lat},\mathrm{lng})$ triples in microsecond-scale wall-time
 on a synthetic 1024-tile dim-128 benchmark
 (\S\ref{sec:limitations} discusses how the constants shift on the
 ${\sim}10$-tile dim-768 Nymeria workload).
@@ -55,7 +54,7 @@ ${\sim}10$-tile dim-768 Nymeria workload).
 Multimodal LLMs (Gemini~3, Claude~4, GPT-4o) achieve strong
 single-frame grounding yet remain brittle on egocentric temporal
 grounding over long
-video~\cite{cheng2024videgothink,chen2025groundedmultihop,xu2026tgpo}.
+video~\cite{cheng2024videgothink,chen2025groundedmultihop}.
 We compose \psm{} as a \emph{prefilter}: it returns top-$K$
 spatial-temporal candidates from its bounded index; the MLLM reranks
 these $K$ frames and emits the localized answer. The two contributions
@@ -69,12 +68,12 @@ localization precision.
     buffers, and reservoir-sampled exemplars
     (\S\ref{sec:method}).
 
-  \item \textbf{\caponek{} knob + mIoU parity:}
-    $\texttt{cap}{=}K$ at oracle reservoir size $R{=}1024$
-    recovers brute-force exactly (same 25/187 hits, identical
-    mIoU)---a correctness property of the substrate, since
-    \texttt{cap}=$K$ over an unbounded reservoir reduces to
-    top-$K$-over-all-exemplars. $\texttt{cap}{=}1$ paired with
+  \item \textbf{\caponek{} knob + oracle sanity check:}
+    at the bounded $R{=}128$ operating point, \texttt{cap}=$K$
+    reaches 21/187 hits vs.\ brute-force CLIP's 25/187; at oracle
+    reservoir size $R{=}1024$, it recovers the same 25/187 hits with identical
+    mIoU, confirming the expected top-$K$ equivalence when reservoir
+    eviction is removed. $\texttt{cap}{=}1$ paired with
     Gemini rerank achieves mIoU\,0.069,
     statistically indistinguishable from brute-force 0.074
     (bootstrap $\Delta{=}{-}0.005$, 95\,\% CI

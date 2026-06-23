@@ -42,10 +42,32 @@ encoder discrimination, not trajectory quality.
 \psm's reported ${\sim}700\,\mu$s per-query latency derives
 from a 1024-tile, dim-128 synthetic CPU benchmark (single H200 host).
 Real Nymeria sessions use ${\sim}$10 tiles at dim\,768 with
-128 exemplars; the constants differ, but the frame-count
-independence property holds on both workloads. The deployment
-target is a wearable device (neither GPU nor H200-class CPU);
-porting the C engine is straightforward but unmeasured here.
+128 exemplars; the constants differ, and we have not yet run the
+same benchmark harness directly on the Nymeria \psm{} state.
+The actual-workload brute-force dot-product baseline is measured
+separately (67\,$\mu$s median on \texttt{shelby\_arroyo\_act0}),
+but the \psm{} microsecond-scale number should be read as a systems
+sanity check, not an on-device latency claim. The deployment target
+is a wearable device (neither GPU nor H200-class CPU); porting the C
+engine is straightforward but unmeasured here.
+
+\paragraph{HLL utility not isolated.}
+The HLL ring buffer supplies cardinality estimates and mergeable
+time envelopes, but the present QA experiments score only retrieval
+and localization. We do not ablate HLL against a cheaper
+\texttt{(count,tmin,tmax)} cell summary, nor do we report cardinality
+estimation error. The current evidence therefore justifies HLL as a
+streaming mergeable substrate, not as an empirically necessary
+component for Hit@5 on Nymeria.
+
+\paragraph{No spatial-only baseline.}
+Our baselines cover full-memory brute-force CLIP, sliding-window CLIP,
+and uniform temporal sampling, but they do not include a spatial-only
+heuristic such as nearest-GPS, random-cell, or low-visit-count cell
+retrieval. The reported gains therefore establish that query-guided
+cell retrieval beats uniform temporal coverage at the same candidate
+budget; they do not fully isolate how much comes from spatial indexing
+alone versus embedding similarity within the selected cells.
 
 \paragraph{Multi-corpus coverage.}
 The deepest single-session analysis
@@ -54,5 +76,6 @@ brute-force comparison) remains on Nymeria
 \texttt{shelby\_arroyo\_act0}.
 The multi-corpus sweep (\S\ref{sec:results-multi-corpus})
 covers 14 sessions across three corpora and three encoder
-families but reports Hit@5 only; mIoU and counting metrics
-across the full 14-session set are a straightforward follow-up.
+families but reports Hit@5 only, under a heuristic monotonicity-plus-lift
+criterion rather than a formal statistical test. mIoU and counting
+metrics across the full 14-session set are a straightforward follow-up.
