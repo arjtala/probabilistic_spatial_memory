@@ -15,9 +15,9 @@ reservoir-sampled embedding exemplars per cell, and exposes a
 \caponek{} knob that trades spatial diversity for
 embedding-similarity precision.  Per-cell state is bounded
 independently of recording duration; per-query latency is
-microsecond-scale on a synthetic benchmark
-(\S\ref{sec:method-query}; the constants on real Nymeria sessions
-shift but the frame-count independence holds, \S\ref{sec:limitations}).
+microsecond-scale on host CPU for both a synthetic stress test and
+the measured Nymeria \psm{} state (\S\ref{sec:method-query};
+on-device constants remain unmeasured, \S\ref{sec:limitations}).
 
 \paragraph{What the evidence supports.}
 On 30 Nymeria sessions, the $R{=}1024$ full-reservoir sweep reaches

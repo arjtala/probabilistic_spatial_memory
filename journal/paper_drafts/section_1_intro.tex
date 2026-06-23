@@ -45,10 +45,10 @@ over recent windows; (3)~a \emph{per-cell capacity bound}
 strict spatial diversity at $\texttt{cap}{=}1$ and recovering
 unconstrained top-$K$ at $\texttt{cap}{=}K$. Memory is bounded per cell,
 ingestion is streaming, and top-$K$ search returns $K$ candidate
-$(t,\mathrm{lat},\mathrm{lng})$ triples in microsecond-scale wall-time
-on a synthetic 1024-tile dim-128 benchmark
-(\S\ref{sec:limitations} discusses how the constants shift on the
-${\sim}10$-tile dim-768 Nymeria workload).
+$(t,\mathrm{lat},\mathrm{lng})$ triples in sub-millisecond host-CPU
+wall-time on both a synthetic stress test and the measured Nymeria
+\psm{} state (\S\ref{sec:limitations} scopes the missing on-device
+measurement).
 
 \paragraph{The PSM--MLLM prefilter pipeline.}
 Multimodal LLMs (Gemini~3, Claude~4, GPT-4o) achieve strong

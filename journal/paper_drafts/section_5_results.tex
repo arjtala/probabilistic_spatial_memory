@@ -72,7 +72,8 @@ Four additional patterns from ablations and baselines:
 Figure~\ref{fig:f6-memory} plots both under the observed ${\sim}10$-cell footprint: the brute-force = \psm{} crossover sits at $N \approx 1500$ frames (${\approx}25$\,min at 1\,fps, CLIP-L 768-d).
 Past the crossover the gap diverges for the same spatial footprint: ${\sim}10\times$ at 4 hours, ${\sim}20\times$ at 8 hours.
 In our measured corpus ($N \in [748, 1325]$), brute-force remains slightly cheaper (${\sim}2.2$--$3.9$\,MiB vs ${\sim}4.3$\,MiB at ${\sim}10$ cells per session); \psm{} pays its constant overhead before brute-force catches up.
-On \texttt{shelby\_arroyo\_act0}, actual-workload brute-force dot-product retrieval over the 1133-frame CLIP-L bank takes 67\,$\mu$s median; the paired \psm{} latency remains a synthetic benchmark measurement rather than an on-device claim (\S\ref{sec:limitations}).
+On \texttt{shelby\_arroyo\_act0}, actual-workload brute-force dot-product retrieval over the 1133-frame CLIP-L bank takes 67\,$\mu$s median.
+The paired in-process \psm{} benchmark on the same host, using the deployment state ($R{=}128$, $p{=}10$, 7 occupied H3 cells, dim\,768), takes 456\,$\mu$s median at \caponek{}$=1$ and 153\,$\mu$s median at \caponek{}$=K$ over 5000 calls; both are host-CPU measurements, not wearable-device measurements (\S\ref{sec:limitations}).
 
 \begin{figure}[t]
 \centering

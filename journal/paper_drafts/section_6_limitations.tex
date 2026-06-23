@@ -3,7 +3,7 @@
 % Retained items:
 %   (1) Revisit-heavy long-narration ceiling
 %   (2) One honest spatial-axis failure (BurlingameDT4)
-%   (3) Latency claim from synthetic workload
+%   (3) Host-CPU latency scope
 %   (4) Multi-corpus coverage scope
 
 \section{Limitations}
@@ -38,18 +38,16 @@ Pilot's~\cite{aria-gen2-pilot} GPS-grounded outdoor walks
 (300\,m extent, real GPS)---confirming the bottleneck is
 encoder discrimination, not trajectory quality.
 
-\paragraph{Latency from synthetic workload.}
-\psm's reported ${\sim}700\,\mu$s per-query latency derives
-from a 1024-tile, dim-128 synthetic CPU benchmark (single H200 host).
-Real Nymeria sessions use ${\sim}$10 tiles at dim\,768 with
-128 exemplars; the constants differ, and we have not yet run the
-same benchmark harness directly on the Nymeria \psm{} state.
-The actual-workload brute-force dot-product baseline is measured
-separately (\S\ref{sec:results-memory-latency}), but the \psm{}
-microsecond-scale number should be read as a systems sanity check,
-not an on-device latency claim. The deployment target
-is a wearable device (neither GPU nor H200-class CPU); porting the C
-engine is straightforward but unmeasured here.
+\paragraph{Latency scope.}
+\psm's reported latency combines a 1024-tile, dim-128 synthetic CPU
+stress test (single H200 host, ${\sim}700\,\mu$s per query) with an
+actual Nymeria \psm{} state measured on the same host
+(\S\ref{sec:results-memory-latency}). The latter uses only 7 occupied
+H3 cells but dim\,768 embeddings, so it checks the real data path
+rather than the worst-case tile count. These numbers should be read as
+systems sanity checks, not on-device latency claims. The deployment
+target is a wearable device (neither GPU nor H200-class CPU); porting
+the C engine is straightforward but unmeasured here.
 
 \paragraph{HLL utility not isolated.}
 The HLL ring buffer supplies cardinality estimates and mergeable

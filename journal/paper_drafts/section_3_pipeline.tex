@@ -26,9 +26,9 @@ Embed the question $q$ with the ingest encoder and call
 \texttt{SpatialMemory\_query\_similar} with the configured
 \caponek{} and $K{=}5$.
 The call returns five candidates sorted by cosine similarity; the
-latency number reported for this call comes from the synthetic systems
-benchmark in \S\ref{sec:results-memory-latency}, not from an on-device
-Nymeria trace.
+latency numbers reported for this call come from host-CPU systems
+benchmarks in \S\ref{sec:results-memory-latency}, not from an
+on-device wearable trace.
 Encoder choice is a pipeline knob, not an architectural commitment:
 the same path serves three families---CLIP-L (430\,M, 768\,d),
 CLIP-bigG (2.5\,B, 1280\,d), and
