@@ -13,27 +13,38 @@ Prints a markdown row + LaTeX row + summary statistics.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import statistics as st
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SWEEP_DIR = ROOT / "captures" / "multisession_pcc_sweep"
+DEFAULT_SWEEP_DIR = ROOT / "captures" / "multisession_pcc_sweep"
 CAPS = [1, 2, 3, 5]
 
 
 def main() -> int:
-    if not SWEEP_DIR.exists():
-        print(f"!!! {SWEEP_DIR} not found; run multisession_cap_sweep_30.sh first",
+    ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
+    ap.add_argument(
+        "--sweep-dir",
+        type=Path,
+        default=DEFAULT_SWEEP_DIR,
+        help="Directory containing <session>/eval_<sid>_pcc<N>.json files.",
+    )
+    args = ap.parse_args()
+    sweep_dir = args.sweep_dir
+
+    if not sweep_dir.exists():
+        print(f"!!! {sweep_dir} not found; run multisession_cap_sweep_30.sh first",
               file=sys.stderr)
         return 1
 
     per_cap: dict[int, list[float]] = {c: [] for c in CAPS}
-    sessions = sorted(d.name for d in SWEEP_DIR.iterdir() if d.is_dir())
+    sessions = sorted(d.name for d in sweep_dir.iterdir() if d.is_dir())
     for sid in sessions:
         for cap in CAPS:
-            p = SWEEP_DIR / sid / f"eval_{sid}_pcc{cap}.json"
+            p = sweep_dir / sid / f"eval_{sid}_pcc{cap}.json"
             if not p.exists():
                 continue
             d = json.loads(p.read_text())

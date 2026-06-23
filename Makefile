@@ -143,7 +143,10 @@ LIB = $(TARGET_DIR)/libpsm.a
 BIN = $(TARGET_DIR)/psm
 VIZ_BIN = $(TARGET_DIR)/psm-viz
 BENCH_SPATIAL = $(TARGET_DIR)/benchmark_spatial_memory
+BENCH_NYMERIA_PSM_QUERY = $(TARGET_DIR)/benchmark_nymeria_psm_query
 BENCH_TILE_DECODE = $(TARGET_DIR)/benchmark_tile_decode
+NYMERIA_GROUP ?= clip
+NYMERIA_QUERY_OPS ?= 1000
 
 # Test executables
 TEST_RING_BUFFER = $(BUILD_DIR)/test_ring_buffer
@@ -245,12 +248,23 @@ viz: $(LIB) $(VIZ_OBJ) $(STB_OBJ)
 bench-spatial-memory: $(BENCH_SPATIAL)
 	./$(BENCH_SPATIAL)
 
+bench-nymeria-psm-query: $(BENCH_NYMERIA_PSM_QUERY)
+	@if [ -z "$(FEATURES_H5)" ]; then \
+		printf 'Usage: make PROFILE=cluster bench-nymeria-psm-query FEATURES_H5=/path/to/clip_l_features.h5 [NYMERIA_GROUP=clip] [NYMERIA_QUERY_OPS=5000]\n'; \
+		exit 2; \
+	fi
+	./$(BENCH_NYMERIA_PSM_QUERY) "$(FEATURES_H5)" "$(NYMERIA_GROUP)" "$(NYMERIA_QUERY_OPS)"
+
 bench-tile-decode: $(BENCH_TILE_DECODE)
 	./$(BENCH_TILE_DECODE)
 
 $(BENCH_SPATIAL): benchmarks/benchmark_spatial_memory.c $(LIB)
 	@mkdir -p $(TARGET_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) benchmarks/benchmark_spatial_memory.c $(LIB) -o $@ -lm
+
+$(BENCH_NYMERIA_PSM_QUERY): benchmarks/benchmark_nymeria_psm_query.c $(LIB)
+	@mkdir -p $(TARGET_DIR)
+	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) benchmarks/benchmark_nymeria_psm_query.c $(LIB) -o $@ -lm
 
 $(BENCH_TILE_DECODE): benchmarks/benchmark_tile_decode.c $(STB_OBJ)
 	@mkdir -p $(TARGET_DIR)
