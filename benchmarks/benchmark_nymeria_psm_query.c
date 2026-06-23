@@ -19,6 +19,14 @@ static double monotonic_seconds(void) {
   return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
 }
 
+static int compare_double_asc(const void *a, const void *b) {
+  const double da = *(const double *)a;
+  const double db = *(const double *)b;
+  if (da < db) return -1;
+  if (da > db) return 1;
+  return 0;
+}
+
 static bool parse_size_arg(const char *text, const char *name, size_t *out) {
   char *end = NULL;
   unsigned long long value;
@@ -98,6 +106,12 @@ static void run_query_bench(SpatialMemory *sm, const float *query, size_t dim,
     fprintf(stderr, "failed to allocate query output\n");
     exit(EXIT_FAILURE);
   }
+  double *samples_us = (double *)calloc(query_ops, sizeof(double));
+  if (!samples_us) {
+    fprintf(stderr, "failed to allocate latency samples\n");
+    free(out);
+    exit(EXIT_FAILURE);
+  }
 
   // Warm cache/branch predictors without counting setup effects.
   for (size_t i = 0; i < 100; ++i) {
@@ -109,19 +123,39 @@ static void run_query_bench(SpatialMemory *sm, const float *query, size_t dim,
   volatile size_t candidates_sum = 0;
   double start = monotonic_seconds();
   for (size_t i = 0; i < query_ops; ++i) {
+    double query_start = monotonic_seconds();
     size_t n = SpatialMemory_query_similar(sm, query, dim, 0.0, 0.0, -1, out,
                                            top, per_cell_cap);
+    samples_us[i] = (monotonic_seconds() - query_start) * 1e6;
     candidates_sum += n;
     if (top > 0) similarity_sum += out[0].similarity;
   }
   double elapsed = monotonic_seconds() - start;
   double mean_us = query_ops > 0 ? (elapsed / (double)query_ops) * 1e6 : 0.0;
+  qsort(samples_us, query_ops, sizeof(double), compare_double_asc);
+  double median_us = 0.0;
+  double p95_us = 0.0;
+  if (query_ops > 0) {
+    size_t p95_idx = ((query_ops * 95) + 99) / 100;
+    if (p95_idx == 0) p95_idx = 1;
+    p95_idx -= 1;
+    if (p95_idx >= query_ops) p95_idx = query_ops - 1;
+    p95_us = samples_us[p95_idx];
+    if (query_ops % 2 == 0) {
+      median_us =
+          0.5 * (samples_us[(query_ops / 2) - 1] + samples_us[query_ops / 2]);
+    } else {
+      median_us = samples_us[query_ops / 2];
+    }
+  }
 
   printf("query_similar_actual ops=%zu dim=%zu top=%zu per_cell_cap=%zu "
-         "secs=%.6f mean_us=%.3f candidates_per_query=%.1f checksum=%.3f\n",
-         query_ops, dim, top, per_cell_cap, elapsed, mean_us,
+         "secs=%.6f mean_us=%.3f median_us=%.3f p95_us=%.3f "
+         "candidates_per_query=%.1f checksum=%.3f\n",
+         query_ops, dim, top, per_cell_cap, elapsed, mean_us, median_us, p95_us,
          query_ops ? (double)candidates_sum / (double)query_ops : 0.0,
          similarity_sum);
+  free(samples_us);
   free(out);
 }
 
