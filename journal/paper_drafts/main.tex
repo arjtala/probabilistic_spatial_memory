@@ -74,9 +74,10 @@ cell, and reservoir-sampled CLIP-embedding exemplars. \psm{} exposes
 a novel \caponek{} knob that smoothly trades strict spatial diversity
 for embedding-similarity precision; the permissive endpoint
 (\texttt{cap}=$K$) reduces to brute-force retrieval over all
-in-reservoir exemplars. On the 25 narrations where the ground-truth
-interval is uniquely groundable, \psm{} at \texttt{cap}=$K$ recovers
-all 25 (\emph{conditional accuracy $=100\%$}).
+in-reservoir exemplars---a substrate-correctness property our
+single-session sanity check confirms ($R{=}1024$ \caponek{}$=K$
+retrieves the same 25 of 187 frames brute-force CLIP does, with
+identical mIoU).
 The spatial-axis discrimination generalizes across \textbf{14 street-scale
 sessions} drawn from \textbf{3 distinct sensor stacks} (SLOPER4D
 head-mounted LiDAR, Nymeria + LookOut~\cite{pan2025lookout} Project

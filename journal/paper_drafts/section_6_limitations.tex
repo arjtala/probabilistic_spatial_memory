@@ -40,10 +40,12 @@ encoder discrimination, not trajectory quality.
 
 \paragraph{Latency from synthetic workload.}
 \psm's reported ${\sim}700\,\mu$s per-query latency derives
-from a 1024-tile, dim-128 synthetic benchmark on H200.
+from a 1024-tile, dim-128 synthetic CPU benchmark (single H200 host).
 Real Nymeria sessions use ${\sim}$10 tiles at dim\,768 with
 128 exemplars; the constants differ, but the frame-count
-independence property holds on both workloads.
+independence property holds on both workloads. The deployment
+target is a wearable device (neither GPU nor H200-class CPU);
+porting the C engine is straightforward but unmeasured here.
 
 \paragraph{Multi-corpus coverage.}
 The deepest single-session analysis

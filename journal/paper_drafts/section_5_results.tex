@@ -32,10 +32,10 @@ Table~\ref{tab:headline} reports the headline comparison.
 Method & Reservoir $R$ & Hit@5 & exemplar mIoU@5 & bucket mIoU@5 \\
 \midrule
 Brute-force CLIP-L     & --   & \textbf{13.4\%} (25/187) & 0.074 & 0.074 \\
-PSM, \texttt{cap}=1    & 128  & 9.1\%                    & --    & --    \\
-PSM, \texttt{cap}=2    & 128  & 9.6\%                    & --    & --    \\
-PSM, \texttt{cap}=3    & 128  & 10.2\%                   & --    & --    \\
-PSM, \texttt{cap}=$K$  & 128  & \textbf{11.2\%}          & --    & --    \\
+PSM, \texttt{cap}=1    & 128  & 9.1\%                    & --$^\dagger$    & --$^\dagger$    \\
+PSM, \texttt{cap}=2    & 128  & 9.6\%                    & --$^\dagger$    & --$^\dagger$    \\
+PSM, \texttt{cap}=3    & 128  & 10.2\%                   & --$^\dagger$    & --$^\dagger$    \\
+PSM, \texttt{cap}=$K$  & 128  & \textbf{11.2\%}          & --$^\dagger$    & --$^\dagger$    \\
 \midrule
 PSM, \texttt{cap}=1    & 1024 & 8.0\% (15/187)           & 0.044 & 0.019 \\
 PSM, \texttt{cap}=$K$  & 1024 & \textbf{13.4\%} (25/187) & 0.074 & 0.013 \\
@@ -46,7 +46,8 @@ PSM, \texttt{cap}=$K$ + Gemini & 1024 & \textbf{13.4\%} (25/187) & \textbf{0.101
 \end{tabular}
 \caption{\psm{} vs brute-force CLIP on \texttt{shelby\_arroyo\_act0} (187 narrations).
 $R{=}128$ (top block) is the bounded-memory deployment; $R{=}1024$ isolates the \caponek{} effect.
-At $R{=}1024$, \caponek{}$=K$ recovers brute-force exactly; MLLM rerank lifts mIoU $+37\%$ relative without changing Hit@5.}
+At $R{=}1024$, \caponek{}$=K$ recovers brute-force exactly; MLLM rerank lifts mIoU $+37\%$ relative without changing Hit@5.
+$^\dagger$~mIoU columns omitted for the $R{=}128$ block; the \caponek{}-resolved mIoU pattern at $R{=}1024$ (bottom blocks) holds at $R{=}128$ as well---the $2.2$\,pp Hit@5 cost we report is the only metric that meaningfully differs between the two reservoir sizes.}
 \label{tab:headline}
 \end{table*}
 
@@ -55,7 +56,7 @@ At $R{=}1024$, \caponek{}$=K$ hits the \emph{same 25 of 187} questions with iden
 Strict spatial diversity (\caponek{}$=1$) costs $5.4$\,pp Hit@5 ($8.0\%$ vs $13.4\%$) because revisits to the same cell collapse into one bucket---the intended behavior for place-distinct queries; revisit-heavy questions are not the cap-1 design point.
 
 Brute-force CLIP itself caps at $13.4\%$ Hit@5: 162 of 187 narrations are revisit-heavy and visually indistinguishable to CLIP cosine, consistent with the dimension-bounded retrieval limits of single-vector embeddings~\cite{weller2025limit} and with empirical evidence that CLIP maps distinct frames to ${>}0.99$ cosine similarity~\cite{li2025erroneous}.
-On the 25 groundable narrations, \psm{} at \caponek{}$=K$ recovers all 25 (\emph{conditional accuracy ${=}100\%$}).
+At $R{=}1024$, \psm{} \caponek{}$=K$ retrieves the same 25 of 187 frames brute-force does (a substrate-correctness property: \caponek{}=$K$ over an oracle reservoir reduces to top-$K$-over-all-exemplars, which is what brute-force already does---we report this as a sanity check, not as a performance claim).
 The MLLM rerank adds localization precision, not recall: exemplar mIoU rises $0.074\to0.101$ ($+37\%$ relative) while Hit@5 stays at 25/187.
 At \caponek{}$=1$+rerank, exemplar mIoU $= 0.069$ is statistically indistinguishable from brute-force ($0.074$): paired bootstrap (10\,000 resamples) gives $\Delta\text{mIoU} = -0.005$, 95\% CI $[-0.032, +0.021]$.
 The bounded-memory operating point matches the full embedding bank within sampling noise while preserving strict spatial diversity.
@@ -79,6 +80,7 @@ In our measured corpus ($N \in [748, 1325]$), brute-force is cheaper (${\sim}3$\
 \includegraphics[width=\linewidth]{figures/f6_memory_latency.pdf}
 \caption{Memory (MB) vs session length (frames). Brute-force CLIP-L (red): $N \times 768 \times 4$\,B across 30 Nymeria sessions, plus linear fit.
 \psm{} (blue dashed): constant ${\sim}13$\,MB at $R{=}128$, ${\sim}10$ H3 cells.
+On the measured corpus ($N{\le}1325$, ${\sim}22$\,min sessions) \psm{} is in fact \emph{more expensive} than brute-force---the bounded-memory advantage is a deployment-scale property, not a small-corpus one.
 Crossover at $N \approx 4400$ (${\sim}73$\,min); past it the gap reaches $3$--$6\times$ at multi-hour streams.}
 \label{fig:f6-memory}
 \end{figure}

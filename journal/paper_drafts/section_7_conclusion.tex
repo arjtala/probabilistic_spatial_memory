@@ -15,7 +15,9 @@ reservoir-sampled embedding exemplars per cell, and exposes a
 \caponek{} knob that trades spatial diversity for
 embedding-similarity precision.  Per-cell state is bounded
 independently of recording duration; per-query latency is
-sub-millisecond (\S\ref{sec:method-query}).
+sub-millisecond on a synthetic benchmark
+(\S\ref{sec:method-query}; the constants on real Nymeria sessions
+shift but the frame-count independence holds, \S\ref{sec:limitations}).
 
 \paragraph{What the evidence supports.}
 On 30 Nymeria sessions, \psm at \caponek{}$=K$ matches brute-force

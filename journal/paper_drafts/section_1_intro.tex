@@ -46,7 +46,10 @@ over recent windows; (3)~a \emph{per-cell capacity bound}
 strict spatial diversity at $\texttt{cap}{=}1$ and recovering
 unconstrained top-$K$ at $\texttt{cap}{=}K$. Memory is bounded per cell,
 ingestion is streaming, and top-$K$ search returns $K$ candidate
-$(t,\mathrm{lat},\mathrm{lng})$ triples in sub-millisecond wall-time.
+$(t,\mathrm{lat},\mathrm{lng})$ triples in sub-millisecond wall-time
+on a synthetic 1024-tile dim-128 benchmark
+(\S\ref{sec:limitations} discusses how the constants shift on the
+${\sim}10$-tile dim-768 Nymeria workload).
 
 \paragraph{The PSM--MLLM prefilter pipeline.}
 Multimodal LLMs (Gemini~3, Claude~4, GPT-4o) achieve strong
@@ -67,10 +70,12 @@ localization precision.
     (\S\ref{sec:method}).
 
   \item \textbf{\caponek{} knob + mIoU parity:}
-    $\texttt{cap}{=}K$ recovers brute-force accuracy exactly
-    (conditional accuracy $100\%$ on the 25 uniquely groundable
-    queries);
-    $\texttt{cap}{=}1$ paired with Gemini rerank achieves mIoU\,0.069,
+    $\texttt{cap}{=}K$ at oracle reservoir size $R{=}1024$
+    recovers brute-force exactly (same 25/187 hits, identical
+    mIoU)---a correctness property of the substrate, since
+    \texttt{cap}=$K$ over an unbounded reservoir reduces to
+    top-$K$-over-all-exemplars. $\texttt{cap}{=}1$ paired with
+    Gemini rerank achieves mIoU\,0.069,
     statistically indistinguishable from brute-force 0.074
     (bootstrap $\Delta{=}{-}0.005$, 95\,\% CI
     $[-0.032,{+}0.021]$) (\S\ref{sec:results-main}).

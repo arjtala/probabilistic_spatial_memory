@@ -62,13 +62,6 @@ brute-force grows $\Theta(N)$; \psm{} grows
 $\Theta(R \cdot |\mathrm{cells}|)$, bounded by the physical area
 covered, not recording length.
 
-\paragraph{TurboQuant codec.} An optional 2-/3-/4-bit codec
-(TurboQuant-style streaming vector
-quantization~\cite{aguerrebere2024lvq}) compresses stored
-exemplars 5--10$\times$ at no Hit@5 cost vs.\ \texttt{raw}
-float32. All main results use \texttt{raw}; the codec targets
-on-device deployment.
-
 \subsection{Top-$K$ query with \caponek}
 \label{sec:method-query}
 
