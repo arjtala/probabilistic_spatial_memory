@@ -75,10 +75,11 @@ a novel \caponek{} knob that smoothly trades strict spatial diversity
 for embedding-similarity precision.
 
 At the bounded deployment point ($R{=}128$, \texttt{cap}=$K$),
-\psm{} reaches 21 of 25 brute-force-groundable queries on a
-187-narration Nymeria proxy session; with reservoir eviction removed
-($R{=}1024$), the same endpoint recovers all 25---a
-substrate-correctness sanity check, not a performance claim.
+\psm{} reaches 21/187 Hit@5 on the Nymeria proxy session
+vs.\ brute-force CLIP's 25/187. With reservoir eviction removed
+($R{=}1024$), the same endpoint recovers the identical 25/187 hit set;
+this is a substrate-correctness sanity check rather than a performance
+claim.
 The spatial-axis discrimination generalizes across \textbf{14 street-scale
 sessions} drawn from \textbf{3 distinct sensor stacks} (SLOPER4D
 head-mounted LiDAR, Nymeria + LookOut~\cite{pan2025lookout} Project

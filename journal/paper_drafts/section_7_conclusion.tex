@@ -21,13 +21,10 @@ shift but the frame-count independence holds, \S\ref{sec:limitations}).
 
 \paragraph{What the evidence supports.}
 On 30 Nymeria sessions, the $R{=}1024$ full-reservoir sweep reaches
-brute-force CLIP retrieval at \caponek{}$=K$ (Hit@5 $8.92\%$); the
-bounded $R{=}128$ deployment point preserves the monotone \caponek{}
-shape with a ${\sim}2$\,pp reservoir-eviction penalty.
-Sliding-window CLIP exceeds both
-by ${\sim}1$\,pp (\S\ref{sec:results-main}).
-On the single deep-analysis session, the bounded $R{=}128$ operating
-point reaches 21/187 vs.\ brute-force's 25/187.
+brute-force CLIP retrieval at \caponek{}$=K$ (Hit@5 $8.92\%$), while
+the bounded $R{=}128$ single-session operating point reaches 21/187
+vs.\ brute-force's 25/187; sliding-window CLIP exceeds the full-reservoir
+endpoint by ${\sim}1$\,pp (\S\ref{sec:results-main}).
 %
 Paired with Gemini~3.1~Pro at \caponek{}$=1$, \psm reaches mIoU
 $0.069$---statistically indistinguishable from brute-force $0.074$

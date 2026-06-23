@@ -45,9 +45,9 @@ Real Nymeria sessions use ${\sim}$10 tiles at dim\,768 with
 128 exemplars; the constants differ, and we have not yet run the
 same benchmark harness directly on the Nymeria \psm{} state.
 The actual-workload brute-force dot-product baseline is measured
-separately (67\,$\mu$s median on \texttt{shelby\_arroyo\_act0}),
-but the \psm{} microsecond-scale number should be read as a systems
-sanity check, not an on-device latency claim. The deployment target
+separately (\S\ref{sec:results-memory-latency}), but the \psm{}
+microsecond-scale number should be read as a systems sanity check,
+not an on-device latency claim. The deployment target
 is a wearable device (neither GPU nor H200-class CPU); porting the C
 engine is straightforward but unmeasured here.
 
