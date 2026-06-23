@@ -63,7 +63,7 @@ Four additional patterns from ablations and baselines:
 (1)~\emph{Operating-point Pareto}: as \caponek{} sweeps from 1 to $K$, Hit@5 rises and bucket mIoU falls monotonically.
 (2)~\emph{Retrieval baselines}: sliding-window CLIP @ $\ell{=}10$\,s exceeds \psm{} \caponek{}$=K$ by $+1.6$\,pp Hit@5 ($15.0\%$ vs $13.4\%$) by averaging out per-frame variance, but requires the full $N$-frame bank; uniform-sample forms the floor at $4.3$--$8.6\%$.
 (3)~\emph{Memory ablation}: tightening the reservoir from 1024 to 128 exemplars costs $2.2$\,pp Hit@5 at \caponek{}$=K$; H3 resolution barely moves Hit@5 (${\pm}0.5$\,pp across $r \in \{10,11,12,13\}$) but moves bucket mIoU monotonically ($0.004 \to 0.019$).
-(4)~\emph{30-session monotonicity}: in the $R{=}1024$ full-reservoir sweep, mean Hit@5 climbs monotonically from $3.26\%$ at \caponek{}$=1$ through $5.69\%$ and $7.08\%$ to $8.92\%$ at \caponek{}$=K$, matching brute-force exactly at the eviction-free endpoint; sliding-window CLIP exceeds both by $+1.0$\,pp. We use $R{=}1024$ for this aggregate to isolate the \caponek{} effect; we have not run the matched $R{=}128$ aggregate across all 30 sessions.
+(4)~\emph{30-session monotonicity}: in the matched $R{=}128$ deployment sweep, mean Hit@5 climbs monotonically from $2.99\%$ at \caponek{}$=1$ through $4.81\%$ and $6.11\%$ to $7.55\%$ at \caponek{}$=K$. The $R{=}1024$ full-reservoir sweep follows the same shape ($3.26\% \to 5.69\% \to 7.08\% \to 8.92\%$) and matches brute-force exactly at the eviction-free endpoint; sliding-window CLIP exceeds both by $+1.0$\,pp. Thus, at \caponek{}$=K$, reservoir eviction costs $1.37$\,pp in the 30-session aggregate.
 
 \subsection{Memory, latency, and failure modes}
 \label{sec:results-memory-latency}

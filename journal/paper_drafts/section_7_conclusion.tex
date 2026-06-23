@@ -20,11 +20,14 @@ the measured Nymeria \psm{} state (\S\ref{sec:method-query};
 on-device constants remain unmeasured, \S\ref{sec:limitations}).
 
 \paragraph{What the evidence supports.}
-On 30 Nymeria sessions, the $R{=}1024$ full-reservoir sweep reaches
-brute-force CLIP retrieval at \caponek{}$=K$ (Hit@5 $8.92\%$), while
-the bounded $R{=}128$ single-session operating point reaches 21/187
-vs.\ brute-force's 25/187; sliding-window CLIP exceeds the full-reservoir
-endpoint by ${\sim}1$\,pp (\S\ref{sec:results-main}).
+On 30 Nymeria sessions, the bounded $R{=}128$ sweep is monotone
+from $2.99\%$ Hit@5 at \caponek{}$=1$ to $7.55\%$ at
+\caponek{}$=K$; the $R{=}1024$ full-reservoir sweep follows the same
+shape and reaches brute-force CLIP retrieval at \caponek{}$=K$
+(Hit@5 $8.92\%$). The bounded $R{=}128$ single-session operating
+point reaches 21/187 vs.\ brute-force's 25/187; sliding-window CLIP
+exceeds the full-reservoir endpoint by ${\sim}1$\,pp
+(\S\ref{sec:results-main}).
 %
 Paired with Gemini~3.1~Pro at \caponek{}$=1$, \psm reaches mIoU
 $0.069$---statistically indistinguishable from brute-force $0.074$
