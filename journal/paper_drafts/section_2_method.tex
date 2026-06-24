@@ -13,11 +13,9 @@
 $(t, \mathrm{lat}, \mathrm{lng}, \mathbf{e})$ tuples---timestamp,
 geographic position, and a $d$-dimensional CLIP embedding---and
 supports bounded-memory top-$K$ similarity search at any time.
-Three layered probabilistic data structures enforce the memory bound;
-Figure~\ref{fig:f1-architecture} shows how they compose with the
-downstream MLLM reranker described in \S\ref{sec:pipeline}.
+Three layered probabilistic data structures enforce the memory bound.
 
-\input{figures/f1_architecture.tex}
+
 
 \subsection{H3 spatial tessellation}
 \label{sec:method-h3}
