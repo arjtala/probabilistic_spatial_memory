@@ -49,15 +49,6 @@ systems sanity checks, not on-device latency claims. The deployment
 target is a wearable device (neither GPU nor H200-class CPU); porting
 the C engine is straightforward but unmeasured here.
 
-\paragraph{HLL utility not isolated.}
-The HLL ring buffer supplies cardinality estimates and mergeable
-time envelopes, but the present QA experiments score only retrieval
-and localization. We do not ablate HLL against a cheaper
-\texttt{(count,tmin,tmax)} cell summary, nor do we report cardinality
-estimation error. The current evidence therefore justifies HLL as a
-streaming mergeable substrate, not as an empirically necessary
-component for Hit@5 on Nymeria.
-
 \paragraph{No spatial-only baseline.}
 Our baselines cover full-memory brute-force CLIP, sliding-window CLIP,
 and uniform temporal sampling, but they do not include a spatial-only

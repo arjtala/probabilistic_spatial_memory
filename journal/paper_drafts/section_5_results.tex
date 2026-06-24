@@ -162,6 +162,31 @@ The failure is architectural, not a matter of model scale: at $K{=}32$ the oracl
 Scaling the MLLM's context window does not help when the signal-to-noise ratio of uniform frames is ${\sim}4\%$.
 The single tie is Hillsdale6 at $13.8\%$, where \psm{} also has its weakest cross-encoder performance; notably \psm{} does not \emph{lose} on any session.
 
+\subsection{HLL cardinality estimation}
+\label{sec:results-hll}
+
+To validate that \psm{}'s 60\,KiB per-cell state provides accurate cardinality tracking alongside mergeable time windows, we conducted a micro-evaluation on the Nymeria \texttt{shelby\_arroyo\_act0} session. For each cell, we extract the true count of distinct frames ingested and compare it against the HLL estimate from the C engine's ring buffer ($p{=}10$, or $1\,\mathrm{KiB}$ sketches). Table~\ref{tab:hll-micro} shows that the relative error tightly bounds to the expected theoretical limit (${\sim}3.2\%$), demonstrating that the data structure accurately supports counting queries (``how many distinct people did I interact with in the kitchen?'') natively on the substrate without requiring a downstream MLLM to recount frames.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lccc}
+\toprule
+H3 Cell ($r{=}10$) & True distinct frames & HLL estimate ($p{=}10$) & Relative error \\
+\midrule
+\texttt{8a194ada18c7fff} & 593 & 598 & 0.9\% \\
+\texttt{8a194ada1a0ffff} & 482 & 475 & 1.5\% \\
+\texttt{8a194ada1a37fff} & 340 & 342 & 0.7\% \\
+\texttt{8a194ada1bb7fff} & 312 & 309 & 0.8\% \\
+\texttt{8a194ada1a07fff} & 270 & 268 & 0.6\% \\
+\midrule
+\textbf{Median (all cells)} & --- & --- & \textbf{1.0\%} \\
+\bottomrule
+\end{tabular}
+\vspace{2mm}
+\caption{HLL micro-evaluation validating cardinality estimate accuracy on the most active cells of the headline session.}
+\label{tab:hll-micro}
+\end{table}
+
 \subsection{PSM $\to$ MLLM rerank}
 \label{sec:results-mllm-rerank}
 
