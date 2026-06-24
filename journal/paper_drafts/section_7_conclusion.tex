@@ -61,11 +61,12 @@ vision-language model (Phi-3.5-Vision, SmolVLM) tests whether the
 \caponek{} + reranker composition holds when the reranker itself
 runs on wearable compute.
 %
-(b)~\emph{Counting via HLL cardinality.}  The ring-buffer sketches
-(\S\ref{sec:method-ring-buffer}) are designed to track unique-event
-cardinality per cell, but the present paper does not validate that
-signal. A counting benchmark would test whether surfacing HLL estimates
-extends \psm to questions beyond moment-grounding
+(b)~\emph{Counting QA via HLL cardinality.}  \S\ref{sec:results-hll}
+validates that the ring-buffer sketches
+(\S\ref{sec:method-ring-buffer}) produce accurate cardinality
+estimates (median relative error $1.0\%$). The open question is
+whether surfacing those counts to the question answerer extends
+\psm{} to a counting question class beyond moment-grounding
 (``how many distinct people did I see in the kitchen today?'').
 %
 (c)~\emph{Federated memory via HLL union.}  H3 cells are global:
