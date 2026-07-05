@@ -320,10 +320,12 @@ span. F-HDD-3's encoder-collapse risk is cleared → full array + F-HDD-2/3 gree
   > ~1 r10 cell). The extraction reader also lacked the outlier guard, so a few
   > teleport fixes were binned to spurious cells. **Both are fixed at the source
   > now** (outlier guard in `io/hdd.py`; skew applied via a synthetic
-  > video-start anchor that survives the rebase), and the current F-HDD-2/3
-  > numbers are corrected non-destructively via `--realign-gps` (recompute
-  > per-frame coords from raw GPS) — see the realign delta below. Only F-HDD-2/3
-  > were affected; F-HDD-1 and the revisit metric read raw GPS directly.
+  > video-start anchor that survives the rebase — **simulation-verified: 0 m
+  > through the sort→rebase→interp path, vs 15 m for the old bare-skew version
+  > the rebase cancelled**), and the current F-HDD-2/3 numbers are corrected
+  > non-destructively via `--realign-gps` (recompute per-frame coords from raw
+  > GPS) — see the realign delta below. Only F-HDD-2/3 were affected; F-HDD-1
+  > and the revisit metric read raw GPS directly.
 - `scripts/slurm/hdd_embed_sanity.sbatch` — **single-task GPU job for the gate.**
   Run this FIRST: `sbatch scripts/slurm/hdd_embed_sanity.sbatch` (or
   `--export=ALL,MODEL=siglip2_l` / `,DRIVE=<id>`). Extracts ~50 frames from one
