@@ -204,22 +204,50 @@ accuracy number, or (b) the drafted B figures read thin without one.
   | 15 | 3.95 GB | 17.07 GB | 4.3× | 77.1% |
   | 30 | 4.79 GB | 34.14 GB | **7.1×** | **86.1%** |
 
-  **Honesty caveat (caught by the pre-GPU curve check):** the win comes from
-  per-cell reservoir *capping* (dwell + revisits discard frames beyond R), NOT
-  from a global area plateau — area keeps growing on this corpus (only 20% of
-  cells seen by the halfway mark; the fleet explores new routes over 8 months).
-  So frame it as "PSM memory grows *sublinearly in the frame count*," not
-  "plateaus with area." An earlier model (n_cells × R, assuming every cell's
-  reservoir full) wrongly inflated PSM 10× above the bank at 1 fps; the min()
-  is the real reservoir.
+  **Honesty caveat (caught by the pre-GPU curve check) + agreed §1/§5 framing.**
+  The win comes from per-cell reservoir *capping* (dwell + revisits discard
+  frames beyond R), NOT from a global area plateau — area keeps growing on this
+  corpus (only 20% of cells seen by the halfway mark; the fleet explores new
+  routes over 8 months, so the 47% revisit fraction doesn't dominate exploration
+  enough to flatten the area curve). An earlier model (n_cells × R, assuming
+  every reservoir full) wrongly inflated PSM 10× above the bank at 1 fps; the
+  min() is the real reservoir. So pitch it precisely:
+  - **F-HDD-1 claim:** "PSM state grows *sublinearly in observation count* —
+    it is O(distinct cells visited), not O(frames ingested). At 15 fps it is
+    4.3× smaller than a dense bank; at 30 fps, 7.1×." The area bound is an
+    **asymptotic architectural property** (state = Σ cells × capped reservoir),
+    stated as such — NOT an observed plateau, which HDD does not show.
+  - **§1 edit:** soften "state bounded by area, not time" → "state is
+    O(distinct cells visited), not O(frames ingested)"; drop any plateau/
+    saturation wording.
+  - **Report all three fps rows, including 1 fps (1.3×).** 1 fps is the
+    wearable corpus's rate and the margin is thin there; frame it as "the
+    advantage grows with ingest rate, and always-on wearable/vehicle streaming
+    is 15–30 fps," turning the weak row into a motivated design point.
+  - **Division of labour:** F-HDD-1 carries "state is sublinear / area-bounded
+    across the whole corpus"; the *persistence* claim (memory accrues + decays
+    across sessions on revisited cells) is **F-HDD-2's** job, not F-HDD-1's.
 - **F-HDD-2 cross-drive HLL cardinality accrual + decay** — pending the
-  embedding pass (seeded by `top_cells_r10` in the revisit JSON).
+  embedding pass (seeded by `top_cells_r10` in the revisit JSON). This is where
+  revisits ARE the whole story: HLL cardinality on the 5,163 revisited cells
+  accrues across drives and decays via the ring buffer over the months-long gaps.
 - **F-HDD-3 self-supervised cross-session retrieval** — pending embeddings.
   Query a revisited cell with a drive-A exemplar; check different-day drive-B
   frames in that cell rank high by cosine. No hand-labels. Closes B's "is the
-  persistent memory actually retrievable across sessions?" gap.
+  persistent memory actually retrievable across sessions?" gap. **Degenerate
+  contingency:** if the embed-sanity verdict were DEGENERATE, F-HDD-3 falls back
+  to reporting cross-session retrieval AUC *with a low-separability caveat*, or
+  pivots to a GPS/geometry-only cross-session consistency check. (Moot for now —
+  the CLIP-L gate PASSED, cos spread 0.41–0.94; see below.)
 
-### Embedding pipeline (prereq for F-HDD-2/3) — ✅ built, ⏳ GPU run pending
+### Embedding pipeline (prereq for F-HDD-2/3) — ✅ built, embed-sanity ✅ PASSED
+
+**Embed-sanity gate PASSED (CLIP-L, drive 201702271017, SLURM job 9270044 on
+h200-137, 2026-07-05):** 50 windshield frames, `cos_mean=0.776, std=0.085,
+p05=0.60, p95=0.88, min=0.41, max=0.94` → **OK (usable spread, not degenerate)**.
+`track_mode=real_gps`, sidecar consumed as `json_sidecar:hdd-rtk`. Also confirmed
+the Bug-2 fix live: `sample_fps=50/3180.2` used the *video* duration, not the GPS
+span. F-HDD-3's encoder-collapse risk is cleared → full array + F-HDD-2/3 greenlit.
 
 - `extraction/psm_extraction/io/hdd.py` — reads real RTK GPS (lat/lng swap +
   SF-Bay guard), no fake-origin projection. Verified: discovers 132 drives.
