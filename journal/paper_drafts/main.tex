@@ -64,22 +64,27 @@ Substrate for Wearable Look-Back Question Answering}
 \maketitle
 
 \begin{abstract}
-A wearable AI assistant captures hours of egocentric video per day;
-answering a look-back question (``where did I leave my keys?'')
-requires retrieving the relevant moments under strict on-device
-memory bounds. We propose \textbf{Probabilistic Spatial Memory}
-(\psm), a streaming spatial-temporal index combining an H3 hex-grid
-tessellation, a time-decayed ring buffer of HyperLogLog sketches per
-cell, and reservoir-sampled CLIP-embedding exemplars. \psm{} exposes
-a novel \caponek{} knob that smoothly trades strict spatial diversity
-for embedding-similarity precision.
+For an agent to hold persistent memory of its environment, its state
+cannot grow unboundedly with observation time. We propose
+\textbf{Probabilistic Spatial Memory} (\psm), a \emph{dynamic spatial
+representation} whose state is budgeted by physical area explored rather
+than by sequence length. \psm{} is a streaming spatial-temporal index
+combining an H3 hex-grid tessellation, a time-decayed ring buffer of
+HyperLogLog sketches per cell for \emph{test-time memory updating}, and
+reservoir-sampled embedding exemplars. It exposes a novel \caponek{} knob
+that smoothly trades strict spatial diversity for embedding-similarity
+precision---dialing state size against recall in the spirit of the
+recall--throughput tradeoff studied for sequence
+models~\cite{arora2024linear,chen2024vljepa}.
 
-At the bounded deployment point ($R{=}128$, \texttt{cap}=$K$),
-\psm{} reaches 21/187 Hit@5 on the Nymeria proxy session
-vs.\ brute-force CLIP's 25/187. With reservoir eviction removed
-($R{=}1024$), the same endpoint recovers the identical 25/187 hit set;
-this is a substrate-correctness sanity check rather than a performance
-claim.
+We evaluate \psm{} as a retrieval substrate on egocentric look-back QA
+(``where did I leave my keys?''), where memory-budgeted operation is a
+hard constraint. At the bounded deployment point ($R{=}128$,
+\texttt{cap}=$K$), \psm{} reaches 21/187 Hit@5 on the Nymeria proxy
+session vs.\ brute-force CLIP's 25/187, at $8\times$ smaller,
+session-length-invariant per-cell state. With reservoir eviction removed
+($R{=}1024$), the same endpoint recovers the identical 25/187 hit set,
+a substrate-correctness check confirming the expected top-$K$ equivalence.
 The spatial-axis discrimination generalizes across \textbf{14 street-scale
 sessions} drawn from \textbf{3 distinct sensor stacks} (SLOPER4D
 head-mounted LiDAR, Nymeria + LookOut~\cite{pan2025lookout} Project
@@ -87,17 +92,17 @@ Aria MPS) and \textbf{3 encoder families} (laion CLIP-L / CLIP-bigG,
 Google SigLIP~2~\cite{tschannen2025siglip2}): 13/14 sessions pass a
 monotone-r10$\to$r12 Hit\,@\,5 acceptance with $\geq 4$\,pp lift on
 at least one encoder. Because \psm{} retrieves candidates from
-query-matched H3 cells rather than uniform time slices, it provides
-the spatial-temporal prefilter that frontier MLLMs
-lack: on four of these sessions, uniform $K{=}8$ sampling yields
-Hit\,@\,5 $= 0\%$---the frontier MLLM never sees a ground-truth
-frame, regardless of its reasoning capability.
-\psm{}'s cell-targeted retrieval removes this structural blind spot
-in those sessions. The C engine ($\sim$700 LoC) and
-Python eval harness are released under MIT.
+query-matched H3 cells rather than uniform time slices, it supplies the
+spatial-temporal prefilter that frontier MLLMs lack: on four of these
+sessions, uniform $K{=}8$ sampling yields Hit\,@\,5 $= 0\%$---the MLLM
+never sees a ground-truth frame, regardless of its reasoning capability,
+and \psm{}'s cell-targeted retrieval removes this structural blind spot.
+The C engine ($\sim$700 LoC) and Python eval harness are released
+under MIT.
 
-\keywords{Egocentric video \and Spatial memory \and Bounded memory \and
-Look-back QA \and Retrieval substrate \and Wearable AI.}
+\keywords{Spatial memory \and Bounded memory \and Dynamic spatial
+representation \and Test-time memory updating \and Probabilistic data
+structures \and Egocentric video \and Retrieval substrate.}
 \end{abstract}
 
 % ---- Body sections -------------------------------------------------
