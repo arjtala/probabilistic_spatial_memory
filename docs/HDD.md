@@ -180,12 +180,66 @@ annotation-free. Option C (retrieval eval) needs a hand-annotated look-back QA
 set and only pays off if a *driving* retrieval result strengthens the wearable
 narrative rather than reading as bolted-on.
 
+## Decision: Option 3 — B now, C gated behind reviewer demand (2026-07-05)
+
+HDD carries the **systems/persistence** thesis; the frozen 14-session corpus
+carries **retrieval fidelity**. Two corpora, two complementary properties
+(stated as division of labor so a missing HDD Hit@5 reads as scope, not
+omission). Run Option C only if (a) a reviewer explicitly demands an HDD
+accuracy number, or (b) the drafted B figures read thin without one.
+
+### B figure plan + status
+
+- **F-HDD-1 memory-vs-area — ✅ built** (`scripts/hdd_memory_vs_area.py`,
+  `captures/hdd/memory_vs_area.json`, `journal/figures/hdd_memory_vs_area.svg`).
+  Honest model: PSM state = Σ_cells min(frames_in_cell, R=128) exemplars;
+  dense bank = all frames. On 102.9 h / 23,736 r10 cells, PSM is smaller at
+  every ingest rate, and the gap grows with fps as the per-cell reservoir caps
+  redundant frames:
+
+  | sample fps | PSM | dense bank | bank/PSM | PSM frame saving |
+  |---|---|---|---|---|
+  | 1  | 0.89 GB | 1.14 GB | 1.3× | 26.3% |
+  | 5  | 2.51 GB | 5.69 GB | 2.3× | 56.7% |
+  | 15 | 3.95 GB | 17.07 GB | 4.3× | 77.1% |
+  | 30 | 4.79 GB | 34.14 GB | **7.1×** | **86.1%** |
+
+  **Honesty caveat (caught by the pre-GPU curve check):** the win comes from
+  per-cell reservoir *capping* (dwell + revisits discard frames beyond R), NOT
+  from a global area plateau — area keeps growing on this corpus (only 20% of
+  cells seen by the halfway mark; the fleet explores new routes over 8 months).
+  So frame it as "PSM memory grows *sublinearly in the frame count*," not
+  "plateaus with area." An earlier model (n_cells × R, assuming every cell's
+  reservoir full) wrongly inflated PSM 10× above the bank at 1 fps; the min()
+  is the real reservoir.
+- **F-HDD-2 cross-drive HLL cardinality accrual + decay** — pending the
+  embedding pass (seeded by `top_cells_r10` in the revisit JSON).
+- **F-HDD-3 self-supervised cross-session retrieval** — pending embeddings.
+  Query a revisited cell with a drive-A exemplar; check different-day drive-B
+  frames in that cell rank high by cosine. No hand-labels. Closes B's "is the
+  persistent memory actually retrievable across sessions?" gap.
+
+### Embedding pipeline (prereq for F-HDD-2/3) — ✅ built, ⏳ GPU run pending
+
+- `extraction/psm_extraction/io/hdd.py` — reads real RTK GPS (lat/lng swap +
+  SF-Bay guard), no fake-origin projection. Verified: discovers 132 drives.
+- `scripts/extract_hdd_sessions.py` — writes an Aria-style `gps.json` sidecar
+  and drives the standard `python -m psm_extraction extract` pipeline (mirrors
+  `extract_sloper4d_sessions.py`). Includes a `--sanity-only` **embed-sanity
+  gate**: extracts ~50 frames from one drive and reports pairwise cosine spread
+  (windshield frames may collapse → would kill F-HDD-3). **Run this first.**
+- `scripts/slurm/extract_hdd.sbatch` — 132-drive array, MODEL=clip_l|clip_bigg|
+  siglip2_l. Needs a GPU node (no torch/GPU on the login node used for the
+  GPS-only analyses above).
+
 ## First cluster-side steps (once access + option chosen)
-1. Confirm HDD RGB frames embed cleanly (CLIP-L / SigLIP 2) — sanity batch.
+1. ⏳ Confirm HDD RGB frames embed cleanly (CLIP-L / SigLIP 2) — `--sanity-only`
+   gate in `extract_hdd_sessions.py`, run on a GPU node before the full array.
 2. ✅ **Done** — Ingest GPS → H3; histogram cells by distinct-drive **and
    distinct-day** count + inter-visit temporal-gap distribution (catch #1;
    result above). → `scripts/hdd_revisit_density.py`,
    `captures/hdd/revisit_density.json`.
-3. If revisits exist: cross-drive HLL cardinality accrual + time-decay plot
-   (seeded by the top-N revisited-cell → drive-list mapping from step 2's JSON).
-4. Memory-vs-area curve: PSM bounded per-cell state vs. dense-bank linear growth.
+3. F-HDD-2: cross-drive HLL cardinality accrual + time-decay plot (seeded by
+   the top-N revisited-cell → drive-list mapping from step 2's JSON).
+4. ✅ **Done (model)** — F-HDD-1 memory-vs-area: PSM bounded per-cell state vs.
+   dense-bank linear growth (`scripts/hdd_memory_vs_area.py`).
