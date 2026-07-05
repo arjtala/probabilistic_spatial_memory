@@ -227,18 +227,29 @@ accuracy number, or (b) the drafted B figures read thin without one.
   - **Division of labour:** F-HDD-1 carries "state is sublinear / area-bounded
     across the whole corpus"; the *persistence* claim (memory accrues + decays
     across sessions on revisited cells) is **F-HDD-2's** job, not F-HDD-1's.
-- **F-HDD-2 cross-drive HLL cardinality accrual + decay** — pending the
-  embedding pass (seeded by `top_cells_r10` in the revisit JSON). This is where
-  revisits ARE the whole story: HLL cardinality on the 5,163 revisited cells
-  accrues across drives and decays via the ring buffer over the months-long gaps.
-- **F-HDD-3 self-supervised cross-session retrieval** — pending embeddings.
-  Query a revisited cell with a drive-A exemplar; check different-day drive-B
-  frames in that cell rank high by cosine. No hand-labels. Closes B's "is the
-  persistent memory actually retrievable across sessions?" gap. **Degenerate
-  contingency:** if the embed-sanity verdict were DEGENERATE, F-HDD-3 falls back
-  to reporting cross-session retrieval AUC *with a low-separability caveat*, or
-  pivots to a GPS/geometry-only cross-session consistency check. (Moot for now —
-  the CLIP-L gate PASSED, cos spread 0.41–0.94; see below.)
+- **F-HDD-2 cross-drive HLL cardinality accrual + decay — ✅ built, ⏳ runs
+  post-extraction** (`scripts/hdd_hll_cardinality.py`). This is where revisits
+  ARE the whole story: a fixed 1 KiB/cell HLL sketch whose cardinality accrues
+  across drives (persistent) and decays via the ring buffer over the months-long
+  gaps (bounded). Python HLL **validated to match `targets/psm` exactly** (0.0%
+  median relerr on the sanity drive); windowed decay is time-grid-sampled so it
+  actually drops to ~0 mid-gap and jumps on revisit (verified 5→0→1 across a
+  100-day synthetic gap). Seeded by `top_cells_r10` in the revisit JSON;
+  recomputes per-cell days/gap from *loaded* drives and warns on partial
+  feature coverage.
+- **F-HDD-3 self-supervised cross-session retrieval — ✅ built, ⏳ runs
+  post-extraction** (`scripts/hdd_cross_session_retrieval.py`). Query a
+  revisited cell with a drive-A exemplar; AUC that different-day drive-B frames
+  in that cell outrank other-cell frames (+ hit-rate@k over the full pool incl.
+  same-drive near-duplicate distractors). No hand-labels. Controls: same-drive
+  AUC (upper bound), shuffled-cell AUC (~0.5 floor). Tie-corrected AUC + AUC
+  math unit-tested. **Degenerate contingency:** if the embed-sanity verdict were
+  DEGENERATE, F-HDD-3 reports AUC *with a low-separability caveat* or pivots to a
+  GPS-only consistency check. (Moot — the CLIP-L gate PASSED, cos 0.41–0.94.)
+- **Verification:** a 15-agent adversarial review→verify workflow over F-HDD-2/3
+  raised 13 findings, confirmed 6 (2 major F-HDD-2, 1 major + 3 minor F-HDD-3),
+  all fixed (commit `3292571`). Both scripts pass `pyrefly` (0 errors) and were
+  smoke-tested on the real 50-frame sanity H5.
 
 ### Embedding pipeline (prereq for F-HDD-2/3) — ✅ built, embed-sanity ✅ PASSED
 
