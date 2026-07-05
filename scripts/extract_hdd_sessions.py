@@ -207,7 +207,10 @@ def main() -> int:
     n_done = 0
     for drive_dir in drives:
         name = drive_dir.name
-        out_dir = out_root / name
+        # Mirror the source layout (out_root/<drive_day>/<drive_id>) so outputs
+        # don't flatten into one dir and, for the sanity default, don't scatter
+        # into the release tree.
+        out_dir = out_root / drive_dir.parent.name / name
         out_h5 = out_dir / (("sanity_" if args.sanity_only else "") + h5_basename)
         if out_h5.exists() and not args.sanity_only:
             print(f"[hdd] {name}: already extracted, skipping", file=sys.stderr)

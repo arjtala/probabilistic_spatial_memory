@@ -36,6 +36,7 @@
 set -euo pipefail
 
 ROOT="${ROOT:-/checkpoint/dream/arjangt/video_retrieval/hdd/release_2019_07_08}"
+OUT_ROOT="${OUT_ROOT:-/checkpoint/dream/arjangt/video_retrieval/hdd/features}"
 MODEL="${MODEL:-clip_l}"
 CONDA_ENV="${CONDA_ENV:-psm}"
 
@@ -69,6 +70,7 @@ fi
 
 python scripts/extract_hdd_sessions.py \
   --root "$ROOT" \
+  --out-root "$OUT_ROOT" \
   --model-family "$FAMILY" \
   --checkpoint "$CHECKPOINT" \
   --sanity-only \
