@@ -261,6 +261,35 @@ accuracy number, or (b) the drafted B figures read thin without one.
   coarse-geography with visual place identity (→ add a k-NN-cell hard-negative
   control if it's ever written up) and is a per-query (not per-cell) mean.
 
+### ✅ REAL RESULTS — full 132-drive corpus (2026-07-05)
+
+Extraction array finished (132/132 drives, `…/hdd/features/`); `scripts/hdd_figures.sh`
+produced all three. JSON in `captures/hdd/`, SVGs in `journal/figures/hdd_*` (commit `8be8035`).
+
+- **F-HDD-1 memory-vs-area** — 102.9 h, 23,736 r10 cells. PSM (Σ min(frames,R))
+  vs dense bank saving **26.3 % / 56.7 % / 77.1 % / 86.1 %** at 1 / 5 / 15 / 30 fps
+  (**1.3× → 7.1×**). Confirms the sublinear/area-bounded story; advantage grows
+  with ingest rate (thin at the 1 fps wearable rate, strong at streaming 15–30 fps).
+- **F-HDD-2 HLL cardinality** — top revisited cell accrues to **7,387 unique
+  observations over 219 days** (25/29 GPS-revisit drives deposited a 1 fps frame
+  in the exact r10 cell) in a **fixed 1 KiB** sketch; windowed estimate decays
+  between visits, jumps on revisit. Python HLL vs `targets/psm` cross-check on
+  real data = **2.4e-5 relerr** (effectively exact).
+- **F-HDD-3 cross-session retrieval** — **cross-session AUC 0.848 ± 0.190** vs
+  **shuffled-cell floor 0.495** and same-drive upper bound 0.978 → **STRONG**
+  cross-session place recognition (5,257 revisited cells; 2,000 stratified
+  queries of 70,885). cos(same-place, other-drive)=0.841 vs cos(other-cell)=0.740.
+  hit-rate@k is low (@1=0.01, @10=0.07) because the full 357k-frame pool is
+  saturated by same-drive near-duplicate distractors — **AUC (not literal top-k)
+  is the headline**; the place is recognizable across sessions, but same-drive
+  near-duplicates fill the literal top of the ranking.
+- **Perf (F-HDD-3):** the full-corpus run needed three fixes to be tractable —
+  int-code cell ids, vectorized (searchsorted) tie-corrected AUC (a per-element
+  Python rank loop over 370k negs × thousands of calls was hanging), O(n) hit@k,
+  and a stratified `--max-total-queries` cap (2000). Runs in ~73 s. All still
+  `pyrefly`-clean; tie/adversarial unit tests re-verified.
+
+
 ### Embedding pipeline (prereq for F-HDD-2/3) — ✅ built, embed-sanity ✅ PASSED
 
 **Embed-sanity gate PASSED (CLIP-L, drive 201702271017, SLURM job 9270044 on
