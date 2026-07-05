@@ -135,9 +135,11 @@ out-of-region GPS). Full stats in `captures/hdd/revisit_density.json`;
 r10 cell map + histogram in `journal/figures/hdd_revisit_{density,hist}_r10.svg`.
 
 **Decision metric (pre-registered): coverage-weighted fraction of driving over
-≥2-distinct-day cells at r10 = 47.0% ≥ 30% bar → GO.**
+≥2-distinct-day cells at r10 = 47.0% ≥ 30% bar → GO.** Precisely: 47.0% of
+*(drive, cell) traversal events* land in ≥2-distinct-day cells (this is an
+event fraction, not a fraction of driven time or distance).
 
-| res | cells | %cells ≥2-drive | %cells ≥2-day | cov ≥2-day |
+| res | cells | %cells ≥2-drive | %cells ≥2-day | cov ≥2-day (events) |
 |---|---|---|---|---|
 | r9  | 8,984 | 36.2% | 21.8% | 48.7% |
 | **r10** | **23,668** | **31.0%** | **21.8%** | **47.0%** |
@@ -149,6 +151,13 @@ the gap between first and last visit is **median 105.9 d, p90 174.3 d, max
 221.2 d** — half the revisited ground is re-driven >3.5 months apart. This is a
 genuine multi-session-persistence signal, not same-week repetition.
 
+**Depot-exclusion sensitivity (defuses "your revisits are just the Honda
+garage"):** recomputing coverage with the top-K most-driven (depot-origin)
+cells removed from both numerator and denominator barely moves it —
+**47.0% → 46.9% (K=5) → 46.7% (K=10) → 46.5% (K=20)**. Cross-day re-driving is
+distributed across thousands of arterial cells, not concentrated at the
+Mountain View origin. The claim is measured, not argued.
+
 **Honesty notes:**
 - Two preprocessing bugs in the first run biased the number *down* to a
   contaminated 22.6%: (a) a too-tight lat floor (37.0) dropped 4 real Santa
@@ -157,11 +166,10 @@ genuine multi-session-persistence signal, not same-week repetition.
   reject) gave the 47.0% above. Both fixes only *raise* the metric, so 47% is
   itself conservative w.r.t. the adjacent-cell undercount noted in the rule.
 - The most-revisited cells cluster near the Honda facility (Mountain View), so
-  some revisit is depot-driven (drives originate there). But the top-50 cells
-  span ~7×6 km along the El Camino corridor (lat 37.387–37.448), and 47%
-  coverage across 23,668 cells cannot come from the depot alone — arterial
-  revisits carry it. Depot cells could be excluded as a sensitivity check;
-  the margin over the bar makes it unnecessary.
+  some revisit is depot-driven (drives originate there). But the depot-exclusion
+  sensitivity above (47.0% → 46.5% removing the top-20 cells) shows the coverage
+  is carried by distributed arterial revisits, not the origin. The top-50 cells
+  already span ~7×6 km along the El Camino corridor (lat 37.387–37.448).
 - `vel.csv` speed units are unverified (max ~47), but the stopped-vs-moving
   gate at >1.0 is unit-robust (0.0 = idling).
 

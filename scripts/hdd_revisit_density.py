@@ -334,6 +334,29 @@ def main() -> int:
     dec = per_res[DECISION_RES]["coverage_visits_ge2_day"]
     verdict = "GO (>= bar)" if dec >= DECISION_BAR else "NO-GO (< bar)"
 
+    # ---- depot-exclusion sensitivity at DECISION_RES --------------------
+    # "Your revisits are just the Honda garage" is the likely reviewer attack.
+    # Exclude the top-K most-driven (depot-origin) cells from BOTH numerator
+    # and denominator and recompute coverage: does cross-day re-driving still
+    # dominate once the origin cells are removed?
+    dcells = cell_drive_ts[DECISION_RES]
+    ddays = cell_days[DECISION_RES]
+    by_traffic = sorted(dcells, key=lambda c: len(dcells[c]), reverse=True)
+
+    def _coverage_excl(exclude: set) -> float:
+        num = den = 0
+        for c, dd in dcells.items():
+            if c in exclude:
+                continue
+            v = len(dd)
+            den += v
+            if len(ddays[c]) >= 2:
+                num += v
+        return num / den if den else 0.0
+
+    depot_sens = {str(k): _coverage_excl(set(by_traffic[:k]))
+                  for k in (1, 5, 10, 20)}
+
     # ---- stdout table ---------------------------------------------------
     print(f"# HDD revisit density -- {n_ok} drives OK, {n_skip} skipped, "
           f"speed_gate={args.speed_gate}")
@@ -343,7 +366,7 @@ def main() -> int:
           f"~{(bbox[3]-bbox[2])*111.32*np.cos(np.radians(bbox[0])):.1f} km E-W)")
     print()
     hdr = (f"{'res':>4s} {'edge_m':>7s} {'cells':>8s} "
-           f"{'%>=2drv':>8s} {'%>=2day':>8s} {'cov>=2day':>10s}")
+           f"{'%>=2drv':>8s} {'%>=2day':>8s} {'covEv>=2d':>10s}")
     print(hdr)
     print("-" * len(hdr))
     for r in RESOLUTIONS:
@@ -352,6 +375,8 @@ def main() -> int:
               f"{100*s['frac_cells_ge2_drive']:>7.1f}% "
               f"{100*s['frac_cells_ge2_day']:>7.1f}% "
               f"{100*s['coverage_visits_ge2_day']:>9.1f}%")
+    print("# covEv>=2d = fraction of (drive,cell) traversal EVENTS that land in "
+          ">=2-distinct-day cells (not fraction of driven time/distance)")
 
     if args.summary:
         print()
@@ -367,9 +392,14 @@ def main() -> int:
               f"p90={gap_stats['p90_days']:.1f}  "
               f"max={gap_stats['max_days']:.1f}")
         print(f"#")
-        print(f"# DECISION (pre-registered): coverage over >=2-day cells at "
-              f"r{DECISION_RES} = {100*dec:.1f}%  vs bar {100*DECISION_BAR:.0f}%"
-              f"  -->  {verdict}")
+        print(f"# depot-exclusion sensitivity (coverage excl. top-K most-driven "
+              f"cells, r{DECISION_RES}):")
+        print("#   " + "  ".join(f"exclK={k}:{100*v:.1f}%"
+                                 for k, v in depot_sens.items()))
+        print(f"#")
+        print(f"# DECISION (pre-registered): traversal-event coverage over "
+              f">=2-day cells at r{DECISION_RES} = {100*dec:.1f}%  "
+              f"vs bar {100*DECISION_BAR:.0f}%  -->  {verdict}")
 
     # ---- JSON ----------------------------------------------------------
     args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -385,9 +415,13 @@ def main() -> int:
         "decision": {
             "resolution": DECISION_RES,
             "metric": "coverage_visits_ge2_day",
+            "metric_desc": ("fraction of (drive,cell) traversal events landing "
+                            "in >=2-distinct-day cells; NOT fraction of driven "
+                            "time or distance"),
             "value": dec,
             "bar": DECISION_BAR,
             "verdict": verdict,
+            "depot_exclusion_sensitivity": depot_sens,
         },
         "gap_days_r%d" % DECISION_RES: gap_stats,
         "top_cells_r%d" % DECISION_RES: top_cells,
