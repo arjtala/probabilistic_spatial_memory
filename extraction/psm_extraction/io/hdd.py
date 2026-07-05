@@ -29,6 +29,20 @@ import numpy as np
 # SF Bay (incl. Santa Cruz ~36.97) guard against a bad file / swapped columns.
 _LAT_RANGE = (36.5, 38.5)
 _LNG_RANGE = (-123.5, -120.5)
+# Per-drive outlier reject: drop teleport fixes >this far from the drive median
+# (a real drive stays within one metro; isolated bad fixes otherwise bin to
+# spurious H3 cells). Mirrors scripts/hdd_revisit_density.py.
+_OUTLIER_KM = 80.0
+
+
+def _haversine_km(lat, lng, lat0, lng0):
+    """Vectorized great-circle distance (km) from each point to (lat0, lng0)."""
+    r = 6371.0
+    p1, p2 = np.radians(lat), np.radians(lat0)
+    dphi = np.radians(lat - lat0)
+    dlam = np.radians(lng - lng0)
+    a = np.sin(dphi / 2) ** 2 + np.cos(p1) * np.cos(p2) * np.sin(dlam / 2) ** 2
+    return 2 * r * np.arcsin(np.sqrt(a))
 
 
 @dataclass(frozen=True)
@@ -92,6 +106,15 @@ def load_rtk_trajectory(drive_dir: Path) -> HDDTrajectory:
     if iso.shape[0] == in_box.shape[0]:
         iso = iso[in_box]
 
+    # Per-drive teleport-outlier reject (drop fixes far from the drive median).
+    near = _haversine_km(lat, lng, float(np.median(lat)),
+                         float(np.median(lng))) <= _OUTLIER_KM
+    ts, lat, lng = ts[near], lat[near], lng[near]
+    if iso.shape[0] == near.shape[0]:
+        iso = iso[near]
+    if ts.size == 0:
+        raise ValueError(f"no in-region rows in {csv_path}")
+
     order = np.argsort(ts)
     ts, lat, lng = ts[order], lat[order], lng[order]
     first_iso = str(iso[order][0]) if iso.shape[0] == order.shape[0] else ""
@@ -138,3 +161,56 @@ def discover_drives(root: Path) -> list[Path]:
                 continue
             drives.append(drive_dir)
     return drives
+
+
+def video_start_skew(drive_dir: Path, traj: HDDTrajectory) -> float:
+    """Seconds the first GPS fix lags the video start (>=0 typical, RTK warmup).
+
+    Center-camera files are named ``YYYY-MM-DD-HH-MM-SS_...mp4`` (local wall
+    clock). ``traj.first_iso`` is the first fix's local ISO time. Both share the
+    timezone, so the naive-datetime difference is the true skew regardless of
+    PST/PDT. Returns 0.0 if either is unparseable.
+    """
+    from datetime import datetime
+    video = find_video(drive_dir)
+    if video is None or not traj.first_iso:
+        return 0.0
+    try:
+        vstart = datetime.strptime(video.name[:19], "%Y-%m-%d-%H-%M-%S")
+        gps_first = datetime.fromisoformat(traj.first_iso).replace(tzinfo=None)
+        return (gps_first - vstart).total_seconds()
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def realign_frames(drive_dir: Path, frame_pts: np.ndarray) -> np.ndarray | None:
+    """Correct per-frame (lat, lng) from raw RTK GPS on the true video clock.
+
+    The 2026-07-05 extraction wrote ``clip/lat,lng`` with a ~3.4 s skew (the
+    sidecar's warmup correction was cancelled by extract.py's unconditional
+    rebase) plus a few teleport outliers (no outlier guard at extract time).
+    This recomputes correct coords non-destructively for analysis:
+
+        frame i (video PTS ``frame_pts[i]``, 0-based) is at real time
+        ``video_start_unix + frame_pts[i]`` where
+        ``video_start_unix = gps_unix[0] - skew``; interpolate the (outlier-
+        filtered) raw RTK track at that absolute time.
+
+    Returns an (N, 2) array of [lat, lng] aligned to ``frame_pts``, or None if
+    the drive's raw GPS is unreadable. Once a re-extraction with the fixed
+    pipeline lands, ``clip/lat,lng`` are correct and this is unnecessary.
+    """
+    try:
+        traj = load_rtk_trajectory(drive_dir)
+    except (FileNotFoundError, ValueError):
+        return None
+    skew = video_start_skew(drive_dir, traj)
+    video_start_unix = float(traj.timestamps[0]) - skew
+    frame_abs = video_start_unix + np.asarray(frame_pts, dtype=np.float64)
+    # np.interp needs strictly increasing xp; timestamps are sorted, drop dups.
+    keep = np.concatenate(([True], np.diff(traj.timestamps) > 0))
+    xp, la, lo = traj.timestamps[keep], traj.lat[keep], traj.lng[keep]
+    lat = np.interp(frame_abs, xp, la)   # clipped at edges by np.interp
+    lng = np.interp(frame_abs, xp, lo)
+    return np.stack([lat, lng], axis=1)
+

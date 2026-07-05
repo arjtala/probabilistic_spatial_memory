@@ -85,11 +85,12 @@ def _load(h5: Path, group: str):
         emb = np.asarray(f[group]["embeddings"], dtype=np.float32)
         lat = np.asarray(f[group]["lat"], dtype=np.float64)
         lng = np.asarray(f[group]["lng"], dtype=np.float64)
+        ts = np.asarray(f[group]["timestamps"], dtype=np.float64)
     if emb.shape[0] == 0:
         return None
     # Re-normalize defensively (attr says normalized, but be safe).
     emb /= (np.linalg.norm(emb, axis=1, keepdims=True) + 1e-8)
-    return emb, lat, lng
+    return emb, lat, lng, ts
 
 
 def _auc_tie(pos: np.ndarray, neg: np.ndarray) -> float:
@@ -151,6 +152,10 @@ def main() -> int:
                          "(each query costs one all-frames pass; 2000 gives a "
                          "tight AUC estimate in ~2 min). 0 = no cap.")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--realign-gps", type=Path, default=None,
+                    help="raw HDD release root; recompute per-frame lat/lng from "
+                         "raw RTK on the true video clock (fixes the 2026-07-05 "
+                         "H5 skew + outliers) instead of using the H5 coords")
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--plot", action="store_true")
     args = ap.parse_args()
@@ -162,6 +167,14 @@ def main() -> int:
         return 1
 
     # Load every drive; concatenate embeddings with per-frame (drive_idx, cell).
+    realign = None
+    realign_root = args.realign_gps
+    if realign_root is not None:
+        sys.path.insert(0, str(Path("extraction").resolve()))
+        from psm_extraction.io.hdd import realign_frames as realign
+        print(f"[hdd-f3] realigning per-frame GPS from raw RTK under "
+              f"{realign_root} (fixes H5 skew + outliers)", file=sys.stderr)
+    n_realigned = 0
     embs, drive_of, cell_of = [], [], []
     drive_names = []
     for di, (day, drive_id, h5) in enumerate(h5s):
@@ -170,13 +183,21 @@ def main() -> int:
             print(f"[hdd-f3] {drive_id}: no usable {args.group} group, skip",
                   file=sys.stderr)
             continue
-        emb, lat, lng = loaded
+        emb, lat, lng, ts = loaded
+        if realign is not None and realign_root is not None:
+            coords = realign(realign_root / day / drive_id, ts)
+            if coords is not None and coords.shape[0] == emb.shape[0]:
+                lat, lng = coords[:, 0], coords[:, 1]
+                n_realigned += 1
         cells = [h3.latlng_to_cell(float(a), float(o), args.resolution)
                  for a, o in zip(lat, lng)]
         embs.append(emb)
         drive_of.append(np.full(emb.shape[0], len(drive_names), dtype=np.int32))
         cell_of.extend(cells)
         drive_names.append(drive_id)
+    if realign is not None:
+        print(f"[hdd-f3] realigned {n_realigned}/{len(drive_names)} drives",
+              file=sys.stderr)
 
     if len(drive_names) < 2:
         print(f"[hdd-f3] only {len(drive_names)} drive(s) loaded -- need >=2 for "
@@ -301,6 +322,7 @@ def main() -> int:
         "n_frames": int(emb.shape[0]),
         "resolution": args.resolution,
         "seed": args.seed,
+        "realigned_gps": str(args.realign_gps) if args.realign_gps else None,
         "max_queries_per_cell": args.max_queries_per_cell,
         "max_total_queries": args.max_total_queries,
         "auc_weighting": "per-query mean (cells weighted by query count, "

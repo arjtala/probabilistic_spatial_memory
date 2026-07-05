@@ -47,10 +47,12 @@ if [[ "$n_h5" -lt 100 ]]; then
 fi
 
 echo "=== F-HDD-2: HLL cardinality accrual + decay (engine cross-checked) ==="
-"$PYTHON" scripts/hdd_hll_cardinality.py "$FEATURES" --h5-name "$H5NAME" --validate --plot
+"$PYTHON" scripts/hdd_hll_cardinality.py "$FEATURES" --h5-name "$H5NAME" \
+  --realign-gps "$RELEASE" --validate --plot
 
 echo "=== F-HDD-3: self-supervised cross-session retrieval ==="
-"$PYTHON" scripts/hdd_cross_session_retrieval.py "$FEATURES" --h5-name "$H5NAME" --plot
+"$PYTHON" scripts/hdd_cross_session_retrieval.py "$FEATURES" --h5-name "$H5NAME" \
+  --realign-gps "$RELEASE" --plot
 
 echo
 echo "[hdd-figures] done. JSON -> captures/hdd/  |  SVGs -> journal/figures/hdd_*"

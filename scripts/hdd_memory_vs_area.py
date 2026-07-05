@@ -71,6 +71,17 @@ def _load_all_points(csv_dir: Path):
     ts, lat, lng = ts[ok], lat[ok], lng[ok]
     if ts.size < 2:
         return None
+    # Per-drive teleport-outlier reject (great-circle > 80 km from the median),
+    # matching hdd_revisit_density; otherwise a bad fix spawns a spurious cell.
+    med_lat, med_lng = float(np.median(lat)), float(np.median(lng))
+    dlat = np.radians(lat - med_lat)
+    dlng = np.radians(lng - med_lng)
+    a = (np.sin(dlat / 2) ** 2 +
+         np.cos(np.radians(lat)) * np.cos(np.radians(med_lat)) * np.sin(dlng / 2) ** 2)
+    near = 2 * 6371.0 * np.arcsin(np.sqrt(a)) <= 80.0
+    ts, lat, lng = ts[near], lat[near], lng[near]
+    if ts.size < 2:
+        return None
     order = np.argsort(ts)
     ts, lat, lng = ts[order], lat[order], lng[order]
     span = float(ts[-1] - ts[0])

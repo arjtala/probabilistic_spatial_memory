@@ -195,6 +195,10 @@ def main() -> int:
                     help="ring-buffer capacity (buckets); window = cap*bucket")
     ap.add_argument("--validate", action="store_true",
                     help="cross-check the python HLL against targets/psm")
+    ap.add_argument("--realign-gps", type=Path, default=None,
+                    help="raw HDD release root; recompute per-frame lat/lng from "
+                         "raw RTK on the true video clock (fixes the 2026-07-05 "
+                         "H5 skew + outliers) instead of using the H5 coords")
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--plot", action="store_true")
     args = ap.parse_args()
@@ -217,6 +221,12 @@ def main() -> int:
     bucket_sec = args.bucket_days * 86400.0
     n_loaded = 0
     loaded_drives: set[str] = set()
+    realign = None
+    if args.realign_gps is not None:
+        sys.path.insert(0, str(Path("extraction").resolve()))
+        from psm_extraction.io.hdd import realign_frames as realign
+        print(f"[hdd-f2] realigning per-frame GPS from raw RTK under "
+              f"{args.realign_gps} (fixes H5 skew + outliers)", file=sys.stderr)
     for drive_id in drives_needed:
         h5 = _find_h5(args.root, drive_id, args.h5_name)
         if h5 is None:
@@ -227,6 +237,10 @@ def main() -> int:
         n_loaded += 1
         loaded_drives.add(drive_id)
         emb, lat, lng, ts = loaded
+        if realign is not None and args.realign_gps is not None:
+            coords = realign(args.realign_gps / h5.parent.parent.name / drive_id, ts)
+            if coords is not None and coords.shape[0] == emb.shape[0]:
+                lat, lng = coords[:, 0], coords[:, 1]
         start = _drive_start_unix(drive_id)
         for i in range(emb.shape[0]):
             c = h3.latlng_to_cell(float(lat[i]), float(lng[i]), args.resolution)
@@ -318,6 +332,7 @@ def main() -> int:
         "bucket_days": args.bucket_days, "capacity": args.capacity,
         "n_drives_union_expected": len(drives_needed),
         "n_drives_loaded": n_loaded,
+        "realigned_gps": str(args.realign_gps) if args.realign_gps else None,
         "top_cells_requested": args.top_cells,
         "n_cells_traced": len(series),
         "n_cells_partial_coverage": n_partial,

@@ -261,33 +261,39 @@ accuracy number, or (b) the drafted B figures read thin without one.
   coarse-geography with visual place identity (→ add a k-NN-cell hard-negative
   control if it's ever written up) and is a per-query (not per-cell) mean.
 
-### ✅ REAL RESULTS — full 132-drive corpus (2026-07-05)
+### ✅ REAL RESULTS — full 132-drive corpus (2026-07-05, GPS-realigned)
 
-Extraction array finished (132/132 drives, `…/hdd/features/`); `scripts/hdd_figures.sh`
-produced all three. JSON in `captures/hdd/`, SVGs in `journal/figures/hdd_*` (commit `8be8035`).
+Extraction array finished (132/132 drives); `scripts/hdd_figures.sh` produced all three.
+F-HDD-2/3 use `--realign-gps` (per-frame coords recomputed from raw RTK on the true
+video clock — corrects the H5 skew + outliers, see the ⚠️ note above). JSON in
+`captures/hdd/`, SVGs in `journal/figures/hdd_*`.
 
-- **F-HDD-1 memory-vs-area** — 102.9 h, 23,736 r10 cells. PSM (Σ min(frames,R))
-  vs dense bank saving **26.3 % / 56.7 % / 77.1 % / 86.1 %** at 1 / 5 / 15 / 30 fps
-  (**1.3× → 7.1×**). Confirms the sublinear/area-bounded story; advantage grows
-  with ingest rate (thin at the 1 fps wearable rate, strong at streaming 15–30 fps).
-- **F-HDD-2 HLL cardinality** — top revisited cell accrues to **7,387 unique
-  observations over 219 days** (25/29 GPS-revisit drives deposited a 1 fps frame
-  in the exact r10 cell) in a **fixed 1 KiB** sketch; windowed estimate decays
-  between visits, jumps on revisit. Python HLL vs `targets/psm` cross-check on
-  real data = **2.4e-5 relerr** (effectively exact).
-- **F-HDD-3 cross-session retrieval** — **cross-session AUC 0.848 ± 0.190** vs
-  **shuffled-cell floor 0.495** and same-drive upper bound 0.978 → **STRONG**
-  cross-session place recognition (5,257 revisited cells; 2,000 stratified
-  queries of 70,885). cos(same-place, other-drive)=0.841 vs cos(other-cell)=0.740.
-  hit-rate@k is low (@1=0.01, @10=0.07) because the full 357k-frame pool is
-  saturated by same-drive near-duplicate distractors — **AUC (not literal top-k)
-  is the headline**; the place is recognizable across sessions, but same-drive
-  near-duplicates fill the literal top of the ranking.
-- **Perf (F-HDD-3):** the full-corpus run needed three fixes to be tractable —
-  int-code cell ids, vectorized (searchsorted) tie-corrected AUC (a per-element
-  Python rank loop over 370k negs × thousands of calls was hanging), O(n) hit@k,
-  and a stratified `--max-total-queries` cap (2000). Runs in ~73 s. All still
-  `pyrefly`-clean; tie/adversarial unit tests re-verified.
+- **F-HDD-1 memory-vs-area** — 102.9 h, 23,298 r10 cells (outlier-filtered). PSM
+  (Σ min(frames,R)) vs dense bank saving **26.3 % / 56.7 % / 77.2 % / 86.2 %** at
+  1 / 5 / 15 / 30 fps (**1.3× → 7.2×**). Sublinear/area-bounded; advantage grows
+  with ingest rate (thin at 1 fps, strong at 15–30 fps streaming).
+- **F-HDD-2 HLL cardinality** — top revisited cell accrues to **8,112 unique
+  observations over 219 days** (15/16 days traced) in a **fixed 1 KiB** sketch;
+  windowed estimate decays between visits, jumps on revisit. Python HLL vs
+  `targets/psm` cross-check = **~0 relerr** on real data.
+- **F-HDD-3 cross-session retrieval** — **cross-session AUC 0.853 ± 0.185** vs
+  **shuffled-cell floor 0.498** and same-drive upper bound 0.977 → **STRONG**
+  cross-session place recognition (5,222 revisited cells; 2,000 stratified
+  queries of ~71k). hit-rate@k low (@10≈0.07) — full 357k-frame pool saturated by
+  same-drive near-duplicate distractors, so **AUC (not literal top-k) is the
+  headline**.
+- **Skew verified negligible (audit Finding 1):** re-running F-HDD-3 with vs
+  without `--realign-gps` moved AUC only **0.848 → 0.853** (within the ±0.19 std,
+  in the predicted direction), so the ~17 m median coord shift does not change
+  the headline. The bug was real and is fixed at the source; the delta is the
+  evidence it was immaterial. Outlier filter (Finding 2) removed ~1.8 % spurious
+  singleton r10 cells from F-HDD-1 (23,736 → 23,298); the saving table is
+  unchanged. Realign machinery in `io/hdd.py:realign_frames`.
+- **Perf (F-HDD-3):** the full-corpus run needed int-code cell ids, vectorized
+  (searchsorted) tie-corrected AUC (a per-element Python rank loop over 370k negs
+  × thousands of calls was hanging), O(n) hit@k, and a stratified
+  `--max-total-queries` cap (2000). Runs in ~73 s; `pyrefly`-clean.
+
 
 
 ### Embedding pipeline (prereq for F-HDD-2/3) — ✅ built, embed-sanity ✅ PASSED
@@ -300,15 +306,24 @@ the Bug-2 fix live: `sample_fps=50/3180.2` used the *video* duration, not the GP
 span. F-HDD-3's encoder-collapse risk is cleared → full array + F-HDD-2/3 greenlit.
 
 - `extraction/psm_extraction/io/hdd.py` — reads real RTK GPS (lat/lng swap +
-  SF-Bay guard), no fake-origin projection. Verified: discovers 132 drives.
-  Carries `first_iso` so the sidecar can correct the video↔GPS clock skew.
+  SF-Bay box guard + per-drive 80 km outlier reject). Verified: discovers 132 drives.
+  Carries `first_iso` for the video↔GPS clock-skew computation.
 - `scripts/extract_hdd_sessions.py` — writes an Aria-style `gps.json` sidecar
   and drives the standard `python -m psm_extraction extract` pipeline (mirrors
-  `extract_sloper4d_sessions.py`). Sidecar timestamps are placed on the **video
-  clock with the GPS-warmup skew corrected** (measured +3.44 s on drive
-  201703061033: video starts 10:33:53, first RTK fix 10:33:56) so per-frame
-  lat/lng don't lead the true position by tens of metres — which would bias r10
-  binning for F-HDD-2/3. Includes a `--sanity-only` **embed-sanity gate**.
+  `extract_sloper4d_sessions.py`). Includes a `--sanity-only` **embed-sanity gate**.
+
+  > **⚠️ Known issue in the H5s produced 2026-07-05 (corrected downstream):**
+  > the ~3.4 s GPS-warmup skew was NOT actually applied in those H5s. The
+  > sidecar added the skew but `extract.py:_track_from_sidecar` rebases
+  > (`timestamps - timestamps[0]`) and cancelled it exactly, so per-frame
+  > `clip/lat,lng` lead the true position by ~3.4 s (~50 m at road speed, up to
+  > ~1 r10 cell). The extraction reader also lacked the outlier guard, so a few
+  > teleport fixes were binned to spurious cells. **Both are fixed at the source
+  > now** (outlier guard in `io/hdd.py`; skew applied via a synthetic
+  > video-start anchor that survives the rebase), and the current F-HDD-2/3
+  > numbers are corrected non-destructively via `--realign-gps` (recompute
+  > per-frame coords from raw GPS) — see the realign delta below. Only F-HDD-2/3
+  > were affected; F-HDD-1 and the revisit metric read raw GPS directly.
 - `scripts/slurm/hdd_embed_sanity.sbatch` — **single-task GPU job for the gate.**
   Run this FIRST: `sbatch scripts/slurm/hdd_embed_sanity.sbatch` (or
   `--export=ALL,MODEL=siglip2_l` / `,DRIVE=<id>`). Extracts ~50 frames from one

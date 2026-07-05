@@ -74,19 +74,26 @@ def _video_start_skew(video: Path, traj) -> float:
 
 
 def _write_gps_sidecar(traj, path: Path, video: Path) -> None:
-    """Aria-style gps.json on the VIDEO clock.
+    """Aria-style gps.json aligned to the VIDEO clock, skew-corrected.
 
-    GPS samples are placed at ``(gps_unix - gps_t0) + skew`` where ``skew`` is
-    the video-start-to-first-fix offset (see _video_start_skew). Without the
-    skew term the first GPS fix (which lands a few seconds into the video during
-    RTK warmup) would be pinned to video PTS 0, shifting every frame's lat/lng
-    a few seconds -- tens of metres at road speed -- earlier along the track,
-    enough to bias r10 (66 m) H3 binning for F-HDD-2/3.
+    GPS sample i belongs at video PTS ``(gps_unix[i] - gps_t0) + skew`` where
+    ``skew`` (>0, RTK warmup) is how long the first fix lags video start. BUT
+    extract.py's ``_track_from_sidecar`` rebases unconditionally
+    (``timestamps - timestamps[0]``), which would cancel a bare skew offset. So
+    we PREPEND a synthetic anchor sample at video PTS 0 (position = first fix):
+    that makes ``timestamps[0] == 0`` so the rebase is a no-op and the real
+    samples keep their ``+skew`` offsets. Frames before the first real fix
+    (~skew s) interpolate from the anchor (best available; no GPS exists yet).
+    If skew <= 0 (no warmup gap) the anchor is omitted.
     """
     t0 = float(traj.timestamps[0])
     skew = _video_start_skew(video, traj)
-    samples = [{
-        "timestamp": float(t) - t0 + skew,
+    samples = []
+    if skew > 0:
+        samples.append({"timestamp": 0.0, "latitude": float(traj.lat[0]),
+                        "longitude": float(traj.lng[0]), "accuracy": 1.0})
+    samples += [{
+        "timestamp": float(t) - t0 + max(skew, 0.0),
         "latitude": float(la),
         "longitude": float(lo),
         "accuracy": 1.0,  # RTK is sub-metre
