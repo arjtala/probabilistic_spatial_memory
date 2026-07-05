@@ -318,6 +318,8 @@ def main() -> int:
         "bucket_days": args.bucket_days, "capacity": args.capacity,
         "n_drives_union_expected": len(drives_needed),
         "n_drives_loaded": n_loaded,
+        "top_cells_requested": args.top_cells,
+        "n_cells_traced": len(series),
         "n_cells_partial_coverage": n_partial,
         "engine_validation_median_relerr": val,
         "cells": series,

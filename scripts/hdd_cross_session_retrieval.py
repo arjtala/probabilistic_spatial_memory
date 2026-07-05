@@ -21,6 +21,13 @@ Controls:
   - shuffled-cell AUC (labels permuted; must fall to ~0.5 -- sanity that the
     metric isn't inflated)
 
+Caveat (for write-up): positives are same-r10-cell/other-drives and negatives
+are all-other-cells, so the AUC blends coarse geographic proximity (~66 m cells)
+with visual place identity. To isolate visual recognition, add a k-NN-cell
+control that uses the nearest neighbouring cells as hard negatives. The reported
+AUC is a per-query mean (cells weighted by query count, capped at
+--max-queries-per-cell), not a per-cell mean.
+
 Degenerate-embedding contingency (embed-sanity verdict): if windshield-frame
 CLIP separability is low, cross-session AUC will sit near 0.5. That is itself
 the honest result -- report it with the low-separability caveat rather than
@@ -249,6 +256,14 @@ def main() -> int:
         "n_drives": len(drive_names),
         "n_frames": int(emb.shape[0]),
         "resolution": args.resolution,
+        "seed": args.seed,
+        "max_queries_per_cell": args.max_queries_per_cell,
+        "auc_weighting": "per-query mean (cells weighted by query count, "
+                         "capped at max_queries_per_cell)",
+        "caveat": "positives=same r10 cell/other drives, negatives=all other "
+                  "cells: AUC blends coarse-geography with visual place identity. "
+                  "If written up, add a k-NN-cell control (nearest cells as hard "
+                  "negatives) to isolate visual recognition.",
         "n_revisited_cells": len(revisited),
         "cross_session_auc": _stats(cross_auc),
         "same_drive_auc_upper_bound": _stats(same_auc),

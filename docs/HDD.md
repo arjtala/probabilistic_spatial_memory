@@ -250,6 +250,16 @@ accuracy number, or (b) the drafted B figures read thin without one.
   raised 13 findings, confirmed 6 (2 major F-HDD-2, 1 major + 3 minor F-HDD-3),
   all fixed (commit `3292571`). Both scripts pass `pyrefly` (0 errors) and were
   smoke-tested on the real 50-frame sanity H5.
+- **Second independent audit (2026-07-05):** a fresh 4-lens pass (statistics /
+  numerics / data-contract / reproducibility) over all HDD code raised 17,
+  **confirmed 0** — the code held; verifiers caught the raisers' own errors (a
+  non-existent float32→float64 round-trip; a "decay window < median gap" that
+  misread first→last *span* as inter-visit *gap*; a proposed "defensive
+  normalize" that would have broken the validated engine match). Banked non-bug
+  improvements applied: run-config (seed, max-queries, top-cells) echoed into
+  the JSON outputs for provenance; F-HDD-3 documents that its AUC blends
+  coarse-geography with visual place identity (→ add a k-NN-cell hard-negative
+  control if it's ever written up) and is a per-query (not per-cell) mean.
 
 ### Embedding pipeline (prereq for F-HDD-2/3) — ✅ built, embed-sanity ✅ PASSED
 
