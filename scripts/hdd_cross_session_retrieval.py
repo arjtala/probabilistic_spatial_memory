@@ -95,25 +95,17 @@ def _load(h5: Path, group: str):
 def _auc_tie(pos: np.ndarray, neg: np.ndarray) -> float:
     """Mann-Whitney AUC = P(pos > neg) + 0.5 P(pos == neg), tie-corrected.
 
-    Uses average (mid-)ranks so exact cosine ties count as 0.5 -- correct in the
-    degenerate/collapsed-embedding regime this script is meant to detect (raw
-    ordinal ranks would report AUC != 0.5 on tied pools).
+    Vectorized via searchsorted (no Python loop -- a per-element rank loop is
+    intractable when called ~thousands of times over ~370k negatives): sort the
+    negatives once, then for each positive count negatives strictly below (0.5
+    credit for ties), which is exactly the tie-corrected AUC.
     """
     if pos.size == 0 or neg.size == 0:
         return float("nan")
-    v = np.concatenate([pos, neg])
-    order = np.argsort(v, kind="stable")
-    sv = v[order]
-    ranks = np.empty(v.size, dtype=np.float64)
-    i = 0
-    while i < v.size:                       # average ranks within tie runs
-        j = i
-        while j < v.size and sv[j] == sv[i]:
-            j += 1
-        ranks[order[i:j]] = (i + 1 + j) / 2.0
-        i = j
-    r_pos = ranks[:pos.size].sum()
-    return float((r_pos - pos.size * (pos.size + 1) / 2) / (pos.size * neg.size))
+    ns = np.sort(neg)
+    lo = np.searchsorted(ns, pos, side="left")    # negatives strictly < pos
+    hi = np.searchsorted(ns, pos, side="right")   # negatives <= pos
+    return float((lo + 0.5 * (hi - lo)).sum() / (pos.size * neg.size))
 
 
 def _hit_at_k(sims: np.ndarray, cand_mask: np.ndarray, pos_mask: np.ndarray,
@@ -123,19 +115,25 @@ def _hit_at_k(sims: np.ndarray, cand_mask: np.ndarray, pos_mask: np.ndarray,
     The candidate pool is every frame except the query -- crucially INCLUDING
     same-drive same-cell frames, the strongest (near-duplicate) distractors, so
     the number reflects realistic retrieval difficulty. Ties are broken
-    adversarially (negatives ranked ahead of positives) so an exact tie never
-    counts as a hit by array-order accident.
+    adversarially (negatives rank ahead of positives).
+
+    O(n) via a threshold count instead of an O(n log n) full-pool sort (the sort
+    is intractable when called per-query over ~370k frames): the best positive's
+    adversarial rank is the number of candidates that (strictly) outrank it plus
+    the negatives tied with it, so it is in top-k iff that rank < k.
     """
-    idx = np.where(cand_mask)[0]
-    if idx.size == 0:
-        return {k: float("nan") for k in ks}
-    s = sims[idx]
-    p = pos_mask[idx]
-    if not p.any():
+    pos_sims = sims[pos_mask]
+    if pos_sims.size == 0:
+        if not cand_mask.any():
+            return {k: float("nan") for k in ks}
         return {k: 0.0 for k in ks}
-    # primary: -s ascending (largest sim first); tie-break: p ascending (neg first)
-    order = np.lexsort((p.astype(np.int8), -s))
-    return {k: float(p[order[:k]].any()) for k in ks}
+    best = float(pos_sims.max())
+    sc = sims[cand_mask]
+    greater = int(np.count_nonzero(sc > best))          # all strictly-better cands
+    neg_cand = cand_mask & ~pos_mask
+    neg_equal = int(np.count_nonzero(sims[neg_cand] == best))  # tied negs rank ahead
+    rank0 = greater + neg_equal                         # 0-indexed pos of 1st positive
+    return {k: float(rank0 < k) for k in ks}
 
 
 
@@ -148,6 +146,10 @@ def main() -> int:
     ap.add_argument("--resolution", type=int, default=RESOLUTION)
     ap.add_argument("--max-queries-per-cell", type=int, default=5,
                     help="cap query exemplars per (cell, drive) to bound cost")
+    ap.add_argument("--max-total-queries", type=int, default=2000,
+                    help="global cap on query exemplars, stratified across cells "
+                         "(each query costs one all-frames pass; 2000 gives a "
+                         "tight AUC estimate in ~2 min). 0 = no cap.")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--plot", action="store_true")
@@ -184,11 +186,15 @@ def main() -> int:
 
     emb = np.concatenate(embs, axis=0)
     drive = np.concatenate(drive_of)
-    cell = np.array(cell_of)
+    # Factorize H3 string cell ids -> integer codes: every `cell == c` mask below
+    # runs per query/group over ~370k entries, and string comparison is ~100x
+    # slower than int. Codes are all we need (cell ids never appear in output).
+    _, cell = np.unique(np.array(cell_of), return_inverse=True)
+    cell = cell.astype(np.int32)
     del embs, drive_of
 
     # Cells revisited by >=2 distinct drives are the cross-session testbed.
-    cell_drives: dict[str, set] = defaultdict(set)
+    cell_drives: dict[int, set] = defaultdict(set)
     for c, d in zip(cell, drive):
         cell_drives[c].add(int(d))
     revisited = [c for c, ds in cell_drives.items() if len(ds) >= 2]
@@ -204,47 +210,85 @@ def main() -> int:
     # Precompute a permuted cell labelling for the shuffled control.
     shuf_cell = cell.copy()
     rng.shuffle(shuf_cell)
-    all_idx = np.arange(emb.shape[0])
 
+    # Collect candidate query exemplars grouped by cell (cap per (cell,drive)),
+    # then STRATIFY-sample down to --max-total-queries round-robin across cells.
+    # Each query costs one all-frames pass, so an uncapped ~1e5 queries is
+    # intractable; stratifying also gives broad cell coverage rather than
+    # weighting toward the few busiest cells.
+    cand_by_cell: dict[int, list] = defaultdict(list)
     for c in revisited:
         in_c = cell == c
-        drives_here = sorted(cell_drives[c])
-        for a in drives_here:
-            q_idx = np.where(in_c & (drive == a))[0]
-            if q_idx.size == 0:
+        for a in sorted(cell_drives[c]):
+            qs = np.where(in_c & (drive == a))[0]
+            if qs.size == 0:
                 continue
-            if q_idx.size > args.max_queries_per_cell:
-                q_idx = rng.choice(q_idx, args.max_queries_per_cell, replace=False)
-            pos_cross = in_c & (drive != a)          # same cell, other drives
-            pos_same = in_c & (drive == a)           # same cell, same drive
-            neg = ~in_c                              # other cells
-            for qi in q_idx:
-                q = emb[qi]
-                sims = emb @ q
-                au = _auc_tie(sims[pos_cross], sims[neg])
-                if not np.isnan(au):
-                    cross_auc.append(au)
-                    # hit@k over the FULL pool minus q (incl. same-drive
-                    # same-cell distractors); positives = cross-session.
-                    cand = all_idx != qi
-                    hk = _hit_at_k(sims, cand, pos_cross, HIT_KS)
-                    for k in HIT_KS:
-                        if not np.isnan(hk[k]):
-                            hit[k].append(hk[k])
-                    cross_cos.append(float(sims[pos_cross].mean()))
-                    diff_cos.append(float(sims[neg].mean()))
-                # same-drive positives (upper bound), excluding q itself
-                ps = pos_same.copy(); ps[qi] = False
-                asame = _auc_tie(sims[ps], sims[neg])
-                if not np.isnan(asame):
-                    same_auc.append(asame)
-                # shuffled control: positives = same *shuffled* cell, other drives
-                sc = shuf_cell[qi]
-                pos_sh = (shuf_cell == sc) & (drive != a)
-                neg_sh = shuf_cell != sc
-                ash = _auc_tie(sims[pos_sh], sims[neg_sh])
-                if not np.isnan(ash):
-                    shuf_auc.append(ash)
+            if qs.size > args.max_queries_per_cell:
+                qs = rng.choice(qs, args.max_queries_per_cell, replace=False)
+            cand_by_cell[c].extend((int(a), int(qi)) for qi in qs)
+    total_cand = sum(len(v) for v in cand_by_cell.values())
+    cells_list = list(cand_by_cell)
+    rng.shuffle(cells_list)
+    for c in cells_list:
+        rng.shuffle(cand_by_cell[c])
+    cap = args.max_total_queries
+    if cap and total_cand > cap:
+        sampled, ptr = [], {c: 0 for c in cells_list}
+        while len(sampled) < cap:
+            progressed = False
+            for c in cells_list:
+                p = ptr[c]
+                if p < len(cand_by_cell[c]):
+                    a, qi = cand_by_cell[c][p]
+                    sampled.append((c, a, qi)); ptr[c] = p + 1; progressed = True
+                    if len(sampled) >= cap:
+                        break
+            if not progressed:
+                break
+        print(f"[hdd-f3] stratified-sampled {len(sampled)}/{total_cand} candidate "
+              f"queries across {len(cells_list)} cells (cap {cap})", file=sys.stderr)
+    else:
+        sampled = [(c, a, qi) for c in cells_list for (a, qi) in cand_by_cell[c]]
+        print(f"[hdd-f3] {len(sampled)} queries across {len(cells_list)} cells "
+              f"(under cap {cap})", file=sys.stderr)
+
+    # Group sampled queries by (cell, drive) so pos/neg masks are built once.
+    by_ca: dict[tuple, list] = defaultdict(list)
+    for c, a, qi in sampled:
+        by_ca[(c, a)].append(qi)
+
+    for (c, a), qis in by_ca.items():
+        in_c = cell == c
+        pos_cross = in_c & (drive != a)          # same cell, other drives
+        pos_same = in_c & (drive == a)           # same cell, same drive
+        neg = ~in_c                              # other cells
+        for qi in qis:
+            q = emb[qi]
+            sims = emb @ q
+            au = _auc_tie(sims[pos_cross], sims[neg])
+            if not np.isnan(au):
+                cross_auc.append(au)
+                # hit@k over the FULL pool minus q (incl. same-drive
+                # same-cell distractors); positives = cross-session.
+                cand = np.ones(emb.shape[0], dtype=bool); cand[qi] = False
+                hk = _hit_at_k(sims, cand, pos_cross, HIT_KS)
+                for k in HIT_KS:
+                    if not np.isnan(hk[k]):
+                        hit[k].append(hk[k])
+                cross_cos.append(float(sims[pos_cross].mean()))
+                diff_cos.append(float(sims[neg].mean()))
+            # same-drive positives (upper bound), excluding q itself
+            ps = pos_same.copy(); ps[qi] = False
+            asame = _auc_tie(sims[ps], sims[neg])
+            if not np.isnan(asame):
+                same_auc.append(asame)
+            # shuffled control: positives = same *shuffled* cell, other drives
+            sc = shuf_cell[qi]
+            pos_sh = (shuf_cell == sc) & (drive != a)
+            neg_sh = shuf_cell != sc
+            ash = _auc_tie(sims[pos_sh], sims[neg_sh])
+            if not np.isnan(ash):
+                shuf_auc.append(ash)
 
     def _stats(xs):
         a = np.array(xs, dtype=np.float64)
@@ -258,6 +302,7 @@ def main() -> int:
         "resolution": args.resolution,
         "seed": args.seed,
         "max_queries_per_cell": args.max_queries_per_cell,
+        "max_total_queries": args.max_total_queries,
         "auc_weighting": "per-query mean (cells weighted by query count, "
                          "capped at max_queries_per_cell)",
         "caveat": "positives=same r10 cell/other drives, negatives=all other "
