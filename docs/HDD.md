@@ -223,14 +223,32 @@ accuracy number, or (b) the drafted B figures read thin without one.
 
 - `extraction/psm_extraction/io/hdd.py` — reads real RTK GPS (lat/lng swap +
   SF-Bay guard), no fake-origin projection. Verified: discovers 132 drives.
+  Carries `first_iso` so the sidecar can correct the video↔GPS clock skew.
 - `scripts/extract_hdd_sessions.py` — writes an Aria-style `gps.json` sidecar
   and drives the standard `python -m psm_extraction extract` pipeline (mirrors
-  `extract_sloper4d_sessions.py`). Includes a `--sanity-only` **embed-sanity
-  gate**: extracts ~50 frames from one drive and reports pairwise cosine spread
-  (windshield frames may collapse → would kill F-HDD-3). **Run this first.**
-- `scripts/slurm/extract_hdd.sbatch` — 132-drive array, MODEL=clip_l|clip_bigg|
-  siglip2_l. Needs a GPU node (no torch/GPU on the login node used for the
-  GPS-only analyses above).
+  `extract_sloper4d_sessions.py`). Sidecar timestamps are placed on the **video
+  clock with the GPS-warmup skew corrected** (measured +3.44 s on drive
+  201703061033: video starts 10:33:53, first RTK fix 10:33:56) so per-frame
+  lat/lng don't lead the true position by tens of metres — which would bias r10
+  binning for F-HDD-2/3. Includes a `--sanity-only` **embed-sanity gate**.
+- `scripts/slurm/hdd_embed_sanity.sbatch` — **single-task GPU job for the gate.**
+  Run this FIRST: `sbatch scripts/slurm/hdd_embed_sanity.sbatch` (or
+  `--export=ALL,MODEL=siglip2_l` / `,DRIVE=<id>`). Extracts ~50 frames from one
+  drive, embeds, prints the pairwise-cosine spread + OK/DEGENERATE/FAIL verdict,
+  and writes `captures/hdd/embed_sanity_<model>.json`. Non-zero exit on
+  FAIL/DEGENERATE so it can gate the array via a dependency.
+- `scripts/slurm/extract_hdd.sbatch` — full 132-drive array, MODEL=clip_l|
+  clip_bigg|siglip2_l. Launch only after the sanity verdict is OK. Needs a GPU
+  node (no torch/GPU/open_clip on the login node used for the GPS-only analyses).
+
+**Hardening (static verification, 2026-07-05).** Since the embed path can't be
+runtime-tested off-GPU, a 3-agent audit (CLI-contract / sbatch-conventions /
+adversarial code review) checked it before the sbatch shipped. It caught and
+fixed 3 GPU-only failures that would each have wasted a job: the sanity group
+selector could pick the always-present `gps` group and `KeyError`; the ~50-frame
+fps was computed from the GPS span (8–11 s off the video) instead of the video
+duration; and a ≤1-frame extraction would have returned a false "OK". Plus the
+clock-skew fix above. All files pass `pyrefly` (0 errors).
 
 ## First cluster-side steps (once access + option chosen)
 1. ⏳ Confirm HDD RGB frames embed cleanly (CLIP-L / SigLIP 2) — `--sanity-only`

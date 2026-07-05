@@ -40,6 +40,7 @@ class HDDTrajectory:
     drive_id: str            # e.g. "201703061033"
     drive_day: str           # e.g. "2017_03_06_ITS1"
     bbox_extent_m: float
+    first_iso: str           # ISO timestamp of the first fix (for video-clock skew)
 
 
 def load_rtk_trajectory(drive_dir: Path) -> HDDTrajectory:
@@ -67,10 +68,16 @@ def load_rtk_trajectory(drive_dir: Path) -> HDDTrajectory:
     raw = np.atleast_2d(raw)
     if raw.size == 0:
         raise ValueError(f"empty rtk_pos.csv at {csv_path}")
+    # ISO timestamps (col 1) carried through the same filtering so first_iso
+    # matches the earliest returned fix (used for the video-clock skew).
+    iso = np.atleast_1d(np.genfromtxt(csv_path, delimiter=",", comments="#",
+                                      usecols=(1,), dtype=str))
 
     ts, lat, lng = raw[:, 0], raw[:, 1], raw[:, 2]
     finite = np.isfinite(ts) & np.isfinite(lat) & np.isfinite(lng)
     ts, lat, lng = ts[finite], lat[finite], lng[finite]
+    if iso.shape[0] == raw.shape[0]:
+        iso = iso[finite]
     if ts.size == 0:
         raise ValueError(f"no finite rows in {csv_path}")
 
@@ -82,9 +89,12 @@ def load_rtk_trajectory(drive_dir: Path) -> HDDTrajectory:
             f"SF Bay box (first lat={lat[0]:.3f}, lng={lng[0]:.3f}); likely a "
             f"swapped-column or bad-fix file.")
     ts, lat, lng = ts[in_box], lat[in_box], lng[in_box]
+    if iso.shape[0] == in_box.shape[0]:
+        iso = iso[in_box]
 
     order = np.argsort(ts)
     ts, lat, lng = ts[order], lat[order], lng[order]
+    first_iso = str(iso[order][0]) if iso.shape[0] == order.shape[0] else ""
 
     m_per_deg_lat = 111_320.0
     m_per_deg_lng = 111_320.0 * np.cos(np.radians(float(np.median(lat))))
@@ -98,6 +108,7 @@ def load_rtk_trajectory(drive_dir: Path) -> HDDTrajectory:
         drive_id=drive_dir.name,
         drive_day=drive_dir.parent.name,
         bbox_extent_m=bbox_extent_m,
+        first_iso=first_iso,
     )
 
 

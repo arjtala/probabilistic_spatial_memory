@@ -52,16 +52,41 @@ def _frames_dirname(checkpoint: str) -> str:
     return "frames_hdd"
 
 
-def _write_gps_sidecar(traj, path: Path) -> None:
-    """Aria-style gps.json on the video clock (RTK t0 subtracted).
+def _video_start_skew(video: Path, traj) -> float:
+    """Seconds the first GPS fix lags the video start (>=0 typical, RTK warmup).
 
-    HDD's video and RTK share the wall clock; the GPS first fix lands ~3 s
-    after the video starts (GPS warmup), so subtracting t0 aligns GPS to
-    video PTS within a few seconds -- well inside an r10 cell at road speed.
+    HDD center-camera files are named ``YYYY-MM-DD-HH-MM-SS_...mp4`` (local
+    wall-clock start). ``traj`` carries the first GPS fix's ISO timestamp. Both
+    are the same local timezone, so the naive-datetime difference is the true
+    skew regardless of PST/PDT. Returns 0.0 (with a warning) if either can't be
+    parsed -- falling back to the uncorrected t0-subtraction.
+    """
+    from datetime import datetime
+    try:
+        stamp = video.name[:19]  # "2017-03-06-10-33-53"
+        vstart = datetime.strptime(stamp, "%Y-%m-%d-%H-%M-%S")
+        gps_first = datetime.fromisoformat(traj.first_iso).replace(tzinfo=None)
+        return (gps_first - vstart).total_seconds()
+    except (ValueError, AttributeError, TypeError) as e:  # noqa: BLE001
+        print(f"  WARN: could not compute video/GPS skew ({e}); assuming 0 s",
+              file=sys.stderr)
+        return 0.0
+
+
+def _write_gps_sidecar(traj, path: Path, video: Path) -> None:
+    """Aria-style gps.json on the VIDEO clock.
+
+    GPS samples are placed at ``(gps_unix - gps_t0) + skew`` where ``skew`` is
+    the video-start-to-first-fix offset (see _video_start_skew). Without the
+    skew term the first GPS fix (which lands a few seconds into the video during
+    RTK warmup) would be pinned to video PTS 0, shifting every frame's lat/lng
+    a few seconds -- tens of metres at road speed -- earlier along the track,
+    enough to bias r10 (66 m) H3 binning for F-HDD-2/3.
     """
     t0 = float(traj.timestamps[0])
+    skew = _video_start_skew(video, traj)
     samples = [{
-        "timestamp": float(t) - t0,
+        "timestamp": float(t) - t0 + skew,
         "latitude": float(la),
         "longitude": float(lo),
         "accuracy": 1.0,  # RTK is sub-metre
@@ -101,16 +126,30 @@ def _normalize_group(out_h5: Path) -> None:
 
 
 def _embed_sanity(out_h5: Path) -> dict:
-    """Report pairwise cosine-similarity spread over the drive's embeddings."""
+    """Report pairwise cosine-similarity spread over the drive's embeddings.
+
+    Selects the model group EXPLICITLY (never next(iter(h)), which would pick
+    the always-present `gps` group and KeyError on `gps/embeddings`). Guards
+    the too-few-frames case so an empty/1-frame extraction FAILS the gate
+    rather than returning a false 'OK' off a degenerate cosine array.
+    """
     import h5py
     with h5py.File(out_h5, "r") as h:
-        grp = "clip" if "clip" in h else next(iter(h))
+        model_groups = [g for g in h
+                        if g not in ("gps", "imu") and "embeddings" in h[g]]
+        if not model_groups:
+            return {"n_frames": 0, "error": f"no model group with embeddings in {out_h5}"}
+        grp = "clip" if "clip" in model_groups else model_groups[0]
         emb = np.asarray(h[grp]["embeddings"], dtype=np.float64)
+    if emb.shape[0] < 2:
+        return {"n_frames": int(emb.shape[0]),
+                "error": "too few frames for a spread estimate (need >=2)"}
     emb /= (np.linalg.norm(emb, axis=1, keepdims=True) + 1e-8)
     sims = emb @ emb.T
     iu = np.triu_indices(sims.shape[0], k=1)
     off = sims[iu]
     return {
+        "group": grp,
         "n_frames": int(emb.shape[0]),
         "cos_mean": float(off.mean()),
         "cos_std": float(off.std()),
@@ -136,6 +175,9 @@ def main() -> int:
     ap.add_argument("--sanity-only", action="store_true",
                     help="extract ~50 frames from ONE drive, report cosine "
                          "spread, and exit (embed-sanity gate)")
+    ap.add_argument("--sanity-out", type=Path, default=None,
+                    help="also write the sanity stats JSON here (durable, so "
+                         "the SLURM job's verdict survives after the log)")
     args = ap.parse_args()
 
     sys.path.insert(0, str(Path("extraction").resolve()))
@@ -184,12 +226,16 @@ def main() -> int:
 
         duration = float(traj.timestamps[-1] - traj.timestamps[0])
         fps = args.fps
-        if args.sanity_only:  # aim for ~50 frames
-            fps = max(0.02, min(1.0, 50.0 / max(duration, 1.0)))
+        if args.sanity_only:  # aim for ~50 frames -- from the VIDEO duration,
+            # not the GPS span (RTK drops fixes at start/end/tunnels, so the two
+            # clocks differ). No lower floor, so long drives still target ~50.
+            from psm_extraction.io.video import video_duration
+            vdur = video_duration(video) or duration
+            fps = min(1.0, 50.0 / max(vdur, 1.0))
 
         out_dir.mkdir(parents=True, exist_ok=True)
         sidecar = video.parent / "gps.json"
-        _write_gps_sidecar(traj, sidecar)
+        _write_gps_sidecar(traj, sidecar, video)
         frames_dir = out_dir / (("sanity_" if args.sanity_only else "")
                                 + _frames_dirname(args.checkpoint))
         rc = _run_extract(video, out_h5, sidecar, frames_dir, name,
@@ -204,6 +250,14 @@ def main() -> int:
             stats = _embed_sanity(out_h5)
             print("\n=== EMBED-SANITY (windshield frames) ===")
             print(json.dumps(stats, indent=2))
+            if args.sanity_out:
+                args.sanity_out.parent.mkdir(parents=True, exist_ok=True)
+                args.sanity_out.write_text(json.dumps(
+                    {"drive": name, "checkpoint": args.checkpoint, **stats}, indent=2))
+                print(f"# wrote {args.sanity_out}")
+            if stats.get("error") or stats["n_frames"] < 20:
+                print(f"\nVERDICT: FAIL -- {stats.get('error', 'too few frames (<20) to trust')}")
+                return 1
             degenerate = stats["cos_mean"] > 0.95 and stats["cos_std"] < 0.03
             print(f"\nVERDICT: {'DEGENERATE -- frames collapse; F-HDD-3 at risk' if degenerate else 'OK -- embeddings show usable spread'}")
             return 1 if degenerate else 0
