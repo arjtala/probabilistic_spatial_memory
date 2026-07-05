@@ -85,20 +85,54 @@ confirmed revisits (do Option A first regardless).
 
 ## Open decisions
 
-- [ ] **Which option (A / B / C)?** — determines all downstream work.
-- [ ] **Do we have a university affiliation / email to clear the HDD access gate?**
+- [x] **Which option (A / B / C)?** → **Option A** (verify overlap first).
+      B-vs-C decided after the revisit measurement (see decision rule below).
+- [x] **HDD access gate?** → Moot. Data is already on the cluster at
+      `/checkpoint/dream/arjangt/video_retrieval/hdd/release_2019_07_08/`
+      (21 drive-days, 132 drives with RTK GPS + center camera).
 - [ ] **Archival (8-page) or non-archival (4-page)?** A new HDD result is
       heavier; a 4-page non-archival abstract may not have room and keeps
       Wearable AI open as a fallback (dual-submission).
-- [ ] **Does HDD replace or supplement the AEA idea?** AEA has revisits but is
-      indoor / no GPS / low geospatial diversity — user ruled it weak on the
-      "spatial" axis. HDD is the stronger spatial fit if revisits check out.
+- [x] **Does HDD replace or supplement the existing corpus?** → **Supplement**
+      the frozen 14-session street-scale corpus (adds the multi-session /
+      revisit-cardinality dimension the single-pass corpus lacks).
 - [ ] **Fallback if revisit density is thin:** keep HDD as a pure
       area-vs-memory systems figure, or soften the intro's multi-session
       claims to match the existing single-pass corpus.
 
+## Revisit-density decision rule (pre-registered 2026-07-05, before running)
+
+Recorded *before* the measurement to avoid a post-hoc criterion.
+
+- **Primary metric:** coverage-weighted fraction of driving over
+  **≥ 2-distinct-*day*** H3 cells at **resolution r10** (~66 m edge).
+  - *Day-count, not drive-count* — same-day drives may be one continuous trip;
+    cross-day revisits are the actual "multi-session persistent memory" signal.
+  - *r10, not finer* — RTK meter-level error cannot leak across a 66 m cell
+    boundary, so r10 revisits are noise-robust. r11/r12 reported but flagged
+    noise-sensitive (no fix-quality column ships with HDD).
+  - *Coverage-weighted, not raw cell count* — a revisited arterial dominates
+    driven time; raw "N revisited cells among thousands" understates the story.
+    Weighting is by distinct drives/days, never by raw GPS point count
+    (stationary idling would inflate it — points are speed-gated via `vel.csv`).
+- **Go/no-go bar: ≥ 30%.** At or above → a meaningful third of driving is over
+  cross-session re-seen ground; proceed to Option B/C. Below → fall back
+  (area-vs-memory systems figure only, or soften §1 multi-session claims).
+- **Conservative bias:** lane changes + GPS noise map true revisits to
+  *adjacent* cells, so the strict count **under**-reports. Clearing the bar
+  despite this undercount is therefore robust. A k-ring-1 "soft revisit"
+  sensitivity variant is held in reserve for a borderline result only.
+- **B-vs-C is a narrative call, not just a number:** HDD is driving; the paper's
+  headline task is wearable look-back QA. A healthy revisit number makes the
+  systems claims (Option B, no annotation) sound; Option C (retrieval eval)
+  additionally needs annotation and is only worth the spend if a driving
+  retrieval result *strengthens* rather than *fragments* the wearable narrative.
+
 ## First cluster-side steps (once access + option chosen)
 1. Confirm HDD RGB frames embed cleanly (CLIP-L / SigLIP 2) — sanity batch.
-2. Ingest GPS → H3; histogram cells by distinct-drive count (answers catch #1).
-3. If revisits exist: cross-drive HLL cardinality accrual + time-decay plot.
+2. Ingest GPS → H3; histogram cells by distinct-drive **and distinct-day** count
+   + inter-visit temporal-gap distribution (answers catch #1, decides B-vs-C).
+   → `scripts/hdd_revisit_density.py`, output `captures/hdd/revisit_density.json`.
+3. If revisits exist: cross-drive HLL cardinality accrual + time-decay plot
+   (seeded by the top-N revisited-cell → drive-list mapping from step 2's JSON).
 4. Memory-vs-area curve: PSM bounded per-cell state vs. dense-bank linear growth.
