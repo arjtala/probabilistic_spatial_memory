@@ -1,13 +1,14 @@
 #!/bin/bash
 #SBATCH --job-name=psm-hdd-sanity
 #SBATCH --account=dream
-#SBATCH --qos=h200_comm_shared
-#SBATCH --gpus=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=32G
-#SBATCH --time=00:15:00
-#SBATCH --output=logs/hdd_embed_sanity_%j.out
-#SBATCH --error=logs/hdd_embed_sanity_%j.err
+#SBATCH --qos=h200_dev
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:h200:1
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=64G
+#SBATCH --time=00:20:00
+#SBATCH --output=logs/%x-%j.out
+#SBATCH --error=logs/%x-%j.err
 #
 # Embed-sanity GATE for Honda HDD (run this ONCE before the full extraction
 # array). Front-facing windshield frames (reflections, motion blur, sky) are a

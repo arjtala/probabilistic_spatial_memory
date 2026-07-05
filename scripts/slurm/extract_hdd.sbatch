@@ -1,20 +1,26 @@
 #!/bin/bash
 #SBATCH --job-name=psm-extract-hdd
 #SBATCH --account=dream
-#SBATCH --qos=h200_comm_shared
-#SBATCH --gpus=1
+#SBATCH --qos=h200_dev
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:h200:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
-#SBATCH --time=02:00:00
-#SBATCH --output=logs/extract_hdd_%A_%a.out
-#SBATCH --error=logs/extract_hdd_%A_%a.err
+#SBATCH --time=00:30:00
+#SBATCH --output=logs/%x-%A_%a.out
+#SBATCH --error=logs/%x-%A_%a.err
 #SBATCH --array=0-131
 #
 # Extract CLIP/SigLIP features from Honda HDD drives for PSM (F-HDD-2/3).
 # One array task per drive; submit once per encoder via MODEL=.
 #
-# ── BEFORE the full array: run the embed-sanity gate on a login/GPU node ──
-#   python scripts/extract_hdd_sessions.py --root "$ROOT" --sanity-only
+# QoS: h200_dev is used to actually get scheduled on this cluster. It may cap
+# concurrent array tasks, so a 132-task array trickles rather than bursts --
+# that's fine. If dev rejects the array size, throttle with e.g.
+# `--array=0-131%8`, or fall back to a bulk QoS for the full sweep.
+#
+# ── BEFORE the full array: run the embed-sanity gate (its own sbatch) ──
+#   sbatch scripts/slurm/hdd_embed_sanity.sbatch
 # Windshield frames (reflections, motion blur, sky) may collapse to near-
 # identical embeddings, which would kill F-HDD-3's cross-session retrieval.
 # The gate extracts ~50 frames from one drive and reports the cosine spread;
