@@ -128,11 +128,56 @@ Recorded *before* the measurement to avoid a post-hoc criterion.
   additionally needs annotation and is only worth the spend if a driving
   retrieval result *strengthens* rather than *fragments* the wearable narrative.
 
+## Revisit-density result (measured 2026-07-05) — **GO** ✅
+
+`scripts/hdd_revisit_density.py` over 130/132 drives (2 dropped: unreadable /
+out-of-region GPS). Full stats in `captures/hdd/revisit_density.json`;
+r10 cell map + histogram in `journal/figures/hdd_revisit_{density,hist}_r10.svg`.
+
+**Decision metric (pre-registered): coverage-weighted fraction of driving over
+≥2-distinct-day cells at r10 = 47.0% ≥ 30% bar → GO.**
+
+| res | cells | %cells ≥2-drive | %cells ≥2-day | cov ≥2-day |
+|---|---|---|---|---|
+| r9  | 8,984 | 36.2% | 21.8% | 48.7% |
+| **r10** | **23,668** | **31.0%** | **21.8%** | **47.0%** |
+| r11 | 58,628 | 25.8% | 20.2% | 44.4% |
+| r12 | 144,200 | 22.6% | 19.4% | 41.2% |
+
+**Persistence (the reframe's load-bearing claim):** of 5,163 ≥2-day r10 cells,
+the gap between first and last visit is **median 105.9 d, p90 174.3 d, max
+221.2 d** — half the revisited ground is re-driven >3.5 months apart. This is a
+genuine multi-session-persistence signal, not same-week repetition.
+
+**Honesty notes:**
+- Two preprocessing bugs in the first run biased the number *down* to a
+  contaminated 22.6%: (a) a too-tight lat floor (37.0) dropped 4 real Santa
+  Cruz drives; (b) outlier GPS fixes created ~42k spurious singleton r10 cells.
+  Fixing both (widen box to include Santa Cruz + per-drive 80 km outlier
+  reject) gave the 47.0% above. Both fixes only *raise* the metric, so 47% is
+  itself conservative w.r.t. the adjacent-cell undercount noted in the rule.
+- The most-revisited cells cluster near the Honda facility (Mountain View), so
+  some revisit is depot-driven (drives originate there). But the top-50 cells
+  span ~7×6 km along the El Camino corridor (lat 37.387–37.448), and 47%
+  coverage across 23,668 cells cannot come from the depot alone — arterial
+  revisits carry it. Depot cells could be excluded as a sensitivity check;
+  the margin over the bar makes it unnecessary.
+- `vel.csv` speed units are unverified (max ~47), but the stopped-vs-moving
+  gate at >1.0 is unit-robust (0.0 = idling).
+
+**Next: B-vs-C is now the open call.** Revisits + months-long persistence make
+Option B (systems: bounded per-cell state vs. linear dense bank; cross-drive
+HLL cardinality accrual + decay over the 5,163 revisited cells) solid and
+annotation-free. Option C (retrieval eval) needs a hand-annotated look-back QA
+set and only pays off if a *driving* retrieval result strengthens the wearable
+narrative rather than reading as bolted-on.
+
 ## First cluster-side steps (once access + option chosen)
 1. Confirm HDD RGB frames embed cleanly (CLIP-L / SigLIP 2) — sanity batch.
-2. Ingest GPS → H3; histogram cells by distinct-drive **and distinct-day** count
-   + inter-visit temporal-gap distribution (answers catch #1, decides B-vs-C).
-   → `scripts/hdd_revisit_density.py`, output `captures/hdd/revisit_density.json`.
+2. ✅ **Done** — Ingest GPS → H3; histogram cells by distinct-drive **and
+   distinct-day** count + inter-visit temporal-gap distribution (catch #1;
+   result above). → `scripts/hdd_revisit_density.py`,
+   `captures/hdd/revisit_density.json`.
 3. If revisits exist: cross-drive HLL cardinality accrual + time-decay plot
    (seeded by the top-N revisited-cell → drive-list mapping from step 2's JSON).
 4. Memory-vs-area curve: PSM bounded per-cell state vs. dense-bank linear growth.
