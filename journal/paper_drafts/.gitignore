@@ -8,3 +8,4 @@ main.out
 main.pdf
 main.fdb_latexmk
 *.fls
+*.brf

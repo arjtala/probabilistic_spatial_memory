@@ -12,27 +12,10 @@
 \section{Introduction}
 \label{sec:intro}
 
-A wearable AI assistant sees the world through the user's eyes for hours
-per day. To answer look-back questions---``where did I leave my keys?'',
-``what was that street sign?''---it must retrieve relevant moments from
-its own past. The straightforward approach embeds every frame with a
-vision--language encoder (CLIP, SigLIP, EVA) and runs cosine-similarity
-retrieval over the resulting bank. This bank, however, grows linearly in
-recording duration: at 1\,fps with CLIP-L 768-dim float32 vectors, one
-hour costs ${\sim}10$\,MB and a full day ${\sim}200$\,MB; on-device
-limits bind in days. Although system-architecture work on always-on
-wearable AI~\cite{lee2025aria2} identifies a persistent
-spatial-temporal index as a first-class component, no bounded-memory
-implementation exists for egocentric look-back retrieval.
+For an intelligent agent to maintain persistent memory of its environment across long timescales, its internal state cannot grow unboundedly with time. Standard retrieval-augmented systems embed every observation into a dense vector bank; this approach grows linearly with recording duration, making continuous, multi-session memory prohibitively expensive for on-device applications. While recent work has focused on improving the long-context capabilities of the models themselves~\cite{arora2024linear,chen2024vljepa}, the fundamental systems bottleneck remains: how do we structure a dynamic spatial representation that supports test-time memory updating without succumbing to unbounded state explosion?
 
-\paragraph{The architectural question.}
-Three properties define the right retrieval substrate for a wearable
-assistant: \emph{bounded memory}---per-cell state independent of
-recording duration; \emph{spatial locality}---the index reflects the
-user's physical trajectory, answering ``what places?'' as naturally as
-``what moments?''; and \emph{streaming ingestion}---frames arrive
-one-at-a-time, the index updates in-place, and queries are served
-without re-indexing.
+\paragraph{The memory-centric systems question.}
+Three properties define a viable retrieval substrate for multi-session persistent memory: \emph{memory-budgeted systems}---state must be bounded independently of sequence length, scaling instead by physical area explored; \emph{dynamic spatial representation}---the index must natively support test-time memory evolution, allowing old information to decay while maintaining unique-event cardinality across revisits; and \emph{streaming ingestion}---observations must update the memory in-place and online.
 
 
 \input{figures/f1_architecture.tex}
@@ -54,16 +37,8 @@ wall-time on both a synthetic stress test and the measured Nymeria
 \psm{} state (\S\ref{sec:limitations} scopes the missing on-device
 measurement).
 
-\paragraph{The PSM--MLLM prefilter pipeline.}
-Multimodal LLMs (Gemini~3, Claude~4, GPT-4o) achieve strong
-single-frame grounding yet remain brittle on egocentric temporal
-grounding over long
-video~\cite{cheng2024videgothink,chen2025groundedmultihop}.
-We compose \psm{} as a \emph{prefilter}: it returns top-$K$
-spatial-temporal candidates from its bounded index; the MLLM reranks
-these $K$ frames and emits the localized answer. The two contributions
-are largely orthogonal---\psm{} supplies recall, the MLLM supplies
-localization precision.
+\paragraph{Evaluating the retrieval substrate.}
+To demonstrate that \psm{} functions as a high-fidelity retrieval substrate, we evaluate it on the challenging task of egocentric look-back QA (e.g., ``where did I leave my keys?''). Multimodal LLMs (Gemini~3, Claude~4, GPT-4o) achieve strong single-frame grounding yet remain notoriously brittle on temporal grounding over long, continuous video sequences~\cite{cheng2024videgothink,chen2025groundedmultihop}. We compose \psm{} as an upstream spatial \emph{prefilter} to a frontier MLLM. The two contributions are complementary: \psm{} guarantees bounded-memory recall, while the MLLM supplies downstream localization precision.
 
 \paragraph{Contributions.}
 \begin{itemize}
