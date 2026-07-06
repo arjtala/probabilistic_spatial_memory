@@ -124,17 +124,26 @@ def main() -> int:
     R = args.reservoir
     per_ex_bytes = args.dim * BYTES_PER_DIM
 
-    # Cumulative curves over chronological drives.
+    # Cumulative curves over chronological drives (per-tick PSM/bank GB so the
+    # combined figure can be drawn from the JSON alone, no raw-GPS pass).
     cell_dwell: dict[str, float] = defaultdict(float)
     cum_secs = 0.0
     cum_hours, cum_cells_l = [], []
-    psm_ex_l, bank_ex_l = [], []
+    _CURVE_FPS = (1.0, 15.0, 30.0)
+    curve_psm = {f: [] for f in _CURVE_FPS}
+    curve_bank = {f: [] for f in _CURVE_FPS}
     for _, dur, dwell in recs:
         for c, d in dwell.items():
             cell_dwell[c] += d
         cum_secs += dur
         cum_hours.append(cum_secs / 3600.0)
         cum_cells_l.append(len(cell_dwell))
+        arr_t = np.fromiter(cell_dwell.values(), dtype=np.float64)
+        for f in _CURVE_FPS:
+            cf = arr_t * f
+            curve_psm[f].append(float((np.minimum(cf, R).sum() * per_ex_bytes
+                                       + arr_t.size * HLL_BYTES) / 1e9))
+            curve_bank[f].append(float(cf.sum() * per_ex_bytes / 1e9))
 
     # PSM/bank exemplar counts are fps-dependent, so compute per fps below;
     # here record the final per-cell dwell for the exemplar sums.
@@ -193,6 +202,9 @@ def main() -> int:
         "fps": fps_report,
         "cum_hours": cum_hours,
         "cum_cells": cum_cells_l,
+        "curve": {"hours": cum_hours,
+                  "psm_gb": {str(f): curve_psm[f] for f in _CURVE_FPS},
+                  "bank_gb": {str(f): curve_bank[f] for f in _CURVE_FPS}},
     }, indent=2))
     print(f"\n# wrote {args.out}")
 
