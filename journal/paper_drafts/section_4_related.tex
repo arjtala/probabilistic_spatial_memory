@@ -8,55 +8,37 @@
 \label{sec:related}
 
 \paragraph{Egocentric video understanding and episodic memory.}
-Ego4D~\cite{grauman2022ego4d} established look-back QA at
-3{,}000-hour scale; EgoSchema~\cite{mangalam2023egoschema} exposed
-the temporal-grounding collapse that motivates our prefilter pipeline.
-The literal ``where did I leave my keys?'' task was posed by
-Barmann et al.~\cite{barmann2022keys}; Di and Xie~\cite{di2024grounded}
-unified grounded QA over long egocentric video, and Chen et
+Ego4D~\cite{grauman2022ego4d} established look-back QA at scale;
+EgoSchema~\cite{mangalam2023egoschema} exposed the temporal-grounding collapse
+our prefilter targets. The ``where did I leave my keys?'' task
+originates with Barmann et al.~\cite{barmann2022keys};
+Di and Xie~\cite{di2024grounded} unified grounded egocentric QA and Chen et
 al.~\cite{chen2025groundedmultihop} extended it to multi-hop chains.
-Plizzari et al.~\cite{plizzari2025spatial} show spatial cognition is
-critical for object localization across time scales,
-EgoMask~\cite{liang2025egomask} benchmarks fine-grained
-spatiotemporal grounding in first-person video, and
-ESOM~\cite{manigrasso2026esom} maintains a streaming object memory
-whose 4\% online success rate underscores the hardness of egocentric
-streaming retrieval. \psm{} is structurally orthogonal: it provides a
-bounded-memory spatial-temporal substrate that any MLLM grounding
-method can rerank, without retraining a new grounding head---an
-instance of the VideoRAG pattern~\cite{jeong2025videorag}.
+Spatial cognition is central to cross-time localization~\cite{plizzari2025spatial};
+EgoMask~\cite{liang2025egomask} benchmarks spatiotemporal grounding, and
+ESOM's~\cite{manigrasso2026esom} 4\% online success rate underscores the
+hardness of streaming egocentric retrieval. \psm{} is orthogonal: a
+bounded-memory spatial-temporal substrate any grounding method can rerank
+without retraining---the VideoRAG pattern~\cite{jeong2025videorag}.
 
 \paragraph{Memory-augmented video LLMs.}
 MovieChat~\cite{song2024moviechat}, MA-LMM~\cite{he2024malmm},
-Flash-VStream~\cite{zhang2024flashvstream}, and
-LifelongMemory~\cite{wang2024lifelongmemory} tackle bounded-memory
-long-video understanding; more recently,
-HERMES~\cite{zhang2026hermes} arranges the KV cache as hierarchical
-memory, InfiniPot-V~\cite{kim2025infinipotv} imposes a training-free
-hard cap with 94\% reduction, and SAVEMem~\cite{wu2026savemem}
-adds 3-tier semantic-aware retention.
-All bound memory in \emph{token} space---dense-to-sparse merging,
-KV-cache compression, or recurrent state---whereas \psm{} bounds
-memory in \emph{geographic} space (H3 cells) and runs upstream of
-any MLLM, returning a top-$K$ candidate set the downstream model
-reranks without retraining.
-Direct comparison is a category error: these methods compress what
-the MLLM \emph{sees}; \psm{} determines \emph{which frames} the
-MLLM is shown. The two are complementary: \psm{} as front-end
-retrieval, token-space methods as MLLM-internal compression.
+Flash-VStream~\cite{zhang2024flashvstream},
+LifelongMemory~\cite{wang2024lifelongmemory},
+HERMES~\cite{zhang2026hermes}, InfiniPot-V~\cite{kim2025infinipotv}, and
+SAVEMem~\cite{wu2026savemem} all bound memory in \emph{token} space (KV-cache
+compression, dense-to-sparse merging, recurrent state). \psm{} instead bounds
+memory in \emph{geographic} space (H3 cells) and runs upstream: it decides
+\emph{which frames} the MLLM sees, whereas these compress what it sees---
+complementary, not competing.
 
 \paragraph{Streaming search and spatial indexing.}
 DiskANN~\cite{jayaram2019diskann}, SPANN~\cite{chen2021spann}, and
-locally-adaptive vector quantization~\cite{aguerrebere2024lvq}
-deliver billion-point ANN with bounded per-query cost, but target
-near-static corpora with no spatial constraint.
-\psm{} adds two capabilities: queries optionally restrict to an H3
-$k$-ring neighborhood---the ``near here'' axis ANN does not
-expose---and ingestion is fully streaming, with bounded per-cell state
-aged out by the ring buffer.
-The H3 hex grid~\cite{brodsky2018h3} replaces R-tree-style
-data-driven subdivisions~\cite{guttman1984rtrees} with equidistant
-neighbors and globally-stable cell ids; the probabilistic primitives
-(HyperLogLog~\cite{flajolet2007hyperloglog}, reservoir
-sampling~\cite{vitter1985reservoir}) are standard---the contribution
-is their composition under the \caponek{} query knob.
+locally-adaptive vector quantization~\cite{aguerrebere2024lvq} give
+bounded-cost billion-point ANN but assume near-static corpora with no spatial
+axis. \psm{} adds a ``near here'' H3 $k$-ring restriction and fully streaming
+ingestion with ring-buffer-aged per-cell state. The H3 grid~\cite{brodsky2018h3}
+replaces R-tree subdivisions~\cite{guttman1984rtrees} with equidistant neighbors
+and stable cell ids; the primitives (HyperLogLog~\cite{flajolet2007hyperloglog},
+reservoir sampling~\cite{vitter1985reservoir}) are standard---the contribution
+is their composition under the \caponek{} knob.

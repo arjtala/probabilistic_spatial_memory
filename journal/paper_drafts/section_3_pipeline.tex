@@ -18,38 +18,21 @@ that narrows the search space, and a frontier MLLM as the
 
 Three stages address distinct failure modes
 (Figure~\ref{fig:f1-architecture}, bottom row).
-
-\paragraph{Stage~1: PSM top-$K$ retrieval.}
-Embed the question $q$ with the ingest encoder and call
-\texttt{SpatialMemory\_query\_similar} with the configured
-\caponek{} and $K{=}5$.
-The call returns five candidates sorted by cosine similarity; the
-latency numbers reported for this call come from host-CPU systems
-benchmarks in \S\ref{sec:results-memory-latency}, not from an
-on-device wearable trace.
-Encoder choice is a pipeline knob, not an architectural commitment:
-the same path serves three families---CLIP-L (430\,M, 768\,d),
-CLIP-bigG (2.5\,B, 1280\,d), and
-SigLIP-2-large~\cite{tschannen2025siglip2}
-(660\,M, 1024\,d)---via a single factory;
-the C engine sees only a $D$-dimensional float vector and is
-encoder-agnostic.
-Cross-encoder generalization in \S\ref{sec:results-multi-corpus}
-confirms the spatial-axis behavior is not a CLIP-L artifact.
-
-\paragraph{Stage~2: Frame fetch.}
-Each candidate $t_i$ identifies a frame decoded on-demand from the
-source MP4 or VRS stream; in deployment the frame already resides
-in the device cache, so the cost reduces to a memcpy rather than a
-video seek.
-
-\paragraph{Stage~3: MLLM rerank.}
-The five base64-encoded frames plus the question are sent in one
-API call to Gemini 3.1 Pro~\cite{google2026gemini}.
-The frozen prompt asks the MLLM to select the single frame index
-from the $K$ candidates that best answers the question.
-The parsed integer reorders \psm{}'s top-$K$ so the chosen frame
-occupies position~1 and the remaining four fill positions 2--$K$.
+\textbf{(1)~Retrieval:} embed the question $q$ with the ingest encoder and call
+\texttt{SpatialMemory\_query\_similar} at the configured \caponek{} and $K{=}5$,
+returning five candidates by cosine similarity (host-CPU latency in
+\S\ref{sec:results-memory-latency}).
+\textbf{(2)~Frame fetch:} each candidate $t_i$ decodes a frame on demand (a
+device-cache memcpy in deployment, not a video seek).
+\textbf{(3)~MLLM rerank:} the five frames plus $q$ go in one call to Gemini 3.1
+Pro~\cite{google2026gemini}, whose frozen prompt selects the single best frame
+index, reordering \psm{}'s top-$K$.
+Encoder choice is a pipeline knob, not an architectural commitment: one factory
+serves CLIP-L (430\,M, 768\,d), CLIP-bigG (2.5\,B, 1280\,d), and
+SigLIP-2-large~\cite{tschannen2025siglip2} (660\,M, 1024\,d); the C engine sees
+only a $D$-dim float vector, and cross-encoder generalization
+(\S\ref{sec:results-multi-corpus}) confirms the spatial-axis behavior is not a
+CLIP-L artifact.
 
 \subsection{Architectural Decomposition}
 \label{sec:pipeline-rationale}
