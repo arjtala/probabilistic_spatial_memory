@@ -54,7 +54,9 @@ def main() -> int:
         return 1
 
     if args.layout == "vertical":
-        fig, (a, b, c) = plt.subplots(3, 1, figsize=(3.4, 7.2))
+        # Sized so that at LNCS \linewidth (~4.8in) it displays ~4.8x4.6in
+        # (fits a column comfortably); a taller aspect scales past the page.
+        fig, (a, b, c) = plt.subplots(3, 1, figsize=(5.0, 4.8))
     else:
         fig, (a, b, c) = plt.subplots(1, 3, figsize=(10.5, 3.3))
 
@@ -106,10 +108,10 @@ def main() -> int:
     fig.tight_layout()
     out = args.out
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(f"{out}.pdf")
-    fig.savefig(f"{out}.svg")
+    fig.savefig(f"{out}.pdf", bbox_inches="tight", pad_inches=0.02)
+    fig.savefig(f"{out}.svg", bbox_inches="tight", pad_inches=0.02)
     if args.png:
-        fig.savefig(f"{out}.png", dpi=130)
+        fig.savefig(f"{out}.png", dpi=130, bbox_inches="tight", pad_inches=0.02)
     print(f"# wrote {out}.pdf/.svg" + (" /.png" if args.png else "")
           + f"  (layout={args.layout})")
     return 0
