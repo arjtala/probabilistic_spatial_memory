@@ -47,11 +47,14 @@ The MLLM reranker is bimodal on Hit@1---tripling it on one session,
 hurting it on another---so we do not promote it to a default
 (\S\ref{sec:results-mllm-rerank}).
 %
-The bounded-memory crossover occurs at $N{\approx}1500$ frames
-(${\sim}25$\,min at 1\,fps under the observed ${\sim}10$-cell
-footprint); past that, \psm's constant per-cell state diverges from
-brute-force linear growth to ${\sim}10\times$ at four hours and
-${\sim}20\times$ at eight (Fig.~\ref{fig:f6-memory}).
+On 102.9\,h of metropolitan driving (HDD, \S\ref{sec:results-hdd}),
+\psm's per-cell-capped state stays $1.3$--$7.2\times$ smaller than a
+dense embedding bank while a $1\,\mathrm{KiB}$ sketch accrues
+unique-event cardinality across 219 days and label-free
+cross-session place recognition reaches $0.853$ AUC---the
+multi-session persistence the single-pass corpus cannot exercise
+(the synthetic memory crossover at $N{\approx}1500$ frames is in
+supp.\ Fig.~\ref{fig:f6-memory}).
 
 \paragraph{Follow-up directions.}
 Three extensions are immediate.

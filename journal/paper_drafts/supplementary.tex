@@ -17,6 +17,28 @@ Beyond the single-session headline (\S\ref{sec:results-main}), four patterns:
 (3)~\emph{Memory ablation}: tightening the reservoir from 1024 to 128 exemplars costs $2.2$\,pp Hit@5 at \caponek{}$=K$; H3 resolution barely moves Hit@5 (${\pm}0.5$\,pp across $r \in \{10,11,12,13\}$) but moves bucket mIoU monotonically ($0.004 \to 0.019$).
 (4)~\emph{30-session monotonicity}: in the matched $R{=}128$ deployment sweep, mean Hit@5 climbs monotonically from $2.99\%$ at \caponek{}$=1$ through $4.81\%$ and $6.11\%$ to $7.55\%$ at \caponek{}$=K$. The $R{=}1024$ full-reservoir sweep follows the same shape ($3.26\% \to 5.69\% \to 7.08\% \to 8.92\%$) and matches brute-force exactly at the eviction-free endpoint; sliding-window CLIP exceeds both by $+1.0$\,pp. Thus, at \caponek{}$=K$, reservoir eviction costs $1.37$\,pp in the 30-session aggregate.
 
+\subsection{Synthetic memory-scaling crossover}
+\label{sec:supp-memory}
+Fig.~\ref{fig:f6-memory} plots per-method embedding memory against session length
+on the 30 Nymeria sessions. \psm{}'s per-cell-capped state is constant in $N$
+while brute-force grows linearly; on these short sessions ($N{\le}1325$,
+${\sim}22$\,min) brute-force is still marginally cheaper, with the crossover at
+$N\approx1500$ frames (${\sim}25$\,min) under the observed ${\sim}10$-cell
+footprint, past which the gap reaches ${\sim}10$--$20\times$ at multi-hour
+streams. The real-data form of this bound---where \psm{} is smaller at every
+ingest rate---is demonstrated on the 102.9\,h HDD corpus
+(\S\ref{sec:results-hdd}, Fig.~\ref{fig:hdd-combined}A).
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\linewidth]{figures/f6_memory_latency.pdf}
+\caption{Memory (MB) vs session length (frames). Brute-force CLIP-L (red): $N \times 768 \times 4$\,B across 30 Nymeria sessions, plus linear fit.
+\psm{} (blue dashed): constant ${\sim}4.3$\,MiB at $R{=}128$, $p{=}10$, ${\sim}10$ H3 cells.
+On the measured corpus ($N{\le}1325$, ${\sim}22$\,min sessions) \psm{} is still slightly more expensive than brute-force; the bounded-memory advantage begins just beyond this range.
+Crossover at $N \approx 1500$ (${\sim}25$\,min); under the same spatial footprint the gap reaches ${\sim}10$--$20\times$ at multi-hour streams.}
+\label{fig:f6-memory}
+\end{figure}
+
 \subsection{Full multi-corpus, multi-encoder per-session verdicts}
 \label{sec:supp-multicorpus}
 Table~\ref{tab:multi-corpus-h3} gives the per-(session, encoder) acceptance
