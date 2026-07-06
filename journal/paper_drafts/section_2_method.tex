@@ -34,16 +34,14 @@ cell IDs are comparable across recordings, sessions, and devices.
 \label{sec:method-ring-buffer}
 
 Each H3 cell maintains a ring buffer of $C$ HyperLogLog
-sketches~\cite{flajolet2007hyperloglog} that rotate on a
-configurable time-window cadence (default 30\,s). Ingesting a
-tuple hashes the frame's embedding into the current sketch;
-when the window elapses the pointer advances and old sketches
-expire as the ring wraps, enforcing bounded-time retention.
-The sketches serve two roles: they provide cardinality estimates
-of distinct events per cell and they expose the cell's
-\emph{temporal envelope}
-$(t_{\min}, t_{\max})$, which \psm{} returns as the bucket window
-that the downstream MLLM consumes as its time-range hint.
+sketches~\cite{flajolet2007hyperloglog} rotating on a configurable
+time-window cadence (default 30\,s): ingesting a tuple hashes its
+embedding into the current sketch, and when the window elapses the pointer
+advances and the oldest sketch expires as the ring wraps, enforcing
+bounded-time retention. The sketches provide per-cell cardinality
+estimates and expose the cell's \emph{temporal envelope}
+$(t_{\min}, t_{\max})$, which \psm{} returns as the bucket window the
+MLLM consumes as a time-range hint.
 
 \paragraph{Memory bound.} Each HLL sketch occupies $2^p$ bytes at
 precision $p$ (default $p{=}10 \Rightarrow$ 1\,KiB); a cell's
@@ -53,12 +51,11 @@ at $C{=}60$, independent of recording duration.
 \subsection{Reservoir-sampled exemplars}
 \label{sec:method-exemplars}
 
-HLL sketches yield counts and time envelopes but not the
-embeddings needed for cosine scoring. We store embeddings via
-\emph{Algorithm~R reservoir sampling}~\cite{vitter1985reservoir}
-per H3 cell (capacity $R{=}128$): after ingesting $n > R$ frames
-into a cell, the reservoir holds a uniformly random $R$-sized
-subset.
+The sketches yield counts and time envelopes but not the
+embeddings needed for cosine scoring, so each cell also stores embeddings
+via \emph{Algorithm~R reservoir sampling}~\cite{vitter1985reservoir}
+(capacity $R{=}128$): after $n > R$ frames, the reservoir holds a
+uniformly random $R$-subset.
 At $R{=}128$ and CLIP-L's $d{=}768$, the retrieval state is ${\sim}444$\,KiB
 per occupied cell (a $128\cdot768\cdot4\approx384$\,KiB exemplar payload plus the
 HLL ring). Brute-force grows $\Theta(N)$; \psm{} grows

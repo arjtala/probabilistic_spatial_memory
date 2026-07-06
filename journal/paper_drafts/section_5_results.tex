@@ -17,8 +17,7 @@ Primary results use \texttt{shelby\_arroyo\_act0} (187 narrations, 69\,m bbox).
 The encoder is CLIP-L~\cite{clip-l-laion,radford2021clip}, 768-d, 1\,fps, 11.6\,ms per query on CPU.
 \psm{} runs at H3 resolution~12 (${\sim}9.4$\,m hexes), time window 30\,s, ring-buffer capacity 60, HLL precision $p{=}10$, reservoir $R{=}128$ exemplars per cell; we also report an oracle row at $R{=}1024$ to isolate reservoir eviction from the \caponek{} effect.
 The baseline is brute-force CLIP top-5 over the full $N$-frame embedding bank (no spatial structure, no capping).
-We report three top-5 metrics: Hit@5 (did any exemplar timestamp fall inside a GT interval), exemplar mIoU@5 (mean IoU between exemplar $\pm1.5$\,s windows and GT), and bucket mIoU@5 (mean IoU between each cell's $[t_\text{min}, t_\text{max}]$ envelope and GT).
-Hit@5 captures retrieval recall; exemplar mIoU, localization precision; bucket mIoU, temporal-envelope overlap.
+We report three top-5 metrics: Hit@5 (recall: did any exemplar timestamp fall in a GT interval), exemplar mIoU@5 (localization: IoU of exemplar $\pm1.5$\,s windows vs.\ GT), and bucket mIoU@5 (IoU of each cell's $[t_\text{min}, t_\text{max}]$ envelope vs.\ GT).
 
 \subsection{Single-session operating points}
 \label{sec:results-main}
@@ -83,70 +82,62 @@ This is the spatial-temporal blind spot that \psm{}'s cell-targeted prefilter is
 \subsection{Multi-session persistence at metropolitan scale (Honda HDD)}
 \label{sec:results-hdd}
 
-The results so far are single-pass---each session is traversed once---so they
-cannot exercise the multi-session persistence and revisit-cardinality
-properties (\S\ref{sec:intro}) that motivate a bounded spatial-temporal index.
-We close this gap on the Honda Research Institute Driving Dataset
-(HDD)~\cite{ramanishka2018hdd}, 104\,h of San Francisco Bay Area driving with
-real RTK GPS and a front camera; our extraction covers 132 drives (102.9\,h
-with valid GPS). A vehicle sweeps far more area per minute than a walker, and
-over 132 drives spanning 8 months genuinely re-drives the same streets. HDD
-ships no look-back QA labels, so we report \emph{systems} and
-\emph{self-supervised} results here, not a retrieval-accuracy metric
-(\S\ref{sec:limitations}).
+The results so far are single-pass, so they cannot exercise the multi-session
+persistence and revisit-cardinality properties (\S\ref{sec:intro}) that motivate
+a bounded index. We close this gap on the Honda Research Institute Driving
+Dataset (HDD)~\cite{ramanishka2018hdd}: 104\,h of San Francisco Bay Area driving
+with RTK GPS and a front camera (our extraction covers 132 drives, 102.9\,h with
+valid GPS). A vehicle sweeps far more area per minute than a walker and, over 132
+drives across 8 months, genuinely re-drives the same streets. HDD ships no
+look-back QA labels, so these results are \emph{systems} and
+\emph{self-supervised}, not retrieval-accuracy (\S\ref{sec:limitations}).
 
 \paragraph{Revisit structure.}
 Binning every drive to H3 $r{=}10$ (${\sim}66$\,m), \textbf{47.0\%} of
 (drive, cell) traversal events fall in cells revisited on $\geq2$ distinct days
-(against a pre-registered $\geq30\%$ acceptance bar), across 5{,}163 revisited
-cells whose first-to-last visit spans a \textbf{median of 106 days} (max 221).
-The coverage is arterial, not a depot artifact: excluding the 20 most-driven
-cells leaves it at 46.5\%. This is the genuine multi-session substrate the
-single-pass corpus lacks.
+(pre-registered bar: $\geq30\%$), across 5{,}163 revisited cells whose
+first-to-last visit spans a \textbf{median of 106 days} (max 221). The coverage
+is arterial, not a depot artifact---excluding the 20 most-driven cells leaves it
+at 46.5\%.
 
 \paragraph{State scales with area, not time (Fig.~\ref{fig:hdd-combined}A).}
-Over 102.9\,h and 23{,}298 distinct $r{=}10$ cells, we compare \psm{}'s
-per-cell-capped state ($\sum_\text{cells} \min(\text{frames in cell}, R)$
-exemplars) against a dense bank that stores every frame.
-\psm{} is smaller at every ingest rate, and the gap widens with frame rate as
-the reservoir discards more redundant dwell/revisit frames:
-$1.3\times$/$2.3\times$/$4.3\times$/$7.2\times$ smaller at 1/5/15/30\,fps,
-capping 26/57/77/86\,\% of frames. The mechanism is that state grows
-\emph{sublinearly in observation count}---it is $O(\text{distinct cells})$, not
-$O(\text{frames})$. We stress this is \emph{not} an observed memory plateau: on
-this exploratory fleet corpus cumulative area keeps growing (only 20\% of cells
-are seen by the halfway mark), so the saving comes from per-cell capping and is
-therefore ingest-rate dependent. This is the empirical form of the abstract's
-``budgeted by area, not sequence length,'' complementing the synthetic crossover
-of supp.\ Fig.~\ref{fig:f6-memory}.
+Over 102.9\,h and 23{,}298 distinct $r{=}10$ cells, \psm{}'s per-cell-capped
+state ($\sum_\text{cells}\min(\text{frames}, R)$) is smaller than a dense
+per-frame bank at every ingest rate, and the gap widens as the reservoir
+discards more redundant dwell/revisit frames:
+$1.3\times$/$2.3\times$/$4.3\times$/$7.2\times$ at 1/5/15/30\,fps (capping
+26/57/77/86\% of frames). State thus grows \emph{sublinearly in observation
+count}---$O(\text{distinct cells})$, not $O(\text{frames})$. This is \emph{not}
+an observed plateau: cumulative area keeps growing (only 20\% of cells seen by
+the halfway mark), so the saving is per-cell capping and is ingest-rate
+dependent---the empirical form of ``budgeted by area, not sequence length'' (cf.\
+the synthetic crossover, supp.\ Fig.~\ref{fig:f6-memory}).
 
 \paragraph{Cross-session cardinality accrual and decay (Fig.~\ref{fig:hdd-combined}B).}
-A Nymeria micro-eval (\S\ref{sec:results-hll}, supp.) validates the HLL sketch's per-session accuracy; HDD's
-revisits let us exercise it \emph{across sessions}. Feeding a revisited cell's
-frames in chronological order across drives, a single fixed $1\,\mathrm{KiB}$
-($p{=}10$) sketch accrues to \textbf{8{,}112 unique observations over 219 days}
-(15 of 16 revisit days), while the windowed estimate over its 60-slot ring
-buffer (\S\ref{sec:results-memory-latency}) decays between visits and jumps on
-each revisit---the ``decay while maintaining unique-event cardinality across
-revisits'' behavior of \S\ref{sec:intro}. A Python reimplementation matches the
-C-engine sketch to $2.4\times10^{-5}$ median relative error on this real data,
-confirming the accrual is the engine's behavior, not an analysis artifact.
+A Nymeria micro-eval (\S\ref{sec:results-hll}, supp.) validates the sketch's
+per-session accuracy; HDD's revisits exercise it \emph{across sessions}. Feeding
+a revisited cell's frames chronologically across drives, a single fixed
+$1\,\mathrm{KiB}$ ($p{=}10$) sketch accrues to \textbf{8{,}112 unique
+observations over 219 days}, while its 60-slot ring-buffer windowed estimate
+decays between visits and jumps on each revisit---the ``decay while maintaining
+unique-event cardinality across revisits'' behavior of \S\ref{sec:intro}. A
+Python reimplementation matches the C sketch to $2.4\times10^{-5}$ median
+relative error, confirming this is the engine's behavior, not an analysis
+artifact.
 
 \paragraph{The persistent memory is retrievable across sessions
 (Fig.~\ref{fig:hdd-combined}C).}
-Finally, is a place recorded on one day retrievable from another? Without any
-labels, we query a revisited cell with an exemplar from drive~A and measure the
-AUC that different-day drive-B frames in that cell outrank frames from other
-cells. Over 5{,}222 revisited cells (2{,}000 stratified queries) the
-cross-session AUC is \textbf{0.853}, against a shuffled-cell null of 0.498 and a
-same-drive upper bound of 0.977---strong cross-session place recognition purely
-from CLIP cosine over the persistent per-cell exemplars.
-The positive/negative split (same cell vs.\ all other cells) blends coarse
-geographic proximity with visual identity; a $k$-nearest-cell hard-negative
-control would isolate the latter (\S\ref{sec:limitations}). Literal top-$k$
-hit-rate is low ($\leq0.07$@10) because the 357k-frame pool is dominated by
-near-duplicate same-drive frames, so AUC, not top-$k$, is the discriminability
-measure here.
+Is a place recorded on one day retrievable from another? Label-free, we query a
+revisited cell with a drive-A exemplar and measure the AUC that different-day
+drive-B frames in that cell outrank frames from other cells. Over 5{,}222
+revisited cells (2{,}000 stratified queries) the cross-session AUC is
+\textbf{0.853}, vs.\ a shuffled-cell null of 0.498 and a same-drive upper bound
+of 0.977---strong cross-session place recognition from CLIP cosine alone. The
+split (same cell vs.\ all others) blends geographic proximity with visual
+identity; a $k$-nearest-cell control would isolate the latter
+(\S\ref{sec:limitations}). Literal top-$k$ hit-rate is low ($\leq0.07$@10)
+because the 357k-frame pool is dominated by near-duplicate same-drive frames, so
+AUC is the discriminability measure here.
 
 \begin{figure}[tb]
 \centering
