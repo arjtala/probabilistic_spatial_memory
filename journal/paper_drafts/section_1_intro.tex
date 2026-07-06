@@ -12,14 +12,10 @@
 \section{Introduction}
 \label{sec:intro}
 
-For an intelligent agent to maintain persistent memory of its environment across long timescales, its internal state cannot grow unboundedly with time. Standard retrieval-augmented systems embed every observation into a dense vector bank; this approach grows linearly with recording duration, making continuous, multi-session memory prohibitively expensive for on-device applications. While recent work has focused on improving the long-context capabilities of the models themselves~\cite{arora2024linear,chen2024vljepa}, the fundamental systems bottleneck remains: how do we structure a dynamic spatial representation that supports test-time memory updating without succumbing to unbounded state explosion?
+For an intelligent agent to hold persistent memory of its environment, its internal state cannot grow unboundedly with time. Standard retrieval-augmented systems embed every observation into a dense vector bank that grows linearly with recording duration, making continuous multi-session memory prohibitively expensive on-device. Long-context modeling of the models themselves~\cite{arora2024linear,chen2024vljepa} does not address the systems bottleneck: how to structure a dynamic spatial representation supporting test-time memory updating without unbounded state explosion?
 
 \paragraph{The memory-centric systems question.}
 Three properties define a viable retrieval substrate for multi-session persistent memory: \emph{memory-budgeted systems}---state must be bounded independently of sequence length, scaling instead by physical area explored; \emph{dynamic spatial representation}---the index must natively support test-time memory evolution, allowing old information to decay while maintaining unique-event cardinality across revisits; and \emph{streaming ingestion}---observations must update the memory in-place and online.
-
-
-\input{figures/f1_architecture.tex}
-Figure~\ref{fig:f1-architecture} sketches the end-to-end architecture.
 
 \paragraph{Probabilistic Spatial Memory.}
 We propose \textbf{\psm{}}, a streaming spatial-temporal index for
@@ -58,17 +54,14 @@ To demonstrate that \psm{} functions as a high-fidelity retrieval substrate, we 
     (bootstrap $\Delta{=}{-}0.005$, 95\,\% CI
     $[-0.032,{+}0.021]$) (\S\ref{sec:results-main}).
 
-  \item \textbf{Multi-corpus generalization + vanilla-MLLM baseline:}
-    13/14 street-scale sessions across 3 sensor stacks and 3 encoders
-    pass monotone acceptance
-    (\S\ref{sec:results-multi-corpus},
-    supp.\ Table~\ref{tab:multi-corpus-h3}).
-    \psm{}'s query-guided retrieval provides the spatial-temporal
-    prefilter that uniform-sampling MLLMs lack: at matched $K{=}8$,
-    \psm{} reaches every session that vanilla Gemini misses, including
-    4 where uniform frames never land in a GT interval
-    (\S\ref{sec:results-vanilla-mllm},
-    Fig.~\ref{fig:f2-psm-vs-mllm}).
+  \item \textbf{Generalization + the MLLM blind spot:}
+    the spatial-axis result holds on 13/14 street-scale sessions across
+    3 sensor stacks and 3 encoders (\S\ref{sec:results-multi-corpus};
+    detail in supp.); and \psm{}'s query-guided retrieval supplies the
+    spatial-temporal prefilter that uniform-sampling MLLMs lack---at
+    matched $K{=}8$ it reaches every session vanilla Gemini misses,
+    including 4 where uniform frames never land in a GT interval
+    (\S\ref{sec:results-vanilla-mllm}).
     Open-source under MIT (\S\ref{sec:conclusion} footnote).
 
   \item \textbf{Multi-session persistence (Honda HDD):} on 102.9\,h of

@@ -59,11 +59,9 @@ embeddings needed for cosine scoring. We store embeddings via
 per H3 cell (capacity $R{=}128$): after ingesting $n > R$ frames
 into a cell, the reservoir holds a uniformly random $R$-sized
 subset.
-At $R = 128$ and CLIP-L's $d = 768$, the raw exemplar payload
-occupies $128 \cdot 768 \cdot 4 \approx 384$\,KiB per cell; with
-the default HLL ring buffer, the retrieval state is ${\sim}444$\,KiB
-per occupied cell before allocator overhead. The gap widens with duration:
-brute-force grows $\Theta(N)$; \psm{} grows
+At $R{=}128$ and CLIP-L's $d{=}768$, the retrieval state is ${\sim}444$\,KiB
+per occupied cell (a $128\cdot768\cdot4\approx384$\,KiB exemplar payload plus the
+HLL ring). Brute-force grows $\Theta(N)$; \psm{} grows
 $\Theta(R \cdot |\mathrm{cells}|)$, bounded by the physical area
 covered, not recording length.
 
@@ -97,7 +95,7 @@ Having defined the substrate, we now compose it into the look-back-QA system.
 \psm{} returns ranked $(t,\mathrm{cell},\mathrm{lat},\mathrm{lng},\mathbf{e})$
 tuples, not natural-language answers, so we use it as a
 \emph{prefilter} feeding a frontier MLLM \emph{reranker}
-(Fig.~\ref{fig:f1-architecture}, bottom row).
+(supp.\ Fig.~\ref{fig:f1-architecture}, bottom row).
 Three stages address distinct failure modes.
 \textbf{(1)~Retrieval:} embed the question $q$ with the ingest encoder and call
 \texttt{SpatialMemory\_query\_similar} at the configured \caponek{} and $K{=}5$,

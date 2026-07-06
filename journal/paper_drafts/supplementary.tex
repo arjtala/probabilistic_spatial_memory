@@ -9,6 +9,13 @@
 \section{Supplementary Material}
 \label{sec:supp}
 
+\subsection{Architecture overview}
+\label{sec:supp-architecture}
+\input{figures/f1_architecture.tex}
+Figure~\ref{fig:f1-architecture} sketches the end-to-end \psm{} pipeline
+described in \S\ref{sec:method}: streaming ingest into H3 cells (top row) and
+query-time retrieval with MLLM rerank (bottom row).
+
 \subsection{Additional ablations and retrieval baselines}
 \label{sec:supp-ablations}
 Beyond the single-session headline (\S\ref{sec:results-main}), four patterns:
@@ -41,8 +48,42 @@ Crossover at $N \approx 1500$ (${\sim}25$\,min); under the same spatial footprin
 
 \subsection{Full multi-corpus, multi-encoder per-session verdicts}
 \label{sec:supp-multicorpus}
-Table~\ref{tab:multi-corpus-h3} gives the per-(session, encoder) acceptance
-verdicts summarized in \S\ref{sec:results-multi-corpus}.
+This is the full form of the generalization result summarized in
+\S\ref{sec:results-multi-corpus}. To rule out a single-corpus / single-encoder
+artifact, we replicate the spatial-axis result across 14 street-scale sessions
+spanning 3 sensor stacks (SLOPER4D~\cite{dai2023sloper4d}: head-mounted LiDAR +
+DJI Action2; Nymeria: Project Aria + MPS SLAM; LookOut~\cite{pan2025lookout}:
+Project Aria across 5 Bay Area locations) and 3 encoder families (CLIP-L 768-d,
+CLIP-bigG 1280-d, SigLIP-2-large 1024-d~\cite{tschannen2025siglip2}). To our
+knowledge no existing egocentric benchmark combines outdoor spatial trajectories
+with temporally-grounded text annotations; we therefore assemble a practical
+three-corpus scaffold with per-corpus extractors for LiDAR-SLAM, Aria MPS, and
+Aria VRS trajectories, while stopping short of claiming a released benchmark.
+Acceptance criterion: for each (session, encoder), Hit@5 must be non-decreasing
+across $r\in\{10,11,12\}$ with $\geq4$\,pp lift from $r{=}10$ to $r{=}12$; a
+session passes if any encoder satisfies both (the $4$\,pp threshold is
+conservative against binomial noise at 28--30 questions per session).
+Table~\ref{tab:multi-corpus-h3} gives the per-(session, encoder) verdicts.
+Three patterns: (a)~cross-corpus robustness holds (SLOPER4D 3/3, Nymeria 1/1,
+LookOut 9/10) despite different sensor stacks and question pipelines;
+(b)~SigLIP-2 is the strongest single encoder (11/14 vs 9/14 clipL, 10/14 bigG),
+with two rescues (\texttt{Sanmateopark\_garage}, \texttt{Hillsdale6}) where the
+sigmoid-pairwise recipe picks up spatial signal the CLIP family misses on
+visually-repetitive trajectories; (c)~the lone failure,
+\texttt{BurlingameDT4\_feb5}, fails all three encoders
+(\S\ref{sec:limitations}).
+
+Figure~\ref{fig:f2-psm-vs-mllm} contrasts \psm{}'s retrieval with a vanilla
+uniform-sampling MLLM on these sessions (discussed in
+\S\ref{sec:results-vanilla-mllm}).
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\linewidth]{figures/f2_psm_vs_mllm.pdf}
+\caption{Vanilla Gemini 3.1 Pro at $K{=}8$ uniform frames (red) vs \psm{} \texttt{clipL@r12} top-5 (blue) on every v1 session.
+\psm{}'s query-guided retrieval reaches every session the uniform baseline misses; four sessions land at vanilla MLLM $= 0\%$ because the $K{=}8$ uniform frames never include a GT-interval frame.}
+\label{fig:f2-psm-vs-mllm}
+\end{figure}
 
 \begin{table}[h]
 \centering

@@ -39,21 +39,17 @@ PSM, \texttt{cap}=$K$  & 128  & \textbf{11.2\%} (21/187) & 0.063 & 0.013 \\
 \midrule
 PSM, \texttt{cap}=1    & 1024 & 8.0\% (15/187)           & 0.044 & 0.019 \\
 PSM, \texttt{cap}=$K$  & 1024 & \textbf{13.4\%} (25/187) & 0.074 & 0.013 \\
-\midrule
-PSM, \texttt{cap}=1 + Gemini   & 1024 & 8.0\% (15/187)           & 0.069 & 0.019 \\
-PSM, \texttt{cap}=$K$ + Gemini & 1024 & \textbf{13.4\%} (25/187) & \textbf{0.101} & 0.013 \\
 \bottomrule
 \end{tabular}
 \caption{\psm{} vs brute-force CLIP on \texttt{shelby\_arroyo\_act0} (187 narrations).
-$R{=}128$ (top block) is the bounded-memory deployment; $R{=}1024$ isolates reservoir eviction from the \caponek{} effect.
-At $R{=}1024$, \caponek{}$=K$ recovers brute-force exactly; MLLM rerank lifts mIoU $+37\%$ relative without changing Hit@5.}
+$R{=}128$ (top block) is the bounded-memory deployment; $R{=}1024$ isolates reservoir eviction from the \caponek{} effect, recovering brute-force exactly at \caponek{}$=K$. Optional MLLM rerank: supp.\ \S\ref{sec:results-mllm-rerank}.}
 \label{tab:headline}
 \end{table*}
 
 At the deployment point ($R{=}128$, \caponek{}$=K$), \psm{} reaches $83\%$ of brute-force Hit@5 ($11.2\%$ vs $13.4\%$; mIoU $0.063$ vs $0.074$) at $8\times$ smaller per-cell state; at $R{=}1024$ it recovers the \emph{same 25/187} with identical mIoU---a substrate-correctness check whose $2.2$\,pp/$0.011$ gap to $R{=}128$ is the bounded-memory cost.
 Strict spatial diversity (\caponek{}$=1$) costs $5.4$\,pp at $R{=}1024$ ($8.0\%$ vs brute-force $13.4\%$; $4.3$\,pp at $R{=}128$) because revisits to a cell collapse into one bucket---the intended behavior for place-distinct queries.
 Brute-force itself caps at $13.4\%$: 162/187 narrations are revisit-heavy and visually indistinguishable to CLIP cosine~\cite{weller2025limit}.
-MLLM rerank adds localization precision, not recall (exemplar mIoU $0.074\to0.101$, $+37\%$; Hit@5 unchanged at 25/187); \caponek{}$=1$+rerank reaches mIoU $0.069$, statistically indistinguishable from brute-force ($0.074$; paired bootstrap $\Delta{=}{-}0.005$, 95\% CI $[-0.032,+0.021]$).
+An optional MLLM rerank adds localization precision, not recall: \caponek{}$=1$+rerank reaches exemplar mIoU $0.069$, statistically indistinguishable from brute-force's $0.074$ (paired bootstrap $\Delta{=}{-}0.005$, 95\% CI $[-0.032,+0.021]$; \S\ref{sec:results-mllm-rerank}).
 Additional ablations (operating-point Pareto, retrieval baselines, memory/H3-resolution ablation, and the 30-session monotonicity sweep) are in the supplement (\S\ref{sec:supp-ablations}).
 
 \subsection{Memory, latency, and failure modes}
@@ -64,38 +60,21 @@ On the short Nymeria sessions ($N\in[748,1325]$, ${\sim}22$\,min) brute-force is
 Retrieval is sub-millisecond either way: brute-force dot-product over the 1133-frame bank is 67\,$\mu$s median, and the paired in-process \psm{} benchmark is 456/153\,$\mu$s at \caponek{}$=1$/$K$ (host-CPU, not wearable-device; \S\ref{sec:limitations}).
 Of the 162 shared brute-force/\psm{} misses, most are revisit-heavy narrations with recurring near-identical frames; the 25 groundable questions reference temporally-distinct events, so the shared $13.4\%$ ceiling is benchmark hardness, not method quality (\S\ref{sec:limitations}).
 
-\subsection{Multi-corpus, multi-encoder generalization}
-\label{sec:results-multi-corpus}
-
-To rule out a single-corpus / single-encoder artifact, we replicate the
-spatial-axis result across \textbf{14 street-scale sessions spanning 3 sensor
-stacks} (SLOPER4D~\cite{dai2023sloper4d} head-mounted LiDAR, Nymeria Project
-Aria + MPS, LookOut~\cite{pan2025lookout} Project Aria across 5 Bay Area sites)
-\textbf{and 3 encoder families} (CLIP-L, CLIP-bigG, SigLIP-2-large~\cite{tschannen2025siglip2}).
-Under a pre-registered criterion---Hit@5 non-decreasing across $r\in\{10,11,12\}$
-with $\geq4$\,pp lift from $r{=}10$ to $r{=}12$ on at least one encoder
-(conservative against binomial noise at 28--30 questions/session)---\textbf{13/14
-sessions pass} (SLOPER4D 3/3, Nymeria 1/1, LookOut 9/10), with SigLIP-2 the
-strongest single encoder (11/14), rescuing two visually-repetitive sessions
-where neither CLIP-family encoder passes. The sole failure,
-\texttt{BurlingameDT4\_feb5}, is a visually-homogeneous trajectory where
-captioned queries do not discriminate at cell scale (\S\ref{sec:limitations}).
-Per-(session, encoder) verdicts and the assembly of this three-corpus scaffold
-(no released benchmark yet combines outdoor trajectories with temporally-grounded
-text) are in the supplement (Table~\ref{tab:multi-corpus-h3}).
-
-\subsection{Vanilla MLLM as retrieval: why MLLMs need a prefilter}
+\subsection{Generalization, and why MLLMs need a spatial prefilter}
 \label{sec:results-vanilla-mllm}
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/f2_psm_vs_mllm.pdf}
-\caption{Vanilla Gemini 3.1 Pro at $K{=}8$ uniform frames (red) vs \psm{} \texttt{clipL@r12} top-5 (blue) on every v1 session.
-\psm{}'s query-guided retrieval reaches every session the uniform baseline misses; four sessions land at vanilla MLLM $= 0\%$ because the $K{=}8$ uniform frames never include a GT-interval frame.}
-\label{fig:f2-psm-vs-mllm}
-\end{figure}
-
-We run Gemini 3.1 Pro on all 14 sessions at $K{=}8$ uniformly-sampled frames per question (Fig.~\ref{fig:f2-psm-vs-mllm}), matching \psm{}'s candidate budget to isolate the retrieval substrate.
+The spatial-axis result generalizes beyond the headline session: across
+\textbf{14 street-scale sessions spanning 3 sensor stacks} (SLOPER4D~\cite{dai2023sloper4d},
+Nymeria, LookOut~\cite{pan2025lookout}) \textbf{and 3 encoder families}
+(CLIP-L, CLIP-bigG, SigLIP-2~\cite{tschannen2025siglip2}), \textbf{13/14 pass a
+pre-registered monotone-$r10{\to}r12$ Hit@5 criterion} (SigLIP-2 strongest at
+11/14; the lone failure is a visually-homogeneous parking-lot street,
+\S\ref{sec:limitations})---full criterion and per-session verdicts in supp.\
+\S\ref{sec:supp-multicorpus} (Table~\ref{tab:multi-corpus-h3}).
+\label{sec:results-multi-corpus}
+On these same 14 sessions we now ask whether a frontier MLLM can retrieve
+\emph{without} a spatial prefilter.
+We run Gemini 3.1 Pro at $K{=}8$ uniformly-sampled frames per question (supp.\ Fig.~\ref{fig:f2-psm-vs-mllm}), matching \psm{}'s candidate budget to isolate the retrieval substrate.
 \psm{} matches or exceeds the MLLM's Hit@5 on every session (median ${\sim}4\times$) and never loses (the sole tie is Hillsdale6 at $13.8\%$, also \psm{}'s weakest cross-encoder session); \textbf{four sessions land at vanilla MLLM $=0\%$} because the $K{=}8$ uniform frames never include a frame inside the ${\sim}3$\,s GT intervals.
 The root cause is temporal coverage: at 100--640\,s session durations the uniform-frame gap is 12--80\,s, a ${\sim}4\%$ chance of \emph{seeing} the right frame before any discrimination applies.
 The failure is architectural, not a matter of scale: at $K{=}32$ the oracle upper bound is $21.4\%$ but Gemini's actual pick rate stays $7.1\%$---a $3\times$ discrimination gap compounding the coverage gap, so a larger context window cannot recover signal that uniform sampling never captured.
