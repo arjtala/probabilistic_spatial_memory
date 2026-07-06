@@ -57,3 +57,13 @@ echo "=== F-HDD-3: self-supervised cross-session retrieval ==="
 echo
 echo "[hdd-figures] done. JSON -> captures/hdd/  |  SVGs -> journal/figures/hdd_*"
 
+# The paper build (journal/paper_drafts/) reads figures/ relative to itself, so
+# mirror the PDFs into the paper's figure dir (SVGs stay in journal/figures/).
+PAPER_FIGS="journal/paper_drafts/figures"
+if [[ -d "$PAPER_FIGS" ]]; then
+  cp -f journal/figures/hdd_memory_vs_area.pdf \
+        journal/figures/hdd_hll_cardinality.pdf \
+        journal/figures/hdd_cross_session_retrieval.pdf "$PAPER_FIGS"/ 2>/dev/null \
+    && echo "[hdd-figures] copied 3 PDFs -> $PAPER_FIGS/"
+fi
+

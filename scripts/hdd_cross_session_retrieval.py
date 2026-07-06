@@ -389,6 +389,7 @@ def _plot(cross_cos, diff_cos, cross_auc, same_auc, shuf_auc) -> None:
     ax2.set_title("Cross-session retrieval AUC")
     fig.tight_layout()
     fig.savefig(out_dir / "hdd_cross_session_retrieval.svg")
+    fig.savefig(out_dir / "hdd_cross_session_retrieval.pdf")
     plt.close(fig)
     print("# wrote journal/figures/hdd_cross_session_retrieval.svg")
 

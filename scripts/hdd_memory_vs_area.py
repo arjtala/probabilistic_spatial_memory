@@ -244,6 +244,7 @@ def _plot(cum_hours, recs, dwell_arr, total_secs, R, per_ex_bytes,
     ax.legend(fontsize=8)
     fig.tight_layout()
     fig.savefig(out_dir / "hdd_memory_vs_area.svg")
+    fig.savefig(out_dir / "hdd_memory_vs_area.pdf")
     plt.close(fig)
     print("# wrote journal/figures/hdd_memory_vs_area.svg")
 

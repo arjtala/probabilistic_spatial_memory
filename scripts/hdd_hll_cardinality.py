@@ -386,6 +386,7 @@ def _plot(series, reg_bytes) -> None:
     ax2.set_title("Ring-buffer time-decay (windowed)")
     fig.tight_layout()
     fig.savefig(out_dir / "hdd_hll_cardinality.svg")
+    fig.savefig(out_dir / "hdd_hll_cardinality.pdf")
     plt.close(fig)
     print("# wrote journal/figures/hdd_hll_cardinality.svg")
 
