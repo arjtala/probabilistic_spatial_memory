@@ -38,7 +38,7 @@ wall-time on both a synthetic stress test and the measured Nymeria
 measurement).
 
 \paragraph{Evaluating the retrieval substrate.}
-To demonstrate that \psm{} functions as a high-fidelity retrieval substrate, we evaluate it on the challenging task of egocentric look-back QA (e.g., ``where did I leave my keys?''). Multimodal LLMs (Gemini~3, Claude~4, GPT-4o) achieve strong single-frame grounding yet remain notoriously brittle on temporal grounding over long, continuous video sequences~\cite{cheng2024videgothink,chen2025groundedmultihop}. We compose \psm{} as an upstream spatial \emph{prefilter} to a frontier MLLM. The two contributions are complementary: \psm{} guarantees bounded-memory recall, while the MLLM supplies downstream localization precision.
+To demonstrate that \psm{} functions as a high-fidelity retrieval substrate, we evaluate it on the challenging task of egocentric look-back QA (e.g., ``where did I leave my keys?''). Multimodal LLMs (Gemini~3, Claude~4, GPT-4o) achieve strong single-frame grounding yet remain notoriously brittle on temporal grounding over long, continuous video sequences~\cite{cheng2024videgothink,chen2025groundedmultihop}. We compose \psm{} as an upstream spatial \emph{prefilter} to a frontier MLLM (\S\ref{sec:pipeline}). The two contributions are complementary: \psm{} guarantees bounded-memory recall, while the MLLM supplies downstream localization precision.
 
 \paragraph{Contributions.}
 \begin{itemize}
@@ -62,7 +62,7 @@ To demonstrate that \psm{} functions as a high-fidelity retrieval substrate, we 
     13/14 street-scale sessions across 3 sensor stacks and 3 encoders
     pass monotone acceptance
     (\S\ref{sec:results-multi-corpus},
-    Table~\ref{tab:multi-corpus-h3}).
+    supp.\ Table~\ref{tab:multi-corpus-h3}).
     \psm{}'s query-guided retrieval provides the spatial-temporal
     prefilter that uniform-sampling MLLMs lack: at matched $K{=}8$,
     \psm{} reaches every session that vanilla Gemini misses, including

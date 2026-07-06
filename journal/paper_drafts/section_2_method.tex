@@ -4,6 +4,8 @@
 % and the per_cell_cap selection rule. Anchored on the actual
 % C-side surface in include/core/{spatial_memory,tile,ring_buffer}.h
 % so any future reader can navigate from the prose to the code.
+% NB: former §3 (PSM-as-MLLM-prefilter pipeline) folded in as the final
+% subsection, labelled sec:pipeline, during the 8pp cut.
 
 \section{Probabilistic Spatial Memory}
 
@@ -91,8 +93,9 @@ in \S\ref{sec:results-memory-latency}.
 
 \subsection{PSM as an MLLM prefilter}
 \label{sec:pipeline}
+Having defined the substrate, we now compose it into the look-back-QA system.
 \psm{} returns ranked $(t,\mathrm{cell},\mathrm{lat},\mathrm{lng},\mathbf{e})$
-tuples, not natural-language answers, so for look-back QA we use it as a
+tuples, not natural-language answers, so we use it as a
 \emph{prefilter} feeding a frontier MLLM \emph{reranker}
 (Fig.~\ref{fig:f1-architecture}, bottom row).
 Three stages address distinct failure modes.
