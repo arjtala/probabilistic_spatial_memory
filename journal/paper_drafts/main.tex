@@ -126,6 +126,10 @@ structures \and Egocentric video \and Retrieval substrate.}
 % For camera-ready this may be split into a separate supplementary PDF; kept
 % here so the single build shows the body ending before the appendix.
 \appendix
+% Give appendix sections unique hyperref anchors, else the appendix's first
+% \section reuses "section.1" and clashes with §1 (the "destination already
+% used" warning in the build log).
+\renewcommand{\theHsection}{supp.\arabic{section}}
 \input{supplementary.tex}
 
 % Reproducibility note: the engine + eval harness are released

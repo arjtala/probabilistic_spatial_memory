@@ -14,64 +14,42 @@
 \label{sec:limitations}
 
 \paragraph{Benchmark ceiling on revisit-heavy narrations.}
-Both \psm and brute-force CLIP plateau at 13.4\% Hit@5 on the
-headline session (\S\ref{sec:results-main}).
-The dominant failure mode is revisit-heavy long narrations:
-162 of the 187 narrations describe rooms the wearer enters
-many times during the recording, and each entry produces
-visually near-identical frames.
-Both methods converge on the most similar frame, which is
-rarely the single interval the annotator chose as ground truth.
-This is a benchmark hardness ceiling, not a method-quality
-signal---\psm and brute-force CLIP agree on the 25 questions
-that \emph{are} uniquely groundable and disagree only on the
-inherently ambiguous remainder.
-Future benchmarks should score against \emph{any} acceptable
-revisit window rather than the one the annotator selected.
+Both \psm and brute-force CLIP plateau at 13.4\% Hit@5 on the headline session
+(\S\ref{sec:results-main}): 162/187 narrations describe rooms entered
+repeatedly, producing near-identical frames on which both converge to a frame
+rarely matching the annotator's single chosen interval. This is benchmark
+hardness, not method quality---the two agree on the 25 uniquely-groundable
+questions and differ only on the ambiguous remainder. Future benchmarks should
+score against \emph{any} acceptable revisit window.
 
 \paragraph{One honest spatial-axis failure.}
-Of the 14 street-scale sessions in \S\ref{sec:results-multi-corpus},
-\texttt{BurlingameDT4\_feb5} (LookOut, 242\,m bbox) is the only
-session where all three encoders fail the monotone-\caponek lift
-criterion.
-The trajectory is a visually homogeneous parking-lot-flanked street
-whose captioned queries collapse onto a handful of cells no encoder
-discriminates above floor.
-The same failure recurs on Aria Gen~2
-Pilot's~\cite{aria-gen2-pilot} GPS-grounded outdoor walks
-(300\,m extent, real GPS)---confirming the bottleneck is
-encoder discrimination, not trajectory quality.
+Of the 14 street-scale sessions (\S\ref{sec:results-multi-corpus}),
+\texttt{BurlingameDT4\_feb5} (242\,m bbox) is the only one where all three
+encoders fail the monotone-\caponek lift---a visually homogeneous parking-lot
+street whose queries collapse onto a few indistinguishable cells. The same
+failure recurs on Aria Gen~2 Pilot's~\cite{aria-gen2-pilot} GPS-grounded walks,
+confirming the bottleneck is encoder discrimination, not trajectory quality.
 
 \paragraph{Latency scope.}
-\psm's reported latency combines a 1024-tile, dim-128 synthetic CPU
-stress test (single H200 host, ${\sim}700\,\mu$s per query) with an
-actual Nymeria \psm{} state measured on the same host
-(\S\ref{sec:results-memory-latency}). The latter uses only 7 occupied
-H3 cells but dim\,768 embeddings, so it checks the real data path
-rather than the worst-case tile count. These numbers should be read as
-systems sanity checks, not on-device latency claims. The deployment
-target is a wearable device (neither GPU nor H200-class CPU); porting
-the C engine is straightforward but unmeasured here.
+\psm's latency (\S\ref{sec:results-memory-latency}) combines a 1024-tile
+dim-128 synthetic CPU stress test (${\sim}700\,\mu$s) and the real Nymeria state
+(7 cells, dim\,768); both are host-CPU sanity checks, not on-device claims. The
+wearable deployment target is unmeasured, though porting the C engine is
+straightforward.
 
 \paragraph{No spatial-only baseline.}
-Our baselines cover full-memory brute-force CLIP, sliding-window CLIP,
-and uniform temporal sampling, but they do not include a spatial-only
-heuristic such as nearest-GPS, random-cell, or low-visit-count cell
-retrieval. The reported gains therefore establish that query-guided
-cell retrieval beats uniform temporal coverage at the same candidate
-budget; they do not fully isolate how much comes from spatial indexing
-alone versus embedding similarity within the selected cells.
+Our baselines (brute-force, sliding-window, uniform-sample CLIP) omit a
+spatial-only heuristic (nearest-GPS, random-cell). The gains thus show
+query-guided cell retrieval beats uniform temporal coverage at matched budget,
+but do not fully isolate spatial indexing from embedding similarity within the
+selected cells.
 
 \paragraph{Multi-corpus coverage.}
-The deepest single-session analysis
-(Table~\ref{tab:headline}, the \caponek sweep, the
-brute-force comparison) remains on Nymeria
-\texttt{shelby\_arroyo\_act0}.
-The multi-corpus sweep (\S\ref{sec:results-multi-corpus})
-covers 14 sessions across three corpora and three encoder
-families but reports Hit@5 only, under a heuristic monotonicity-plus-lift
-criterion rather than a formal statistical test. mIoU and counting
-metrics across the full 14-session set are a straightforward follow-up.
+The deepest single-session analysis (Table~\ref{tab:headline}) remains Nymeria
+\texttt{shelby\_arroyo\_act0}; the 14-session sweep
+(\S\ref{sec:results-multi-corpus}) reports Hit@5 under a heuristic
+monotonicity-plus-lift criterion rather than a formal test, and mIoU/counting
+across all 14 are a follow-up.
 
 \paragraph{HDD is a systems, not a retrieval-accuracy, result.}
 HDD ships no look-back QA labels, so the multi-session results

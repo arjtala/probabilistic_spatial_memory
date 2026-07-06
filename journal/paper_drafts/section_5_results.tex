@@ -50,25 +50,18 @@ At $R{=}1024$, \caponek{}$=K$ recovers brute-force exactly; MLLM rerank lifts mI
 \label{tab:headline}
 \end{table*}
 
-At the deployment configuration ($R{=}128$, \caponek{}$=K$), \psm{} reaches $83\%$ of brute-force Hit@5 ($11.2\%$ vs $13.4\%$) and exemplar mIoU $0.063$ vs.\ $0.074$ at $8\times$ smaller per-cell reservoir state.
-At $R{=}1024$, \caponek{}$=K$ hits the \emph{same 25 of 187} questions with identical exemplar mIoU ($0.074$): this is a substrate-correctness sanity check, with the bounded-memory cost being the $2.2$\,pp Hit@5 and $0.012$ mIoU gap between the two reservoir sizes.
-Strict spatial diversity (\caponek{}$=1$) costs $5.4$\,pp Hit@5 ($8.0\%$ vs $13.4\%$) because revisits to the same cell collapse into one bucket---the intended behavior for place-distinct queries; revisit-heavy questions are not the cap-1 design point.
-
-Brute-force CLIP itself caps at $13.4\%$ Hit@5: 162 of 187 narrations are revisit-heavy and visually indistinguishable to CLIP cosine, consistent with the dimension-bounded retrieval limits of single-vector embeddings~\cite{weller2025limit}.
-The MLLM rerank adds localization precision, not recall: exemplar mIoU rises $0.074\to0.101$ ($+37\%$ relative) while Hit@5 stays at 25/187.
-At \caponek{}$=1$+rerank, exemplar mIoU $= 0.069$ is statistically indistinguishable from brute-force ($0.074$): paired bootstrap (10\,000 resamples) gives $\Delta\text{mIoU} = -0.005$, 95\% CI $[-0.032, +0.021]$.
-The bounded-memory operating point retains most of the full-bank recall while preserving the query-time choice between spatial diversity and embedding precision.
+At the deployment point ($R{=}128$, \caponek{}$=K$), \psm{} reaches $83\%$ of brute-force Hit@5 ($11.2\%$ vs $13.4\%$; mIoU $0.063$ vs $0.074$) at $8\times$ smaller per-cell state; at $R{=}1024$ it recovers the \emph{same 25/187} with identical mIoU---a substrate-correctness check whose $2.2$\,pp/$0.012$ gap to $R{=}128$ is the bounded-memory cost.
+Strict spatial diversity (\caponek{}$=1$) costs $5.4$\,pp because revisits to a cell collapse into one bucket---the intended behavior for place-distinct queries.
+Brute-force itself caps at $13.4\%$: 162/187 narrations are revisit-heavy and visually indistinguishable to CLIP cosine~\cite{weller2025limit}.
+MLLM rerank adds localization precision, not recall (exemplar mIoU $0.074\to0.101$, $+37\%$; Hit@5 unchanged at 25/187); \caponek{}$=1$+rerank reaches mIoU $0.069$, statistically indistinguishable from brute-force ($0.074$; paired bootstrap $\Delta{=}{-}0.005$, 95\% CI $[-0.032,+0.021]$).
 Additional ablations (operating-point Pareto, retrieval baselines, memory/H3-resolution ablation, and the 30-session monotonicity sweep) are in the supplement (\S\ref{sec:supp-ablations}).
 
 \subsection{Memory, latency, and failure modes}
 \label{sec:results-memory-latency}
 
-\psm{}'s per-cell storage at the deployment configuration ($R{=}128$ exemplars $\times$ 768-d $\times$ 4\,B $\approx 0.38$\,MiB, plus a 60-slot $p{=}10$ HLL ring buffer $\approx 0.06$\,MiB) is session-length-invariant; brute-force grows linearly in $N$.
-Figure~\ref{fig:f6-memory} plots both under the observed ${\sim}10$-cell footprint: the brute-force = \psm{} crossover sits at $N \approx 1500$ frames (${\approx}25$\,min at 1\,fps, CLIP-L 768-d).
-Past the crossover the gap diverges for the same spatial footprint: ${\sim}10\times$ at 4 hours, ${\sim}20\times$ at 8 hours.
-In our measured corpus ($N \in [748, 1325]$), brute-force remains slightly cheaper (${\sim}2.2$--$3.9$\,MiB vs ${\sim}4.3$\,MiB at ${\sim}10$ cells per session); \psm{} pays its constant overhead before brute-force catches up.
-On \texttt{shelby\_arroyo\_act0}, actual-workload brute-force dot-product retrieval over the 1133-frame CLIP-L bank takes 67\,$\mu$s median.
-The paired in-process \psm{} benchmark on the same host, using the deployment state ($R{=}128$, $p{=}10$, 7 occupied H3 cells, dim\,768), takes 456\,$\mu$s median at \caponek{}$=1$ and 153\,$\mu$s median at \caponek{}$=K$ over 5000 calls; both are host-CPU measurements, not wearable-device measurements (\S\ref{sec:limitations}).
+\psm{}'s per-cell state is session-length-invariant ($R{=}128\times768$-d$\times4$\,B $\approx0.38$\,MiB plus a 60-slot $p{=}10$ HLL ring $\approx0.06$\,MiB); brute-force grows linearly in $N$.
+Under the observed ${\sim}10$-cell footprint (Fig.~\ref{fig:f6-memory}) the crossover is $N\approx1500$ frames (${\approx}25$\,min at 1\,fps), beyond which the gap reaches ${\sim}10\times$ at 4\,h and ${\sim}20\times$ at 8\,h; on our short measured corpus ($N\in[748,1325]$) brute-force is still marginally cheaper.
+Retrieval is sub-millisecond either way: brute-force dot-product over the 1133-frame bank is 67\,$\mu$s median, and the paired in-process \psm{} benchmark is 456/153\,$\mu$s at \caponek{}$=1$/$K$ (host-CPU, not wearable-device; \S\ref{sec:limitations}).
 
 \begin{figure}[t]
 \centering
@@ -80,9 +73,7 @@ Crossover at $N \approx 1500$ (${\sim}25$\,min); under the same spatial footprin
 \label{fig:f6-memory}
 \end{figure}
 
-Of the 162 questions both methods miss, most are revisit-heavy narrations where visually-similar frames recur across the session.
-The 25 groundable questions all reference temporally-distinct events.
-The shared $13.4\%$ ceiling is benchmark hardness, not method quality (\S\ref{sec:limitations}).
+Of the 162 shared misses, most are revisit-heavy narrations with recurring near-identical frames; the 25 groundable questions reference temporally-distinct events, so the shared $13.4\%$ ceiling is benchmark hardness, not method quality (\S\ref{sec:limitations}).
 
 \subsection{Multi-corpus, multi-encoder generalization}
 \label{sec:results-multi-corpus}
@@ -186,7 +177,7 @@ hit-rate is low ($\leq0.07$@10) because the 357k-frame pool is dominated by
 near-duplicate same-drive frames, so AUC, not top-$k$, is the discriminability
 measure here.
 
-\begin{figure}[t]
+\begin{figure}[tb]
 \centering
 \includegraphics[width=\linewidth]{figures/hdd_combined.pdf}
 \caption{HDD multi-session results (132 drives, 102.9\,h).

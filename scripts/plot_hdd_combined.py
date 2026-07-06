@@ -54,9 +54,10 @@ def main() -> int:
         return 1
 
     if args.layout == "vertical":
-        # Sized so that at LNCS \linewidth (~4.8in) it displays ~4.8x4.6in
-        # (fits a column comfortably); a taller aspect scales past the page.
-        fig, (a, b, c) = plt.subplots(3, 1, figsize=(5.0, 4.8))
+        # Wider-and-shorter so it displays ~4.8x2.5in at \linewidth -- small
+        # enough (<50% text height) that a [t]/[tb] float places in-section
+        # rather than drifting to the end of the document.
+        fig, (a, b, c) = plt.subplots(3, 1, figsize=(5.4, 4.0))
     else:
         fig, (a, b, c) = plt.subplots(1, 3, figsize=(10.5, 3.3))
 
