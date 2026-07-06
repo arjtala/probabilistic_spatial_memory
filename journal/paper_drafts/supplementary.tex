@@ -9,13 +9,6 @@
 \section{Supplementary Material}
 \label{sec:supp}
 
-\subsection{Architecture overview}
-\label{sec:supp-architecture}
-\input{figures/f1_architecture.tex}
-Figure~\ref{fig:f1-architecture} sketches the end-to-end \psm{} pipeline
-described in \S\ref{sec:method}: streaming ingest into H3 cells (top row) and
-query-time retrieval with MLLM rerank (bottom row).
-
 \subsection{Additional ablations and retrieval baselines}
 \label{sec:supp-ablations}
 Beyond the single-session headline (\S\ref{sec:results-main}), four patterns:
@@ -46,7 +39,7 @@ Crossover at $N \approx 1500$ (${\sim}25$\,min); under the same spatial footprin
 \label{fig:f6-memory}
 \end{figure}
 
-\subsection{Multi-corpus generalization and the vanilla-MLLM baseline}
+\subsection{Full multi-corpus, multi-encoder per-session verdicts}
 \label{sec:supp-multicorpus}
 This is the full form of the generalization result summarized in
 \S\ref{sec:results-multi-corpus}. To rule out a single-corpus / single-encoder
@@ -72,18 +65,6 @@ sigmoid-pairwise recipe picks up spatial signal the CLIP family misses on
 visually-repetitive trajectories; (c)~the lone failure,
 \texttt{BurlingameDT4\_feb5}, fails all three encoders
 (\S\ref{sec:limitations}).
-
-Figure~\ref{fig:f2-psm-vs-mllm} contrasts \psm{}'s retrieval with a vanilla
-uniform-sampling MLLM on these sessions (discussed in
-\S\ref{sec:results-vanilla-mllm}).
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=\linewidth]{figures/f2_psm_vs_mllm.pdf}
-\caption{Vanilla Gemini 3.1 Pro at $K{=}8$ uniform frames (red) vs \psm{} \texttt{clipL@r12} top-5 (blue) on every one of the 14 street-scale sessions.
-\psm{}'s query-guided retrieval reaches every session the uniform baseline misses; four sessions land at vanilla MLLM $= 0\%$ because the $K{=}8$ uniform frames never include a GT-interval frame.}
-\label{fig:f2-psm-vs-mllm}
-\end{figure}
 
 \begin{table}[h]
 \centering

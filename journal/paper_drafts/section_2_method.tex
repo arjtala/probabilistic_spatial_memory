@@ -92,7 +92,7 @@ Having defined the substrate, we now compose it into the look-back-QA system.
 \psm{} returns ranked $(t,\mathrm{cell},\mathrm{lat},\mathrm{lng},\mathbf{e})$
 tuples, not natural-language answers, so we use it as a
 \emph{prefilter} feeding a frontier MLLM \emph{reranker}
-(supp.\ Fig.~\ref{fig:f1-architecture}, bottom row).
+(Fig.~\ref{fig:f1-architecture}, bottom row).
 Three stages address distinct failure modes.
 \textbf{(1)~Retrieval:} embed the question $q$ with the ingest encoder and call
 \texttt{SpatialMemory\_query\_similar} at the configured \caponek{} and $K{=}5$,
