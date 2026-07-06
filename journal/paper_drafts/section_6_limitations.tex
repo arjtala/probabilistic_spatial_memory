@@ -4,7 +4,11 @@
 %   (1) Revisit-heavy long-narration ceiling
 %   (2) One honest spatial-axis failure (BurlingameDT4)
 %   (3) Host-CPU latency scope
-%   (4) Multi-corpus coverage scope
+%   (4) No spatial-only baseline
+%   (5) Multi-corpus coverage scope
+%   (6) HDD is a systems/self-supervised result (no QA labels); F-HDD-3
+%       geography-vs-visual confound (k-NN-cell control); ~3s GPS skew
+%       corrected via analysis-time realign, source fix not yet re-extracted
 
 \section{Limitations}
 \label{sec:limitations}
@@ -68,3 +72,19 @@ covers 14 sessions across three corpora and three encoder
 families but reports Hit@5 only, under a heuristic monotonicity-plus-lift
 criterion rather than a formal statistical test. mIoU and counting
 metrics across the full 14-session set are a straightforward follow-up.
+
+\paragraph{HDD is a systems, not a retrieval-accuracy, result.}
+HDD ships no look-back QA labels, so the multi-session results
+(\S\ref{sec:results-hdd}) are \emph{systems} and \emph{self-supervised}
+(bounded state, cross-session cardinality, label-free place recognition), not a
+Hit@5/mIoU number---a deliberate division of labor in which the wearable corpora
+carry retrieval accuracy and HDD carries multi-session persistence.
+Two caveats. First, F-HDD-3's positive/negative split (same $r{=}10$ cell vs.\
+all other cells) blends coarse geographic proximity with visual place identity;
+a $k$-nearest-cell hard-negative control would isolate the visual component and
+is the natural next step. Second, the extracted HDD feature files carry a
+${\sim}3$\,s GPS-warmup clock skew (${\sim}17$\,m median); we correct it at
+analysis time by re-aligning per-frame coordinates from the raw RTK track, and
+verified the correction shifts cross-session AUC by only $+0.005$
+($0.848{\to}0.853$). The source-side extraction fix is verified in simulation
+but has not been re-run through GPU extraction.
