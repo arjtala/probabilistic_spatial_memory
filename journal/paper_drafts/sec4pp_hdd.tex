@@ -1,0 +1,76 @@
+% P3: HDD multi-session results — the core payload. Adapted from the 8pp
+% §5.6; cross-refs to supp/limitations rewritten to be self-contained.
+
+\section{Multi-Session Persistence at Metropolitan Scale}
+\label{sec:results-hdd}
+
+We evaluate on the Honda Research Institute Driving Dataset
+(HDD)~\cite{ramanishka2018hdd}: 104\,h of San Francisco Bay Area driving
+with RTK GPS and a front camera (our extraction covers 132 drives,
+102.9\,h with valid GPS). A vehicle sweeps far more area per minute than a
+walker and, over 132 drives across 8 months, genuinely re-drives the same
+streets---the multi-session revisit structure a single-pass egocentric
+corpus lacks. HDD ships no look-back-QA labels, so these results are
+\emph{systems} and \emph{self-supervised}, not retrieval-accuracy; frames
+are embedded with CLIP-L.
+
+\paragraph{Revisit structure.}
+Binning every drive to H3 $r{=}10$ (${\sim}66$\,m), \textbf{47.0\%} of
+(drive, cell) traversal events fall in cells revisited on $\geq2$ distinct
+days (pre-registered acceptance bar: $\geq30\%$), across 5{,}163 revisited
+cells whose first-to-last visit spans a \textbf{median of 106 days} (max
+221). The coverage is arterial, not a depot artifact---excluding the 20
+most-driven cells leaves it at 46.5\%.
+
+\paragraph{State scales with area, not time (Fig.~\ref{fig:hdd-combined}A).}
+Over 102.9\,h and 23{,}298 distinct $r{=}10$ cells, \psm{}'s
+per-cell-capped state ($\sum_\text{cells}\min(\text{frames}, R)$) is
+smaller than a dense per-frame bank at every ingest rate, and the gap
+widens as the reservoir discards more redundant dwell/revisit frames:
+$1.3\times$/$2.3\times$/$4.3\times$/$7.2\times$ at 1/5/15/30\,fps (capping
+26/57/77/86\% of frames). State thus grows \emph{sublinearly in
+observation count}---$O(\text{distinct cells})$, not $O(\text{frames})$.
+This is \emph{not} an observed plateau: cumulative area keeps growing (only
+20\% of cells are seen by the halfway mark), so the saving comes from
+per-cell capping and is ingest-rate dependent---the empirical form of
+``budgeted by area, not sequence length.''
+
+\paragraph{Cross-session cardinality accrual and decay
+(Fig.~\ref{fig:hdd-combined}B).}
+HDD's revisits exercise the HLL sketch \emph{across sessions}. Feeding a
+revisited cell's frames chronologically across drives, a single fixed
+$1\,\mathrm{KiB}$ ($p{=}10$) sketch accrues to \textbf{8{,}112 unique
+observations over 219 days}, while its 60-slot ring-buffer windowed
+estimate decays between visits and jumps on each revisit---decay while
+maintaining unique-event cardinality across revisits. A Python
+reimplementation matches the C-engine sketch to $2.4\times10^{-5}$ median
+relative error.
+
+\paragraph{The persistent memory is retrievable across sessions
+(Fig.~\ref{fig:hdd-combined}C).}
+Label-free, we query a revisited cell with a drive-A exemplar and measure
+the AUC that different-day drive-B frames in that cell outrank frames from
+other cells. Over 5{,}222 revisited cells (2{,}000 stratified queries) the
+cross-session AUC is \textbf{0.853}, vs.\ a shuffled-cell null of $0.498$
+and a same-drive upper bound of $0.977$---strong cross-session place
+recognition from CLIP cosine over the persistent per-cell exemplars alone.
+The same-cell-vs-all-others split blends geographic proximity with visual
+identity; a $k$-nearest-cell control would isolate the latter.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.86\linewidth]{figures/hdd_combined.pdf}
+\caption{HDD multi-session results (132 drives, 102.9\,h).
+\textbf{(A)}~\psm{}'s area-bounded per-cell reservoir vs a dense per-frame
+embedding bank over cumulative driving hours; the gap widens with ingest
+rate as redundant frames are capped ($O(\text{cells})$, not
+$O(\text{frames})$; drawn at 30\,fps).
+\textbf{(B)}~Cross-session HLL cardinality on the most-revisited cell:
+cumulative accrual (left axis) in a fixed $1\,\mathrm{KiB}$ sketch, and the
+ring-buffer windowed estimate (right axis) decaying between visits and
+jumping on each revisit, over months-long gaps.
+\textbf{(C)}~Self-supervised cross-session retrieval AUC (different-day
+same-cell frames outranking other-cell frames), with the shuffled-cell
+null ($0.498$) and same-drive upper bound ($0.977$).}
+\label{fig:hdd-combined}
+\end{figure}

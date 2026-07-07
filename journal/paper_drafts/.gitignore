@@ -9,3 +9,18 @@ main.pdf
 main.fdb_latexmk
 *.fls
 *.brf
+
+# Local CTAN fetches for offline builds (not kit source; do not commit)
+axessibility.sty
+silence.sty
+soulpos.sty
+accsupp.sty
+accsupp-stub.sty
+main_4pp.aux
+main_4pp.bbl
+main_4pp.blg
+main_4pp.log
+main_4pp.out
+main_4pp.pdf
+main_4pp.brf
+main_4pp.fdb_latexmk

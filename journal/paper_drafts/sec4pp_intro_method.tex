@@ -1,0 +1,72 @@
+% P1-2: intro (systems problem + 3 properties) + compact method + F1.
+
+\section{Introduction}
+\label{sec:intro}
+
+For an agent to hold persistent memory of its environment, its internal
+state cannot grow unboundedly with time. Standard retrieval-augmented
+systems embed every observation into a dense vector bank that grows
+linearly with recording duration, making continuous multi-session memory
+prohibitively expensive on-device. Improving the long-context capacity of
+the models themselves~\cite{arora2024linear,chen2024vljepa} does not
+address the underlying systems bottleneck: how to structure a dynamic
+spatial representation that supports test-time memory updating without
+unbounded state explosion.
+
+Three properties define a viable substrate for multi-session persistent
+spatial memory. \emph{Memory-budgeted}: state must be bounded
+independently of sequence length, scaling instead by physical area
+explored. \emph{Dynamic}: the index must support test-time evolution,
+letting old information decay while maintaining unique-event cardinality
+across revisits. \emph{Streaming}: observations must update the memory
+in-place and online. We present \textbf{Probabilistic Spatial Memory}
+(\psm{}), a substrate meeting all three, and demonstrate the
+multi-session regime it targets on 102.9\,h of metropolitan driving with
+genuine same-place revisits---the setting a single-pass egocentric corpus
+cannot exercise.
+
+\section{Probabilistic Spatial Memory}
+\label{sec:method}
+
+\psm{} is a streaming spatial-temporal index that ingests
+$(t, \mathrm{lat}, \mathrm{lng}, \mathbf{e})$ tuples---timestamp,
+geographic position, and a $d$-dimensional embedding---and supports
+bounded-memory top-$K$ similarity search at any time. Three layered
+probabilistic data structures over an H3~\cite{brodsky2018h3} hexagonal
+tessellation enforce the memory bound.
+
+\paragraph{H3 tessellation.}
+Each tuple maps to its containing H3 cell at resolution~$r$ (default~12,
+${\sim}9$\,m edges; the street-scale results below use $r{=}10$,
+${\sim}66$\,m). Cell IDs are global---comparable across recordings,
+sessions, and devices---which is what makes cross-session and
+cross-device memory well-defined.
+
+\paragraph{Time-decayed HLL ring buffer.}
+Each cell keeps a ring buffer of $C$ HyperLogLog
+sketches~\cite{flajolet2007hyperloglog} rotating on a fixed time-window
+cadence (default 30\,s). Ingest hashes the embedding into the current
+sketch; when the window elapses the pointer advances and the oldest sketch
+expires, enforcing bounded-time retention. The sketches estimate
+unique-event cardinality per cell and expose the cell's temporal envelope
+$(t_{\min}, t_{\max})$. At precision $p{=}10$ each sketch is $1\,$KiB, so
+a cell's ring is $C\cdot1\,\mathrm{KiB} = 60\,$KiB, independent of
+recording length.
+
+\paragraph{Reservoir-sampled exemplars.}
+For cosine scoring we store embeddings via Algorithm~R reservoir
+sampling~\cite{vitter1985reservoir} per cell (capacity $R{=}128$): after
+$n > R$ frames a cell holds a uniform $R$-sized sample. Brute-force grows
+$\Theta(N)$; \psm{} grows $\Theta(R\cdot|\mathrm{cells}|)$, bounded by the
+physical area covered, not recording length---the design's central
+property.
+
+\paragraph{Top-$K$ query.}
+A query embeds the request and, for each cell in an optional
+$k$-ring neighborhood, returns its top-$\min(\caponek, R)$ exemplars by
+cosine similarity, then merges and truncates to $K$. \caponek{}$=1$
+enforces strict spatial diversity (one slot per cell); \caponek{}$=K$
+recovers unconstrained top-$K$. Ingest is $O(1)$ amortized (H3 lookup, HLL
+hash, reservoir update); queries run at any time after the first ingest.
+For look-back QA the ranked candidates feed a frontier-MLLM reranker; the
+full pipeline and architecture diagram are in the extended paper.
