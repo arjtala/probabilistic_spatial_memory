@@ -7,32 +7,30 @@
 We evaluate on the Honda Research Institute Driving Dataset
 (HDD)~\cite{ramanishka2018hdd}: 104\,h of San Francisco Bay Area driving
 with RTK GPS and a front camera (our extraction covers 132 drives,
-102.9\,h with valid GPS). A vehicle sweeps far more area per minute than a
-walker and, over 132 drives across 8 months, genuinely re-drives the same
-streets. HDD ships no look-back-QA labels, so these results are
+102.9\,h with valid GPS). Over 8 months a vehicle genuinely re-drives the
+same streets. HDD ships no look-back-QA labels, so these results are
 \emph{systems} and \emph{self-supervised}, not retrieval-accuracy; frames
 are embedded with CLIP-L.
 
 \paragraph{Revisit structure.}
 Binning every drive to H3 $r{=}10$ (${\sim}66$\,m), \textbf{47.0\%} of
 (drive, cell) traversal events fall in cells revisited on $\geq2$ distinct
-days (pre-registered acceptance bar: $\geq30\%$), across 5{,}163 revisited
-cells whose first-to-last visit spans a \textbf{median of 106 days} (max
-221). The coverage is arterial, not a depot artifact---excluding the 20
-most-driven cells leaves it at 46.5\%.
+days (pre-registered bar: $\geq30\%$), across 5{,}163 revisited cells
+whose first-to-last visit spans a \textbf{median of 106 days} (max 221);
+the coverage is arterial, not a depot artifact (46.5\% excluding the 20
+most-driven cells).
 
 \paragraph{State scales with area, not time (Fig.~\ref{fig:hdd-combined}A).}
 Over 102.9\,h and 23{,}298 distinct $r{=}10$ cells, \psm{}'s
 per-cell-capped state ($\sum_\text{cells}\min(\text{frames}, R)$) is
-smaller than a dense per-frame bank at every ingest rate, and the gap
-widens as the reservoir discards more redundant dwell/revisit frames:
+smaller than a dense per-frame bank at every ingest rate, the gap widening
+as the reservoir caps redundant dwell/revisit frames:
 $1.3\times$/$2.3\times$/$4.3\times$/$7.2\times$ at 1/5/15/30\,fps (capping
-26/57/77/86\% of frames). State thus grows \emph{sublinearly in
-observation count}---$O(\text{distinct cells})$, not $O(\text{frames})$.
-This is \emph{not} an observed plateau: cumulative area keeps growing (only
-20\% of cells are seen by the halfway mark), so the saving comes from
-per-cell capping and is ingest-rate dependent---the empirical form of
-``budgeted by area, not sequence length.''
+26/57/77/86\% of frames)---state grows \emph{sublinearly in observation
+count}, $O(\text{distinct cells})$ not $O(\text{frames})$. This is not a
+plateau (area keeps growing: only 20\% of cells seen by the halfway mark);
+the saving is per-cell capping, the empirical form of ``budgeted by area,
+not sequence length.''
 
 \paragraph{Cross-session cardinality accrual and decay
 (Fig.~\ref{fig:hdd-combined}B).}

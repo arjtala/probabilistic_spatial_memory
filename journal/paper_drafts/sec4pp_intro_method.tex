@@ -6,24 +6,21 @@
 For an agent to hold persistent memory of its environment, its internal
 state cannot grow unboundedly with time. Standard retrieval-augmented
 systems embed every observation into a dense vector bank that grows
-linearly with recording duration, making continuous multi-session memory
-prohibitively expensive on-device. Improving the long-context capacity of
-the models themselves~\cite{arora2024linear,chen2024vljepa} does not
-address the underlying systems bottleneck: how to structure a dynamic
-spatial representation that supports test-time memory updating without
-unbounded state explosion.
+linearly with recording duration, untenable for continuous multi-session
+memory on-device. Improving the long-context capacity of the models
+themselves~\cite{arora2024linear,chen2024vljepa} does not address this
+systems bottleneck: how to structure a dynamic spatial representation
+supporting test-time memory updates without unbounded state explosion.
 
 Three properties define a viable substrate for multi-session persistent
-spatial memory. \emph{Memory-budgeted}: state must be bounded
-independently of sequence length, scaling instead by physical area
-explored. \emph{Dynamic}: the index must support test-time evolution,
-letting old information decay while maintaining unique-event cardinality
-across revisits. \emph{Streaming}: observations must update the memory
-in-place and online. We present \textbf{Probabilistic Spatial Memory}
-(\psm{}), a substrate meeting all three, and demonstrate the
-multi-session regime it targets on 102.9\,h of metropolitan driving with
-genuine same-place revisits---the setting a single-pass egocentric corpus
-cannot exercise.
+spatial memory. \emph{Memory-budgeted}: state bounded independently of
+sequence length, scaling by physical area explored. \emph{Dynamic}:
+test-time evolution, letting old information decay while maintaining
+unique-event cardinality across revisits. \emph{Streaming}: in-place,
+online updates. We present \textbf{Probabilistic Spatial Memory}
+(\psm{}), which meets all three, and demonstrate the multi-session regime
+it targets on 102.9\,h of metropolitan driving with genuine same-place
+revisits---the setting a single-pass egocentric corpus cannot exercise.
 
 \section{Probabilistic Spatial Memory}
 \label{sec:method}

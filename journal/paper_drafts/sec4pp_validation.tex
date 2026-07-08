@@ -21,15 +21,14 @@ and three encoders (CLIP-L, CLIP-bigG, SigLIP-2~\cite{tschannen2025siglip2});
 the full generalization study, ablations, and MLLM comparison are deferred
 to the extended paper.
 
-\paragraph{Limitations and outlook.}
+\paragraph{Limitations.}
 The HDD results are systems and self-supervised, not a retrieval-accuracy
 metric, since HDD carries no QA labels; the cross-session AUC conflates
 geographic proximity with visual identity pending a $k$-nearest-cell
-control. Reported latency is host-CPU, not on-device, and the extracted
-HDD features carry a ${\sim}3$\,s GPS-warmup skew (${\sim}17$\,m) corrected
-at analysis time (shifting AUC by $+0.005$). By budgeting spatial memory
-by area rather than time, \psm{} demonstrates on 102.9\,h of driving the
-multi-session regime a single-pass corpus cannot---sublinear state growth,
-cross-session cardinality accrual with decay, and label-free place
-recognition. The engine and harness are released under
-MIT.\footnote{Repository URL withheld for double-blind review.}
+control; and reported latency is host-CPU, not on-device. Still, by
+budgeting spatial memory by area rather than time, \psm{} demonstrates on
+102.9\,h of driving the multi-session regime a single-pass corpus
+cannot---sublinear state growth, cross-session cardinality accrual with
+decay, and label-free place recognition. The engine and harness are
+released under MIT.\footnote{Repository URL withheld for double-blind
+review.}
