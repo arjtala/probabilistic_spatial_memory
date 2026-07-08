@@ -8,18 +8,15 @@
 Bounding memory is only useful if retrieval survives it. On a wearable
 look-back-QA corpus (Nymeria~\cite{ma2024nymeria} atomic-action
 narrations), \psm{} recovers brute-force CLIP retrieval \emph{exactly} at
-an eviction-free operating point---reservoir capacity exceeding the
-per-cell frame count, so no exemplar is dropped---returning the same 25 of
-187 groundable narrations at identical mean IoU. At the $8\times$-smaller
-bounded $R{=}128$ deployment point it retains 83\% of that Hit@5, and with
-a single MLLM rerank the strict-diversity (\caponek{}$=1$) point matches
+an eviction-free operating point (reservoir capacity exceeding the
+per-cell frame count)---the same 25 of 187 groundable narrations at
+identical mean IoU---and retains 83\% of that Hit@5 at the
+$8\times$-smaller $R{=}128$ deployment point; a single MLLM rerank matches
 brute-force localization within sampling noise. The spatial-axis behavior
 further holds on 13 of 14 street-scale sessions (the lone failure a
 visually-homogeneous parking-lot street) spanning three sensor stacks
 (SLOPER4D~\cite{dai2023sloper4d}, Nymeria, LookOut~\cite{pan2025lookout})
-and three encoders (CLIP-L, CLIP-bigG, SigLIP-2~\cite{tschannen2025siglip2});
-the full generalization study, ablations, and MLLM comparison are deferred
-to the extended paper.
+and three encoders (CLIP-L, CLIP-bigG, SigLIP-2~\cite{tschannen2025siglip2}).
 
 \paragraph{Limitations.}
 HDD carries no QA labels, so its results are self-supervised, not
