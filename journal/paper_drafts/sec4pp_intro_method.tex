@@ -31,9 +31,10 @@ cannot exercise.
 \psm{} is a streaming spatial-temporal index that ingests
 $(t, \mathrm{lat}, \mathrm{lng}, \mathbf{e})$ tuples---timestamp,
 geographic position, and a $d$-dimensional embedding---and supports
-bounded-memory top-$K$ similarity search at any time. Three layered
-probabilistic data structures over an H3~\cite{brodsky2018h3} hexagonal
-tessellation enforce the memory bound.
+bounded-memory top-$K$ similarity search at any time
+(Fig.~\ref{fig:f1-schematic}). Three layered probabilistic data structures
+over an H3~\cite{brodsky2018h3} hexagonal tessellation enforce the memory
+bound.
 
 \paragraph{H3 tessellation.}
 Each tuple maps to its containing H3 cell at resolution~$r$ (default~12,
@@ -68,5 +69,7 @@ cosine similarity, then merges and truncates to $K$. \caponek{}$=1$
 enforces strict spatial diversity (one slot per cell); \caponek{}$=K$
 recovers unconstrained top-$K$. Ingest is $O(1)$ amortized (H3 lookup, HLL
 hash, reservoir update); queries run at any time after the first ingest.
-For look-back QA the ranked candidates feed a frontier-MLLM reranker; the
-full pipeline and architecture diagram are in the extended paper.
+For look-back QA the ranked candidates feed a frontier-MLLM reranker
+(full pipeline in the extended paper).
+
+\input{figures/f1_schematic.tex}
