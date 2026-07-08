@@ -39,26 +39,26 @@
 \node[font=\tiny, below=4.6mm of hC, gray!60!black] {H3 cells};
 
 % ---- per-cell state pop-out ----
-\coordinate (cellAnchor) at ($(hexcenter) + (12mm, 1mm)$);
+\coordinate (cellAnchor) at ($(hexcenter) + (16mm, 1mm)$);
 % HLL ring (top row) with label ABOVE it
 \node[hllold] (hll1) at ($(cellAnchor) + (-3mm, 3.0mm)$) {};
 \node[hllold] (hll2) at ($(cellAnchor) + (-1mm, 3.0mm)$) {};
 \node[hllbox] (hll3) at ($(cellAnchor) + ( 1mm, 3.0mm)$) {};
 \node[hllbox] (hll4) at ($(cellAnchor) + ( 3mm, 3.0mm)$) {};
-\node[font=\tiny, above=0.3mm of hll2, anchor=south, xshift=1mm]
+\node[font=\tiny, above=0.4mm of hll2, anchor=south, xshift=1mm]
      {HLL ring \textit{(decay)}};
 % Reservoir (bottom row) with label BELOW it
 \node[resvslot] (r1) at ($(cellAnchor) + (-3mm, 0.6mm)$) {};
 \node[resvslot] (r2) at ($(cellAnchor) + (-1mm, 0.6mm)$) {};
 \node[resvslot] (r3) at ($(cellAnchor) + ( 1mm, 0.6mm)$) {};
 \node[resvslot] (r4) at ($(cellAnchor) + ( 3mm, 0.6mm)$) {};
-\node[font=\tiny, below=0.3mm of r2, anchor=north, xshift=1mm] (rlab)
+\node[font=\tiny, below=0.4mm of r3, anchor=north] (rlab)
      {$R$ exemplars \textit{(bounded)}};
 \draw[smallflow, dashed, blue!50!black]
-     (hC.east) -- ($(cellAnchor) + (-5mm, 1.8mm)$);
+     (hC.east) -- ($(cellAnchor) + (-4.5mm, 1.8mm)$);
 
 % ---- query ----
-\node[box, right=24mm of cellAnchor, align=center, fill=orange!10,
+\node[box, right=20mm of cellAnchor, align=center, fill=orange!10,
       draw=orange!70!black] (topk)
      {top-$K$ cosine\\{\tiny\caponek}};
 \node[iobox, right=2.5mm of topk] (out)

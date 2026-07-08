@@ -22,9 +22,8 @@ the full generalization study, ablations, and MLLM comparison are deferred
 to the extended paper.
 
 \paragraph{Limitations.}
-The HDD results are systems and self-supervised, not a retrieval-accuracy
-metric, since HDD carries no QA labels; the cross-session AUC conflates
-geographic proximity with visual identity pending a $k$-nearest-cell
-control; and reported latency is host-CPU, not on-device. The engine and
-harness are released under MIT.\footnote{Repository URL withheld for
-double-blind review.}
+HDD carries no QA labels, so its results are systems and self-supervised,
+not retrieval-accuracy; the cross-session AUC conflates geographic
+proximity with visual identity (a $k$-nearest-cell control would isolate
+it); and latency is host-CPU, not on-device. Engine and harness are MIT
+licensed.\footnote{Repository URL withheld for double-blind review.}
