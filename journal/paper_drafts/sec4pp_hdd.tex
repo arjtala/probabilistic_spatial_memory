@@ -25,11 +25,10 @@ Over 102.9\,h and 23{,}298 distinct $r{=}10$ cells, \psm{}'s
 per-cell-capped state ($\sum_\text{cells}\min(\text{frames}, R)$) is
 smaller than a dense per-frame bank at every ingest rate, the gap widening
 as the reservoir caps redundant dwell/revisit frames:
-$1.3\times$/$2.3\times$/$4.3\times$/$7.2\times$ at 1/5/15/30\,fps (capping
-26/57/77/86\% of frames)---state grows \emph{sublinearly in observation
-count}, $O(\text{distinct cells})$ not $O(\text{frames})$. This is not a
-plateau (area keeps growing: only 20\% of cells seen by the halfway mark);
-the saving is per-cell capping, the empirical form of ``budgeted by area,
+$1.3\times$/$2.3\times$/$4.3\times$/$7.2\times$ at 1/5/15/30\,fps---state
+grows \emph{sublinearly in observation count}, $O(\text{distinct cells})$
+not $O(\text{frames})$. This is not a plateau (only 20\% of cells seen by
+the halfway mark); the saving is per-cell capping---``budgeted by area,
 not sequence length.''
 
 \paragraph{Cross-session cardinality accrual and decay
