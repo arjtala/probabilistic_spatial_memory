@@ -9,8 +9,7 @@ We evaluate on the Honda Research Institute Driving Dataset
 with RTK GPS and a front camera (our extraction covers 132 drives,
 102.9\,h with valid GPS). A vehicle sweeps far more area per minute than a
 walker and, over 132 drives across 8 months, genuinely re-drives the same
-streets---the multi-session revisit structure a single-pass egocentric
-corpus lacks. HDD ships no look-back-QA labels, so these results are
+streets. HDD ships no look-back-QA labels, so these results are
 \emph{systems} and \emph{self-supervised}, not retrieval-accuracy; frames
 are embedded with CLIP-L.
 
@@ -41,8 +40,7 @@ HDD's revisits exercise the HLL sketch \emph{across sessions}. Feeding a
 revisited cell's frames chronologically across drives, a single fixed
 $1\,\mathrm{KiB}$ ($p{=}10$) sketch accrues to \textbf{8{,}112 unique
 observations over 219 days}, while its 60-slot ring-buffer windowed
-estimate decays between visits and jumps on each revisit---decay while
-maintaining unique-event cardinality across revisits. A Python
+estimate decays between visits and jumps on each revisit. A Python
 reimplementation matches the C-engine sketch to $2.4\times10^{-5}$ median
 relative error.
 
@@ -50,7 +48,8 @@ relative error.
 (Fig.~\ref{fig:hdd-combined}C).}
 Label-free, we query a revisited cell with a drive-A exemplar and measure
 the AUC that different-day drive-B frames in that cell outrank frames from
-other cells. Over 5{,}222 revisited cells (2{,}000 stratified queries) the
+other cells. Over 5{,}222 revisited cells with valid cross-drive query
+pairs (2{,}000 stratified queries) the
 cross-session AUC is \textbf{0.853}, vs.\ a shuffled-cell null of $0.498$
 and a same-drive upper bound of $0.977$---strong cross-session place
 recognition from CLIP cosine over the persistent per-cell exemplars alone.

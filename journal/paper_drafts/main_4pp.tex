@@ -55,8 +55,9 @@ than a dense bank as ingest rate rises, a $1\,\mathrm{KiB}$ sketch
 accrues unique-event cardinality across 219 days while decaying between
 visits, and label-free cross-session place recognition reaches
 $0.853$ AUC (vs.\ a $0.498$ shuffled null). On a wearable look-back-QA
-corpus the substrate matches brute-force CLIP retrieval at bounded
-memory. The C engine and evaluation harness are released under MIT.
+corpus the bounded substrate retains 83\% of brute-force CLIP Hit@5,
+recovering it exactly once reservoir eviction is removed. The C engine and
+evaluation harness are released under MIT.
 \keywords{Spatial memory \and Multi-session persistence \and
 Bounded-memory systems \and Egocentric video \and Streaming retrieval.}
 \end{abstract}

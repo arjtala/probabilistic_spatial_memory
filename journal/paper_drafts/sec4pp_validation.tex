@@ -4,20 +4,22 @@
 \section{Retrieval Fidelity and Scope}
 \label{sec:validation}
 
-\paragraph{The substrate does not lose recall.}
+\paragraph{Retrieval survives the memory bound.}
 Bounding memory is only useful if retrieval survives it. On a wearable
 look-back-QA corpus (Nymeria~\cite{ma2024nymeria} atomic-action
-narrations), \psm{} at the eviction-free operating point recovers
-brute-force CLIP retrieval \emph{exactly} (the same 25 of 187 groundable
-narrations at identical mean IoU) and at the bounded $R{=}128$ deployment
-point reaches 83\% of brute-force Hit@5 at $8\times$ smaller per-cell
-state; with a single MLLM rerank the strict-diversity point matches
-brute-force on localization within sampling noise. The spatial-axis
-behavior further holds across 14 street-scale sessions spanning three
-sensor stacks (SLOPER4D~\cite{dai2023sloper4d}, Nymeria,
-LookOut~\cite{pan2025lookout}) and three encoders (CLIP-L, CLIP-bigG,
-SigLIP-2~\cite{tschannen2025siglip2}); the full generalization study,
-ablations, and MLLM comparison are deferred to the extended paper.
+narrations), \psm{} recovers brute-force CLIP retrieval \emph{exactly} at
+an eviction-free operating point---reservoir capacity exceeding the
+per-cell frame count, so no exemplar is dropped---returning the same 25 of
+187 groundable narrations at identical mean IoU. At the $8\times$-smaller
+bounded $R{=}128$ deployment point it retains 83\% of that Hit@5, and with
+a single MLLM rerank the strict-diversity (\caponek{}$=1$) point matches
+brute-force localization within sampling noise. The spatial-axis behavior
+further holds on 13 of 14 street-scale sessions (the lone failure a
+visually-homogeneous parking-lot street) spanning three sensor stacks
+(SLOPER4D~\cite{dai2023sloper4d}, Nymeria, LookOut~\cite{pan2025lookout})
+and three encoders (CLIP-L, CLIP-bigG, SigLIP-2~\cite{tschannen2025siglip2});
+the full generalization study, ablations, and MLLM comparison are deferred
+to the extended paper.
 
 \paragraph{Limitations and outlook.}
 The HDD results are systems and self-supervised, not a retrieval-accuracy
@@ -25,12 +27,9 @@ metric, since HDD carries no QA labels; the cross-session AUC conflates
 geographic proximity with visual identity pending a $k$-nearest-cell
 control. Reported latency is host-CPU, not on-device, and the extracted
 HDD features carry a ${\sim}3$\,s GPS-warmup skew (${\sim}17$\,m) corrected
-at analysis time (shifting AUC by $+0.005$). Nonetheless, by budgeting
-spatial memory by area rather than time---bounded per-cell state,
-time-decayed HLL cardinality, and reservoir exemplars under a \caponek{}
-knob---\psm{} demonstrates on 102.9\,h of driving the multi-session
-regime a single-pass corpus cannot: sublinear state growth, cross-session
-cardinality accrual with decay, and label-free cross-session place
-recognition, while matching brute-force retrieval at bounded memory on a
-wearable corpus. The engine and harness are released under
+at analysis time (shifting AUC by $+0.005$). By budgeting spatial memory
+by area rather than time, \psm{} demonstrates on 102.9\,h of driving the
+multi-session regime a single-pass corpus cannot---sublinear state growth,
+cross-session cardinality accrual with decay, and label-free place
+recognition. The engine and harness are released under
 MIT.\footnote{Repository URL withheld for double-blind review.}
