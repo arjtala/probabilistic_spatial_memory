@@ -37,22 +37,21 @@ not sequence length.''
 HDD's revisits exercise the HLL sketch \emph{across sessions}. Feeding a
 revisited cell's frames chronologically across drives, a single fixed
 $1\,\mathrm{KiB}$ ($p{=}10$) sketch accrues to \textbf{8{,}112 unique
-observations over 219 days}, while its 60-slot ring-buffer windowed
-estimate decays between visits and jumps on each revisit. A Python
-reimplementation matches the C-engine sketch to $2.4\times10^{-5}$ median
-relative error.
+observations over 219 days} while its 60-slot ring-buffer windowed estimate
+decays between visits and jumps on each revisit; a Python reimplementation
+matches the C-engine sketch to $2.4\times10^{-5}$ median relative error.
 
 \paragraph{The persistent memory is retrievable across sessions
 (Fig.~\ref{fig:hdd-combined}C).}
 Label-free, we query a revisited cell with a drive-A exemplar and measure
 the AUC that different-day drive-B frames in that cell outrank frames from
-other cells. Over 5{,}222 revisited cells with valid cross-drive query
-pairs (2{,}000 stratified queries) the
-cross-session AUC is \textbf{0.853}, vs.\ a shuffled-cell null of $0.498$
-and a same-drive upper bound of $0.977$---strong cross-session place
-recognition from CLIP cosine over the persistent per-cell exemplars alone.
-The same-cell-vs-all-others split blends geographic proximity with visual
-identity; a $k$-nearest-cell control would isolate the latter.
+other cells. Over 5{,}222 revisited cells with valid cross-drive pairs
+(2{,}000 stratified queries) the cross-session AUC is \textbf{0.853}, vs.\
+a shuffled-cell null of $0.498$ and a same-drive upper bound of $0.977$---
+strong cross-session place recognition from CLIP cosine over the persistent
+per-cell exemplars alone. The same-cell-vs-all-others split blends
+geographic proximity with visual identity; a $k$-nearest-cell control would
+isolate the latter.
 
 \begin{figure}[t]
 \centering

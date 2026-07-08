@@ -39,27 +39,26 @@
 \node[font=\tiny, below=4.6mm of hC, gray!60!black] {H3 cells};
 
 % ---- per-cell state pop-out ----
-\coordinate (cellAnchor) at ($(hexcenter) + (13mm, 0mm)$);
-% HLL ring (top): two faded (old) + three fresh
-\node[hllold] (hll1) at ($(cellAnchor) + (-3mm, 2.8mm)$) {};
-\node[hllold] (hll2) at ($(cellAnchor) + (-1mm, 2.8mm)$) {};
-\node[hllbox] (hll3) at ($(cellAnchor) + ( 1mm, 2.8mm)$) {};
-\node[hllbox] (hll4) at ($(cellAnchor) + ( 3mm, 2.8mm)$) {};
-\node[font=\tiny, right=0.4mm of hll4, anchor=west]
+\coordinate (cellAnchor) at ($(hexcenter) + (12mm, 1mm)$);
+% HLL ring (top row) with label ABOVE it
+\node[hllold] (hll1) at ($(cellAnchor) + (-3mm, 3.0mm)$) {};
+\node[hllold] (hll2) at ($(cellAnchor) + (-1mm, 3.0mm)$) {};
+\node[hllbox] (hll3) at ($(cellAnchor) + ( 1mm, 3.0mm)$) {};
+\node[hllbox] (hll4) at ($(cellAnchor) + ( 3mm, 3.0mm)$) {};
+\node[font=\tiny, above=0.3mm of hll2, anchor=south, xshift=1mm]
      {HLL ring \textit{(decay)}};
-% Reservoir (bottom)
-\node[resvslot] (r1) at ($(cellAnchor) + (-3mm, 0mm)$) {};
-\node[resvslot] (r2) at ($(cellAnchor) + (-1mm, 0mm)$) {};
-\node[resvslot] (r3) at ($(cellAnchor) + ( 1mm, 0mm)$) {};
-\node[resvslot] (r4) at ($(cellAnchor) + ( 3mm, 0mm)$) {};
-\node[font=\tiny, right=0.4mm of r4, anchor=west] {$R$ exemplars};
-\node[font=\tiny\itshape, below=1.4mm of r2, gray!60!black]
-     {bounded / cell};
+% Reservoir (bottom row) with label BELOW it
+\node[resvslot] (r1) at ($(cellAnchor) + (-3mm, 0.6mm)$) {};
+\node[resvslot] (r2) at ($(cellAnchor) + (-1mm, 0.6mm)$) {};
+\node[resvslot] (r3) at ($(cellAnchor) + ( 1mm, 0.6mm)$) {};
+\node[resvslot] (r4) at ($(cellAnchor) + ( 3mm, 0.6mm)$) {};
+\node[font=\tiny, below=0.3mm of r2, anchor=north, xshift=1mm] (rlab)
+     {$R$ exemplars \textit{(bounded)}};
 \draw[smallflow, dashed, blue!50!black]
-     (hC.east) -- ($(hll1.west) + (-0.6mm, -1.4mm)$);
+     (hC.east) -- ($(cellAnchor) + (-5mm, 1.8mm)$);
 
 % ---- query ----
-\node[box, right=15mm of r4, align=center, fill=orange!10,
+\node[box, right=24mm of cellAnchor, align=center, fill=orange!10,
       draw=orange!70!black] (topk)
      {top-$K$ cosine\\{\tiny\caponek}};
 \node[iobox, right=2.5mm of topk] (out)
@@ -67,8 +66,9 @@
 
 % ---- flows ----
 \draw[flow] (in.east) -- (hC.west);
+% reservoir -> top-K: exit right from the reservoir row, clear of labels
 \draw[flow, dashed, blue!50!black]
-     ($(r4.east)+(0.5mm,0)$) -- ++(3mm,0) |- (topk.west);
+     ($(r4.east)+(0.8mm,0)$) -- (topk.west);
 \draw[flow] (topk.east) -- (out.west);
 
 \end{tikzpicture}
