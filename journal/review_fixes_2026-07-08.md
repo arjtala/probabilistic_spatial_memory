@@ -129,3 +129,29 @@ Recorded here so they are not "re-discovered" later:
   extractor, not the reader.
 - `_largest_stream` in `json_sidecar.py` is now unused (left in place to keep
   the edit minimal); a future cleanup can remove it.
+
+## Follow-ups for the full paper (not the 4pp abstract)
+
+Two fixes in this pass change values that feed the *full* paper (8pp/ICCV-CVPR),
+not the 4pp abstract. Recorded here so they are not missed at full-paper build:
+
+- **`eval_mllm_baseline.py` (Hit@1→Hit@k scorer fix)** changes the vanilla-MLLM
+  side of the **PSM-vs-MLLM headline comparison (F2)**. The corrected scorer
+  raises the vanilla-MLLM Hit@k, so **F2 must be regenerated and the
+  vanilla-MLLM numbers re-run** for the full paper. The 4pp abstract does not
+  show F2, so it is unaffected.
+- **`dino_pytorch.py` (attention maps silently `None` on transformers≥4.40)** —
+  verified **no paper-number impact**: the 4pp body uses CLIP-L/CLIP-bigG/SigLIP/
+  JEPA only (no DINO), and `attention_maps` is consumed solely by the viz
+  pipeline (`src/ingest/ingest.c`, `src/viz/viz_main.c`) — no `eval_*.py` reads
+  it. DINO attention is a visualization feature, not a metric input.
+
+## Open (not addressed here): 4pp page count
+
+The 4pp body still runs to **5 pages on the real ECCV kit**. The overflow onto
+p5 is the full 10-entry References block (plus the 4-line Limitations
+paragraph), i.e. ~a full page over — not something a small prose trim closes.
+The `paper(4pp)` commit dropped the host-CPU latency caveat from Limitations
+(5→4 lines) but that alone does not land 4pp. A structural fix (bibliography
+`\small`/spacing squeeze and/or trimming the weakest 1–2 of the 10 citations)
+is deferred per author decision.
