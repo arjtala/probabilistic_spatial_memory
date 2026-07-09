@@ -383,3 +383,13 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] §5.5 vanilla-MLLM body prose trimmed (mechanism already in supp); pushed 1ef8764
 - [x] Result: body ~9pp local (float-quantized; supp starts p10). Still 1pp over 8pp.
 - [ ] DECISION PENDING: low-damage levers exhausted. To reach 8pp: (a) F2->supp too (2 figs F1+hdd, clean 8pp) OR (b) demote a ~1pp §5 results block (keep 3 figs). Confirm with real-kit build first.
+
+## 2026-07-09 21:56 -- Reviewer cut list (keep 3 figs) + git reconcile
+
+- [x] Applied prioritized cut list: §7 evidence recap -> 3 sentences (+ fixed §4.3,§4.3 dup ref); §6 limitations 4->2 paragraphs; §5.2 crossover para -> 1 sentence; §2.4 novelty sentence deleted; §2.5 encoder sizes -> footnote; abstract trimmed
+- [x] Reconciled divergence: cluster 1be0bf2 (F2->supp, 2 figs) vs review (keep 3 figs). Per user: kept F2 in body; merged 1be0bf2 into history then reverted its F2->supp
+- [x] Verified: F2 single (body, not supp); 3 body figs (F1+F2+hdd_combined); 0 undefined/duplicate refs; pushed b350cae
+- [x] Body ~9.5pp -> ~8.3pp local (supp p10->p9, total 17->16); conclusion bleeds ~9 lines onto p9 on loose lmodern build
+- [ ] Real-kit confirming build (cluster): 3-fig body was 9pp pre-cuts; cut list frees ~1pg -> expect ~8pp on tighter Times kit
+- [ ] If ~1 line over on real kit: reserve cut = drop §7 follow-up directions / tighten §6 evaluation-scope
+- [ ] Table 1 promotion to body (review minor #3): held -- fights 8pp; left in supp
