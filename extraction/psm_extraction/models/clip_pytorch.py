@@ -50,11 +50,16 @@ def _coerce_clip_features(out, model, modality: str):
     if isinstance(out, torch.Tensor):
         tensor = out
     else:
-        tensor = (
-            getattr(out, "image_embeds", None)
-            or getattr(out, "text_embeds", None)
-            or getattr(out, "pooler_output", None)
-        )
+        # Explicit None checks (not an `or` chain): a batched tensor's truth
+        # value is ambiguous, so `getattr(...) or getattr(...)` would raise
+        # "Boolean value of Tensor ... ambiguous". Pick the first attribute
+        # whose value is not None.
+        tensor = None
+        for attr in ("image_embeds", "text_embeds", "pooler_output"):
+            value = getattr(out, attr, None)
+            if value is not None:
+                tensor = value
+                break
         if tensor is None:
             last = getattr(out, "last_hidden_state", None)
             if last is not None and last.dim() == 3:
@@ -155,18 +160,24 @@ class CLIPPyTorchRunner(ModelRunner):
 
     def embed_text(self, query: str) -> np.ndarray:
         torch = self._torch
+        # CLIP's text encoder hard-caps its context; probe the actual limit
+        # from config.text_config.max_position_embeddings (mirroring
+        # siglip_pytorch.py) rather than hard-coding 77, since custom
+        # checkpoints can differ. getattr defensively falls back to 77.
+        text_cfg = getattr(self._model.config, "text_config", None)
+        max_length = int(getattr(text_cfg, "max_position_embeddings", 77))
         with torch.inference_mode():
-            # CLIP's text encoder hard-caps at 77 tokens; long-form narrations
-            # (Nymeria atomic_action, Ego-Exo4D atomic_descriptions) routinely
-            # blow past this. Truncate at the tokenizer rather than letting
-            # the embedding layer raise, since the queries-are-too-long failure
-            # mode is "drop trailing context", not "fail the run."
+            # Long-form narrations (Nymeria atomic_action, Ego-Exo4D
+            # atomic_descriptions) routinely blow past this cap. Truncate at
+            # the tokenizer rather than letting the embedding layer raise,
+            # since the queries-are-too-long failure mode is "drop trailing
+            # context", not "fail the run."
             inputs = self._processor(
                 text=[query],
                 return_tensors="pt",
                 padding=True,
                 truncation=True,
-                max_length=77,
+                max_length=max_length,
             )
             inputs = {k: v.to(self._device) for k, v in inputs.items()}
             feats = self._model.get_text_features(**inputs)

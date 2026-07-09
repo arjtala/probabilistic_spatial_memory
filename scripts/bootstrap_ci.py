@@ -86,14 +86,41 @@ def _scored_records(data: dict) -> list[dict]:
     return [r for r in raw if r.get("intervals_gt")]
 
 
+def _record_metrics(r: dict) -> tuple[float, float, float]:
+    """Return (exemplar_iou_at_k, bucket_iou_at_k, hit_at_k) for one record.
+
+    Handles two record shapes:
+
+      * eval_lookback.py / eval_psm_mllm.py: flat ``*_at_k`` keys.
+      * eval_mllm_baseline.py: per-prediction metrics live under a
+        ``predictions`` list, so @k is the max IoU over predictions and
+        Hit@k is any prediction landing in GT (``in_gt_idx >= 0``).
+    """
+    if "exemplar_iou_at_k" in r and "bucket_iou_at_k" in r:
+        return (
+            float(r["exemplar_iou_at_k"]),
+            float(r["bucket_iou_at_k"]),
+            1.0 if r.get("exemplar_hit_at_k") else 0.0,
+        )
+    preds = r.get("predictions")
+    if preds is not None:
+        exemplar = max((float(p["exemplar_iou"]) for p in preds), default=0.0)
+        bucket = max((float(p["bucket_iou"]) for p in preds), default=0.0)
+        hit = 1.0 if any(p.get("in_gt_idx", -1) >= 0 for p in preds) else 0.0
+        return exemplar, bucket, hit
+    raise KeyError(
+        "record has neither flat *_at_k keys nor a 'predictions' list; "
+        "cannot extract exemplar/bucket IoU"
+    )
+
+
 def _extract_arrays(records: list[dict]) -> dict[str, np.ndarray]:
     """Pull the three metric arrays from scored records."""
+    triples = [_record_metrics(r) for r in records]
     return {
-        "exemplar_miou": np.array([r["exemplar_iou_at_k"] for r in records], dtype=float),
-        "bucket_miou": np.array([r["bucket_iou_at_k"] for r in records], dtype=float),
-        "hit_at_k": np.array(
-            [1.0 if r["exemplar_hit_at_k"] else 0.0 for r in records], dtype=float,
-        ),
+        "exemplar_miou": np.array([t[0] for t in triples], dtype=float),
+        "bucket_miou": np.array([t[1] for t in triples], dtype=float),
+        "hit_at_k": np.array([t[2] for t in triples], dtype=float),
     }
 
 

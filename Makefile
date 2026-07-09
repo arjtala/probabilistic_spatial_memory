@@ -157,6 +157,7 @@ TEST_EXEMPLAR_CODEC = $(BUILD_DIR)/test_exemplar_codec
 TEST_INGEST = $(BUILD_DIR)/test_ingest
 TEST_JEPA_CACHE = $(BUILD_DIR)/test_jepa_cache
 TEST_VIZ_MATH = $(BUILD_DIR)/test_viz_math
+TEST_IMU_PROCESSOR = $(BUILD_DIR)/test_imu_processor
 TEST_VIZ_CONFIG = $(BUILD_DIR)/test_viz_config
 TEST_GPS_TRACE = $(BUILD_DIR)/test_gps_trace
 TEST_VIZ_RUNTIME = $(BUILD_DIR)/test_viz_runtime
@@ -285,7 +286,7 @@ $(BUILD_DIR)/vendor/%.o: $(VENDOR)/%.c $(TOOLCHAIN_INFO)
 	$(CC) $(VENDOR_CFLAGS) $(VENDOR_INCLUDES) -c $< -o $@
 
 # Test targets
-test: test-ring-buffer test-tile test-tile-table test-spatial test-exemplar-codec test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud test-screenshot test-ui-overlay
+test: test-ring-buffer test-tile test-tile-table test-spatial test-exemplar-codec test-ingest test-jepa-cache test-viz-math test-imu-processor test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud test-screenshot test-ui-overlay
 
 test-ring-buffer: $(TEST_RING_BUFFER)
 	./$(TEST_RING_BUFFER)
@@ -343,6 +344,16 @@ test-viz-math: $(TEST_VIZ_MATH)
 $(TEST_VIZ_MATH): tests/test_viz_math.c src/viz/viz_math.c include/viz/viz_math.h include/viz/imu_processor.h $(UTILITIES_OBJ)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_viz_math.c src/viz/viz_math.c $(UTILITIES_OBJ) -o $@ -lm
+
+test-imu-processor: $(TEST_IMU_PROCESSOR)
+	./$(TEST_IMU_PROCESSOR)
+
+# imu_processor.c is pure dead-reckoning math (no GL/GLFW), so it links with
+# the same lib-free recipe as test-viz-math. It uses M_PI without its own
+# guard, so define _GNU_SOURCE for glibc where -std=c99 otherwise hides it.
+$(TEST_IMU_PROCESSOR): tests/test_imu_processor.c src/viz/imu_processor.c src/viz/viz_math.c include/viz/imu_processor.h include/viz/viz_math.h $(UTILITIES_OBJ)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE $(VENDOR_INCLUDES) $(LDFLAGS) tests/test_imu_processor.c src/viz/imu_processor.c src/viz/viz_math.c $(UTILITIES_OBJ) -o $@ -lm
 
 test-viz-config: $(TEST_VIZ_CONFIG)
 	./$(TEST_VIZ_CONFIG)
@@ -416,7 +427,7 @@ check-format:
 	clang-format --dry-run --Werror $$files
 
 # Phony targets
-.PHONY: all debug portable cluster sanitize viz bench-spatial-memory bench-tile-decode test test-debug test-portable test-cluster test-sanitize test-ring-buffer test-tile test-tile-table test-spatial test-exemplar-codec test-ingest test-jepa-cache test-viz-math test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud test-screenshot test-ui-overlay check-format clean rebuild show run FORCE
+.PHONY: all debug portable cluster sanitize viz bench-spatial-memory bench-tile-decode test test-debug test-portable test-cluster test-sanitize test-ring-buffer test-tile test-tile-table test-spatial test-exemplar-codec test-ingest test-jepa-cache test-viz-math test-imu-processor test-viz-config test-gps-trace test-viz-runtime test-tile-disk-cache test-map-view test-viz-debug-hud test-screenshot test-ui-overlay check-format clean rebuild show run FORCE
 
 # Show detected files
 show:

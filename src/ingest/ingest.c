@@ -248,6 +248,13 @@ IngestReader *IngestReader_open(hid_t file, const char *group) {
     return NULL;
   }
 
+  if (emb_dims[1] == 0) {
+    fprintf(stderr, "IngestReader_open: zero-width embeddings in group '%s'\n", group);
+    H5Gclose(grp);
+    IngestReader_close(reader);
+    return NULL;
+  }
+
   reader->n_records = ts_dims[0];
   reader->emb_dimension = emb_dims[1];
   reader->cursor = 0;
@@ -406,6 +413,8 @@ bool IngestReader_run(IngestReader *reader, SpatialMemory *sm,
     if (status == INGEST_READ_EOF) return true;
     if (status == INGEST_READ_ERROR) return false;
 
+    // Precondition: record.timestamp is non-decreasing (see ingest.h). The
+    // window advance below assumes monotonic timestamps.
     SpatialMemory_advance_to_timestamp(sm, record.timestamp, &window_anchor,
                                        time_window_sec);
     if (!SpatialMemory_observe(sm, record.timestamp, record.lat, record.lng,
@@ -644,6 +653,12 @@ bool ImuGpsReader_interpolate_gps(ImuGpsReader *r, double timestamp, double *lat
     *lat = r->gps_lat[r->gps_n_records - 1];
     *lng = r->gps_lng[r->gps_n_records - 1];
     return true;
+  }
+
+  // Reset cursor for backward (non-monotonic) queries so the forward scan
+  // below re-brackets correctly instead of reusing a stale, extrapolating pair
+  if (timestamp < r->gps_ts[r->gps_cursor]) {
+    r->gps_cursor = 0;
   }
 
   // Advance cursor forward to bracket the timestamp

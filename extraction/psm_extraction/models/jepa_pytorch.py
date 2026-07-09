@@ -132,7 +132,7 @@ class VJEPAPyTorchRunner(ModelRunner):
     def embed_images(
         self,
         paths: Sequence[Path],
-        batch_size: int = 4,
+        batch_size: int = 16,
         *,
         progress: Callable[[int], None] | None = None,
     ) -> tuple[np.ndarray, np.ndarray | None]:

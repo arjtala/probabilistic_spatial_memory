@@ -42,6 +42,7 @@ typedef enum {
 typedef struct {
   const char *filepath;
   const char *group;
+  bool has_group;
   double time_window_sec;
   int h3_resolution;
   size_t capacity;
@@ -59,6 +60,7 @@ typedef struct {
   double center_lat;
   double center_lng;
   size_t exemplar_capacity;
+  bool has_exemplar_capacity;
   bool has_seed;
   uint64_t seed;
   ExemplarCodec exemplar_codec;
@@ -237,6 +239,7 @@ static void cli_options_init(CliOptions *options) {
   if (!options) return;
   options->filepath = NULL;
   options->group = DINO;
+  options->has_group = false;
   options->time_window_sec = 5.0;
   options->h3_resolution = DEFAULT_RESOLUTION;
   options->capacity = DEFAULT_CAPACITY;
@@ -254,6 +257,7 @@ static void cli_options_init(CliOptions *options) {
   options->center_lat = 0.0;
   options->center_lng = 0.0;
   options->exemplar_capacity = 0;
+  options->has_exemplar_capacity = false;
   options->has_seed = false;
   options->seed = 0;
   options->exemplar_codec = EXEMPLAR_CODEC_RAW;
@@ -307,7 +311,7 @@ static bool apply_positional_args(CliOptions *options, int argc, char *argv[],
   if (!options->filepath && index < argc) {
     options->filepath = argv[index++];
   }
-  if (index < argc) {
+  if (!options->has_group && index < argc) {
     options->group = argv[index++];
   }
   if (index < argc &&
@@ -373,6 +377,7 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
       break;
     case 'g':
       options->group = optarg;
+      options->has_group = true;
       break;
     case 't':
       if (!parse_positive_double(optarg, "time window",
@@ -444,6 +449,7 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
                                  &options->exemplar_capacity)) {
         return false;
       }
+      options->has_exemplar_capacity = true;
       break;
     case PER_CELL_CAP_OPT_VAL:
       if (!parse_size_t_in_range(optarg, "per-cell-cap", 1, SIZE_MAX,
@@ -487,7 +493,7 @@ static bool parse_cli_options(int argc, char *argv[], CliOptions *options) {
   }
   // Auto-enable a modest exemplar reservoir when similarity search is requested
   // and the user hasn't overridden --exemplars explicitly.
-  if (options->search_mode && options->exemplar_capacity == 0) {
+  if (options->search_mode && !options->has_exemplar_capacity) {
     options->exemplar_capacity = 8;
   }
   if (!options->filepath) {

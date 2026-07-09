@@ -68,8 +68,16 @@ class DINOPyTorchRunner(ModelRunner):
         if processor is None:
             raise RuntimeError(f"AutoImageProcessor returned None for {checkpoint!r}")
         self._processor = processor
+        # `attn_implementation="eager"` is required: on transformers>=4.40 the
+        # default SDPA path returns attentions=None even with
+        # output_attentions=True, which would silently drop attention_maps and
+        # leave patch_grid unprobed. Eager attention actually populates them.
         self._model = (
-            AutoModel.from_pretrained(checkpoint, output_attentions=True)
+            AutoModel.from_pretrained(
+                checkpoint,
+                output_attentions=True,
+                attn_implementation="eager",
+            )
             .eval()
             .to(self._device)
         )
@@ -86,8 +94,24 @@ class DINOPyTorchRunner(ModelRunner):
         # register tokens after the CLS token, before the patch tokens. The
         # config exposes this; defaults to 0 for plain DINOv2.
         self._num_register_tokens = int(getattr(cfg, "num_register_tokens", 0))
-        # Probed lazily on the first batch from the attention shape.
-        self.patch_grid: tuple[int, int] | None = None
+        # Probed lazily on the first batch from the attention shape. As
+        # defense-in-depth (SDPA fallbacks, custom checkpoints), seed a
+        # config-derived grid so patch_grid isn't silently None when
+        # attentions are unavailable: patch_grid = image_size / patch_size.
+        self.patch_grid: tuple[int, int] | None = self._patch_grid_from_config(cfg)
+        # True once the authoritative attention-based probe has run (which may
+        # correct num_register_tokens); the config seed above is only a fallback.
+        self._patch_grid_probed = False
+
+    def _patch_grid_from_config(self, cfg: Any) -> tuple[int, int] | None:
+        image_size = getattr(cfg, "image_size", None)
+        patch_size = getattr(cfg, "patch_size", None)
+        if not isinstance(image_size, int) or not isinstance(patch_size, int):
+            return None
+        if image_size <= 0 or patch_size <= 0 or image_size % patch_size != 0:
+            return None
+        side = image_size // patch_size
+        return (side, side)
 
     def _probe_patch_grid(self, attentions_shape: tuple[int, ...]) -> tuple[int, int]:
         # attentions[-1] has shape (B, heads, tokens, tokens). For a typical
@@ -148,14 +172,24 @@ class DINOPyTorchRunner(ModelRunner):
                 inputs = {k: v.to(self._device) for k, v in inputs.items()}
                 outputs = self._model(**inputs, output_attentions=True)
                 attn = getattr(outputs, "attentions", None)
-                if attn is not None and len(attn) > 0 and self.patch_grid is None:
+                if attn is not None and len(attn) > 0 and not self._patch_grid_probed:
                     # Probe up-front so we know how many register tokens to
-                    # skip in the embedding pool below.
+                    # skip in the embedding pool below. Authoritative over the
+                    # config seed (it can correct num_register_tokens).
                     self.patch_grid = self._probe_patch_grid(tuple(attn[-1].shape))
+                    self._patch_grid_probed = True
 
                 # Mean-pool patch tokens, excluding CLS + register tokens.
                 hidden = outputs.last_hidden_state  # (B, tokens, D)
                 patch_start = 1 + self._num_register_tokens
+                # Defense-in-depth for the attentions-unavailable path: if the
+                # config-derived grid disagrees with the actual token count
+                # (1 + num_register_tokens + h*w != tokens), it can't be trusted
+                # for the reshape, so drop it rather than silently mis-shape.
+                if not self._patch_grid_probed and self.patch_grid is not None:
+                    h_cfg, w_cfg = self.patch_grid
+                    if patch_start + h_cfg * w_cfg != int(hidden.shape[1]):
+                        self.patch_grid = None
                 patch_features = hidden[:, patch_start:, :].mean(dim=1)  # (B, D)
                 embeddings.append(
                     patch_features.detach().cpu().to(torch.float32).numpy()

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <h3/h3api.h>
@@ -88,11 +89,24 @@ size_t SpatialMemory_advance_to_timestamp(SpatialMemory *sm, double timestamp,
     return 0;
   }
 
-  while (timestamp - *window_anchor >= time_window_sec) {
+  // Number of grid steps between the anchor and the target timestamp.
+  double gap = timestamp - *window_anchor;
+  if (gap < time_window_sec) {
+    return 0;
+  }
+  size_t steps = (size_t)(gap / time_window_sec);
+
+  // Advancing more than `capacity` times is redundant: every ring slot has
+  // already been reset/emptied, so further rotations are no-ops. Cap the
+  // physical advances to avoid spinning millions of times on a large gap,
+  // but still move the anchor to the correct grid position below so
+  // subsequent calls stay consistent.
+  size_t physical = (steps < sm->capacity) ? steps : sm->capacity;
+  for (size_t i = 0; i < physical; ++i) {
     SpatialMemory_advance_all(sm);
-    *window_anchor += time_window_sec;
     advances++;
   }
+  *window_anchor += (double)steps * time_window_sec;
   return advances;
 }
 
@@ -377,9 +391,24 @@ size_t SpatialMemory_query_similar(SpatialMemory *sm, const float *query,
     ExemplarCodecQuery_free(prepared);
     return 0;
   }
-  // Each tile may contribute up to per_cell_cap rows. Multiply.
+  // Each tile may contribute up to per_cell_cap rows. Clamp per_cell_cap to
+  // max_out (no point collecting more rows per cell than can ever be returned)
+  // and guard both multiplies against size_t overflow — per_cell_cap comes
+  // from the CLI and can be up to SIZE_MAX. On overflow, bail via the same
+  // path as an allocation failure.
+  if (max_out > 0 && per_cell_cap > max_out) per_cell_cap = max_out;
+  if (per_cell_cap != 0 && max_scratch > SIZE_MAX / per_cell_cap) {
+    free(cells);
+    ExemplarCodecQuery_free(prepared);
+    return 0;
+  }
   max_scratch *= per_cell_cap;
 
+  if (max_scratch > SIZE_MAX / sizeof(SpatialMemorySimilar)) {
+    free(cells);
+    ExemplarCodecQuery_free(prepared);
+    return 0;
+  }
   SpatialMemorySimilar *scratch = (SpatialMemorySimilar *)malloc(
       max_scratch * sizeof(SpatialMemorySimilar));
   if (!scratch) {

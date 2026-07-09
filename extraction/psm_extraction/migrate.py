@@ -1,9 +1,9 @@
 """In-place migration of schema-v1 features.h5 to schema-v2.
 
 Adds missing root + per-group attrs using best-effort defaults for known
-group names (`dino`, `jepa`, `clip`). Sensor groups (`gps`, `imu`) are left
-alone — only an optional `rate_hz_nominal` would belong there and we can't
-infer it without the source pipeline metadata.
+group names (`dino`, `jepa`, `clip`, `siglip`, `longclip`). Sensor groups
+(`gps`, `imu`) are left alone — only an optional `rate_hz_nominal` would
+belong there and we can't infer it without the source pipeline metadata.
 
 Datasets are never modified. The migration is idempotent: running it on an
 already-v2 file is a no-op that returns `{"already_at": SCHEMA_VERSION}`.
@@ -45,6 +45,20 @@ KNOWN_GROUP_DEFAULTS: dict[str, dict[str, Any]] = {
         "model": "openai/clip",
         "checkpoint": "unknown_v1",
         "preprocess": "clip_default",
+        "normalized": True,
+        "sampling": "downsampled_from_video",
+    },
+    "siglip": {
+        "model": "google/siglip",
+        "checkpoint": "unknown_v1",
+        "preprocess": "siglip_default",
+        "normalized": True,
+        "sampling": "downsampled_from_video",
+    },
+    "longclip": {
+        "model": "longclip-L-vit-l-14",
+        "checkpoint": "unknown_v1",
+        "preprocess": "longclip_default",
         "normalized": True,
         "sampling": "downsampled_from_video",
     },

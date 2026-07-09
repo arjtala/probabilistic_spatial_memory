@@ -1,5 +1,55 @@
 # TODO Items
 
+## Review 2026-07-08 — full-codebase review + fixes (applied)
+
+Full-codebase review (10 subsystem lanes, adversarial per-finding verification): 56 raw findings → 50 survived (36 confirmed, 14 plausible; 6 rejected as false positives). All verified findings were fixed the same day and the build + full test suite were re-verified green (C `-Werror` + 17 C tests + 59 extraction pytest). Fix writeup: [journal/review_fixes_2026-07-08.md](journal/review_fixes_2026-07-08.md).
+
+### Fixed — High
+- [x] `src/viz/progress_bar.c` — VBO allocated for `12*6` floats but start-overlay uploads `30*6` → `glBufferSubData` rejected (`GL_INVALID_VALUE`), splash drew stale geometry. VBO now sized `30*6` (covers all three draw paths).
+- [x] `extraction/psm_extraction/models/dino_pytorch.py` — added `attn_implementation="eager"`; on `transformers>=4.40` the default SDPA returned `attentions=None`, silently dropping attention maps + `patch_grid`. Plus a config-derived `patch_grid` fallback.
+- [x] `scripts/eval_mllm_baseline.py` — exemplar hit was Hit@1 (top-1 only) under a `_at_5` key; now ORs over all top-k predictions to match `_eval_common`/`eval_lookback` (fixes the MLLM-vs-PSM headline comparison).
+- [x] `.github/workflows/ci.yml` — jobs installed only `h3 hdf5` while `make test` links GLFW viz tests → CI could never pass on a clean runner. Added `glfw` (brew) / `libglfw3-dev` (apt) to all jobs.
+
+### Fixed — Medium
+- [x] `src/core/spatial_memory.c` — `SpatialMemory_advance_to_timestamp` capped physical advances at ring capacity (was unbounded on large timestamp gaps); anchor still moves to the exact grid position.
+- [x] `extraction/psm_extraction/extract.py` — VRS/EgoExo model-group vs `--gps-json` sensor-group clock mismatch: sensor groups now co-located on the model group's origin via an explicit `rebase_origin` (residual documented; partial where clocks are genuinely independent).
+- [x] `extraction/psm_extraction/io/json_sidecar.py` — `read_gps_json`/`read_imu_json` now select the stream with the most *valid* samples (was largest-raw-count before validity filtering).
+- [x] `README.md` — CLI flag table + `--search` JSON fields brought in sync with `psm --help` (see doc fixes below).
+- [x] CI: added a Python `extraction` pytest job (was no Python coverage in CI).
+- [x] `tests/test_imu_processor.c` (new) + `test-imu-processor` Makefile target — the IMU dead-reckoning integrator now has coverage (heading integration, dead-reckoning displacement, dt-gating boundary).
+- [x] `extraction/psm_extraction/io/nymeria_narration.py` — removed alignment overclaims; documented the `trajectory_t0` vs `rgb_t0` offset and exposed `trajectory_t0_sec` for downstream re-alignment (partial — full rebase needs the RGB-frame origin from the extractor).
+
+### Fixed — Low
+- [x] `src/core/spatial_memory.c` — guarded `size_t` overflow in `per_cell_cap` scratch sizing.
+- [x] `src/core/tile.c` — `exemplar_seen` now advanced only after a successful encode (Algorithm-R bias on encode failure).
+- [x] `src/core/ring_buffer.c` — consistent NULL-slot guard in `RingBuffer_merge_window`.
+- [x] `include/core/spatial_memory.h` — corrected stale `query_similar` return-value + `SpatialMemorySimilar` per-cell docs.
+- [x] `src/ingest/ingest.c` — backward in-range GPS query resets cursor (was forward-only extrapolation returning success); reject zero-width embedding datasets; documented the non-decreasing-timestamp precondition.
+- [x] `src/main.c` — explicit `-g` no longer overridden by a positional; explicit `--exemplars 0` now honored (added `has_group`/`has_exemplar_capacity` flags).
+- [x] `src/viz/viz_config.c` — `hex_extrude_scale` parser now rejects trailing garbage / errno (matches sibling parsers).
+- [x] `src/viz/viz_main.c` — NULL-check `malloc` in `find_file_in_dir`.
+- [x] `src/viz/shader.c` — check `ftell` return before allocating (avoids silently-empty shader source).
+- [x] `extraction/psm_extraction/models/clip_pytorch.py` — replaced tensor-truthiness `or` chain; probe `max_position_embeddings` instead of hard-coded 77.
+- [x] `extraction/psm_extraction/models/jepa_pytorch.py` — `embed_images` default `batch_size` 4 → 16 (matches ABC).
+- [x] `extraction/psm_extraction/__main__.py` — `--group` flag now honored (was dead) for single-model extraction.
+- [x] `extraction/psm_extraction/migrate.py` — added `siglip`/`longclip` to `KNOWN_GROUP_DEFAULTS` (were skipped while still stamping schema v2).
+- [x] `extraction/psm_extraction/writer.py` — `write_model_group` now enforces `schema.MODEL_REQUIRED_ATTRS`/`_DATASETS` (constants are now the enforced contract).
+- [x] `extraction/psm_extraction/io/aria_vrs.py` — sort + dedup SLAM/GPS timestamps before `np.interp` (undefined on non-monotonic `xp`).
+- [x] `extraction/psm_extraction/io/hdd.py` — `video_start_skew` handles tz-aware ISO timestamps instead of blindly stripping tzinfo.
+- [x] `scripts/bootstrap_ci.py` — `_extract_arrays` tolerates `eval_mllm_baseline` shape (metrics under `predictions`) instead of KeyError.
+- [x] `scripts/eval_aggregate.py` — negative-control set now excludes counting/spatial-only questions (matches `eval_lookback`).
+- [x] `scripts/eval_mllm_baseline.py` — dropped the `max(0.0, …)` bucket-window clamp so IoU matches the shared scorer.
+- [x] `.gitignore` — removed the over-broad `*/*.txt` (would silently ignore a future `extraction/requirements-dev.txt`); anchored `*.gch`/`*.tmp`.
+- [x] CI: added a compile step for the C benchmarks (were never built by CI → bit-rot risk).
+
+### Docs synced
+- [x] `README.md` — added `-v/--version`, `--per-cell-cap`, `--exemplar-codec`, `--exemplars 0` to the CLI table; documented `exemplar_codec`/`exemplar_payload_bytes` JSON fields; added `torchvision` to the `clip` extra; refreshed the `src/`, `include/`-adjacent, `benchmarks/`, and `tests/` structure listings.
+- [x] `EXPERIMENTS.md` — E0 pipeline item 2 pointed at the real `scripts/extract_bigg_all.sh` (the never-created `extract_nymeria_all.sh` reference).
+- [x] `TODO.md` — corrected the stale `--clip-checkpoint`-threading claim for the sliding-window / uniform-sample sweeps (both already had it; remaining blocker is compute only).
+
+### Rejected (false positives — no change needed)
+GPS-monotonicity "crash" (negative `dt` short-circuits safely), `attention_overlay` OOB (buffer sized from the same dim as the loop), DINO register-count collision (impossible for real grids), IMU/GPS clock reconciliation (consumer already does it via `_resolve_offset`), `_at_5` key "mislabel" (suffix is discarded), `make run` "fails" (it's `.PHONY`, exits 0).
+
 ## Bugs
 
 - [x] `gps_trace.c:73-78` — `GpsTrace_push` realloc has a dangling pointer bug: if the first `realloc` succeeds (freeing the old buffer) but a subsequent one fails, the early-return leaves `gt->lats`/`gt->lngs`/`gt->imu_meta` pointing at freed memory
@@ -249,8 +299,8 @@ This section is just for the harness/glue code those experiments need.
 ### Baselines + sweeps
 
 - [x] `scripts/eval_brute_force_clip.py` — for E11. Embed every frame of a session, rank all frames by cosine against the query, take top-k. Use the same scorer as `eval_lookback.py` so numbers are directly comparable. Landed; ran on Nymeria `shelby_arroyo_act0` (13.4% Hit@5).
-- [x] `scripts/eval_sliding_window.py` — for E11. Slide 5-second windows, mean-pool frame embeddings inside each window, rank windows. Same scorer. Script landed; Nymeria sweep still pending (needs the `--clip-checkpoint` threading that brute-force got in `00d6383`).
-- [x] `scripts/eval_uniform_sample.py` — for E11. 1-frame-per-time-window sampling, no learned aggregation. Lower-bound baseline. Script landed; Nymeria sweep still pending (same `--clip-checkpoint` threading as sliding-window).
+- [x] `scripts/eval_sliding_window.py` — for E11. Slide 5-second windows, mean-pool frame embeddings inside each window, rank windows. Same scorer. Script landed with `--clip-checkpoint` threading already in place; Nymeria sweep still pending (compute only).
+- [x] `scripts/eval_uniform_sample.py` — for E11. 1-frame-per-time-window sampling, no learned aggregation. Lower-bound baseline. Script landed with `--clip-checkpoint` threading already in place; Nymeria sweep still pending (compute only).
 - [x] Hyperparameter sweep loop on top of `eval_bigg_all.sh` — for E12. Adds `H3_RESOLUTION`, `RETENTION` (as `TIME_WINDOW × CAPACITY`), and `EXEMPLARS` env knobs; auto-suffixes the TAG so outputs don't clobber the v2 raw runs. Landed as standalone `scripts/eval_hyperparam_sweep.sh`.
 - [x] `scripts/eval_hyperparam_aggregate.py` — small extension to the aggregator that pools across hyperparameter axis and plots single-axis sensitivity curves. The plot is paper Figure F3. Landed as `scripts/eval_hyperparam_plot.py`; F3 SVG at `journal/figures/hyperparam_sensitivity.svg`.
 

@@ -507,8 +507,14 @@ bool VizConfig_load_file(VizConfig *config, const char *path) {
       }
     } else if (strcmp(key, "hex_extrude_scale") == 0) {
       char *endp = NULL;
+      errno = 0;
       double parsed = strtod(value_buf, &endp);
-      if (endp == value_buf || parsed < 0.0 || parsed > 1.0) {
+      if (errno != 0 || endp == value_buf || *endp != '\0') {
+        fprintf(stderr, "Invalid %s: '%s'\n", key, value_buf);
+        fclose(file);
+        return false;
+      }
+      if (parsed < 0.0 || parsed > 1.0) {
         fprintf(stderr, "%s must be in [0.0, 1.0]\n", key);
         fclose(file);
         return false;

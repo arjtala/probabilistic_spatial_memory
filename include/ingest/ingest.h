@@ -56,6 +56,9 @@ typedef enum {
 
 IngestReader *IngestReader_open(hid_t file, const char *group);
 void IngestReader_close(IngestReader *reader);
+// PRECONDITION: the TIMESTAMPS column must be non-decreasing (equal values are
+// allowed). IngestReader_next/IngestReader_run rely on this for correct window
+// advance; out-of-order timestamps yield undefined windowing behavior.
 IngestReadStatus IngestReader_next(IngestReader *reader,
                                    IngestRecord *record);
 bool IngestReader_run(IngestReader *reader, SpatialMemory *sm,
