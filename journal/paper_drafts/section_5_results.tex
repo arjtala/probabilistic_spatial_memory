@@ -66,7 +66,7 @@ Of the 162 shared brute-force/\psm{} misses, most are revisit-heavy narrations w
 \centering
 \includegraphics[width=\linewidth]{figures/f2_psm_vs_mllm.pdf}
 \caption{Vanilla Gemini 3.1 Pro at $K{=}8$ uniform frames (red) vs \psm{} \texttt{clipL@r12} top-5 (blue) on every one of the 14 street-scale sessions.
-\psm{}'s query-guided retrieval reaches every session the uniform baseline misses; four sessions land at vanilla MLLM $= 0\%$ because the $K{=}8$ uniform frames never include a GT-interval frame.}
+\psm{}'s query-guided retrieval reaches every session the uniform baseline misses; two sessions land at vanilla MLLM $= 0\%$ because the $K{=}8$ uniform frames never include a GT-interval frame.}
 \label{fig:f2-psm-vs-mllm}
 \end{figure}
 
@@ -82,9 +82,9 @@ pre-registered monotone-$r10{\to}r12$ Hit@5 criterion} (SigLIP-2 strongest at
 On these same 14 sessions we now ask whether a frontier MLLM can retrieve
 \emph{without} a spatial prefilter.
 We run Gemini 3.1 Pro at $K{=}8$ uniformly-sampled frames per question (Fig.~\ref{fig:f2-psm-vs-mllm}), matching \psm{}'s candidate budget to isolate the retrieval substrate.
-\psm{} matches or exceeds the MLLM's Hit@5 on every session (median ${\sim}4\times$) and never loses (the sole tie is Hillsdale6 at $13.8\%$, also \psm{}'s weakest cross-encoder session); \textbf{four sessions land at vanilla MLLM $=0\%$} because the $K{=}8$ uniform frames never include a frame inside the ${\sim}3$\,s GT intervals.
+\psm{} matches or exceeds the MLLM's Hit@5 on every session (median ${\sim}4\times$) and never loses (the sole tie is Hillsdale6 at $13.8\%$, also \psm{}'s weakest cross-encoder session); \textbf{two sessions land at vanilla MLLM $=0\%$} because the $K{=}8$ uniform frames never include a frame inside the ${\sim}3$\,s GT intervals.
 The root cause is temporal coverage: at 100--640\,s session durations the uniform-frame gap is 12--80\,s, a ${\sim}4\%$ chance of \emph{seeing} the right frame before any discrimination applies.
-The failure is architectural, not a matter of scale: at $K{=}32$ the oracle upper bound is $21.4\%$ but Gemini's actual pick rate stays $7.1\%$---a $3\times$ discrimination gap compounding the coverage gap, so a larger context window cannot recover signal that uniform sampling never captured.
+The failure is architectural, not a matter of scale: at $K{=}32$ the oracle upper bound is $21.4\%$ but Gemini's actual pick rate stays $7.1\%$\footnote{The $21.4\%$ oracle bound is the any-of-$K$ Hit@5 our re-scored baseline summaries report; the $7.1\%$ pick rate counts only the single frame Gemini selects.}---a $3\times$ discrimination gap compounding the coverage gap, so a larger context window cannot recover signal that uniform sampling never captured.
 This is the spatial-temporal blind spot that \psm{}'s cell-targeted prefilter is designed to close.
 
 \subsection{Multi-session persistence at metropolitan scale (Honda HDD)}

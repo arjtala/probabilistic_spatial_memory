@@ -34,9 +34,9 @@
 <text x="70" y="54.0" text-anchor="end">45%</text>
 <line x1="80" y1="50.0" x2="840" y2="50.0" stroke="#dddddd" stroke-width="1" stroke-dasharray="2,2"/>
 <rect x="84.1" y="216.7" width="19.0" height="133.3" fill="#1f77b4" />
-<rect x="107.1" y="350.0" width="19.0" height="0.0" fill="#d62728" />
+<rect x="107.1" y="327.8" width="19.0" height="22.2" fill="#d62728" />
 <text x="93.6" y="212.7" text-anchor="middle" font-size="10" fill="#1f77b4" font-weight="bold">20%</text>
-<text x="116.6" y="346.0" text-anchor="middle" font-size="10" fill="#d62728" font-weight="bold">0%</text>
+<text x="116.6" y="323.8" text-anchor="middle" font-size="10" fill="#d62728" font-weight="bold">3%</text>
 <text x="107.1" y="368.0" text-anchor="end" font-size="10" transform="rotate(-35 107.1 368.0)">Mainquad</text>
 <text x="107.1" y="428.0" text-anchor="middle" font-size="8" fill="#666">LookOut</text>
 <rect x="138.4" y="127.8" width="19.0" height="222.2" fill="#1f77b4" />
@@ -64,21 +64,21 @@
 <text x="324.3" y="368.0" text-anchor="end" font-size="10" transform="rotate(-35 324.3 368.0)">SanmateoDT2</text>
 <text x="324.3" y="428.0" text-anchor="middle" font-size="8" fill="#666">LookOut</text>
 <rect x="355.6" y="97.1" width="19.0" height="252.9" fill="#1f77b4" />
-<rect x="378.6" y="281.0" width="19.0" height="69.0" fill="#d62728" />
+<rect x="378.6" y="235.1" width="19.0" height="114.9" fill="#d62728" />
 <text x="365.1" y="93.1" text-anchor="middle" font-size="10" fill="#1f77b4" font-weight="bold">38%</text>
-<text x="388.1" y="277.0" text-anchor="middle" font-size="10" fill="#d62728" font-weight="bold">10%</text>
+<text x="388.1" y="231.1" text-anchor="middle" font-size="10" fill="#d62728" font-weight="bold">17%</text>
 <text x="378.6" y="368.0" text-anchor="end" font-size="10" transform="rotate(-35 378.6 368.0)">Gates_to_mainquad</text>
 <text x="378.6" y="428.0" text-anchor="middle" font-size="8" fill="#666">LookOut</text>
 <rect x="409.9" y="105.6" width="19.0" height="244.4" fill="#1f77b4" />
-<rect x="432.9" y="350.0" width="19.0" height="0.0" fill="#d62728" />
+<rect x="432.9" y="327.8" width="19.0" height="22.2" fill="#d62728" />
 <text x="419.4" y="101.6" text-anchor="middle" font-size="10" fill="#1f77b4" font-weight="bold">37%</text>
-<text x="442.4" y="346.0" text-anchor="middle" font-size="10" fill="#d62728" font-weight="bold">0%</text>
+<text x="442.4" y="323.8" text-anchor="middle" font-size="10" fill="#d62728" font-weight="bold">3%</text>
 <text x="432.9" y="368.0" text-anchor="end" font-size="10" transform="rotate(-35 432.9 368.0)">Huang_Gates</text>
 <text x="432.9" y="428.0" text-anchor="middle" font-size="8" fill="#666">LookOut</text>
 <rect x="464.1" y="216.7" width="19.0" height="133.3" fill="#1f77b4" />
-<rect x="487.1" y="327.8" width="19.0" height="22.2" fill="#d62728" />
+<rect x="487.1" y="283.3" width="19.0" height="66.7" fill="#d62728" />
 <text x="473.6" y="212.7" text-anchor="middle" font-size="10" fill="#1f77b4" font-weight="bold">20%</text>
-<text x="496.6" y="323.8" text-anchor="middle" font-size="10" fill="#d62728" font-weight="bold">3%</text>
+<text x="496.6" y="279.3" text-anchor="middle" font-size="10" fill="#d62728" font-weight="bold">10%</text>
 <text x="487.1" y="368.0" text-anchor="end" font-size="10" transform="rotate(-35 487.1 368.0)">BurlingameDT4</text>
 <text x="487.1" y="428.0" text-anchor="middle" font-size="8" fill="#666">LookOut</text>
 <rect x="518.4" y="64.3" width="19.0" height="285.7" fill="#1f77b4" />
@@ -94,15 +94,15 @@
 <text x="595.7" y="368.0" text-anchor="end" font-size="10" transform="rotate(-35 595.7 368.0)">Hillsdale6</text>
 <text x="595.7" y="428.0" text-anchor="middle" font-size="8" fill="#666">LookOut</text>
 <rect x="627.0" y="261.1" width="19.0" height="88.9" fill="#1f77b4" />
-<rect x="650.0" y="305.6" width="19.0" height="44.4" fill="#d62728" />
+<rect x="650.0" y="283.3" width="19.0" height="66.7" fill="#d62728" />
 <text x="636.5" y="257.1" text-anchor="middle" font-size="10" fill="#1f77b4" font-weight="bold">13%</text>
-<text x="659.5" y="301.6" text-anchor="middle" font-size="10" fill="#d62728" font-weight="bold">7%</text>
+<text x="659.5" y="279.3" text-anchor="middle" font-size="10" fill="#d62728" font-weight="bold">10%</text>
 <text x="650.0" y="368.0" text-anchor="end" font-size="10" transform="rotate(-35 650.0 368.0)">seq003_street_002</text>
 <text x="650.0" y="428.0" text-anchor="middle" font-size="8" fill="#666">SLOPER4D</text>
 <rect x="681.3" y="150.0" width="19.0" height="200.0" fill="#1f77b4" />
-<rect x="704.3" y="305.6" width="19.0" height="44.4" fill="#d62728" />
+<rect x="704.3" y="283.3" width="19.0" height="66.7" fill="#d62728" />
 <text x="690.8" y="146.0" text-anchor="middle" font-size="10" fill="#1f77b4" font-weight="bold">30%</text>
-<text x="713.8" y="301.6" text-anchor="middle" font-size="10" fill="#d62728" font-weight="bold">7%</text>
+<text x="713.8" y="279.3" text-anchor="middle" font-size="10" fill="#d62728" font-weight="bold">10%</text>
 <text x="704.3" y="368.0" text-anchor="end" font-size="10" transform="rotate(-35 704.3 368.0)">seq008_running_001</text>
 <text x="704.3" y="428.0" text-anchor="middle" font-size="8" fill="#666">SLOPER4D</text>
 <rect x="735.6" y="231.0" width="19.0" height="119.0" fill="#1f77b4" />
