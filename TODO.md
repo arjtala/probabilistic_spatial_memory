@@ -372,3 +372,14 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Body ~11->~10pp local (total 18->17); 0 undefined refs; no results lost
 - [ ] Real-kit confirming build (cluster) -- ~9pp estimate; if >8pp trim §6 limitations next
 - [ ] (open) Confirm OpenSUN3D archival page limit -- if >8pp the squeeze is moot
+
+## 2026-07-09 21:06 -- F7->supp (3 figs) + verified 8pp limit
+
+- [x] Real-kit trace (user): body=10pp with 4 figs; local build agrees (~10pp)
+- [x] Chosen fork: F7->supp (keep F1+F2+hdd_combined in body); pushed e073d10
+- [x] Trims: §6 limitations, §7 follow-ups, hdd_combined width 1.0->0.82
+- [x] VERIFIED via CFP: OpenSUN3D archival = 8pp full papers (refs excluded, supp unlimited); Huawei SpatialMem = submission flag
+- [x] F2 aspect 0.43 (wide-short) -> shrinking saves ~nothing; figures tapped out
+- [x] §5.5 vanilla-MLLM body prose trimmed (mechanism already in supp); pushed 1ef8764
+- [x] Result: body ~9pp local (float-quantized; supp starts p10). Still 1pp over 8pp.
+- [ ] DECISION PENDING: low-damage levers exhausted. To reach 8pp: (a) F2->supp too (2 figs F1+hdd, clean 8pp) OR (b) demote a ~1pp §5 results block (keep 3 figs). Confirm with real-kit build first.
