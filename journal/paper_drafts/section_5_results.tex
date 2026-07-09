@@ -39,12 +39,16 @@ pre-registered monotone-$r10{\to}r12$ Hit@5 criterion} (SigLIP-2 strongest at
 \S\ref{sec:limitations})---full criterion and per-session verdicts in supp.\
 \S\ref{sec:supp-multicorpus} (Table~\ref{tab:multi-corpus-h3}).
 \label{sec:results-multi-corpus}
-On these same 14 sessions we now ask whether a frontier MLLM can retrieve
-\emph{without} a spatial prefilter.
-We run Gemini 3.1 Pro at $K{=}8$ uniformly-sampled frames per question (Fig.~\ref{fig:f2-psm-vs-mllm}), matching \psm{}'s candidate budget to isolate the retrieval substrate.
-\psm{} matches or exceeds the MLLM's Hit@5 on every session, and \textbf{two sessions land at vanilla MLLM $=0\%$} because the $K{=}8$ uniform frames never include a frame inside the ${\sim}3$\,s GT intervals.
-The root cause is temporal coverage, not reasoning: uniform sampling has a ${\sim}4\%$ chance of \emph{seeing} the right frame, and even at $K{=}32$ Gemini's pick rate ($7.1\%$) trails the oracle upper bound ($21.4\%$) by $3\times$, so a larger context window cannot recover signal that sampling never captured (mechanism in supp.\ \S\ref{sec:results-mllm-rerank}).
-This is the spatial-temporal blind spot that \psm{}'s cell-targeted prefilter is designed to close.
+On these same 14 sessions we ask whether a frontier MLLM can retrieve
+\emph{without} a spatial prefilter: we run Gemini 3.1 Pro at $K{=}8$
+uniformly-sampled frames per question (Fig.~\ref{fig:f2-psm-vs-mllm}), matching
+\psm{}'s candidate budget. \psm{} matches or exceeds its Hit@5 on every session,
+and \textbf{two sessions land at vanilla MLLM $=0\%$} because the $K{=}8$ uniform
+frames never fall inside the ${\sim}3$\,s GT intervals. The failure is one of
+temporal coverage, not reasoning---a larger context window cannot recover signal
+uniform sampling never captured (mechanism in supp.\ \S\ref{sec:results-mllm-rerank})---the
+spatial-temporal blind spot \psm{}'s cell-targeted prefilter is designed to
+close.
 
 \begin{figure}[t]
 \centering
