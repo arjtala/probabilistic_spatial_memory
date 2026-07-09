@@ -40,7 +40,7 @@ pre-registered monotone-$r10{\to}r12$ Hit@5 criterion} (SigLIP-2 strongest at
 \label{sec:results-multi-corpus}
 On these same 14 sessions we ask whether a frontier MLLM can retrieve
 \emph{without} a spatial prefilter: we run Gemini 3.1 Pro at $K{=}8$
-uniformly-sampled frames per question (Fig.~\ref{fig:f2-psm-vs-mllm}), matching
+uniformly-sampled frames per question (supp.\ Fig.~\ref{fig:f2-psm-vs-mllm}), matching
 \psm{}'s candidate budget. \psm{} matches or exceeds its Hit@5 on every session,
 and \textbf{two sessions land at vanilla MLLM $=0\%$} because the $K{=}8$ uniform
 frames never fall inside the ${\sim}3$\,s GT intervals. The failure is one of
@@ -48,14 +48,6 @@ temporal coverage, not reasoning---a larger context window cannot recover signal
 uniform sampling never captured (mechanism in supp.\ \S\ref{sec:results-mllm-rerank})---the
 spatial-temporal blind spot \psm{}'s cell-targeted prefilter is designed to
 close.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/f2_psm_vs_mllm.pdf}
-\caption{Vanilla Gemini 3.1 Pro at $K{=}8$ uniform frames (red) vs \psm{} \texttt{clipL@r12} top-5 (blue) on every one of the 14 street-scale sessions.
-\psm{}'s query-guided retrieval reaches every session the uniform baseline misses; two sessions land at vanilla MLLM $=0\%$ because the $K{=}8$ uniform frames never include a GT-interval frame.}
-\label{fig:f2-psm-vs-mllm}
-\end{figure}
 
 \subsection{Multi-session persistence at metropolitan scale (Honda HDD)}
 \label{sec:results-hdd}
