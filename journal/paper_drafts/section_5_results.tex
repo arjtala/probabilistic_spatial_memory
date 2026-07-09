@@ -1,8 +1,8 @@
 % Section 5 — Results
-% Status: 8pp-cut. §5.1 Setup, §5.2 Single-session (tab:headline),
-% §5.3 Memory/latency/failure (F6 now in supp), §5.4 Multi-corpus
-% (per-session table in supp), §5.5 Vanilla-MLLM (F2 in body),
-% §5.6 HDD persistence (hdd_combined). Depth relocated to supplementary.tex.
+% Status: 8pp, 4 body figures (F1 arch, F2 PSM-vs-MLLM, F7 qualitative,
+% hdd_combined). §5.1 Setup, §5.2 Single-session + F7 (headline table in supp),
+% §5.5 Multi-corpus + Vanilla-MLLM (F2 in body), §5.6 HDD persistence
+% (hdd_combined). Memory/latency, F6, per-session table relocated to supplementary.tex.
 
 \section{Results}
 \label{sec:results}
@@ -27,6 +27,16 @@ An optional MLLM rerank adds localization precision, not recall: \caponek{}$=1$+
 The strict-diversity cost, the brute-force ceiling, and the operating-point Pareto, retrieval baselines, memory/H3-resolution ablation, and 30-session monotonicity sweep are in the supplement (\S\ref{sec:supp-ablations}).
 
 \psm{}'s per-cell state is session-length-invariant (${\sim}0.44$\,MiB at $R{=}128$) while brute-force grows linearly in $N$; on the short Nymeria sessions brute-force is still marginally cheaper (the synthetic crossover falls at $N\approx1500$ frames, supp.\ Fig.~\ref{fig:f6-memory}), so the bounded-memory payoff is demonstrated on the multi-hour HDD corpus (\S\ref{sec:results-hdd}). Retrieval is sub-millisecond either way (host-CPU state size, latency, and the shared-miss failure analysis in supp.\ \S\ref{sec:supp-memory-latency}).
+Fig.~\ref{fig:f7-qualitative} shows representative retrievals---\psm{}'s top-5 candidates with the Gemini-selected frame---spanning two hits (one a Gemini Hit@1 rescue) and an honest revisit-heavy miss.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/f7_qualitative.pdf}
+\caption{Qualitative look-back retrievals on \texttt{shelby\_arroyo\_act0}.
+Each row is one query: the narration text, GT interval, and \psm{}/Gemini verdict (left), then \psm{}'s top-5 candidates ranked by CLIP cosine (similarity and timestamp per frame). Green/red borders mark whether a candidate falls in the GT interval; the Gemini-selected frame is highlighted.
+Rows~1--2 are hits (row~2 a Gemini Hit@1 rescue over \psm{}'s ranking); row~3 is an honest revisit-heavy miss, where recurring near-identical frames defeat cosine retrieval (\S\ref{sec:limitations}).}
+\label{fig:f7-qualitative}
+\end{figure}
 
 \subsection{Generalization, and why MLLMs need a spatial prefilter}
 \label{sec:results-vanilla-mllm}
@@ -42,10 +52,18 @@ pre-registered monotone-$r10{\to}r12$ Hit@5 criterion} (SigLIP-2 strongest at
 \label{sec:results-multi-corpus}
 On these same 14 sessions we now ask whether a frontier MLLM can retrieve
 \emph{without} a spatial prefilter.
-We run Gemini 3.1 Pro at $K{=}8$ uniformly-sampled frames per question (supp.\ Fig.~\ref{fig:f2-psm-vs-mllm}), matching \psm{}'s candidate budget to isolate the retrieval substrate.
-\psm{} matches or exceeds the MLLM's Hit@5 on every session (median ${\sim}4\times$) and never loses (the sole tie is Hillsdale6 at $13.8\%$, also \psm{}'s weakest cross-encoder session); \textbf{two sessions land at vanilla MLLM $=0\%$} because the $K{=}8$ uniform frames never include a frame inside the ${\sim}3$\,s GT intervals.
+We run Gemini 3.1 Pro at $K{=}8$ uniformly-sampled frames per question (Fig.~\ref{fig:f2-psm-vs-mllm}), matching \psm{}'s candidate budget to isolate the retrieval substrate.
+\psm{} matches or exceeds the MLLM's Hit@5 on every session, and \textbf{two sessions land at vanilla MLLM $=0\%$} because the $K{=}8$ uniform frames never include a frame inside the ${\sim}3$\,s GT intervals.
 The root cause is temporal coverage, not reasoning: uniform sampling has a ${\sim}4\%$ chance of \emph{seeing} the right frame, and even at $K{=}32$ Gemini's pick rate ($7.1\%$) trails the oracle upper bound ($21.4\%$) by $3\times$, so a larger context window cannot recover signal that sampling never captured (mechanism in supp.\ \S\ref{sec:results-mllm-rerank}).
 This is the spatial-temporal blind spot that \psm{}'s cell-targeted prefilter is designed to close.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/f2_psm_vs_mllm.pdf}
+\caption{Vanilla Gemini 3.1 Pro at $K{=}8$ uniform frames (red) vs \psm{} \texttt{clipL@r12} top-5 (blue) on every one of the 14 street-scale sessions.
+\psm{}'s query-guided retrieval reaches every session the uniform baseline misses; two sessions land at vanilla MLLM $=0\%$ because the $K{=}8$ uniform frames never include a GT-interval frame.}
+\label{fig:f2-psm-vs-mllm}
+\end{figure}
 
 \subsection{Multi-session persistence at metropolitan scale (Honda HDD)}
 \label{sec:results-hdd}
@@ -59,48 +77,38 @@ valid GPS), which over 8 months genuinely re-drives the same streets. HDD ships
 no look-back QA labels, so these results are \emph{systems} and
 \emph{self-supervised}, not retrieval-accuracy (\S\ref{sec:limitations}).
 
-\paragraph{Revisit structure.}
+\paragraph{Revisit structure and area-bounded state (Fig.~\ref{fig:hdd-combined}A).}
 Binning every drive to H3 $r{=}10$ (${\sim}66$\,m), \textbf{47.0\%} of
 (drive, cell) traversal events fall in cells revisited on $\geq2$ distinct days
-(pre-registered bar: $\geq30\%$), across 5{,}163 revisited cells whose
-first-to-last visit spans a \textbf{median of 106 days} (max 221); the coverage
-is arterial, not a depot artifact (46.5\% excluding the 20 most-driven cells).
+(pre-registered bar $\geq30\%$), across 5{,}163 revisited cells spanning a
+\textbf{median of 106 days} (max 221; arterial, not a depot artifact---46.5\%
+excluding the 20 most-driven cells). Over these 102.9\,h and 23{,}298 distinct
+cells, \psm{}'s per-cell-capped state ($\sum_\text{cells}\min(\text{frames}, R)$)
+is smaller than a dense per-frame bank at every ingest rate, the gap widening as
+the reservoir discards redundant dwell/revisit frames
+($1.3$/$2.3$/$4.3$/$7.2\times$ at 1/5/15/30\,fps). State thus grows
+\emph{sublinearly in observation count}---$O(\text{distinct cells})$, not
+$O(\text{frames})$, and not a plateau (only 20\% of cells seen by the halfway
+mark): the empirical form of ``budgeted by area, not sequence length'' (cf.\ the
+synthetic crossover, supp.\ Fig.~\ref{fig:f6-memory}).
 
-\paragraph{State scales with area, not time (Fig.~\ref{fig:hdd-combined}A).}
-Over 102.9\,h and 23{,}298 distinct $r{=}10$ cells, \psm{}'s per-cell-capped
-state ($\sum_\text{cells}\min(\text{frames}, R)$) is smaller than a dense
-per-frame bank at every ingest rate, and the gap widens as the reservoir
-discards redundant dwell/revisit frames:
-$1.3\times$/$2.3\times$/$4.3\times$/$7.2\times$ at 1/5/15/30\,fps. State thus
-grows \emph{sublinearly in observation count}---$O(\text{distinct cells})$, not
-$O(\text{frames})$. This is not a plateau (only 20\% of cells seen by the
-halfway mark): the saving is per-cell capping, the empirical form of ``budgeted
-by area, not sequence length'' (cf.\ the synthetic crossover, supp.\
-Fig.~\ref{fig:f6-memory}).
-
-\paragraph{Cross-session cardinality accrual and decay (Fig.~\ref{fig:hdd-combined}B).}
-A Nymeria micro-eval (\S\ref{sec:results-hll}, supp.) validates the sketch's
-per-session accuracy; HDD's revisits exercise it \emph{across sessions}. Feeding
-a revisited cell's frames chronologically across drives, a single fixed
+\paragraph{Persistent, retrievable cross-session memory (Fig.~\ref{fig:hdd-combined}B,C).}
+Feeding a revisited cell's frames chronologically across drives, a single fixed
 $1\,\mathrm{KiB}$ ($p{=}10$) sketch accrues to \textbf{8{,}112 unique
-observations over 219 days}, while its 60-slot ring-buffer windowed estimate
+observations over 219 days} while its 60-slot ring-buffer windowed estimate
 decays between visits and jumps on each revisit---the ``decay while maintaining
-unique-event cardinality across revisits'' behavior of \S\ref{sec:intro}
-(matched by a Python reimplementation to $2.4\times10^{-5}$ median relative
-error).
-
-\paragraph{The persistent memory is retrievable across sessions
-(Fig.~\ref{fig:hdd-combined}C).}
-Is a place recorded on one day retrievable from another? Label-free, we query a
-revisited cell with a drive-A exemplar and measure the AUC that different-day
-drive-B frames in that cell outrank frames from other cells. Over 5{,}222
-revisited cells (2{,}000 stratified queries) the cross-session AUC is
-\textbf{0.853}, vs.\ a shuffled-cell null of 0.498 and a same-drive upper bound
-of 0.977---strong cross-session place recognition from CLIP cosine alone. The
-same-cell-vs-all split blends geographic proximity with visual identity ($k$-nearest-cell
-control deferred, \S\ref{sec:limitations}); literal top-$k$ hit-rate is low
-($\leq0.07$@10) as the 357k-frame pool is dominated by near-duplicate same-drive
-frames, so AUC is the discriminability measure here.
+unique-event cardinality across revisits'' behavior of \S\ref{sec:intro} (a
+Nymeria micro-eval, \S\ref{sec:results-hll}, validates per-session accuracy; a
+Python reimplementation matches the C sketch to $2.4\times10^{-5}$ median
+relative error). Is that memory retrievable across sessions? Label-free,
+querying a revisited cell with a drive-A exemplar, different-day drive-B frames
+outrank other-cell frames at cross-session AUC \textbf{0.853} (5{,}222 cells,
+2{,}000 stratified queries) vs.\ a shuffled-cell null of 0.498 and a same-drive
+upper bound of 0.977---strong cross-session place recognition from CLIP cosine
+alone. The same-cell-vs-all split blends geographic proximity with visual
+identity ($k$-nearest-cell control deferred, \S\ref{sec:limitations}); AUC (not
+top-$k$ hit-rate) is the discriminability measure here, as the 357k-frame pool
+is near-duplicate-dominated.
 
 \begin{figure}[tb]
 \centering

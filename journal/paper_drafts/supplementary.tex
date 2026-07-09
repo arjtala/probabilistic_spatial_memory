@@ -95,14 +95,6 @@ visually-repetitive trajectories; (c)~the lone failure,
 \texttt{BurlingameDT4\_feb5}, fails all three encoders
 (\S\ref{sec:limitations}).
 
-\begin{figure}[h]
-\centering
-\includegraphics[width=\linewidth]{figures/f2_psm_vs_mllm.pdf}
-\caption{Vanilla Gemini 3.1 Pro at $K{=}8$ uniform frames (red) vs \psm{} \texttt{clipL@r12} top-5 (blue) on every one of the 14 street-scale sessions.
-\psm{}'s query-guided retrieval reaches every session the uniform baseline misses; two sessions land at vanilla MLLM $= 0\%$ because the $K{=}8$ uniform frames never include a GT-interval frame.}
-\label{fig:f2-psm-vs-mllm}
-\end{figure}
-
 \begin{table}[h]
 \centering
 \setlength{\tabcolsep}{4pt}
