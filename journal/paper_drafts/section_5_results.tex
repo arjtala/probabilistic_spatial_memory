@@ -98,9 +98,7 @@ is smaller than a dense per-frame bank at every ingest rate, the gap widening as
 the reservoir discards redundant dwell/revisit frames
 ($1.3$/$2.3$/$4.3$/$7.2\times$ at 1/5/15/30\,fps). State thus grows
 \emph{sublinearly in observation count}---$O(\text{distinct cells})$, not
-$O(\text{frames})$, and not a plateau (only 20\% of cells seen by the halfway
-mark): the empirical form of ``budgeted by area, not sequence length'' (cf.\ the
-synthetic crossover, supp.\ Fig.~\ref{fig:f6-memory}).
+$O(\text{frames})$.
 
 \paragraph{Persistent, retrievable cross-session memory (Fig.~\ref{fig:hdd-combined}B,C).}
 Feeding a revisited cell's frames chronologically across drives, a single fixed
@@ -108,14 +106,12 @@ $1\,\mathrm{KiB}$ ($p{=}10$) sketch accrues to \textbf{8{,}112 unique
 observations over 219 days} while its 60-slot ring-buffer windowed estimate
 decays between visits and jumps on each revisit---the ``decay while maintaining
 unique-event cardinality across revisits'' behavior of \S\ref{sec:intro} (a
-Nymeria micro-eval, \S\ref{sec:results-hll}, validates per-session accuracy; a
-Python reimplementation matches the C sketch to $2.4\times10^{-5}$ median
-relative error). Is that memory retrievable across sessions? Label-free,
+Nymeria micro-eval, \S\ref{sec:results-hll}, validates per-session accuracy). Is that memory retrievable across sessions? Label-free,
 querying a revisited cell with a drive-A exemplar, different-day drive-B frames
 outrank other-cell frames at cross-session AUC \textbf{0.853} (5{,}222 cells,
 2{,}000 stratified queries) vs.\ a shuffled-cell null of 0.498 and a same-drive
 upper bound of 0.977---strong cross-session place recognition from CLIP cosine
 alone. The same-cell-vs-all split blends geographic proximity with visual
-identity ($k$-nearest-cell control deferred, \S\ref{sec:limitations}); AUC (not
-top-$k$ hit-rate) is the discriminability measure here, as the 357k-frame pool
-is near-duplicate-dominated.
+identity ($k$-nearest-cell control deferred, \S\ref{sec:limitations}).\footnote{AUC
+(not top-$k$ hit-rate) is the discriminability measure here, as the 357k-frame
+pool is near-duplicate-dominated.}
