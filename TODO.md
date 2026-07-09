@@ -404,3 +404,14 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Fallback: §7 follow-ups + MIT line compressed
 - [x] Local p9 conclusion bleed ~9 -> ~3 lines; 0 undefined/dup refs; no evidence lost; pushed eee2be8
 - [ ] Real-kit confirming build: expected to clear 8pp (~3 loose-lmodern lines should absorb on tighter Times); if ~1 line over, one micro-trim remains
+
+## 2026-07-09 23:34 -- Internal review (Kamek) fixes; decision: submit non-archival as-is
+
+- [x] Decision: OpenSUN3D non-archival + SpatialMem flag; NO 3D experiment / venue pivot (accept topical-fit risk)
+- [x] Fix '8x smaller' claim (abstract + §4.2): 8x = R=128-vs-R=1024 reservoir, not vs brute-force; lead with session-length-invariance
+- [x] cap=1 R-non-monotonicity: confirmed Table 1 is single default seed (sweep_per_cell_cap.py); footnoted as reservoir noise; 30-session sweep monotone in R
+- [x] Honest rounding: rerank mIoU +37% -> +36.5% (supp §A.6)
+- [x] §5.1: note no purpose-built outdoor egocentric look-back QA benchmark exists
+- [x] Surface sliding-window-CLIP-edges-PSM (+1.6pp, full N-frame) in body §4.2
+- [x] Page-neutral (conclusion p8, supp p9); 0 undefined/dup refs; pushed d650095
+- [ ] Deferred to future main-venue version: genuine look-back QA annotation; scene-graph/SLAM baseline; on-device profiling; compose PSM w/ memory-augmented video-LLM; 3D (Aria MPS xyz) indexing
