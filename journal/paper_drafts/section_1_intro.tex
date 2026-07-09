@@ -21,18 +21,14 @@ Three properties define a viable retrieval substrate for multi-session persisten
 Figure~\ref{fig:f1-architecture} sketches the end-to-end architecture.
 
 \paragraph{Probabilistic Spatial Memory.}
-We propose \textbf{\psm{}}, a streaming spatial-temporal index for
-egocentric look-back retrieval built on three data structures over an H3
-hex-grid tessellation: (1)~\emph{reservoir-sampled exemplars} per cell
-retain a fixed-size embedding sample; (2)~a \emph{time-decayed ring
-buffer of HyperLogLog sketches} per cell tracks unique-event cardinality
-over recent windows; (3)~a \emph{per-cell capacity bound}
-(\caponek{}) limits how many top-$K$ slots one cell may fill---enforcing
-strict spatial diversity at $\texttt{cap}{=}1$ and recovering
-unconstrained top-$K$ at $\texttt{cap}{=}K$. Memory is bounded per cell,
-ingestion is streaming, and top-$K$ search runs in sub-millisecond
-host-CPU wall-time (\S\ref{sec:limitations} scopes the missing on-device
-measurement).
+We propose \textbf{\psm{}}, a streaming spatial-temporal index over an H3
+hex-grid tessellation with three per-cell structures: reservoir-sampled
+embedding exemplars; a time-decayed ring buffer of HyperLogLog sketches tracking
+unique-event cardinality; and a per-cell capacity bound (\caponek{}) that dials
+strict spatial diversity ($\texttt{cap}{=}1$) to unconstrained top-$K$
+($\texttt{cap}{=}K$). Memory is bounded per cell, ingestion is streaming, and
+top-$K$ search is sub-millisecond on host CPU (\S\ref{sec:method}; on-device
+timing unmeasured, \S\ref{sec:limitations}).
 
 \paragraph{Evaluating the retrieval substrate.}
 We evaluate \psm{} as a retrieval substrate on egocentric look-back QA (e.g., ``where did I leave my keys?''). Multimodal LLMs achieve strong single-frame grounding yet remain brittle on temporal grounding over long video~\cite{cheng2024videgothink,chen2025groundedmultihop}, so we compose \psm{} as an upstream spatial \emph{prefilter} to a frontier MLLM (\S\ref{sec:pipeline}): \psm{} guarantees bounded-memory recall, the MLLM supplies localization precision.
@@ -41,36 +37,19 @@ We evaluate \psm{} as a retrieval substrate on egocentric look-back QA (e.g., ``
 \begin{itemize}
   \item \textbf{\psm{} architecture:} a bounded-memory streaming
     spatial-temporal index combining H3 cells, time-decayed HLL ring
-    buffers, and reservoir-sampled exemplars
-    (\S\ref{sec:method}).
-
-  \item \textbf{\caponek{} knob + oracle sanity check:}
-    at the bounded $R{=}128$ operating point, \texttt{cap}=$K$
-    reaches 21/187 hits vs.\ brute-force CLIP's 25/187; at oracle
-    $R{=}1024$ it recovers the same 25/187 with identical mIoU,
-    confirming top-$K$ equivalence once eviction is removed. With a
-    Gemini rerank, $\texttt{cap}{=}1$ reaches mIoU\,0.069,
-    statistically indistinguishable from brute-force's 0.074
-    (\S\ref{sec:results-main}).
-
-  \item \textbf{Generalization + the MLLM blind spot:}
-    the spatial-axis result holds on 13/14 street-scale sessions across
-    3 sensor stacks and 3 encoders (supp.\ Table~\ref{tab:multi-corpus-h3});
-    and \psm{}'s query-guided retrieval supplies the
-    spatial-temporal prefilter that uniform-sampling MLLMs lack---at
-    matched $K{=}8$ it reaches every session vanilla Gemini misses,
-    including 2 where uniform frames never land in a GT interval
-    (\S\ref{sec:results-vanilla-mllm}).
-    Open-source under MIT (\S\ref{sec:conclusion} footnote).
-
+    buffers, and reservoir-sampled exemplars (\S\ref{sec:method}).
+  \item \textbf{\caponek{} knob + oracle sanity check:} the bounded
+    $R{=}128$ index tracks brute-force CLIP and, with eviction removed
+    at $R{=}1024$, recovers it exactly; a Gemini rerank matches
+    brute-force mIoU (\S\ref{sec:results-main}).
+  \item \textbf{Generalization + the MLLM blind spot:} the spatial-axis
+    result holds on 13/14 street-scale sessions across 3 sensor stacks
+    and 3 encoders, and \psm{}'s query-guided retrieval supplies the
+    spatial-temporal prefilter uniform-sampling MLLMs lack---reaching
+    every session vanilla Gemini misses (\S\ref{sec:results-vanilla-mllm}).
   \item \textbf{Multi-session persistence (Honda HDD):} on 102.9\,h of
-    metropolitan driving with genuine revisits (47\% of traversal events over
-    cells re-driven on $\geq2$ days, median 106-day gap), \psm{} demonstrates
-    the multi-session regime its design targets: state that grows
-    \emph{sublinearly} in observation count ($O(\text{area})$, not
-    $O(\text{time})$; $1.3$--$7.2\times$ below a dense bank as ingest rate
-    rises), a $1\,\mathrm{KiB}$ HLL sketch that accrues unique-event cardinality
-    across 219 days while decaying between visits, and label-free cross-session
-    place recognition (0.853 AUC vs.\ a 0.498 shuffled null)
-    (\S\ref{sec:results-hdd}).
+    metropolitan driving with genuine revisits, \psm{} exercises its
+    target regime---sublinear $O(\text{area})$ state, cross-session HLL
+    cardinality accrual over months, and label-free place recognition
+    (\S\ref{sec:results-hdd}). Open-source under MIT.
 \end{itemize}

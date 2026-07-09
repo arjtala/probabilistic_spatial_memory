@@ -22,91 +22,63 @@ Three layered probabilistic data structures enforce the memory bound.
 \subsection{H3 spatial tessellation}
 \label{sec:method-h3}
 
-We tessellate the wearer's trajectory with
-H3~\cite{brodsky2018h3}, a hexagonal hierarchical geospatial index.
-Each tuple maps to its containing H3 cell at resolution~$r$
-(default~12, ${\sim}9$\,m hex edges, room scale; we sweep
-$r \in \{10, 11, 12, 13\}$ in \S\ref{sec:results-main}, covering
-street to sub-room granularity). H3 cells are global identifiers:
-cell IDs are comparable across recordings, sessions, and devices.
+We tessellate the wearer's trajectory with H3~\cite{brodsky2018h3}, a
+hierarchical hexagonal geospatial index. Each tuple maps to its containing cell
+at resolution~$r$ (default~12, ${\sim}9$\,m edges, room scale; swept over
+$r\in\{10,11,12,13\}$ in supp.\ \S\ref{sec:supp-ablations}). H3 cell IDs are
+global---comparable across recordings, sessions, and devices.
 
 \subsection{Time-decayed ring buffer of HyperLogLog sketches}
 \label{sec:method-ring-buffer}
 
-Each H3 cell maintains a ring buffer of $C$ HyperLogLog
-sketches~\cite{flajolet2007hyperloglog} rotating on a configurable
-time-window cadence (default 30\,s): ingesting a tuple hashes its
-embedding into the current sketch, and when the window elapses the pointer
-advances and the oldest sketch expires as the ring wraps, enforcing
-bounded-time retention. The sketches provide per-cell cardinality
-estimates and expose the cell's \emph{temporal envelope}
-$(t_{\min}, t_{\max})$, which \psm{} returns as the bucket window the
-MLLM consumes as a time-range hint.
-
-\paragraph{Memory bound.} Each HLL sketch occupies $2^p$ bytes at
-precision $p$ (default $p{=}10 \Rightarrow$ 1\,KiB); a cell's
-ring buffer costs $C \cdot 1\,\mathrm{KiB} = 60\,\mathrm{KiB}$
-at $C{=}60$, independent of recording duration.
+Each cell maintains a ring buffer of $C$ HyperLogLog
+sketches~\cite{flajolet2007hyperloglog} rotating on a time-window cadence
+(default 30\,s): ingest hashes the embedding into the current sketch, and when
+the window elapses the oldest sketch expires as the ring wraps. The sketches
+give per-cell cardinality and expose the cell's \emph{temporal envelope}
+$(t_{\min},t_{\max})$, returned as the bucket window the MLLM consumes as a
+time-range hint. Each sketch is $2^p$ bytes ($p{=}10\Rightarrow$1\,KiB), so the
+ring costs $C\cdot1\,\mathrm{KiB}=60\,\mathrm{KiB}$ at $C{=}60$, independent of
+duration.
 
 \subsection{Reservoir-sampled exemplars}
 \label{sec:method-exemplars}
 
-The sketches yield counts and time envelopes but not the
-embeddings needed for cosine scoring, so each cell also stores embeddings
-via \emph{Algorithm~R reservoir sampling}~\cite{vitter1985reservoir}
-(capacity $R{=}128$): after $n > R$ frames, the reservoir holds a
-uniformly random $R$-subset.
-At $R{=}128$ and CLIP-L's $d{=}768$, the retrieval state is ${\sim}444$\,KiB
-per occupied cell (a $128\cdot768\cdot4\approx384$\,KiB exemplar payload plus the
-HLL ring). Brute-force grows $\Theta(N)$; \psm{} grows
-$\Theta(R \cdot |\mathrm{cells}|)$, bounded by the physical area
+Counts and envelopes are not embeddings, so each cell also stores exemplars via
+\emph{Algorithm~R reservoir sampling}~\cite{vitter1985reservoir} (capacity
+$R{=}128$): after $n>R$ frames the reservoir holds a uniform random $R$-subset
+(${\sim}0.44$\,MiB/cell at $R{=}128$, CLIP-L's $d{=}768$). Brute-force grows
+$\Theta(N)$; \psm{} grows $\Theta(R\cdot|\mathrm{cells}|)$---bounded by the area
 covered, not recording length.
 
 \subsection{Top-$K$ query with \caponek}
 \label{sec:method-query}
 
-A query takes a vector $\mathbf{q}$ and an optional
-$(\mathrm{lat}, \mathrm{lng})$ center with k-ring radius.
-Aggregation proceeds in two phases:
-(i)~for each H3 cell in scope, return the top-$\min(\caponek,\;
-\texttt{cell.reservoir.size})$ exemplars by
-$\cos(\mathbf{q}, \mathbf{e}_i)$;
-(ii)~sort the union by similarity and emit the top-$K$
-with each cell's ring-buffer-derived bucket window.
-Setting $\caponek{=}1$ enforces strict spatial diversity (one
-slot per cell); $\caponek{=}K$ reduces to plain top-$K$ over
-all reservoir exemplars; intermediate values trade off smoothly
-(\S\ref{sec:results-main}).
-Per-partition result limits are standard in database query planning;
-the novelty here is the composition of this knob with H3 spatial
-tessellation, time-decayed HLL sketches, and reservoir sampling under
-streaming constraints.
-Ingest is $O(1)$ amortized---H3 lookup, HLL hash, reservoir
-update---and queries run at any time after the first ingest; the
-reported microsecond constants come from host-CPU systems benchmarks
-in supp.\ \S\ref{sec:supp-memory-latency}.
+A query takes a vector $\mathbf{q}$ (optionally an $(\mathrm{lat},\mathrm{lng})$
+center with k-ring radius) and aggregates in two phases: (i)~each in-scope cell
+returns its top-$\min(\caponek,|\text{reservoir}|)$ exemplars by
+$\cos(\mathbf{q},\mathbf{e}_i)$; (ii)~the union is sorted and the top-$K$ emitted
+with each cell's bucket window. $\caponek{=}1$ enforces strict spatial diversity
+(one slot per cell), $\caponek{=}K$ recovers plain top-$K$, and intermediate
+values trade off smoothly (\S\ref{sec:results-main}). The novelty is composing
+this per-partition limit---standard in query planning---with H3 tessellation,
+HLL sketches, and reservoir sampling under streaming constraints. Ingest is
+$O(1)$ amortized; queries run any time after the first ingest (microsecond
+host-CPU constants in supp.\ \S\ref{sec:supp-memory-latency}).
 
 \subsection{PSM as an MLLM prefilter}
 \label{sec:pipeline}
-Having defined the substrate, we now compose it into the look-back-QA system.
-\psm{} returns ranked $(t,\mathrm{cell},\mathrm{lat},\mathrm{lng},\mathbf{e})$
-tuples, not natural-language answers, so we use it as a
+\psm{} returns ranked tuples, not answers, so we compose it as a
 \emph{prefilter} feeding a frontier MLLM \emph{reranker}
-(Fig.~\ref{fig:f1-architecture}, bottom row).
-Three stages address distinct failure modes.
-\textbf{(1)~Retrieval:} embed the question $q$ with the ingest encoder and call
-\texttt{SpatialMemory\_query\_similar} at the configured \caponek{} and $K{=}5$,
-returning five candidates by cosine similarity.
-\textbf{(2)~Frame fetch:} each candidate $t_i$ decodes a frame on demand (a
-device-cache memcpy in deployment, not a video seek).
-\textbf{(3)~MLLM rerank:} the five frames plus $q$ go in one call to Gemini~3.1
-Pro~\cite{google2026gemini}, whose frozen prompt selects the single best frame,
-reordering \psm{}'s top-$K$.
-The split is deliberate: \psm{} contributes bounded-memory \emph{recall} and the
-MLLM contributes \emph{localization precision} (\S\ref{sec:results-main}).
-Encoder choice is a pipeline knob, not an architectural commitment: one factory
-serves CLIP-L (430\,M, 768\,d), CLIP-bigG (2.5\,B, 1280\,d), and
-SigLIP-2-large~\cite{tschannen2025siglip2} (660\,M, 1024\,d)---the C engine sees
-only a $D$-dim float vector, and cross-encoder generalization
-(\S\ref{sec:results-multi-corpus}) confirms the spatial-axis behavior is not a
+(Fig.~\ref{fig:f1-architecture}, bottom row): embed the question, call
+\texttt{query\_similar} at the configured \caponek{} and $K{=}5$, decode the five
+candidate frames on demand (a device-cache memcpy in deployment, not a video
+seek), and pass them with $q$ in one Gemini~3.1~Pro~\cite{google2026gemini} call
+whose frozen prompt selects the best frame. The split is deliberate---\psm{}
+contributes bounded-memory \emph{recall}, the MLLM \emph{localization precision}
+(\S\ref{sec:results-main}). Encoder choice is a pipeline knob, not an
+architectural commitment: one factory serves CLIP-L (430\,M, 768\,d), CLIP-bigG
+(2.5\,B, 1280\,d), and SigLIP-2-large~\cite{tschannen2025siglip2}
+(660\,M, 1024\,d); the C engine sees only a $D$-dim vector, and cross-encoder
+generalization (\S\ref{sec:results-multi-corpus}) confirms the behavior is not a
 CLIP-L artifact.
