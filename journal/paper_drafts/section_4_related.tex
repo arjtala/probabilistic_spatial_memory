@@ -26,19 +26,18 @@ MovieChat~\cite{song2024moviechat}, MA-LMM~\cite{he2024malmm},
 Flash-VStream~\cite{zhang2024flashvstream},
 LifelongMemory~\cite{wang2024lifelongmemory},
 HERMES~\cite{zhang2026hermes}, InfiniPot-V~\cite{kim2025infinipotv}, and
-SAVEMem~\cite{wu2026savemem} all bound memory in \emph{token} space (KV-cache
-compression, dense-to-sparse merging, recurrent state). \psm{} instead bounds
-memory in \emph{geographic} space (H3 cells) and runs upstream: it decides
-\emph{which frames} the MLLM sees, whereas these compress what it sees---
-complementary, not competing.
+SAVEMem~\cite{wu2026savemem} bound memory in \emph{token} space (KV-cache
+compression, dense-to-sparse merging, recurrent state). \psm{} bounds
+\emph{geographic} space (H3 cells) and runs upstream---deciding
+\emph{which} frames the MLLM sees, not compressing what it sees.
 
 \paragraph{Streaming search and spatial indexing.}
 DiskANN~\cite{jayaram2019diskann}, SPANN~\cite{chen2021spann}, and
 locally-adaptive vector quantization~\cite{aguerrebere2024lvq} give
 bounded-cost billion-point ANN but assume near-static corpora with no spatial
-axis. \psm{} adds a ``near here'' H3 $k$-ring restriction and fully streaming
-ingestion with ring-buffer-aged per-cell state. The H3 grid~\cite{brodsky2018h3}
+axis. \psm{} adds a ``near here'' H3 $k$-ring restriction and streaming
+ring-buffer-aged per-cell state. The H3 grid~\cite{brodsky2018h3}
 replaces R-tree subdivisions~\cite{guttman1984rtrees} with equidistant neighbors
-and stable cell ids; the primitives (HyperLogLog~\cite{flajolet2007hyperloglog},
+and stable ids; the primitives (HyperLogLog~\cite{flajolet2007hyperloglog},
 reservoir sampling~\cite{vitter1985reservoir}) are standard---the contribution
-is their composition under the \caponek{} knob.
+is their composition under \caponek{}.

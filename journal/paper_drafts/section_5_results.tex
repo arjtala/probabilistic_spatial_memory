@@ -17,7 +17,7 @@ Primary results use \texttt{shelby\_arroyo\_act0} (187 narrations, 69\,m bbox).
 The encoder is CLIP-L~\cite{clip-l-laion,radford2021clip}, 768-d, 1\,fps, 11.6\,ms per query on CPU.
 \psm{} runs at H3 resolution~12 (${\sim}9.4$\,m hexes), time window 30\,s, ring-buffer capacity 60, HLL precision $p{=}10$, reservoir $R{=}128$ exemplars per cell; we also report an oracle row at $R{=}1024$ to isolate reservoir eviction from the \caponek{} effect.
 The baseline is brute-force CLIP top-5 over the full $N$-frame embedding bank (no spatial structure, no capping).
-We report three top-5 metrics: Hit@5 (recall: did any exemplar timestamp fall in a GT interval), exemplar mIoU@5 (localization: IoU of exemplar $\pm1.5$\,s windows vs.\ GT), and bucket mIoU@5 (IoU of each cell's $[t_\text{min}, t_\text{max}]$ envelope vs.\ GT).
+We report three top-5 metrics: Hit@5 (any exemplar timestamp in a GT interval), exemplar mIoU@5 (IoU of exemplar $\pm1.5$\,s windows vs.\ GT), and bucket mIoU@5 (IoU of each cell's $[t_\text{min}, t_\text{max}]$ envelope vs.\ GT).
 
 \subsection{Single-session operating points}
 \label{sec:results-main}

@@ -9,15 +9,14 @@
 \label{sec:conclusion}
 
 \psm is a streaming bounded-memory index for egocentric look-back
-question answering.  It tessellates ego-trajectories onto an H3
-hex grid, maintains time-decayed HLL ring-buffer sketches and
-reservoir-sampled embedding exemplars per cell, and exposes a
-\caponek{} knob that trades spatial diversity for
+question answering: it tessellates ego-trajectories onto an H3
+hex grid, keeps time-decayed HLL ring-buffer sketches and
+reservoir-sampled exemplars per cell, and exposes a
+\caponek{} knob trading spatial diversity for
 embedding-similarity precision.  Per-cell state is bounded
-independently of recording duration; per-query latency is
-microsecond-scale on host CPU for both a synthetic stress test and
-the measured Nymeria \psm{} state (\S\ref{sec:method-query};
-on-device constants remain unmeasured, \S\ref{sec:limitations}).
+independently of recording duration, and per-query latency is
+microsecond-scale on host CPU (\S\ref{sec:method-query};
+on-device constants unmeasured, \S\ref{sec:limitations}).
 
 \paragraph{What the evidence supports.}
 Across a 30-session Nymeria sweep and a single-session
@@ -45,34 +44,19 @@ $1\,\mathrm{KiB}$ sketch, and label-free cross-session place
 recognition---the deployment regime the design targets.
 
 \paragraph{Follow-up directions.}
-Three extensions are immediate.
-%
-(a)~\emph{On-device MLLM rerank.}  Replacing Gemini with a small
-vision-language model (Phi-3.5-Vision, SmolVLM) tests whether the
-\caponek{} + reranker composition holds when the reranker itself
-runs on wearable compute.
-%
-(b)~\emph{Counting QA via HLL cardinality.}  \S\ref{sec:results-hll}
-validates that the ring-buffer sketches
-(\S\ref{sec:method-ring-buffer}) produce accurate cardinality
-estimates (median relative error $1.0\%$). The open question is
-whether surfacing those counts to the question answerer extends
-\psm{} to a counting question class beyond moment-grounding
-(``how many distinct people did I see in the kitchen today?'').
-%
-(c)~\emph{Federated memory via HLL union.}  H3 cells are global:
-two devices visiting the same cell can merge their \psm state via
-HLL union and reservoir sampling without sharing raw frames---a
-privacy-preserving foundation for multi-user spatial memory.
+Three extensions are immediate: (a)~an \emph{on-device rerank} swapping
+Gemini for a small VLM (Phi-3.5-Vision, SmolVLM) to test the
+\caponek{}+reranker composition on wearable compute; (b)~\emph{counting
+QA} surfacing the validated HLL cardinalities (\S\ref{sec:results-hll},
+median relative error $1.0\%$) to a question class beyond
+moment-grounding (``how many distinct people did I see in the
+kitchen?''); and (c)~\emph{federated memory}, merging two devices'
+per-cell state via HLL union and reservoir sampling without sharing raw
+frames---H3 cell ids are global.
 
 The engine (${\sim}700$ LoC of portable C with HDF5 storage and
 projectaria-tools/ffmpeg ingest) and the Python evaluation harness
 are released under MIT.\footnote{Repository URL withheld for
-double-blind review; added in the camera-ready. Key reproduction
-entry points: \texttt{scripts/sweep\_per\_cell\_cap.py},
-\texttt{scripts/multisession\_per\_cell\_cap\_sweep.py},
-\texttt{scripts/eval\_psm\_mllm.py\,--mllm\,gemini}; the canonical
-one-shot driver that regenerates the headline figures and Table~\ref{tab:multi-corpus-h3}
-verdicts from the captured artifacts is
-\texttt{scripts/reproduce\_paper.sh}; pinned dependencies for that
-driver are in \texttt{requirements-paper.txt}.}
+double-blind review. The one-shot driver
+\texttt{scripts/reproduce\_paper.sh} regenerates the headline figures
+and Table~\ref{tab:multi-corpus-h3} verdicts from captured artifacts.}
