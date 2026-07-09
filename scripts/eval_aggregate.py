@@ -371,7 +371,7 @@ def _seed_aggregate(runs_for_session: list[dict]) -> dict:
         "n_scored": per_seed[0]["n_scored"] if per_seed else 0,
     }
     for m in metrics:
-        values = [s[m] for s in per_seed]
+        values = [float(v) for s in per_seed if (v := s[m]) is not None]
         if not values:
             summary[m + "_mean"] = 0.0
             summary[m + "_std"] = 0.0

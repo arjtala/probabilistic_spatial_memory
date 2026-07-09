@@ -114,7 +114,7 @@ def main() -> int:
     print(header)
     print("-" * len(header))
 
-    rows = []
+    rows: list[tuple[float, str, tuple | None]] = []
     for d in sessions:
         csv_path = d / "recording_head" / "mps" / "slam" / "closed_loop_trajectory.csv"
         parsed = parse_trajectory(csv_path)

@@ -86,7 +86,7 @@ def _interpolate_latlng(
     rgb_info reader)."""
     lat = np.interp(frame_ts, traj_ts, traj_lat)
     lng = np.interp(frame_ts, traj_ts, traj_lng)
-    return lat, lng
+    return np.asarray(lat), np.asarray(lng)
 
 
 def extract_one(
