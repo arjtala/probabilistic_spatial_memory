@@ -16,14 +16,12 @@
 \paragraph{Benchmark ceiling and coverage.}
 Both \psm{} and brute-force CLIP plateau at 13.4\% Hit@5 on the headline session
 (\S\ref{sec:results-main}): 162/187 narrations describe repeatedly-entered rooms
-with near-identical frames, so both converge to a frame rarely matching the
-annotator's single chosen interval---benchmark hardness, not method quality (the
-two agree on the 25 uniquely-groundable questions). Future benchmarks should
-score against \emph{any} acceptable revisit window. Relatedly, the deepest
-single-session analysis (supp.\ Table~\ref{tab:headline}) remains one Nymeria session,
-and the 14-session sweep (\S\ref{sec:results-multi-corpus}) uses a heuristic
-monotonicity-plus-lift criterion rather than a formal test; mIoU/counting across
-all 14 are a follow-up.
+with near-identical frames, so both rarely match the annotator's single chosen
+interval---benchmark hardness, not method quality (the two agree on the 25
+uniquely-groundable questions; future benchmarks should score against \emph{any}
+acceptable revisit window). The deepest single-session analysis (supp.\
+Table~\ref{tab:headline}) is one Nymeria session, and the 14-session sweep uses a
+heuristic monotonicity-plus-lift criterion, not a formal test.
 
 \paragraph{One honest spatial-axis failure.}
 Of the 14 street-scale sessions, \texttt{BurlingameDT4\_feb5} (242\,m bbox) is
@@ -34,23 +32,19 @@ Pilot's~\cite{aria-gen2-pilot} GPS-grounded walks, confirming the bottleneck is
 encoder discrimination, not trajectory quality.
 
 \paragraph{Evaluation scope.}
-\psm's latency (supp.\ \S\ref{sec:supp-memory-latency}) is a host-CPU sanity check
-(a 1024-tile synthetic stress test plus the real 7-cell Nymeria state), not an
-on-device claim; the wearable target is unmeasured, though porting the C engine
-is straightforward. Our baselines also omit a spatial-only heuristic
-(nearest-GPS, random-cell), so the gains show query-guided cell retrieval beats
+\psm's latency (supp.\ \S\ref{sec:supp-memory-latency}) is a host-CPU sanity
+check, not an on-device claim (the wearable target is unmeasured, though porting
+the C engine is straightforward). Our baselines omit a spatial-only heuristic
+(nearest-GPS, random-cell), so the gains show query-guided retrieval beats
 uniform temporal coverage at matched budget but do not fully isolate spatial
-indexing from embedding similarity within the selected cells.
+indexing from embedding similarity within cells.
 
-\paragraph{HDD is a systems, not a retrieval-accuracy, result.}
-HDD ships no look-back QA labels, so the multi-session results
-(\S\ref{sec:results-hdd}) are \emph{systems} and \emph{self-supervised}
-(bounded state, cross-session cardinality, label-free place recognition), not a
-Hit@5/mIoU number---a deliberate division of labor in which the wearable corpora
-carry retrieval accuracy and HDD carries multi-session persistence. Two caveats:
-the cross-session split (same $r{=}10$ cell vs.\ all others) blends geographic
-proximity with visual identity, so a $k$-nearest-cell hard-negative control is
-the natural next step; and the extracted features carry a ${\sim}3$\,s
-GPS-warmup skew (${\sim}17$\,m median) that we correct at analysis time
-(shifting AUC by only $+0.005$, $0.848{\to}0.853$), with the source-side fix
-verified in simulation but not yet re-run through GPU extraction.
+\paragraph{HDD is a systems, not retrieval-accuracy, result.}
+HDD ships no look-back QA labels, so its results (\S\ref{sec:results-hdd}) are
+\emph{systems} and \emph{self-supervised}, not Hit@5/mIoU---a deliberate division
+where the wearable corpora carry accuracy and HDD carries persistence. Two
+caveats: the cross-session split (same $r{=}10$ cell vs.\ all others) blends
+geographic proximity with visual identity, so a $k$-nearest-cell control is the
+next step; and the features carry a ${\sim}3$\,s GPS-warmup skew (${\sim}17$\,m
+median) corrected at analysis time (AUC $0.848{\to}0.853$), with the source-side
+fix verified in simulation but not yet re-extracted.

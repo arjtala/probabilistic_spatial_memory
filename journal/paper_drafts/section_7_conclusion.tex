@@ -44,15 +44,11 @@ $1\,\mathrm{KiB}$ sketch, and label-free cross-session place
 recognition---the deployment regime the design targets.
 
 \paragraph{Follow-up directions.}
-Three extensions are immediate: (a)~an \emph{on-device rerank} swapping
-Gemini for a small VLM (Phi-3.5-Vision, SmolVLM) to test the
-\caponek{}+reranker composition on wearable compute; (b)~\emph{counting
-QA} surfacing the validated HLL cardinalities (\S\ref{sec:results-hll},
-median relative error $1.0\%$) to a question class beyond
-moment-grounding (``how many distinct people did I see in the
-kitchen?''); and (c)~\emph{federated memory}, merging two devices'
-per-cell state via HLL union and reservoir sampling without sharing raw
-frames---H3 cell ids are global.
+Three extensions are immediate: an \emph{on-device rerank} (a small VLM in
+place of Gemini); \emph{counting QA} surfacing the validated HLL cardinalities
+(\S\ref{sec:results-hll}) to a class beyond moment-grounding; and
+\emph{federated memory} merging devices' per-cell state via HLL union without
+sharing raw frames (H3 cell ids are global).
 
 The engine (${\sim}700$ LoC of portable C with HDF5 storage and
 projectaria-tools/ffmpeg ingest) and the Python evaluation harness

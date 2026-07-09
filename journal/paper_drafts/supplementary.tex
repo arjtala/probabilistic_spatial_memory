@@ -177,3 +177,12 @@ On the headline Nymeria session it adds localization precision, not recall: it l
 On Hit@1 the effect is bimodal: it tripled Hit@1 on \texttt{seq008\_running\_001} ($10\%{\to}30\%$) and helped on \texttt{seq009} ($+3.6$\,pp), but hurt on \texttt{seq003} ($-3.3$\,pp) and Nymeria ($-1.6$\,pp).
 The rerank is a visually-rich-query lever, useful when visual content discriminates beyond \psm{}'s embedding similarity, counterproductive on action-narrations.
 The headline result---\psm{}'s query-guided retrieval reaching sessions that uniform sampling misses---is achievable without any MLLM in the loop; we do not promote the reranker to a default.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\linewidth]{figures/f7_qualitative.pdf}
+\caption{Qualitative look-back retrievals on \texttt{shelby\_arroyo\_act0}.
+Each row is one query: the narration text, GT interval, and \psm{}/Gemini verdict (left), then \psm{}'s top-5 candidates ranked by CLIP cosine (similarity and timestamp per frame). Green/red borders mark whether a candidate falls in the GT interval; the Gemini-selected frame is highlighted.
+Rows~1--2 are hits (row~2 a Gemini Hit@1 rescue over \psm{}'s ranking); row~3 is an honest revisit-heavy miss, where recurring near-identical frames defeat cosine retrieval (\S\ref{sec:limitations}).}
+\label{fig:f7-qualitative}
+\end{figure}
