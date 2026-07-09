@@ -261,10 +261,14 @@ def main() -> int:
     # Load H5 timestamps to keep the questions.yaml intervals
     # consistent with eval_lookback's matching against clip/timestamps.
     with h5py.File(args.features, "r") as h:
-        session_id = h.attrs.get(
-            "session_id",
-            (args.session_dir.name if args.session_dir else args.frames_dir.parent.name),
-        )
+        # Invariant (enforced above): exactly one of --session-dir /
+        # --frames-dir is set, so when session_dir is falsy frames_dir
+        # is guaranteed non-None.
+        if args.session_dir is not None:
+            session_id = h.attrs.get("session_id", args.session_dir.name)
+        else:
+            assert args.frames_dir is not None
+            session_id = h.attrs.get("session_id", args.frames_dir.parent.name)
         if isinstance(session_id, bytes):
             session_id = session_id.decode()
         g = next((h[k] for k in ("clip", "dino", "jepa") if k in h), None)

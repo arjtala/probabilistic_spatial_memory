@@ -301,7 +301,7 @@ def main() -> int:
         if enc not in agg:
             print(f"{enc:10s}  (no data)")
             continue
-        cells = []
+        cells: list[str] = []
         for r in _H3_RES:
             if r in agg[enc]:
                 m, s, n = agg[enc][r]

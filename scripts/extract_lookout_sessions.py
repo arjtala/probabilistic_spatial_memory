@@ -165,6 +165,11 @@ def extract_one(
     def progress(done: int) -> None:
         print(f"  [embed] {done}/{n} ({100*done/n:.1f}%)", file=sys.stderr)
     emb = runner.embed_images(png_paths, progress=progress)
+    # embed_images is typed to return either an ndarray or a (embeddings, extra)
+    # tuple; the CLIP runner used here returns a bare ndarray. Narrow to the
+    # embeddings array (runtime-safe: isinstance is False for the ndarray case).
+    if isinstance(emb, tuple):
+        emb = emb[0]
     if emb.shape != (n, embed_dim):
         raise RuntimeError(
             f"embedding shape {emb.shape} != expected ({n}, {embed_dim})"

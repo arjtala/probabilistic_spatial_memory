@@ -60,6 +60,9 @@ def main() -> int:
         s = _summary(p)
         if not s:
             continue
+        # sid is always set alongside tag in the loop above; the `if not tag:
+        # continue` guard guarantees we only reach here when a suffix matched.
+        assert sid is not None
         by_session.setdefault(sid, {})[tag] = s.get("exemplar_hit_rate_at_5", 0.0) * 100
 
     if not by_session:

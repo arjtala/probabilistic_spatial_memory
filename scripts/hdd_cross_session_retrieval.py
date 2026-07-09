@@ -47,6 +47,13 @@ import json
 import sys
 from collections import defaultdict
 from pathlib import Path
+from typing import TypedDict
+
+
+class _Stats(TypedDict):
+    n: int
+    mean: float
+    std: float
 
 import numpy as np
 
@@ -311,10 +318,17 @@ def main() -> int:
             if not np.isnan(ash):
                 shuf_auc.append(ash)
 
-    def _stats(xs):
+    def _stats(xs) -> _Stats:
         a = np.array(xs, dtype=np.float64)
         return {"n": int(a.size), "mean": float(a.mean()) if a.size else float("nan"),
                 "std": float(a.std()) if a.size else float("nan")}
+
+    ca: _Stats = _stats(cross_auc)
+    sa: _Stats = _stats(same_auc)
+    sh: _Stats = _stats(shuf_auc)
+    hit_stats: dict[str, _Stats] = {str(k): _stats(hit[k]) for k in HIT_KS}
+    cross_cos_stats: _Stats = _stats(cross_cos)
+    diff_cos_stats: _Stats = _stats(diff_cos)
 
     result = {
         "root": str(args.root),
@@ -332,23 +346,22 @@ def main() -> int:
                   "If written up, add a k-NN-cell control (nearest cells as hard "
                   "negatives) to isolate visual recognition.",
         "n_revisited_cells": len(revisited),
-        "cross_session_auc": _stats(cross_auc),
-        "same_drive_auc_upper_bound": _stats(same_auc),
-        "shuffled_cell_auc_control": _stats(shuf_auc),
-        "hit_rate_at_k": {str(k): _stats(hit[k]) for k in HIT_KS},
-        "cross_session_cos_mean": _stats(cross_cos),
-        "different_cell_cos_mean": _stats(diff_cos),
+        "cross_session_auc": ca,
+        "same_drive_auc_upper_bound": sa,
+        "shuffled_cell_auc_control": sh,
+        "hit_rate_at_k": hit_stats,
+        "cross_session_cos_mean": cross_cos_stats,
+        "different_cell_cos_mean": diff_cos_stats,
     }
 
     print(f"# F-HDD-3 cross-session retrieval  ({len(drive_names)} drives, "
           f"{emb.shape[0]} frames, {len(revisited)} revisited r{args.resolution} cells)")
-    ca, sa, sh = result["cross_session_auc"], result["same_drive_auc_upper_bound"], result["shuffled_cell_auc_control"]
     print(f"# cross-session AUC   = {ca['mean']:.3f} +/- {ca['std']:.3f}  (n={ca['n']})")
     print(f"# same-drive AUC (UB) = {sa['mean']:.3f}  |  shuffled-cell (floor) = {sh['mean']:.3f}")
     print(f"# hit-rate@k (any cross-session frame in top-k of full pool): " + "  ".join(
-        f"@{k}={result['hit_rate_at_k'][str(k)]['mean']:.2f}" for k in HIT_KS))
-    print(f"# cos(query, same-place other-drive)={result['cross_session_cos_mean']['mean']:.3f}  "
-          f"vs cos(query, other-cell)={result['different_cell_cos_mean']['mean']:.3f}")
+        f"@{k}={hit_stats[str(k)]['mean']:.2f}" for k in HIT_KS))
+    print(f"# cos(query, same-place other-drive)={cross_cos_stats['mean']:.3f}  "
+          f"vs cos(query, other-cell)={diff_cos_stats['mean']:.3f}")
     verdict = ("STRONG cross-session place recognition" if ca["mean"] > 0.75
                else "WEAK/degenerate -- windshield CLIP separability low; "
                     "report with caveat or pivot to GPS-only consistency"

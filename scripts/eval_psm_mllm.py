@@ -38,6 +38,7 @@ import json
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import yaml
@@ -221,8 +222,8 @@ class VrsFrameSource(FrameSource):
             prefix="psm-mllm-vrs-",
             dir=str(scratch_root) if scratch_root else None,
         ))
-        self._provider = None
-        self._rgb_stream = None
+        self._provider: Any | None = None
+        self._rgb_stream: object | None = None
         self._first_ts_s: float | None = None
         # All RGB frame timestamps in device-clock seconds, indexed
         # by frame index. Cached on provider open so subsequent
@@ -269,6 +270,11 @@ class VrsFrameSource(FrameSource):
         if bucket in self._cache:
             return self._cache[bucket]
         self._ensure_provider()
+        # Guaranteed non-None after _ensure_provider(); narrow for the
+        # type checker (runtime-safe: _ensure_provider raises otherwise).
+        assert self._frame_ts_s is not None
+        assert self._provider is not None
+        provider = self._provider
         # Binary search for the closest frame to the target (in the
         # rebased 0-relative timeline). np.searchsorted gives the
         # insertion point; we pick whichever of the two neighbors is
@@ -281,7 +287,7 @@ class VrsFrameSource(FrameSource):
             best_i = len(ts) - 1
         else:
             best_i = idx if abs(ts[idx] - bucket) < abs(ts[idx - 1] - bucket) else idx - 1
-        image_data, _ = self._provider.get_image_data_by_index(self._rgb_stream, best_i)
+        image_data, _ = provider.get_image_data_by_index(self._rgb_stream, best_i)
         arr = image_data.to_numpy_array()
         from PIL import Image
         out = self._scratch / f"frame_t{bucket:06d}.jpg"

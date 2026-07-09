@@ -373,19 +373,23 @@ def _print_table(
     print("|---|---|---|---|---|")
 
     for r in results:
+        # Explicit 3-unpack narrows the tuple to (mean, lo, hi) so is_pct is
+        # not filled positionally; runtime-identical to *r['hit_at_k'].
+        r_hit_mean, r_hit_lo, r_hit_hi = r['hit_at_k']
         print(
             f"| `{r['label']}` | {r['n_scored']} | "
             f"{_fmt(*r['exemplar_miou'])} | "
             f"{_fmt(*r['bucket_miou'])} | "
-            f"{_fmt(*r['hit_at_k'], is_pct=True)} |"
+            f"{_fmt(r_hit_mean, r_hit_lo, r_hit_hi, is_pct=True)} |"
         )
 
     if agg_result is not None:
+        agg_hit_mean, agg_hit_lo, agg_hit_hi = agg_result['hit_at_k']
         print(
             f"| **pooled** | **{agg_result['n_scored']}** | "
             f"**{_fmt(*agg_result['exemplar_miou'])}** | "
             f"**{_fmt(*agg_result['bucket_miou'])}** | "
-            f"**{_fmt(*agg_result['hit_at_k'], is_pct=True)}** |"
+            f"**{_fmt(agg_hit_mean, agg_hit_lo, agg_hit_hi, is_pct=True)}** |"
         )
 
     print()

@@ -94,7 +94,7 @@ def main() -> int:
         gts_rel = [(float(iv[0]), float(iv[1])) for iv in q.get("intervals", [])]
 
         qvec = runner.embed_text(text).astype(np.float32)
-        qn = qvec / max(np.linalg.norm(qvec), 1e-12)
+        qn = qvec / max(float(np.linalg.norm(qvec)), 1e-12)
         sims = emb_bank @ qn  # (N,)
         top_idx = np.argpartition(-sims, args.top)[: args.top]
         top_idx = top_idx[np.argsort(-sims[top_idx])]

@@ -191,7 +191,7 @@ def main() -> int:
 
             # Pool + re-score each candidate.
             # Normalize query.
-            qn = qvec / max(np.linalg.norm(qvec), 1e-12)
+            qn = qvec / max(float(np.linalg.norm(qvec)), 1e-12)
             rescored = []
             for r in results:
                 t_min = float(r["t_min"]) - session_start
