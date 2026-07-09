@@ -360,3 +360,15 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Pushed 3545b8e + 51120d5 to paper-8pp-cut
 - [ ] Confirming build on real ECCV kit (cluster) -- local lmodern build ~9.5pp; p10 ~75% full
 - [ ] If still >8pp on real kit: trim §7 follow-up directions + §4 related work + §5.1 setup
+
+## 2026-07-09 20:34 -- Figure rebalance (body 2->4 figs) + prose squeeze
+
+- [x] Verify unused figures: f7_qualitative (submission-quality), f3_multi_corpus_h3 (actually H3-resolution sensitivity, not 13/14 verdict)
+- [x] Promote F2 (PSM-vs-MLLM) supp -> body §5.5; trim MLLM prose figure self-explains
+- [x] Add F7 (qualitative retrievals) to body §5.2 -- previously unused
+- [x] Collapse §5.6 HDD 4 paragraphs -> 2 (figure carries panels)
+- [x] Body now F1+F2+F7+hdd_combined; F3 held in supp; pushed 46d2849
+- [x] Prose squeeze to fund 4 figs: compress §1 intro, §2 method, §5.1 setup; pushed e019077
+- [x] Body ~11->~10pp local (total 18->17); 0 undefined refs; no results lost
+- [ ] Real-kit confirming build (cluster) -- ~9pp estimate; if >8pp trim §6 limitations next
+- [ ] (open) Confirm OpenSUN3D archival page limit -- if >8pp the squeeze is moot
