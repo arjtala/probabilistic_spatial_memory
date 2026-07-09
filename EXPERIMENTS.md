@@ -641,8 +641,11 @@ JSON, motion JSON, and metadata.
    samples). Slots into the existing `ExtractOptions.frame_source`
    abstraction so the rest of the extraction pipeline (CLIP/DINO/JEPA
    runners, HDF5 writer, schema-v2 metadata) is unchanged.
-2. **`scripts/extract_nymeria_all.sh`** — env-knobbed sweep over the
-   manifest sessions. One encoder at a time (bigG by default).
+2. **`scripts/extract_bigg_all.sh`** — env-knobbed sweep over the
+   manifest sessions (the generic per-encoder extraction driver; a
+   dedicated `extract_nymeria_all.sh` wrapper was never split out
+   before the SLOPER4D pivot in E0'). One encoder at a time (bigG by
+   default).
 3. **`scripts/slurm/extract_nymeria.sbatch`** — GPU job wrapper.
    Probably needs `h200_comm_shared` × 1 GPU per session and an array
    job to parallelize the 20 sessions.

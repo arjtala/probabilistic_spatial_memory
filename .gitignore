@@ -1,7 +1,6 @@
-*/*.gch
-*/*.tmp
+*.gch
+*.tmp
 */*.out
-*/*.txt
 */build/
 build/
 .cache/

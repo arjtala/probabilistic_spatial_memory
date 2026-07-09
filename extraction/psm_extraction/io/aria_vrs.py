@@ -243,11 +243,16 @@ def _read_slam_trajectory(
                 continue
     if not t_us:
         return None
-    return (
-        np.array(t_us, dtype=np.int64) / 1e6,  # → seconds
-        np.array(tx, dtype=np.float64),
-        np.array(ty, dtype=np.float64),
-    )
+    t_s = np.array(t_us, dtype=np.int64) / 1e6  # → seconds
+    tx_arr = np.array(tx, dtype=np.float64)
+    ty_arr = np.array(ty, dtype=np.float64)
+    # np.interp (used downstream by _interpolate_track_to_frames) requires a
+    # strictly increasing xp; CSV rows aren't guaranteed sorted, so sort by
+    # time and drop non-increasing duplicates (mirrors hdd.py's np.diff > 0).
+    order = np.argsort(t_s, kind="stable")
+    t_s, tx_arr, ty_arr = t_s[order], tx_arr[order], ty_arr[order]
+    keep = np.concatenate(([True], np.diff(t_s) > 0))
+    return t_s[keep], tx_arr[keep], ty_arr[keep]
 
 
 def _read_vrs_gps(provider) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
@@ -314,11 +319,16 @@ def _read_vrs_gps(provider) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
 
     if not t_s:
         return None
-    return (
-        np.array(t_s, dtype=np.float64),
-        np.array(lat, dtype=np.float64),
-        np.array(lng, dtype=np.float64),
-    )
+    t_arr = np.array(t_s, dtype=np.float64)
+    lat_arr = np.array(lat, dtype=np.float64)
+    lng_arr = np.array(lng, dtype=np.float64)
+    # np.interp (used downstream by _interpolate_latlng_to_frames) requires a
+    # strictly increasing xp; VRS index order isn't guaranteed monotonic in
+    # capture time, so sort and drop non-increasing dups (mirrors hdd.py).
+    order = np.argsort(t_arr, kind="stable")
+    t_arr, lat_arr, lng_arr = t_arr[order], lat_arr[order], lng_arr[order]
+    keep = np.concatenate(([True], np.diff(t_arr) > 0))
+    return t_arr[keep], lat_arr[keep], lng_arr[keep]
 
 
 @contextlib.contextmanager

@@ -160,11 +160,10 @@ static void tile_exemplars_sample(Tile *tile, double t, const void *data,
                                   size_t size) {
   if (!tile || tile->exemplar_capacity == 0 || !data || size == 0) return;
 
-  tile->exemplar_seen++;
-
   // Reservoir sampling (Algorithm R): fill the buffer first, then each
   // subsequent candidate evicts a uniformly chosen slot with probability
-  // capacity / seen.
+  // capacity / seen. exemplar_seen is only advanced after a successful
+  // encode/insert so a failed encode does not bias the sampler.
   if (tile->exemplar_count < tile->exemplar_capacity) {
     void *encoded = NULL;
     size_t encoded_size = 0;
@@ -173,6 +172,7 @@ static void tile_exemplars_sample(Tile *tile, double t, const void *data,
       fprintf(stderr, "Tile: failed to encode exemplar (size=%zu)\n", size);
       return;
     }
+    tile->exemplar_seen++;
     TileExemplar *slot = &tile->exemplars[tile->exemplar_count++];
     slot->t = t;
     slot->data = encoded;
@@ -180,7 +180,11 @@ static void tile_exemplars_sample(Tile *tile, double t, const void *data,
     return;
   }
 
-  uint64_t idx = tile_rand_uint64() % tile->exemplar_seen;
+  // The eviction probability uses the count of candidates seen so far
+  // including this one, so compute against exemplar_seen + 1 and only
+  // commit the increment after a successful encode.
+  uint64_t seen_with_current = tile->exemplar_seen + 1;
+  uint64_t idx = tile_rand_uint64() % seen_with_current;
   if (idx < tile->exemplar_capacity) {
     void *encoded = NULL;
     size_t encoded_size = 0;
@@ -189,11 +193,16 @@ static void tile_exemplars_sample(Tile *tile, double t, const void *data,
       fprintf(stderr, "Tile: failed to encode exemplar (size=%zu)\n", size);
       return;
     }
+    tile->exemplar_seen++;
     TileExemplar *slot = &tile->exemplars[(size_t)idx];
     free(slot->data);
     slot->t = t;
     slot->data = encoded;
     slot->size = encoded_size;
+  } else {
+    // Candidate not selected, but it was successfully considered — advance
+    // the reservoir counter so the sampling probability stays correct.
+    tile->exemplar_seen++;
   }
 }
 

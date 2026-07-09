@@ -190,6 +190,29 @@ class FeaturesWriter:
         if spec.track_mode is not None:
             group.attrs["track_mode"] = spec.track_mode
 
+        # Enforce the schema contract: the constants in `schema` are the single
+        # source of truth for what a v2 model group must carry. Assert here so
+        # any future drift (a required attr/dataset added to schema but not
+        # written above) fails loudly at write time rather than silently
+        # producing a non-conformant file.
+        missing_attrs = [
+            a for a in schema.MODEL_REQUIRED_ATTRS if a not in group.attrs
+        ]
+        if missing_attrs:
+            raise RuntimeError(
+                f"model group '{name}' missing required attrs {missing_attrs}; "
+                "writer is out of sync with schema.MODEL_REQUIRED_ATTRS"
+            )
+        missing_datasets = [
+            d for d in schema.MODEL_REQUIRED_DATASETS if d not in group
+        ]
+        if missing_datasets:
+            raise RuntimeError(
+                f"model group '{name}' missing required datasets "
+                f"{missing_datasets}; writer is out of sync with "
+                "schema.MODEL_REQUIRED_DATASETS"
+            )
+
     def close(self) -> None:
         # Local-variable narrowing pattern: pyrefly does not narrow
         # `self._h` through the `is not None` guard alone (mutable attribute).

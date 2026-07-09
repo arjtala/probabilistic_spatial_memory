@@ -107,7 +107,7 @@ The extraction pipeline producing v2 files lives in `extraction/`. Optional extr
 | Extra | Pulls in | Needed for |
 |---|---|---|
 | `dev` | `pytest` | running the extraction test suite |
-| `clip` | `torch`, `transformers`, `Pillow` | CLIP runner — text/image embeddings, the `--search` query path |
+| `clip` | `torch`, `torchvision`, `transformers`, `Pillow` | CLIP runner — text/image embeddings, the `--search` query path |
 | `mlx` | `mlx` | Apple Silicon MLX runners (currently stubbed; Phase 2 follow-up) |
 | `aria` | `projectaria-tools` | raw VRS reading (Phase 3 follow-up; sidecar JSON works without it) |
 | `viz` | `matplotlib`, `umap-learn`, `h3` | `scripts/embedding_atlas.py` (paper-figure helper) |
@@ -223,17 +223,20 @@ targets/psm features.h5 dino 5.0 10 12 10
 | `-p` | `<bits>` | `10` | HLL precision |
 | `-j` | — | — | Emit JSON summary instead of text |
 | `-h` | — | — | Print help |
+| `-v`, `--version` | — | — | Print `psm` version and exit |
 | `--last-seen` | `LAT,LNG` | — | Return top interval hits around a coordinate |
 | `--search` | `<path>` | — | Query by embedding similarity from a raw `float32` LE vector |
 | `--center` | `LAT,LNG` | — | Restrict `--search` to a centered search neighborhood |
 | `--k-ring` | `<N>` | `0` | H3 neighborhood radius for `--last-seen` or centered `--search` |
 | `--top` | `<N>` | `5` | Maximum query hits to print |
-| `--exemplars` | `<N>` | `8*` | Per-tile exemplar reservoir; auto-set to `8` with `--search` |
+| `--exemplars` | `<N>` | `8*` | Per-tile exemplar reservoir; auto-set to `8` with `--search`. Pass `--exemplars 0` to force it off. |
+| `--per-cell-cap` | `<N>` | `1` | Max top-k result slots a single cell may fill (raise to let one hot cell contribute several exemplars) |
+| `--exemplar-codec` | `<name>` | `raw` | Exemplar payload codec: `raw`, `turboquant_2b`, `turboquant_3b`, `turboquant_4b` |
 | `--seed` | `<N>` | — | Reservoir-sampler PRNG seed (uint64). Same seed + same input ⇒ bit-identical exemplar selections. Without it, the sampler self-seeds entropically on first use. |
 
 > **Retention:** each tile remembers observations for `capacity × time_window_sec` (default 60s). Query output is empty past that horizon — widen `-C` or `-t` for longer sessions.
 
-`--search` expects a binary file containing a flat `float32` little-endian vector in the same embedding space as the HDF5 group's `embeddings` dataset. With `-j`, each result includes `cell` (H3 hex string), `lat`/`lng` (cell center, degrees), `similarity` (cosine), `exemplar_t` (timestamp of the matching exemplar), the retained `t_min`/`t_max` interval, and the HLL `count` over the active retention horizon. `--last-seen` results carry the same fields minus `similarity` and `exemplar_t`.
+`--search` expects a binary file containing a flat `float32` little-endian vector in the same embedding space as the HDF5 group's `embeddings` dataset. With `-j`, each result includes `cell` (H3 hex string), `lat`/`lng` (cell center, degrees), `similarity` (cosine), `exemplar_t` (timestamp of the matching exemplar), the retained `t_min`/`t_max` interval, and the HLL `count` over the active retention horizon. The top-level JSON also reports `exemplar_codec` (the active codec name) and `exemplar_payload_bytes` (per-exemplar payload size under that codec). `--last-seen` results carry the same per-result fields minus `similarity` and `exemplar_t`.
 
 ## E5 Demo
 
@@ -355,37 +358,62 @@ src/
   core/             # Core engine
     ring_buffer.c
     tile.c
+    tile_table.c
     spatial_memory.c
+    exemplar_codec.c
   ingest/           # HDF5 ingestion pipeline
     ingest.c
-  viz/              # OpenGL visualizer
+  viz/              # OpenGL visualizer (abbreviated — see src/viz/ for the full set)
     viz_main.c
     shader.c
     video_decoder.c
+    video_quad.c
     hex_renderer.c
+    map_view.c
     tile_disk_cache.c
     tile_map.c
+    tile_pipeline.c
     gps_trace.c
     imu_processor.c
+    attention_overlay.c
+    jepa_cache.c
+    screenshot.c
+    progress_bar.c
+    ui_overlay.c
+    ui_overlay_renderer.c
+    viz_overlay_panels.c
+    viz_debug_hud.c
+    viz_input.c
+    viz_math.c
     viz_config.c
     viz_runtime.c
 psm-viz.toml.example  # Sample visualizer config
 configs/            # Ready-to-use psm-viz tuning presets
 benchmarks/         # Lightweight performance benchmarks
+  benchmark_spatial_memory.c
+  benchmark_nymeria_psm_query.c
+  benchmark_tile_decode.c
   sweep_spatial_memory.sh
   sweep_tile_decode.sh
 shaders/            # GLSL shaders
-tests/              # Test suites
+tests/              # Test suites (run via `make test`)
   test_ring_buffer.c
   test_tile.c
   test_tile_table.c
   test_spatial_memory.c
+  test_exemplar_codec.c
   test_ingest.c
   test_jepa_cache.c
   test_viz_math.c
+  test_imu_processor.c
   test_viz_config.c
+  test_gps_trace.c
   test_viz_runtime.c
   test_tile_disk_cache.c
+  test_map_view.c
+  test_viz_debug_hud.c
+  test_screenshot.c
+  test_ui_overlay.c
 EXPERIMENTS.md      # Reproducible experiment protocols and sweep recipes
 targets/            # Build outputs (psm, psm-viz, libpsm.a)
 build/              # Intermediate object files

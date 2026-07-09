@@ -433,7 +433,14 @@ def main() -> int:
     for path, data in loaded:
         records = data.get("records", [])
         scored = [r for r in records if r.get("intervals_gt")]
-        negative = [r for r in records if not r.get("intervals_gt")]
+        # Negative controls: no GT intervals AND not a counting-only or
+        # spatial-only question. Mirrors eval_lookback.py's definition so
+        # counting/spatial questions aren't over-counted as negatives.
+        negative = [
+            r for r in records
+            if not r.get("intervals_gt")
+            and not (r.get("count_gt") is not None or r.get("expected"))
+        ]
         label = _session_label(data, args.label_from_features,
                                include_codec=include_codec_in_label,
                                include_method=include_method_in_label)

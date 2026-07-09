@@ -198,15 +198,17 @@ RingBufferWindow RingBuffer_merge_window(RingBuffer *rb, size_t n) {
   size_t idx = rb->head;
   for (size_t i = 0; i < n; ++i) {
     idx = (idx - 1 + rb->capacity) % rb->capacity;
-    next = HLL_merge_copy(merged_hll, rb->hlls[idx]->hll);
+    RingBufferHLL *slot = rb->hlls[idx];
+    HLL *slot_hll = slot ? slot->hll : NULL;
+    if (!slot_hll) continue;  // skip empty/NULL slots, matching guarded style
+    next = HLL_merge_copy(merged_hll, slot_hll);
     freeHLL(merged_hll);
     if (!next) {
       return window;  // sketch left NULL to signal OOM
     }
     merged_hll = next;
 
-    RingBufferHLL *slot = rb->hlls[idx];
-    if (slot && slot->t_min <= slot->t_max) {
+    if (slot->t_min <= slot->t_max) {
       if (slot->t_min < window.t_min) window.t_min = slot->t_min;
       if (slot->t_max > window.t_max) window.t_max = slot->t_max;
     }

@@ -436,7 +436,7 @@ def main() -> int:
         exemplar_hit_idx = -1
         for rank, j in enumerate(order):
             t = float(frame_ts_h5[j])
-            t_min = max(0.0, t - args.exemplar_tolerance_sec)
+            t_min = t - args.exemplar_tolerance_sec
             t_max = t + args.exemplar_tolerance_sec
             bucket_iou, _ = _best_iou((t_min, t_max), gts)
             exemplar_iou, _ = _best_iou(
@@ -444,7 +444,11 @@ def main() -> int:
                 gts,
             )
             in_gt = _point_in_any(t, gts)
-            if rank == 0:
+            # Exemplar Hit@k: OR over ALL top-k predictions (a hit if ANY
+            # evidence frame lands in GT), matching
+            # _eval_common.summarize_question and eval_lookback.py. Keep the
+            # first GT index we hit so the recorded value stays a GT index.
+            if in_gt >= 0 and exemplar_hit_idx < 0:
                 exemplar_hit_idx = in_gt
             predictions.append({
                 "rank": rank + 1,

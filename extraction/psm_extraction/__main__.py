@@ -193,6 +193,19 @@ def _handle_extract(args: argparse.Namespace) -> int:
 
     from .models.base import ModelRunner
 
+    # Group naming: by default each model family writes to a group named after
+    # the family (so multi-model runs get distinct groups). --group overrides
+    # the group name, but only makes sense when a single family is requested —
+    # renaming N families to one group would collide.
+    group_override = None
+    if args.group != "clip":
+        if len(requested) != 1:
+            raise SystemExit(
+                f"--group {args.group!r} can only be used with a single "
+                f"--models family; got {requested}"
+            )
+        group_override = args.group
+
     runners: list[tuple[str, ModelRunner]] = []
     try:
         for family in requested:
@@ -202,7 +215,8 @@ def _handle_extract(args: argparse.Namespace) -> int:
                 backend=args.backend,
                 device=args.device,
             )
-            runners.append((family, runner))
+            group_name = group_override if group_override is not None else family
+            runners.append((group_name, runner))
 
         result = extract(
             ExtractOptions(

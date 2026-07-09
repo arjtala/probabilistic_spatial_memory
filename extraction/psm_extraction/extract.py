@@ -295,6 +295,11 @@ def extract(opts: ExtractOptions) -> ExtractResult:
     frames_dir = _resolve_frames_dir(opts)
     vrs_result = None
     egoexo_mp4: Path | None = None
+    # Origin subtracted from the model-group timestamps. Zero for MP4/EgoExo
+    # (their timestamps already start at 0 by construction); for VRS it is the
+    # first device-clock sample (see below). Used to rebase JSON sensor groups
+    # onto the same origin as the model group.
+    rebase_origin = 0.0
     if is_egoexo:
         egoexo_mp4 = ego_rgb_mp4(opts.video)
         duration = video_duration(egoexo_mp4, verbose=opts.verbose)
@@ -324,8 +329,13 @@ def extract(opts: ExtractOptions) -> ExtractResult:
         frame_paths = vrs_result.frame_paths
         # Re-base device-clock timestamps so the model group starts at t=0,
         # matching the existing MP4 convention (and the downstream eval
-        # scripts that assume timestamps[0] ≈ 0).
+        # scripts that assume timestamps[0] ≈ 0). Record the origin so any
+        # JSON sensor group we write below can be rebased onto the SAME
+        # origin — otherwise the model group (device clock rebased to 0) and
+        # the gps/imu groups (sidecar clock via _resolve_offset) would sit on
+        # different clocks in one file.
         device_ts = vrs_result.timestamps_s
+        rebase_origin = float(device_ts[0]) if device_ts.size else 0.0
         timestamps = device_ts - device_ts[0] if device_ts.size else device_ts
         duration = float(device_ts[-1] - device_ts[0]) if device_ts.size else None
         stage_banner(
@@ -522,18 +532,40 @@ def extract(opts: ExtractOptions) -> ExtractResult:
         # is the wrong offset. Prefer a GPS-derived clock offset (when the
         # GPS sidecar carries both timestamp + utc_time_ms) before falling
         # back to capture_time_epoch.
+        #
+        # For VRS/EgoExo inputs the model group was rebased so timestamps[0]
+        # is 0 (subtracting `rebase_origin` from the device clock). To keep all
+        # groups in the file on ONE origin, the JSON sensor groups must be
+        # rebased onto that same origin: after mapping the sidecar to its
+        # absolute clock we subtract `rebase_origin` too (a no-op for MP4 where
+        # rebase_origin == 0). NOTE: this is only exact when the sidecar's
+        # absolute clock and the VRS device clock coincide; when they are truly
+        # independent clocks we cannot align them without the VRS/sidecar clock
+        # mapping (unavailable here). The model group's t=0 rebase remains the
+        # single documented origin and the sensor group is placed relative to
+        # it as best we can.
         gps_clock_offset = (
             gps_sidecar.clock_offset_to_unix if gps_sidecar is not None else None
         )
 
         def _resolve_offset(sidecar) -> float:
             if sidecar.timestamps_absolute:
-                return 0.0
-            if sidecar.clock_offset_to_unix is not None:
-                return float(sidecar.clock_offset_to_unix)
-            if gps_clock_offset is not None:
-                return float(gps_clock_offset)
-            return float(epoch_offset) if epoch_offset else 0.0
+                base = 0.0
+            elif sidecar.clock_offset_to_unix is not None:
+                base = float(sidecar.clock_offset_to_unix)
+            elif gps_clock_offset is not None:
+                base = float(gps_clock_offset)
+            else:
+                base = float(epoch_offset) if epoch_offset else 0.0
+            # Share the model group's origin. The model group used
+            # (timestamps_out = (device_ts - rebase_origin) + epoch_offset).
+            # `base` already carries the sidecar→absolute mapping (and, in the
+            # fallback branch, the same epoch_offset the model group used), so
+            # the only remaining term needed to co-locate the sensor group with
+            # the model group's origin is the VRS device-clock rebase. For MP4
+            # inputs rebase_origin is 0 and this is a no-op (preserving the
+            # prior, already-consistent behavior).
+            return base - rebase_origin
 
         if gps_sidecar is not None:
             gps_ts = gps_sidecar.timestamps + _resolve_offset(gps_sidecar)

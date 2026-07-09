@@ -69,10 +69,11 @@ size_t SpatialMemory_query_intervals(SpatialMemory *sm, double lat, double lng,
                                      int k_ring, SpatialMemoryInterval *out,
                                      size_t max_out);
 
-// Result row for SpatialMemory_query_similar. Reports the single winning
-// exemplar per tile (the one with the highest cosine similarity to the query)
-// together with the containing cell's merged-window interval for downstream
-// grounding.
+// Result row for SpatialMemory_query_similar. Reports a winning exemplar per
+// tile (the one with the highest cosine similarity to the query) together with
+// the containing cell's merged-window interval for downstream grounding. A
+// single cell may appear in multiple result rows when per_cell_cap > 1, since
+// each tile can then contribute more than one of its top exemplars.
 typedef struct {
   H3Index cell;
   double similarity;  // cosine similarity in [-1, 1] for the winning exemplar.
@@ -100,7 +101,8 @@ typedef struct {
 // Pass 0 to mean "1" so the legacy 2-arg callers keep their semantics.
 //
 // Results are sorted by similarity descending; ties broken by t_max descending.
-// Returns the total number of (cell, exemplar) candidates considered; probe
+// Returns the total number of result rows collected (each tile contributes up
+// to per_cell_cap rows, so this is bounded by tile_count * per_cell_cap); probe
 // mode (out == NULL or max_out == 0) scans without writing.
 size_t SpatialMemory_query_similar(SpatialMemory *sm, const float *query,
                                    size_t dim, double center_lat,

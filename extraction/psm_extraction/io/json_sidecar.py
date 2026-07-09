@@ -56,6 +56,26 @@ def _largest_stream(streams: list[dict]) -> dict:
     return max(streams, key=lambda s: len(s.get("samples") or []))
 
 
+def _stream_with_most_valid(streams: list[dict], is_valid) -> tuple[dict, list[dict]]:
+    """Pick the stream with the most samples passing `is_valid`.
+
+    Selecting by raw sample count (`_largest_stream`) can choose a large
+    all-zero / pre-fix stream and starve out a smaller sibling that
+    actually carries valid fixes. Filter first, then pick the stream with
+    the most valid samples. Returns `(stream, valid_samples)`; the caller
+    already raises when the valid list is empty.
+    """
+    if not streams:
+        raise RuntimeError("JSON sidecar has zero streams")
+    best_stream = streams[0]
+    best_valid: list[dict] = [s for s in (best_stream.get("samples") or []) if is_valid(s)]
+    for stream in streams[1:]:
+        valid = [s for s in (stream.get("samples") or []) if is_valid(s)]
+        if len(valid) > len(best_valid):
+            best_stream, best_valid = stream, valid
+    return best_stream, best_valid
+
+
 def _utc_seconds(sample: dict) -> float | None:
     """Aria sidecars sometimes carry both a session-clock `timestamp` and
     an absolute `utc_time_ms`. Prefer the latter when present and non-zero
@@ -108,10 +128,10 @@ def read_gps_json(path: Path, *, stream_id: str | None = None) -> GPSSidecar:
         if not candidates:
             raise RuntimeError(f"{path}: stream_id {stream_id!r} not found")
         stream = candidates[0]
+        samples = stream.get("samples") or []
+        valid = [s for s in samples if _valid_gps_sample(s)]
     else:
-        stream = _largest_stream(raw)
-    samples = stream.get("samples") or []
-    valid = [s for s in samples if _valid_gps_sample(s)]
+        stream, valid = _stream_with_most_valid(raw, _valid_gps_sample)
     if not valid:
         raise RuntimeError(f"{path}: stream has no valid GPS fixes")
 
@@ -179,10 +199,10 @@ def read_imu_json(path: Path, *, stream_id: str | None = None) -> IMUSidecar:
         if not candidates:
             raise RuntimeError(f"{path}: stream_id {stream_id!r} not found")
         stream = candidates[0]
+        samples = stream.get("samples") or []
+        valid = [s for s in samples if _valid_imu_sample(s)]
     else:
-        stream = _largest_stream(raw)
-    samples = stream.get("samples") or []
-    valid = [s for s in samples if _valid_imu_sample(s)]
+        stream, valid = _stream_with_most_valid(raw, _valid_imu_sample)
     if not valid:
         raise RuntimeError(f"{path}: stream has no valid IMU samples")
 

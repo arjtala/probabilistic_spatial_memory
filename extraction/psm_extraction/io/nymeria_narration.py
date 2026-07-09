@@ -8,11 +8,20 @@ but adapted to Nymeria's CSV schema:
   creation_time, "Describe my atomic actions"  <-- last column = text
 
 Time units are seconds since Aria capture start (head VRS device clock).
-The VRS reader rebases device-clock to t=0 when extracting frames, so
-narration timestamps end up in the same frame timeline as the model
-group's `timestamps` dataset — no additional rebase needed at eval
-time (verified against atomic_action's column-7 floats vs the head
-VRS's `_read_vrs_timestamps` start offset).
+Narration timestamps here are rebased by subtracting the SLAM trajectory
+CSV's first `tracking_timestamp_us` (`trajectory_t0`). The VRS extractor,
+however, rebases features.h5 frame timestamps against the first *sampled
+RGB frame* (`rgb_t0`), not the trajectory's first row. Those two origins
+are not guaranteed to coincide, so narration intervals produced here can
+be offset from the features.h5 timeline by `(rgb_t0 - trajectory_t0)`.
+
+CAVEAT: this module cannot see `rgb_t0` (it lives in the VRS extractor),
+so it rebases against `trajectory_t0` and exposes that value on
+`NymeriaSession.trajectory_t0_sec`. A consumer that also knows `rgb_t0`
+should re-align by subtracting `(rgb_t0 - trajectory_t0)` from the
+`t_start_sec` / `t_end_sec` fields. When `rgb_t0 == trajectory_t0` (both
+clocks start at the head VRS device-clock origin) no further adjustment
+is needed, but that equality is unverified for the general case.
 
 Unlike Ego-Exo4D atomic_descriptions, Nymeria narrations come with
 real `[start_time, end_time]` intervals (not single timestamps), so
@@ -47,10 +56,13 @@ _NARRATION_CSV = "narration/atomic_action.csv"
 class NymeriaNarration:
     """One atomic-action narration from a Nymeria session.
 
-    Time fields are seconds in the head VRS device-clock frame; the
-    same offset the extractor rebases to t=0 when writing the model
-    group. So a (t_start, t_end) here lines up with the features.h5
-    timestamps without further adjustment.
+    Time fields are seconds relative to the SLAM trajectory's first row
+    (`trajectory_t0`; see module docstring). The VRS extractor rebases
+    features.h5 frame timestamps against the first sampled RGB frame
+    (`rgb_t0`) instead, so `(t_start_sec, t_end_sec)` may be offset from
+    the features.h5 timeline by `(rgb_t0 - trajectory_t0)`. A consumer
+    that knows `rgb_t0` should subtract that offset before matching; the
+    basis used here is exposed via `NymeriaSession.trajectory_t0_sec`.
     """
     text: str
     t_start_sec: float
@@ -67,9 +79,15 @@ class NymeriaSession:
     `narrations` are deduplicated by (text, t_start_sec) within a
     session — different `request_id`s sometimes re-annotate the same
     window with paraphrases; keep the first.
+
+    `trajectory_t0_sec` is the SLAM-trajectory device-clock origin (seconds)
+    the narration timestamps were rebased against. Exposed so a consumer
+    that also knows the extractor's RGB-frame origin (`rgb_t0`) can correct
+    the `(rgb_t0 - trajectory_t0)` offset described in the module docstring.
     """
     session_id: str          # the directory name, e.g. 20230607_s0_james_johnson_act0_e72nhq
     narrations: list[NymeriaNarration] = field(default_factory=list)
+    trajectory_t0_sec: float | None = None
 
 
 # Trajectory CSV's first row gives us the Aria device-clock time the
@@ -117,10 +135,16 @@ def read_session_narrations(
     """Load `narration/atomic_action.csv` for one Nymeria session.
 
     Rebases narration timestamps by subtracting the trajectory CSV's
-    first `tracking_timestamp_us` so they match the extractor's
-    0-relative features.h5 timeline. When the trajectory CSV is missing
-    (no SLAM), returns None — without the rebase the narrations would
-    land at unphysical times like `33446s` for a 1207s-long recording.
+    first `tracking_timestamp_us` (`trajectory_t0`), the closest in-module
+    proxy for the extractor's frame-timeline origin. NOTE: the extractor
+    actually rebases features.h5 against the first sampled RGB frame
+    (`rgb_t0`), which this module cannot see; when the two origins differ
+    the intervals are offset by `(rgb_t0 - trajectory_t0)`. The basis used
+    is returned on `NymeriaSession.trajectory_t0_sec` so a consumer that
+    knows `rgb_t0` can correct it (see module docstring). When the
+    trajectory CSV is missing (no SLAM), returns None — without any rebase
+    the narrations would land at unphysical times like `33446s` for a
+    1207s-long recording.
 
     Returns None if the CSV is missing — caller should skip the
     session rather than emit an empty record (otherwise downstream
@@ -174,7 +198,11 @@ def read_session_narrations(
             ))
     if not out:
         return None
-    return NymeriaSession(session_id=session_dir.name, narrations=out)
+    return NymeriaSession(
+        session_id=session_dir.name,
+        narrations=out,
+        trajectory_t0_sec=t0,
+    )
 
 
 def read_nymeria_root(

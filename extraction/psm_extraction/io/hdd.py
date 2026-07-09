@@ -167,9 +167,14 @@ def video_start_skew(drive_dir: Path, traj: HDDTrajectory) -> float:
     """Seconds the first GPS fix lags the video start (>=0 typical, RTK warmup).
 
     Center-camera files are named ``YYYY-MM-DD-HH-MM-SS_...mp4`` (local wall
-    clock). ``traj.first_iso`` is the first fix's local ISO time. Both share the
-    timezone, so the naive-datetime difference is the true skew regardless of
-    PST/PDT. Returns 0.0 if either is unparseable.
+    clock). ``traj.first_iso`` is the first fix's ISO time. When ``first_iso``
+    is naive we assume it shares the video's local timezone (release_2019_07_08
+    RTK CSVs write local wall-clock without an offset), so a naive-datetime
+    difference is the true skew regardless of PST/PDT. When ``first_iso`` is
+    tz-aware (e.g. a ``...Z`` / ``+00:00`` offset), blindly stripping the
+    tzinfo would leave a UTC wall clock that is skewed from the local video
+    filename by the whole UTC offset; convert to the local wall clock first.
+    Returns 0.0 if either is unparseable.
     """
     from datetime import datetime
     video = find_video(drive_dir)
@@ -177,7 +182,11 @@ def video_start_skew(drive_dir: Path, traj: HDDTrajectory) -> float:
         return 0.0
     try:
         vstart = datetime.strptime(video.name[:19], "%Y-%m-%d-%H-%M-%S")
-        gps_first = datetime.fromisoformat(traj.first_iso).replace(tzinfo=None)
+        gps_first = datetime.fromisoformat(traj.first_iso)
+        if gps_first.tzinfo is not None:
+            # Re-express the tz-aware fix as local wall-clock to match the
+            # naive local video filename, then drop tzinfo for subtraction.
+            gps_first = gps_first.astimezone().replace(tzinfo=None)
         return (gps_first - vstart).total_seconds()
     except (ValueError, TypeError):
         return 0.0

@@ -195,6 +195,7 @@ static char *find_file_in_dir(const char *dir, const char *extension,
       bool needs_slash = (dlen > 0 && dir[dlen - 1] != '/');
       size_t path_len = dlen + needs_slash + strlen(ent->d_name) + 1;
       char *path = malloc(path_len);
+      if (!path) { closedir(d); return NULL; }
       snprintf(path, path_len, "%s%s%s", dir, needs_slash ? "/" : "",
                ent->d_name);
       closedir(d);
