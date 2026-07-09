@@ -106,29 +106,6 @@ def _pick_uniform_from_cache(
     n_frames: int,
     h5_ts: np.ndarray,
 ) -> list[tuple[float, Path]]:
-    """Pick `n_frames` evenly-spaced frames from an existing JPEG cache.
-
-    The orchestrator (and our SLOPER4D / Aria extractors) drops 1 fps
-    JPEGs into `<session>/frames*/frame_*.jpg` when called with
-    --keep-frames or via VRS reader. We just need to align the JPEG
-    list with the H5 timestamps and pick N evenly-spaced indices.
-
-    Returns (h5_clock_ts, path) tuples. Frame ts are inferred to be
-    the H5 timestamps at the same index — both the extractor's
-    JPEGs and the H5 are produced together at the same sample_fps,
-    so frame_i ↔ ts_i is the natural mapping.
-    """
-    # NOTE: this earlier definition is fully shadowed by the one below
-    # (Python keeps only the last binding), so this return never executes.
-    # The explicit empty-list return only satisfies the declared return type.
-    return []
-
-
-def _pick_uniform_from_cache(
-    frames_dir: Path,
-    n_frames: int,
-    h5_ts: np.ndarray,
-) -> list[tuple[float, Path]]:
     """Pick `n_frames` evenly-spaced frames from an existing JPEG/PNG cache.
 
     Two layouts handled:
