@@ -393,3 +393,14 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [ ] Real-kit confirming build (cluster): 3-fig body was 9pp pre-cuts; cut list frees ~1pg -> expect ~8pp on tighter Times kit
 - [ ] If ~1 line over on real kit: reserve cut = drop §7 follow-up directions / tighten §6 evaluation-scope
 - [ ] Table 1 promotion to body (review minor #3): held -- fights 8pp; left in supp
+
+## 2026-07-09 22:32 -- Micro-cuts A-E (final ~0.5pg)
+
+- [x] A: abstract generalization sentence compressed
+- [x] B: §4.4 'not a plateau' restatement dropped
+- [x] C: Python-reimpl detail (2.4e-5) MOVED to supp HLL §A.5 (was not there -> moved, not deleted)
+- [x] D: §3 R-tree/primitives disclaimer compressed (drops sole guttman cite)
+- [x] E: §4.4 AUC-vs-hit-rate justification -> footnote
+- [x] Fallback: §7 follow-ups + MIT line compressed
+- [x] Local p9 conclusion bleed ~9 -> ~3 lines; 0 undefined/dup refs; no evidence lost; pushed eee2be8
+- [ ] Real-kit confirming build: expected to clear 8pp (~3 loose-lmodern lines should absorb on tighter Times); if ~1 line over, one micro-trim remains
