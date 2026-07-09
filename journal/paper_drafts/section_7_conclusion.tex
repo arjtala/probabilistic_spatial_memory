@@ -20,41 +20,29 @@ the measured Nymeria \psm{} state (\S\ref{sec:method-query};
 on-device constants remain unmeasured, \S\ref{sec:limitations}).
 
 \paragraph{What the evidence supports.}
-On 30 Nymeria sessions, the bounded $R{=}128$ sweep is monotone
-from $2.99\%$ Hit@5 at \caponek{}$=1$ to $7.55\%$ at
-\caponek{}$=K$; the $R{=}1024$ full-reservoir sweep follows the same
-shape and reaches brute-force CLIP retrieval at \caponek{}$=K$
-(Hit@5 $8.92\%$). The bounded $R{=}128$ single-session operating
-point reaches 21/187 vs.\ brute-force's 25/187; sliding-window CLIP
-exceeds the full-reservoir endpoint by ${\sim}1$\,pp
-(\S\ref{sec:results-main}).
+Across a 30-session Nymeria sweep and a single-session
+operating-point analysis, the bounded $R{=}128$ index tracks
+brute-force CLIP retrieval monotonically in \caponek{} and---once
+eviction is removed at $R{=}1024$---recovers it exactly, establishing
+\caponek{} as a correct spatial-diversity-versus-recall control; an
+optional Gemini~3.1~Pro rerank adds localization precision without
+changing recall, and is bimodal on Hit@1 so we do not promote it to a
+default (\S\ref{sec:results-main}, supp.\ \S\ref{sec:results-mllm-rerank}).
 %
-Paired with Gemini~3.1~Pro at \caponek{}$=1$, \psm reaches mIoU
-$0.069$---statistically indistinguishable from brute-force $0.074$
-(paired bootstrap 95\,\% CI $[-0.032,+0.021]$).
-%
-The spatial-axis gain generalises: 13/14 multi-corpus sessions pass
-the monotone acceptance test, with SigLIP~2 strongest at 11/14
-(supp.\ Table~\ref{tab:multi-corpus-h3}).
-At matched candidate budget ($K{=}8$), \psm{}'s query-guided
-retrieval reaches every session that vanilla Gemini~3.1~Pro
-uniform-sampling misses---including two where the uniform $K{=}8$
-frames never land in any GT interval---demonstrating that frontier
-MLLMs need a spatial-temporal prefilter to close the
-temporal-coverage gap (\S\ref{sec:results-vanilla-mllm}).
-%
-The MLLM reranker is bimodal on Hit@1---tripling it on one session,
-hurting it on another---so we do not promote it to a default
-(\S\ref{sec:results-mllm-rerank}).
+The spatial-axis gain generalises to 13/14 multi-corpus sessions
+across 3 sensor stacks and 3 encoder families, and \psm{}'s
+query-guided retrieval reaches every street-scale session that
+uniform-sampling Gemini misses---including two the MLLM cannot see at
+all---so a frontier MLLM needs a spatial-temporal prefilter to close
+its temporal-coverage gap (\S\ref{sec:results-multi-corpus},
+\S\ref{sec:results-vanilla-mllm}).
 %
 On 102.9\,h of metropolitan driving (HDD, \S\ref{sec:results-hdd}),
-\psm's per-cell-capped state stays $1.3$--$7.2\times$ smaller than a
-dense embedding bank while a $1\,\mathrm{KiB}$ sketch accrues
-unique-event cardinality across 219 days and label-free
-cross-session place recognition reaches $0.853$ AUC---the
-multi-session persistence the single-pass corpus cannot exercise
-(the synthetic memory crossover at $N{\approx}1500$ frames is in
-supp.\ Fig.~\ref{fig:f6-memory}).
+\psm{} exercises the multi-session persistence the single-pass corpus
+cannot: area-bounded state well below a dense embedding bank,
+cross-session unique-event cardinality accruing over months in a
+$1\,\mathrm{KiB}$ sketch, and label-free cross-session place
+recognition---the deployment regime the design targets.
 
 \paragraph{Follow-up directions.}
 Three extensions are immediate.

@@ -11,6 +11,28 @@
 
 \subsection{Additional ablations and retrieval baselines}
 \label{sec:supp-ablations}
+
+\begin{table*}[t]
+\centering
+\begin{tabular}{lcccc}
+\toprule
+Method & Reservoir $R$ & Hit@5 & exemplar mIoU@5 & bucket mIoU@5 \\
+\midrule
+Brute-force CLIP-L     & --   & \textbf{13.4\%} (25/187) & 0.074 & 0.074 \\
+PSM, \texttt{cap}=1    & 128  & 9.1\% (17/187)           & 0.048 & 0.019 \\
+PSM, \texttt{cap}=2    & 128  & 9.6\% (18/187)           & 0.050 & 0.014 \\
+PSM, \texttt{cap}=3    & 128  & 10.2\% (19/187)          & 0.057 & 0.014 \\
+PSM, \texttt{cap}=$K$  & 128  & \textbf{11.2\%} (21/187) & 0.063 & 0.013 \\
+\midrule
+PSM, \texttt{cap}=1    & 1024 & 8.0\% (15/187)           & 0.044 & 0.019 \\
+PSM, \texttt{cap}=$K$  & 1024 & \textbf{13.4\%} (25/187) & 0.074 & 0.013 \\
+\bottomrule
+\end{tabular}
+\caption{\psm{} vs brute-force CLIP on \texttt{shelby\_arroyo\_act0} (187 narrations), full single-session operating-point sweep (summarized in \S\ref{sec:results-main}).
+$R{=}128$ (top block) is the bounded-memory deployment; $R{=}1024$ isolates reservoir eviction from the \caponek{} effect, recovering brute-force exactly at \caponek{}$=K$. Optional MLLM rerank: \S\ref{sec:results-mllm-rerank}.}
+\label{tab:headline}
+\end{table*}
+
 Beyond the single-session headline (\S\ref{sec:results-main}), four patterns:
 (1)~\emph{Operating-point Pareto}: as \caponek{} sweeps from 1 to $K$, Hit@5 rises and bucket mIoU falls monotonically. Strict spatial diversity (\caponek{}$=1$) costs $5.4$\,pp at $R{=}1024$ ($8.0\%$ vs brute-force $13.4\%$; $4.3$\,pp at $R{=}128$) because revisits to a cell collapse into one bucket---the intended behavior for place-distinct queries. Brute-force itself caps at $13.4\%$: 162/187 narrations are revisit-heavy and visually indistinguishable to CLIP cosine~\cite{weller2025limit}.
 (2)~\emph{Retrieval baselines}: sliding-window CLIP @ $\ell{=}10$\,s exceeds \psm{} \caponek{}$=K$ by $+1.6$\,pp Hit@5 ($15.0\%$ vs $13.4\%$) by averaging out per-frame variance, but requires the full $N$-frame bank; uniform-sample forms the floor at $4.3$--$8.6\%$.
