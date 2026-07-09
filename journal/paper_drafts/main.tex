@@ -90,15 +90,13 @@ LookOut~\cite{pan2025lookout} Project Aria) \textbf{and 3 encoder families}
 monotone-$r10{\to}r12$ Hit@5 acceptance. Because \psm{} retrieves from
 query-matched H3 cells rather than uniform time slices, it supplies the
 spatial-temporal prefilter frontier MLLMs lack: on two sessions, uniform
-$K{=}8$ sampling yields Hit@5 $=0\%$---the MLLM never sees a ground-truth
-frame regardless of reasoning capability. On 102.9\,h of metropolitan
+$K{=}8$ sampling yields Hit@5 $=0\%$. On 102.9\,h of metropolitan
 driving (Honda HDD~\cite{ramanishka2018hdd}) with genuine revisits, \psm{}
-exercises its target multi-session regime: state that grows
-\emph{sublinearly}---$O(\text{area})$, not $O(\text{time})$---at
-$1.3$--$7.2\times$ below a dense bank; unique-event cardinality accruing
-across 219 days in a $1\,\mathrm{KiB}$ sketch while decaying between visits;
-and label-free cross-session place recognition (0.853 AUC vs.\ a 0.498
-null). The C engine ($\sim$700 LoC) and Python harness are released
+exercises its target multi-session regime: \emph{sublinear} state
+($O(\text{area})$, not $O(\text{time})$; $1.3$--$7.2\times$ below a dense
+bank), cross-session cardinality accruing across 219 days in a
+$1\,\mathrm{KiB}$ sketch, and label-free place recognition (0.853 AUC vs.\ a
+0.498 null). The C engine ($\sim$700 LoC) and Python harness are released
 under MIT.
 
 \keywords{Spatial memory \and Bounded memory \and Dynamic spatial

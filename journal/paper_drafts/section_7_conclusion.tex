@@ -8,47 +8,28 @@
 \section{Conclusion}
 \label{sec:conclusion}
 
-\psm is a streaming bounded-memory index for egocentric look-back
-question answering: it tessellates ego-trajectories onto an H3
-hex grid, keeps time-decayed HLL ring-buffer sketches and
-reservoir-sampled exemplars per cell, and exposes a
-\caponek{} knob trading spatial diversity for
-embedding-similarity precision.  Per-cell state is bounded
-independently of recording duration, and per-query latency is
-microsecond-scale on host CPU (\S\ref{sec:method-query};
-on-device constants unmeasured, \S\ref{sec:limitations}).
+\psm is a streaming bounded-memory index for egocentric look-back QA: an H3
+hex-grid tessellation with per-cell time-decayed HLL sketches, reservoir-sampled
+exemplars, and a \caponek{} knob trading spatial diversity for
+embedding-similarity precision, bounded independently of recording duration
+(\S\ref{sec:method}; on-device latency unmeasured, \S\ref{sec:limitations}).
 
 \paragraph{What the evidence supports.}
-Across a 30-session Nymeria sweep and a single-session
-operating-point analysis, the bounded $R{=}128$ index tracks
-brute-force CLIP retrieval monotonically in \caponek{} and---once
-eviction is removed at $R{=}1024$---recovers it exactly, establishing
-\caponek{} as a correct spatial-diversity-versus-recall control; an
-optional Gemini~3.1~Pro rerank adds localization precision without
-changing recall, and is bimodal on Hit@1 so we do not promote it to a
-default (\S\ref{sec:results-main}, supp.\ \S\ref{sec:results-mllm-rerank}).
-%
-The spatial-axis gain generalises to 13/14 multi-corpus sessions
-across 3 sensor stacks and 3 encoder families, and \psm{}'s
-query-guided retrieval reaches every street-scale session that
-uniform-sampling Gemini misses---including two the MLLM cannot see at
-all---so a frontier MLLM needs a spatial-temporal prefilter to close
-its temporal-coverage gap (\S\ref{sec:results-multi-corpus},
-\S\ref{sec:results-vanilla-mllm}).
-%
-On 102.9\,h of metropolitan driving (HDD, \S\ref{sec:results-hdd}),
-\psm{} exercises the multi-session persistence the single-pass corpus
-cannot: area-bounded state well below a dense embedding bank,
-cross-session unique-event cardinality accruing over months in a
-$1\,\mathrm{KiB}$ sketch, and label-free cross-session place
-recognition---the deployment regime the design targets.
+The bounded $R{=}128$ index tracks brute-force CLIP retrieval monotonically in
+\caponek{} and recovers it exactly once eviction is removed at $R{=}1024$
+(\S\ref{sec:results-main}), and \psm{}'s query-guided retrieval closes the
+temporal-coverage gap frontier MLLMs lack, reaching every street-scale session
+uniform-sampling Gemini misses (\S\ref{sec:results-vanilla-mllm},
+Fig.~\ref{fig:f2-psm-vs-mllm}). On 102.9\,h of driving (HDD,
+\S\ref{sec:results-hdd}) it exercises the multi-session persistence the
+single-pass corpus cannot---area-bounded state, cross-session cardinality
+accrual over months, and label-free place recognition---the deployment regime
+the design targets.
 
 \paragraph{Follow-up directions.}
-Three extensions are immediate: an \emph{on-device rerank} (a small VLM in
-place of Gemini); \emph{counting QA} surfacing the validated HLL cardinalities
-(\S\ref{sec:results-hll}) to a class beyond moment-grounding; and
-\emph{federated memory} merging devices' per-cell state via HLL union without
-sharing raw frames (H3 cell ids are global).
+Immediate extensions include an on-device rerank (a small VLM for Gemini),
+counting QA over the validated HLL cardinalities (\S\ref{sec:results-hll}), and
+federated memory via HLL union across devices.
 
 The engine (${\sim}700$ LoC of portable C with HDF5 storage and
 projectaria-tools/ffmpeg ingest) and the Python evaluation harness

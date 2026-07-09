@@ -24,8 +24,7 @@ On the \texttt{shelby\_arroyo\_act0} proxy session (187 narrations), at the depl
 An optional MLLM rerank adds localization precision, not recall: \caponek{}$=1$+rerank reaches exemplar mIoU $0.069$, statistically indistinguishable from brute-force's $0.074$ (paired bootstrap $\Delta{=}{-}0.005$, 95\% CI $[-0.032,+0.021]$; \S\ref{sec:results-mllm-rerank}).
 The strict-diversity cost, the brute-force ceiling, and the operating-point Pareto, retrieval baselines, memory/H3-resolution ablation, and 30-session monotonicity sweep are in the supplement (\S\ref{sec:supp-ablations}).
 
-\psm{}'s per-cell state is session-length-invariant (${\sim}0.44$\,MiB at $R{=}128$) while brute-force grows linearly in $N$; on the short Nymeria sessions brute-force is still marginally cheaper (the synthetic crossover falls at $N\approx1500$ frames, supp.\ Fig.~\ref{fig:f6-memory}), so the bounded-memory payoff is demonstrated on the multi-hour HDD corpus (\S\ref{sec:results-hdd}). Retrieval is sub-millisecond either way (host-CPU state size, latency, and the shared-miss failure analysis in supp.\ \S\ref{sec:supp-memory-latency}).
-Representative retrievals---\psm{}'s top-5 candidates with the Gemini-selected frame, spanning two hits (one a Gemini Hit@1 rescue) and an honest revisit-heavy miss---are in supp.\ Fig.~\ref{fig:f7-qualitative}.
+\psm{}'s per-cell state is session-length-invariant (${\sim}0.44$\,MiB at $R{=}128$) while brute-force grows linearly in $N$, so the bounded-memory payoff is demonstrated on the multi-hour HDD corpus (\S\ref{sec:results-hdd}); state size, latency, qualitative retrievals, and failure analysis are in the supplement (\S\ref{sec:supp-memory-latency}, Fig.~\ref{fig:f7-qualitative}).
 
 \subsection{Generalization, and why MLLMs need a spatial prefilter}
 \label{sec:results-vanilla-mllm}
@@ -70,6 +69,24 @@ valid GPS), which over 8 months genuinely re-drives the same streets. HDD ships
 no look-back QA labels, so these results are \emph{systems} and
 \emph{self-supervised}, not retrieval-accuracy (\S\ref{sec:limitations}).
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.82\linewidth]{figures/hdd_combined.pdf}
+\caption{HDD multi-session results (132 drives, 102.9\,h).
+\textbf{(A)}~\psm{}'s area-bounded per-cell reservoir vs a dense per-frame
+embedding bank over cumulative driving hours; the gap widens with ingest rate
+as redundant frames are capped ($O(\text{cells})$, not $O(\text{frames})$;
+drawn at 30\,fps).
+\textbf{(B)}~Cross-session HLL cardinality on the most-revisited cell:
+cumulative accrual (left axis) in a fixed $1\,\mathrm{KiB}$ sketch, and the
+ring-buffer windowed estimate (right axis) decaying between visits and jumping
+on each revisit, over months-long gaps.
+\textbf{(C)}~Self-supervised cross-session retrieval AUC (different-day
+same-cell frames outranking other-cell frames), with the shuffled-cell null
+($0.498$) and same-drive upper bound ($0.977$).}
+\label{fig:hdd-combined}
+\end{figure}
+
 \paragraph{Revisit structure and area-bounded state (Fig.~\ref{fig:hdd-combined}A).}
 Binning every drive to H3 $r{=}10$ (${\sim}66$\,m), \textbf{47.0\%} of
 (drive, cell) traversal events fall in cells revisited on $\geq2$ distinct days
@@ -102,21 +119,3 @@ alone. The same-cell-vs-all split blends geographic proximity with visual
 identity ($k$-nearest-cell control deferred, \S\ref{sec:limitations}); AUC (not
 top-$k$ hit-rate) is the discriminability measure here, as the 357k-frame pool
 is near-duplicate-dominated.
-
-\begin{figure}[tb]
-\centering
-\includegraphics[width=0.82\linewidth]{figures/hdd_combined.pdf}
-\caption{HDD multi-session results (132 drives, 102.9\,h).
-\textbf{(A)}~\psm{}'s area-bounded per-cell reservoir vs a dense per-frame
-embedding bank over cumulative driving hours; the gap widens with ingest rate
-as redundant frames are capped ($O(\text{cells})$, not $O(\text{frames})$;
-drawn at 30\,fps).
-\textbf{(B)}~Cross-session HLL cardinality on the most-revisited cell:
-cumulative accrual (left axis) in a fixed $1\,\mathrm{KiB}$ sketch, and the
-ring-buffer windowed estimate (right axis) decaying between visits and jumping
-on each revisit, over months-long gaps.
-\textbf{(C)}~Self-supervised cross-session retrieval AUC (different-day
-same-cell frames outranking other-cell frames), with the shuffled-cell null
-($0.498$) and same-drive upper bound ($0.977$).}
-\label{fig:hdd-combined}
-\end{figure}

@@ -17,34 +17,22 @@
 Both \psm{} and brute-force CLIP plateau at 13.4\% Hit@5 on the headline session
 (\S\ref{sec:results-main}): 162/187 narrations describe repeatedly-entered rooms
 with near-identical frames, so both rarely match the annotator's single chosen
-interval---benchmark hardness, not method quality (the two agree on the 25
-uniquely-groundable questions; future benchmarks should score against \emph{any}
-acceptable revisit window). The deepest single-session analysis (supp.\
-Table~\ref{tab:headline}) is one Nymeria session, and the 14-session sweep uses a
-heuristic monotonicity-plus-lift criterion, not a formal test.
-
-\paragraph{One honest spatial-axis failure.}
-Of the 14 street-scale sessions, \texttt{BurlingameDT4\_feb5} (242\,m bbox) is
-the only one where all three encoders fail the monotone-\caponek{} lift---a
-visually homogeneous parking-lot street whose queries collapse onto a few
-indistinguishable cells. The same failure recurs on Aria Gen~2
-Pilot's~\cite{aria-gen2-pilot} GPS-grounded walks, confirming the bottleneck is
-encoder discrimination, not trajectory quality.
+interval---benchmark hardness, not method quality (future benchmarks should
+score against \emph{any} acceptable revisit window). The 14-session sweep uses a
+heuristic monotonicity-plus-lift criterion, not a formal test, and one session
+(\texttt{BurlingameDT4\_feb5}, a visually homogeneous parking-lot street) is an
+honest cross-encoder failure---also recurring on Aria Gen~2
+Pilot's~\cite{aria-gen2-pilot} walks, so the bottleneck is encoder
+discrimination, not trajectory quality.
 
 \paragraph{Evaluation scope.}
 \psm's latency (supp.\ \S\ref{sec:supp-memory-latency}) is a host-CPU sanity
-check, not an on-device claim (the wearable target is unmeasured, though porting
-the C engine is straightforward). Our baselines omit a spatial-only heuristic
-(nearest-GPS, random-cell), so the gains show query-guided retrieval beats
-uniform temporal coverage at matched budget but do not fully isolate spatial
-indexing from embedding similarity within cells.
-
-\paragraph{HDD is a systems, not retrieval-accuracy, result.}
-HDD ships no look-back QA labels, so its results (\S\ref{sec:results-hdd}) are
-\emph{systems} and \emph{self-supervised}, not Hit@5/mIoU---a deliberate division
-where the wearable corpora carry accuracy and HDD carries persistence. Two
-caveats: the cross-session split (same $r{=}10$ cell vs.\ all others) blends
-geographic proximity with visual identity, so a $k$-nearest-cell control is the
-next step; and the features carry a ${\sim}3$\,s GPS-warmup skew (${\sim}17$\,m
-median) corrected at analysis time (AUC $0.848{\to}0.853$), with the source-side
-fix verified in simulation but not yet re-extracted.
+check, not an on-device claim, and our baselines omit a spatial-only heuristic,
+so the gains show query-guided retrieval beats uniform temporal coverage at
+matched budget but do not fully isolate spatial indexing from embedding
+similarity. HDD ships no look-back QA labels, so its results
+(\S\ref{sec:results-hdd}) are \emph{systems} and \emph{self-supervised}, not
+Hit@5/mIoU; the cross-session split blends geographic proximity with visual
+identity (a $k$-nearest-cell control is the next step), and the features carry a
+${\sim}3$\,s GPS-warmup skew corrected at analysis time (AUC $0.848{\to}0.853$),
+with the source-side fix verified in simulation but not yet re-extracted.

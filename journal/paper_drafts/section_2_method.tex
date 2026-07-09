@@ -60,9 +60,7 @@ returns its top-$\min(\caponek,|\text{reservoir}|)$ exemplars by
 $\cos(\mathbf{q},\mathbf{e}_i)$; (ii)~the union is sorted and the top-$K$ emitted
 with each cell's bucket window. $\caponek{=}1$ enforces strict spatial diversity
 (one slot per cell), $\caponek{=}K$ recovers plain top-$K$, and intermediate
-values trade off smoothly (\S\ref{sec:results-main}). The novelty is composing
-this per-partition limit---standard in query planning---with H3 tessellation,
-HLL sketches, and reservoir sampling under streaming constraints. Ingest is
+values trade off smoothly (\S\ref{sec:results-main}). Ingest is
 $O(1)$ amortized; queries run any time after the first ingest (microsecond
 host-CPU constants in supp.\ \S\ref{sec:supp-memory-latency}).
 
@@ -77,8 +75,9 @@ seek), and pass them with $q$ in one Gemini~3.1~Pro~\cite{google2026gemini} call
 whose frozen prompt selects the best frame. The split is deliberate---\psm{}
 contributes bounded-memory \emph{recall}, the MLLM \emph{localization precision}
 (\S\ref{sec:results-main}). Encoder choice is a pipeline knob, not an
-architectural commitment: one factory serves CLIP-L (430\,M, 768\,d), CLIP-bigG
-(2.5\,B, 1280\,d), and SigLIP-2-large~\cite{tschannen2025siglip2}
-(660\,M, 1024\,d); the C engine sees only a $D$-dim vector, and cross-encoder
-generalization (\S\ref{sec:results-multi-corpus}) confirms the behavior is not a
-CLIP-L artifact.
+architectural commitment: one factory serves CLIP-L, CLIP-bigG, and
+SigLIP-2-large~\cite{tschannen2025siglip2}\footnote{Encoder scales: CLIP-L
+430\,M/768\,d, CLIP-bigG 2.5\,B/1280\,d, SigLIP-2-large 660\,M/1024\,d.}; the C
+engine sees only a $D$-dim vector, and cross-encoder generalization
+(\S\ref{sec:results-multi-corpus}) confirms the behavior is not a CLIP-L
+artifact.
