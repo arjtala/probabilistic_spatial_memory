@@ -346,3 +346,17 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [ ] Pin `requirements.txt` for the paper-time scripts (separate from `extraction/pyproject.toml` which is for the extraction package).
 - [ ] `scripts/reproduce_paper.sh` — one-shot script that runs every paper experiment end-to-end from a fresh clone. Required by most workshops' artifact tracks.
 - [ ] Tag the submission commit: `git tag eccv2026-submission` once frozen.
+
+## 2026-07-09 12:50 -- 8pp archival squeeze (OpenSUN3D archival + Huawei SpatialMem)
+
+- [x] F2 (PSM-vs-MLLM per-session) figure -> supp multi-corpus (body 11->10pp)
+- [x] §5.3 memory/latency/failure-modes -> supp sec:supp-memory-latency
+- [x] §5.2 strict-diversity cost + brute-force ceiling -> supp ablations
+- [x] Vanilla-MLLM temporal-coverage mechanism + K=32 oracle -> supp mllm-rerank
+- [x] Tighten HDD 4-paragraph prose (findings + hdd_combined figure kept in body)
+- [x] Demote single-session Nymeria tab:headline -> supp ablations; 2-sentence summary in body
+- [x] Compress §7 "What the evidence supports" recap -> 3-sentence synthesis
+- [x] Repoint all body refs to supp anchors; 0 undefined refs; both F1 + hdd_combined kept in body
+- [x] Pushed 3545b8e + 51120d5 to paper-8pp-cut
+- [ ] Confirming build on real ECCV kit (cluster) -- local lmodern build ~9.5pp; p10 ~75% full
+- [ ] If still >8pp on real kit: trim §7 follow-up directions + §4 related work + §5.1 setup
