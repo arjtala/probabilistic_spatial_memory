@@ -80,9 +80,9 @@ We evaluate \psm{} as a retrieval substrate on egocentric look-back QA
 (``where did I leave my keys?''), where memory-budgeted operation is a
 hard constraint. At the bounded deployment point ($R{=}128$,
 \texttt{cap}=$K$), \psm{} reaches 21/187 Hit@5 on the Nymeria proxy
-session vs.\ brute-force CLIP's 25/187 at $8\times$ smaller,
-session-length-invariant per-cell state; removing reservoir eviction
-($R{=}1024$) recovers the identical 25/187, a substrate-correctness check.
+session vs.\ brute-force CLIP's 25/187 with session-length-invariant
+per-cell state; removing reservoir eviction ($R{=}1024$, $8\times$ the
+per-cell budget) recovers the identical 25/187, a substrate-correctness check.
 The spatial-axis result generalizes across 14 sessions, 3 sensor stacks, and
 3 encoders (13/14 pass). Because \psm{} retrieves from
 query-matched H3 cells rather than uniform time slices, it supplies the

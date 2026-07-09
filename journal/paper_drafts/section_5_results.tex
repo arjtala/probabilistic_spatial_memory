@@ -12,7 +12,7 @@ We evaluate \psm{} against a brute-force CLIP oracle and a frontier MLLM on egoc
 \subsection{Setup}
 \label{sec:results-setup}
 
-We evaluate on the Nymeria atomic-action benchmark~\cite{ma2024nymeria}, 30 sessions (${\sim}5{,}600$ narrations) on Project Aria Gen~1 headsets~\cite{engel2024aria}; each narration's $[t_\text{start},t_\text{end}]$ interval is retrieval ground truth---a proxy benchmark, as the narrations are third-person action descriptions, not natural look-back questions (\S\ref{sec:conclusion}).
+We evaluate on the Nymeria atomic-action benchmark~\cite{ma2024nymeria}, 30 sessions (${\sim}5{,}600$ narrations) on Project Aria Gen~1 headsets~\cite{engel2024aria}; each narration's $[t_\text{start},t_\text{end}]$ interval is retrieval ground truth---a proxy benchmark, as the narrations are third-person action descriptions, not natural look-back questions (no purpose-built outdoor egocentric look-back QA benchmark exists; \S\ref{sec:conclusion}).
 Primary results use \texttt{shelby\_arroyo\_act0} (187 narrations, 69\,m bbox), encoder CLIP-L~\cite{clip-l-laion,radford2021clip} (768-d, 1\,fps).
 \psm{} uses the \S\ref{sec:method} defaults ($r{=}12$, $R{=}128$); an oracle row at $R{=}1024$ isolates reservoir eviction from the \caponek{} effect, and the baseline is brute-force CLIP top-5 over the full $N$-frame bank (no spatial structure, no capping).
 We report three top-5 metrics: Hit@5 (any exemplar timestamp in a GT interval), exemplar mIoU@5 (IoU of exemplar $\pm1.5$\,s windows vs.\ GT), and bucket mIoU@5 (IoU of each cell's $[t_\text{min},t_\text{max}]$ envelope vs.\ GT).
@@ -20,9 +20,9 @@ We report three top-5 metrics: Hit@5 (any exemplar timestamp in a GT interval), 
 \subsection{Single-session operating points}
 \label{sec:results-main}
 
-On the \texttt{shelby\_arroyo\_act0} proxy session (187 narrations), at the deployment point ($R{=}128$, \caponek{}$=K$), \psm{} reaches $83\%$ of brute-force Hit@5 ($11.2\%$ vs $13.4\%$; mIoU $0.063$ vs $0.074$) at $8\times$ smaller per-cell state; at $R{=}1024$ it recovers the \emph{same 25/187} with identical mIoU---a substrate-correctness check whose $2.2$\,pp/$0.011$ gap to $R{=}128$ is the bounded-memory cost (full operating-point sweep in supp.\ Table~\ref{tab:headline}).
+On the \texttt{shelby\_arroyo\_act0} proxy session (187 narrations), at the deployment point ($R{=}128$, \caponek{}$=K$), \psm{} reaches $83\%$ of brute-force Hit@5 ($11.2\%$ vs $13.4\%$; mIoU $0.063$ vs $0.074$) with session-length-invariant per-cell state; at $R{=}1024$ ($8\times$ the per-cell reservoir) it recovers the \emph{same 25/187} with identical mIoU---a substrate-correctness check whose $2.2$\,pp/$0.011$ gap to $R{=}128$ is the bounded-memory cost (full operating-point sweep in supp.\ Table~\ref{tab:headline}).
 An optional MLLM rerank adds localization precision, not recall: \caponek{}$=1$+rerank reaches exemplar mIoU $0.069$, statistically indistinguishable from brute-force's $0.074$ (paired bootstrap $\Delta{=}{-}0.005$, 95\% CI $[-0.032,+0.021]$; \S\ref{sec:results-mllm-rerank}).
-The strict-diversity cost, the brute-force ceiling, and the operating-point Pareto, retrieval baselines, memory/H3-resolution ablation, and 30-session monotonicity sweep are in the supplement (\S\ref{sec:supp-ablations}).
+The strict-diversity cost, the brute-force ceiling, the operating-point Pareto, retrieval baselines (sliding-window CLIP edges \psm{} by $+1.6$\,pp Hit@5 but needs the full $N$-frame bank), memory/H3-resolution ablation, and 30-session monotonicity sweep are in the supplement (\S\ref{sec:supp-ablations}).
 
 \psm{}'s per-cell state is session-length-invariant (${\sim}0.44$\,MiB at $R{=}128$) while brute-force grows linearly in $N$, so the bounded-memory payoff is demonstrated on the multi-hour HDD corpus (\S\ref{sec:results-hdd}); state size, latency, qualitative retrievals, and failure analysis are in the supplement (\S\ref{sec:supp-memory-latency}, Fig.~\ref{fig:f7-qualitative}).
 
