@@ -47,9 +47,14 @@ duration.
 Counts and envelopes are not embeddings, so each cell also stores exemplars via
 \emph{Algorithm~R reservoir sampling}~\cite{vitter1985reservoir} (capacity
 $R{=}128$): after $n>R$ frames the reservoir holds a uniform random $R$-subset
-(${\sim}0.44$\,MiB/cell at $R{=}128$, CLIP-L's $d{=}768$). Brute-force grows
-$\Theta(N)$; \psm{} grows $\Theta(R\cdot|\mathrm{cells}|)$---bounded by the area
-covered, not recording length.
+(${\sim}0.38$\,MiB/cell at $R{=}128$, CLIP-L's $d{=}768$; ${\sim}0.44$\,MiB with
+the HLL ring).
+
+\paragraph{Memory bound.} For a trajectory visiting $C_n$ distinct H3 cells over
+$n$ frames, \psm{}'s state is $\Theta\!\big(C_n(R d + C\,2^p)\big)=O(\text{area})$,
+independent of $n$, whereas brute-force embedding storage is $\Theta(n d)$.
+Because $C_n$ is bounded by the physical area covered rather than the recording
+length, \psm{}'s footprint is budgeted by area, not observation count.
 
 \subsection{Top-$K$ query with \caponek}
 \label{sec:method-query}

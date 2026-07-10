@@ -44,7 +44,7 @@ $R{=}128$ (top block) is the bounded-memory deployment; $R{=}1024$ isolates rese
 \label{tab:headline}
 \end{table*}
 
-At the deployment point ($R{=}128$, \caponek{}$=K$), \psm{} reaches $83\%$ of brute-force Hit@5 ($11.2\%$ vs $13.4\%$; mIoU $0.063$ vs $0.074$) with session-length-invariant per-cell state; at $R{=}1024$ ($8\times$ the per-cell reservoir) it recovers the \emph{same 25/187} with identical mIoU---a substrate-correctness check whose $2.2$\,pp/$0.011$ gap to $R{=}128$ is the bounded-memory cost.
+At the deployment point ($R{=}128$, \caponek{}$=K$), \psm{} reaches $84\%$ of brute-force Hit@5 ($11.2\%$ vs $13.4\%$; mIoU $0.063$ vs $0.074$) with session-length-invariant per-cell state; at $R{=}1024$ ($8\times$ the per-cell reservoir) it recovers the \emph{same 25/187} with identical mIoU---a substrate-correctness check whose $2.2$\,pp/$0.011$ gap to $R{=}128$ is the bounded-memory cost.
 Strict spatial diversity (\caponek{}$=1$) costs $5.4$\,pp at $R{=}1024$ ($8.0\%$ vs $13.4\%$; $4.3$\,pp at $R{=}128$) because revisits to a cell collapse into one bucket---the intended behavior for place-distinct queries.\footnote{Table~\ref{tab:headline} is a single representative seed; its one non-monotonicity---\caponek{}$=1$ Hit@5 higher at $R{=}128$ ($9.1\%$) than $R{=}1024$ ($8.0\%$)---is within reservoir-sampling noise (max-cosine need not be the ground-truth frame, so a random subsample can incidentally surface a GT-interval exemplar the full set's top-1 misses); the seed-averaged 30-session sweep (\S\ref{sec:supp-ablations}) is monotone in $R$ at every \caponek{}.}
 Brute-force itself caps at $13.4\%$: 162/187 narrations are revisit-heavy and visually indistinguishable to CLIP cosine~\cite{weller2025limit}.
 An optional MLLM rerank adds localization precision, not recall: \caponek{}$=1$+rerank reaches exemplar mIoU $0.069$, statistically indistinguishable from brute-force's $0.074$ (paired bootstrap $\Delta{=}{-}0.005$, 95\% CI $[-0.032,+0.021]$; \S\ref{sec:results-mllm-rerank}).
@@ -126,6 +126,7 @@ Nymeria  & \texttt{shelby\_arroyo\_act0}         & \cmark & \cmark & \xmark & \c
 \bottomrule
 \end{tabular}
 \caption{Acceptance verdicts on the multi-corpus, multi-encoder spatial-axis sweep (5 seeds $\times$ 5 H3 resolutions $\times$ 3 encoders per session).
+\emph{Criterion}: a session passes if any encoder's Hit@5 is non-decreasing across $r{\in}\{10,11,12\}$ with a $\geq4$\,pp $r10{\to}r12$ lift ($4$\,pp is conservative against binomial noise at 28--30 questions/session).
 ``Any-enc'' is the disjunction over encoders; $\dagger$~marks SigLIP rescues where neither CLIP-family encoder passes.
 \textbf{13/14 sessions pass}; \texttt{BurlingameDT4} is an honest failure on a visually-homogeneous trajectory.}
 \label{tab:multi-corpus-h3}

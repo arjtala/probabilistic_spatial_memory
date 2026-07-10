@@ -72,14 +72,14 @@ memory growing unboundedly with recording time. We propose
 index whose state is budgeted by the physical \emph{area} explored, not the
 \emph{length} of the recording---$O(\text{area})$, not $O(\text{time})$.
 \psm{} tessellates the wearer's trajectory into H3 hex cells, each holding a
-time-decayed ring buffer of HyperLogLog sketches (streaming, test-time
-memory updating) and a reservoir-sampled set of embedding exemplars; a
-\caponek{} knob trades spatial diversity for embedding-similarity precision,
-dialing state size against recall.
+time-decayed ring buffer of HyperLogLog sketches for streaming test-time
+memory updating and a reservoir-sampled set of embedding exemplars; a
+capacity knob (\caponek{}) trades spatial diversity for embedding-similarity
+precision, dialing state size against retrieval coverage.
 
 We evaluate \psm{} as a retrieval substrate for egocentric look-back QA
 (``where did I leave my keys?''). At a bounded deployment point it recovers
-$83\%$ of a brute-force CLIP oracle's Hit@5 (21/187 vs.\ 25/187) with
+$84\%$ of a brute-force CLIP oracle's Hit@5 (21/187 vs.\ 25/187) with
 session-length-invariant per-cell state, and matches it exactly once
 reservoir eviction is removed---a substrate-correctness check
 (\S\ref{sec:results-main}). The result generalizes across \textbf{14
