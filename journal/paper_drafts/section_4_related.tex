@@ -8,9 +8,10 @@
 \label{sec:related}
 
 \paragraph{Egocentric video understanding and episodic memory.}
-Ego4D~\cite{grauman2022ego4d} established look-back QA at scale;
-EgoSchema~\cite{mangalam2023egoschema} exposed the temporal-grounding collapse
-our prefilter targets. The ``where did I leave my keys?'' task
+Ego4D~\cite{grauman2022ego4d} established look-back QA at scale and
+EgoVLP~\cite{lin2022egovlp} the dominant egocentric video-language pretraining
+recipe; EgoSchema~\cite{mangalam2023egoschema} exposed the temporal-grounding
+collapse our prefilter targets. The ``where did I leave my keys?'' task
 originates with Barmann et al.~\cite{barmann2022keys};
 Di and Xie~\cite{di2024grounded} unified grounded egocentric QA and Chen et
 al.~\cite{chen2025groundedmultihop} extended it to multi-hop chains.
@@ -30,6 +31,9 @@ SAVEMem~\cite{wu2026savemem} bound memory in \emph{token} space (KV-cache
 compression, dense-to-sparse merging, recurrent state). \psm{} bounds
 \emph{geographic} space (H3 cells) and runs upstream---deciding
 \emph{which} frames the MLLM sees, not compressing what it sees.
+Time-sensitive video LLMs such as TimeChat~\cite{ren2024timechat} instead target
+temporal grounding within a fixed context, but do not bound memory---orthogonal
+to \psm{}'s substrate role.
 
 \paragraph{Streaming search and spatial indexing.}
 DiskANN~\cite{jayaram2019diskann}, SPANN~\cite{chen2021spann}, and
