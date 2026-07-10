@@ -438,3 +438,13 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
   - #1: run scripts/multisession_cap_sweep_30.sh then aggregate_cap_sweep_30.py -> send CI line -> I insert into §A.1
   - #3: annotate 15-20 genuine questions on cluster footage -> run eval_lookback.py -> send eval_genuine_*.json -> I write §4.x paragraph
 - [ ] Deadline Jul 25; paper is Accept-grade as-is on paper-wearable-14pp
+
+## 2026-07-10 04:40 -- Android POC assessment + fine-detail fixes (merged w/ cluster)
+
+- [x] Android on-device: YES feasible/recommended (Snapdragon/Tensor ~ Aria/Quest silicon; better proxy than RPi). POC = self-contained benchmark_spatial_memory (no HDF5/ffmpeg/encoder; core-only build needs libh3). Post-submission-safe (camera-ready/poster), do NOT block Jul 25.
+- [x] Guide: journal/on_device/ANDROID_BENCH.md (Termux + NDK paths, peak-RSS, §4.3 fill-in)
+- [x] Device-independent fixes: §2.3 memory 0.44->0.38 (reservoir; 0.44 total); §2 'Memory bound' formal statement; 83%->84% (abstract+§4.2); Table 2 acceptance criterion in caption
+- [x] Merged cluster fixes (18de6f3): abstract knob semantics 'dialing recall against per-query retrieval fan-out' (supersedes my nit -- per_cell_cap is a fan-out knob, not state); §1 drop chen2024vljepa; supp HLL 3.2%-bound reword. Conflict resolved (kept both correct parts). + d7f7993 PAPER_INSERTS.md
+- [x] Build clean (~12pp, 0 undefined/dup, no conflict markers); pushed 2e28ad6
+- [ ] Android POC run on author's phone -> send µs/MiB -> I insert §4.3 row (post-submission ok)
+- [ ] HELD (need input): EgoVLP/TimeChat/EgoTimeQA citations (verified bib); §5.4 cap=1 456us vs cap=K 153us latency ordering (flagged by cluster commit for verification); optional aggressive abstract re-cut
