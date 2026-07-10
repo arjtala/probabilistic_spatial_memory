@@ -426,3 +426,15 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Body ~8pp -> ~12pp local (supp starts p12); 0 undefined/duplicate refs; no evidence lost; pushed 8eccdff
 - [ ] Optional further depth to ~13-14pp: promote 30-session monotonicity and/or F6 crossover to body; restore fuller method prose
 - [ ] Real-kit confirming build; submit non-archival (or archival) + no 3D pressure. Deadline Jul 25
+
+## 2026-07-10 00:33 -- Two WearablesAI reviews (both Accept); polish pass
+
+- [x] Both reviews: Accept (4/5 and 4.5/5 relevance); all prior honesty fixes confirmed applied
+- [x] Author selected: 30-session CIs, restructure abstract, genuine look-back QA (NOT on-device profiling)
+- [x] #2 abstract restructured: lead w/ wearable problem + O(area)-not-O(time) + one headline number, softened jargon, section signposts; page-neutral (~12pp); pushed b045a04
+- [x] #1 CIs PREPPED: aggregate_cap_sweep_30.py emits mean+/-std, 95% CI, paste-ready supp §A.1 sentence
+- [x] #3 genuine-QA PREPPED: journal/genuine_lookback_qa/{template_questions.yaml,PROTOCOL.md}
+- [ ] BLOCKER (cluster-only): #1 + #3 need data at /checkpoint/.../nymeria_atomic (not in clone; captures/ empty; no committed per-session numbers). No fabrication.
+  - #1: run scripts/multisession_cap_sweep_30.sh then aggregate_cap_sweep_30.py -> send CI line -> I insert into §A.1
+  - #3: annotate 15-20 genuine questions on cluster footage -> run eval_lookback.py -> send eval_genuine_*.json -> I write §4.x paragraph
+- [ ] Deadline Jul 25; paper is Accept-grade as-is on paper-wearable-14pp
