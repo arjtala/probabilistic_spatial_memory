@@ -415,3 +415,14 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Surface sliding-window-CLIP-edges-PSM (+1.6pp, full N-frame) in body §4.2
 - [x] Page-neutral (conclusion p8, supp p9); 0 undefined/dup refs; pushed d650095
 - [ ] Deferred to future main-venue version: genuine look-back QA annotation; scene-graph/SLAM baseline; on-device profiling; compose PSM w/ memory-augmented video-LLM; 3D (Aria MPS xyz) indexing
+
+## 2026-07-09 23:51 -- Venue switch to Wearable AI (ECCV 2026, 14pp); full-depth restore
+
+- [x] Assessed Wearable AI workshop CFP: native fit (wearable egocentric memory/QA), 14pp both tracks, deadline Jul 25, ECCV format, archival+non-archival; no 3D-fit risk
+- [x] Decision: switch OpenSUN3D->Wearable AI; restore to full ~12-14pp
+- [x] New branch paper-wearable-14pp (8pp version preserved on paper-8pp-cut)
+- [x] Restored to body: Table 1 (headline), F7 (qualitative), 5.3 memory/latency/failure, 5.4 multi-corpus discussion + Table 2, 5.5 MLLM mechanism, 5.6 detail, un-abbreviated abstract, limitations 2->4 paragraphs
+- [x] Kept all internal-review honesty fixes (8x claim, cap=1 seed footnote, +36.5%, proxy, sliding-window)
+- [x] Body ~8pp -> ~12pp local (supp starts p12); 0 undefined/duplicate refs; no evidence lost; pushed 8eccdff
+- [ ] Optional further depth to ~13-14pp: promote 30-session monotonicity and/or F6 crossover to body; restore fuller method prose
+- [ ] Real-kit confirming build; submit non-archival (or archival) + no 3D pressure. Deadline Jul 25
