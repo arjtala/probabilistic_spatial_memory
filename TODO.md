@@ -448,3 +448,15 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Build clean (~12pp, 0 undefined/dup, no conflict markers); pushed 2e28ad6
 - [ ] Android POC run on author's phone -> send µs/MiB -> I insert §4.3 row (post-submission ok)
 - [ ] HELD (need input): EgoVLP/TimeChat/EgoTimeQA citations (verified bib); §5.4 cap=1 456us vs cap=K 153us latency ordering (flagged by cluster commit for verification); optional aggressive abstract re-cut
+
+## 2026-07-10 05:02 -- Citations + abstract denominator fix (pulled latest first: already at 22a25d8)
+
+- [x] Pulled latest: already up to date (22a25d8)
+- [x] Abstract '84% (21/187 vs 25/187)' -> '21 of a brute-force CLIP oracle's 25 Hit@5 hits (84%)' (removes the 83.6%-rate ambiguity)
+- [x] Added EgoVLP (lin2022egovlp, NeurIPS 2022) to §3 egocentric para; TimeChat (ren2024timechat, CVPR 2024) to §3 memory-augmented para; verified bib metadata
+- [x] EgoTimeQA NOT added (not standalone -- CG-Bench split; grounded-QA line already cited via di2024grounded)
+- [x] 37 refs, 0 undefined citations; build clean (~12pp); pushed 4f84945
+- [ ] Cluster-only verifications (data, not text; per advisor notes): §4.3 cap=1 456us vs cap=K 153us ordering; Hillsdale6 13.8% vs Fig.3 14% label
+- [ ] Android on-device POC (post-submission): run journal/on_device/ANDROID_BENCH.md -> send numbers -> §4.3 row
+- [ ] Abstract aggressive re-cut: HELD (advisors agree don't destabilize)
+- [ ] Paper deemed READY for Jul 25 submission by both advisor notes
