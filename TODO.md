@@ -469,3 +469,10 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [ ] Hillsdale6 13.8% vs Fig.3 14% label: still a cluster data-verify (per-session JSON); consistent if raw count rounds to 14%
 - [ ] Android on-device POC (post-submission): journal/on_device/ANDROID_BENCH.md
 - [ ] Paper READY for Jul 25 (both advisor notes); citations + all correctness items in
+
+## 2026-07-10 17:49 -- Anonymized code link + pulled bib cleanup
+
+- [x] Pulled latest: ff to 9b926e1 (bib drop guttman1984/chen2024vljepa -> 35 refs)
+- [x] Conclusion footnote: replaced 'URL withheld' with anonymized double-blind link https://anonymous.4open.science/r/probabilistic_spatial_memory-3C17/ ; kept reproduce_paper.sh pointer; build clean (~12pp, 0 undefined); pushed e031803
+- [ ] Author: confirm the 4open.science repo actually mirrors the code incl. scripts/reproduce_paper.sh and renders (it anonymizes a real GitHub repo)
+- [ ] Android on-device POC (post-submission): ANDROID_BENCH.md -> numbers -> §4.3 row
