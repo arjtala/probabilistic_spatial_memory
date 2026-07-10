@@ -460,3 +460,12 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [ ] Android on-device POC (post-submission): run journal/on_device/ANDROID_BENCH.md -> send numbers -> §4.3 row
 - [ ] Abstract aggressive re-cut: HELD (advisors agree don't destabilize)
 - [ ] Paper deemed READY for Jul 25 submission by both advisor notes
+
+## 2026-07-10 05:06 -- cap=1 vs cap=K latency: code-verified REAL (not a swap)
+
+- [x] Traced SpatialMemory_query_similar: dominant per-query cost = fill_window_for_top_k/RingBuffer_merge_window, run once per UNIQUE cell in top-K (dedup lines 458-466)
+- [x] cap=1 -> K distinct cells -> K merge-window passes; cap=K -> shared cells -> fewer passes (cosine identical). 456>153us is mechanistically correct, ~3x matches K=5 vs ~1.6 unique cells. NOT a transcription swap.
+- [x] Added one-clause explanation to §4.3; measured numbers unchanged; build clean (~12pp); pushed acc5996
+- [ ] Hillsdale6 13.8% vs Fig.3 14% label: still a cluster data-verify (per-session JSON); consistent if raw count rounds to 14%
+- [ ] Android on-device POC (post-submission): journal/on_device/ANDROID_BENCH.md
+- [ ] Paper READY for Jul 25 (both advisor notes); citations + all correctness items in
