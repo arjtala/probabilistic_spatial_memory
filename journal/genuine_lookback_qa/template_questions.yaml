@@ -1,0 +1,56 @@
+# Genuine look-back QA — annotation TEMPLATE (schema for scripts/eval_lookback.py)
+#
+# PURPOSE: blunt the "proxy benchmark" reviewer concern by evaluating PSM on a
+# small set of REAL look-back questions ("where did I leave my keys?"), not the
+# Nymeria third-person action narrations.
+#
+# HOW TO USE (on the cluster, where the session footage + clip_l_features.h5 live):
+#   1. Pick 1-3 sessions with rich revisit structure (e.g. shelby_arroyo_act0).
+#   2. Watch the footage and author 15-20 genuine look-back questions below,
+#      filling in REAL ground-truth intervals (seconds from session start).
+#      DO NOT invent intervals -- each must correspond to footage you verified.
+#   3. Save as <ROOT>/<session>/genuine_questions.yaml and run:
+#        python scripts/eval_lookback.py \
+#          --session <ROOT>/<session> \
+#          --questions <ROOT>/<session>/genuine_questions.yaml \
+#          --psm-binary targets/psm --out eval_genuine_<session>.json
+#   4. Send me eval_genuine_<session>.json (Hit@k + mIoU) and I will write the
+#      §4.x "Genuine look-back QA" paragraph with the real numbers.
+#
+# Balance categories toward true look-back cognition (object_recall,
+# location_trace, spatial_awareness) rather than visual_detail_recall alone.
+
+session_id: TODO_SESSION_ID
+# session_start_unix: TODO   # optional; auto-detected if absent
+iou_threshold: 0.3
+
+questions:
+  # ---- object recall: "where/when did I last see X?" ----
+  - id: g01
+    query: "TODO: e.g. my water bottle on the counter"
+    category: object_recall
+    intervals: [[TODO_START, TODO_END]]   # verified from footage
+    notes: "TODO: what/where, for the annotator's record"
+
+  - id: g02
+    query: "TODO: the backpack I set down"
+    category: object_recall
+    intervals: [[TODO_START, TODO_END]]
+
+  # ---- location trace: a PLACE the wearer revisited (spatial, encoder-bypass) ----
+  - id: g03
+    query: "TODO: the kitchen sink"           # text kept for the record
+    category: location_trace
+    query_mode: last_seen                      # isolates PSM's spatial substrate
+    query_lat: TODO_LAT
+    query_lng: TODO_LNG
+    query_k_ring: 1
+    intervals: [[TODO_START, TODO_END]]
+
+  # ---- spatial awareness / counting (optional richer scoring) ----
+  - id: g04
+    query: "TODO: how many distinct rooms did I enter?"
+    category: counting
+    count: TODO_INT
+
+  # ... author ~15-20 total, across categories ...

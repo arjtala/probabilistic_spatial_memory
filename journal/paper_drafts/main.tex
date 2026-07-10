@@ -66,40 +66,34 @@ Substrate for Wearable Look-Back Question Answering}
 \maketitle
 
 \begin{abstract}
-For an agent to hold persistent memory of its environment, its state
-cannot grow unboundedly with observation time. We propose
-\textbf{Probabilistic Spatial Memory} (\psm), a \emph{dynamic spatial
-representation} whose state is budgeted by physical area explored rather
-than sequence length. \psm{} is a streaming spatial-temporal index
-combining an H3 hex-grid tessellation, a time-decayed ring buffer of
-HyperLogLog sketches per cell for \emph{test-time memory updating}, and
-reservoir-sampled embedding exemplars. A novel \caponek{} knob smoothly
-trades spatial diversity for embedding-similarity precision, dialing state
-size against recall in the spirit of the recall--throughput tradeoff for
-sequence models~\cite{arora2024linear,chen2024vljepa}.
+An agent on wearable glasses must remember its environment without its
+memory growing unboundedly with recording time. We propose
+\textbf{Probabilistic Spatial Memory} (\psm), a streaming spatial-temporal
+index whose state is budgeted by the physical \emph{area} explored, not the
+\emph{length} of the recording---$O(\text{area})$, not $O(\text{time})$.
+\psm{} tessellates the wearer's trajectory into H3 hex cells, each holding a
+time-decayed ring buffer of HyperLogLog sketches (streaming, test-time
+memory updating) and a reservoir-sampled set of embedding exemplars; a
+\caponek{} knob trades spatial diversity for embedding-similarity precision,
+dialing state size against recall.
 
-We evaluate \psm{} as a retrieval substrate on egocentric look-back QA
-(``where did I leave my keys?''), where memory-budgeted operation is a
-hard constraint. At the bounded deployment point ($R{=}128$,
-\texttt{cap}=$K$), \psm{} reaches 21/187 Hit@5 on the Nymeria proxy
-session vs.\ brute-force CLIP's 25/187 with session-length-invariant
-per-cell state; removing reservoir eviction ($R{=}1024$, $8\times$ the
-per-cell budget) recovers the identical 25/187, a substrate-correctness check.
-The spatial-axis discrimination generalizes across \textbf{14 street-scale
-sessions from 3 sensor stacks} (SLOPER4D, Nymeria,
-LookOut~\cite{pan2025lookout} Project Aria) \textbf{and 3 encoder families}
-(CLIP-L/bigG, SigLIP~2~\cite{tschannen2025siglip2}): 13/14 pass a
-monotone-$r10{\to}r12$ Hit@5 acceptance. Because \psm{} retrieves from
-query-matched H3 cells rather than uniform time slices, it supplies the
-spatial-temporal prefilter frontier MLLMs lack: on two sessions, uniform
-$K{=}8$ sampling yields Hit@5 $=0\%$. On 102.9\,h of metropolitan
-driving (Honda HDD~\cite{ramanishka2018hdd}) with genuine revisits, \psm{}
-exercises its target multi-session regime: \emph{sublinear} state
-($O(\text{area})$, not $O(\text{time})$; $1.3$--$7.2\times$ below a dense
-bank), cross-session cardinality accruing across 219 days in a
-$1\,\mathrm{KiB}$ sketch, and label-free place recognition (0.853 AUC vs.\ a
-0.498 null). The C engine ($\sim$700 LoC) and Python harness are released
-under MIT.
+We evaluate \psm{} as a retrieval substrate for egocentric look-back QA
+(``where did I leave my keys?''). At a bounded deployment point it recovers
+$83\%$ of a brute-force CLIP oracle's Hit@5 (21/187 vs.\ 25/187) with
+session-length-invariant per-cell state, and matches it exactly once
+reservoir eviction is removed---a substrate-correctness check
+(\S\ref{sec:results-main}). The result generalizes across \textbf{14
+street-scale sessions, 3 sensor stacks, and 3 encoder
+families}~\cite{dai2023sloper4d,pan2025lookout,tschannen2025siglip2} (13/14
+pass; \S\ref{sec:results-multi-corpus}), and \psm{}'s query-matched retrieval
+supplies the spatial-temporal prefilter uniform-sampling MLLMs lack---on two
+sessions vanilla Gemini scores Hit@5 $=0\%$ (\S\ref{sec:results-vanilla-mllm}).
+On 102.9\,h of metropolitan driving (Honda HDD~\cite{ramanishka2018hdd})
+\psm{} exercises its target multi-session regime: sublinear state
+($1.3$--$7.2\times$ below a dense bank), cross-session cardinality accruing
+across 219 days in a $1\,\mathrm{KiB}$ sketch, and label-free place
+recognition (0.853 AUC vs.\ a 0.498 null; \S\ref{sec:results-hdd}). The C
+engine ($\sim$700 LoC) and harness are released under MIT.
 
 \keywords{Spatial memory \and Bounded memory \and Dynamic spatial
 representation \and Test-time memory updating \and Probabilistic data
