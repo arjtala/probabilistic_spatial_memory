@@ -1,5 +1,7 @@
 % PSM: Probabilistic Spatial Memory for Wearable Look-Back QA
-% Body compressed to the 8pp ECCV limit; depth relocated to supplementary.tex (v3, paper-8pp-cut).
+% Target: Wearable AI Workshop @ ECCV 2026 (14pp limit + unlimited refs).
+% Full-depth version: relocated body content restored from supplementary
+% (v4, paper-wearable-14pp). Retains the internal-review honesty fixes.
 %
 % Build: pdflatex main && bibtex main && pdflatex main && pdflatex main
 % Kit files (eccv.sty, eccvabbrv.sty, llncs.cls, splncs04.bst,
@@ -83,8 +85,11 @@ hard constraint. At the bounded deployment point ($R{=}128$,
 session vs.\ brute-force CLIP's 25/187 with session-length-invariant
 per-cell state; removing reservoir eviction ($R{=}1024$, $8\times$ the
 per-cell budget) recovers the identical 25/187, a substrate-correctness check.
-The spatial-axis result generalizes across 14 sessions, 3 sensor stacks, and
-3 encoders (13/14 pass). Because \psm{} retrieves from
+The spatial-axis discrimination generalizes across \textbf{14 street-scale
+sessions from 3 sensor stacks} (SLOPER4D, Nymeria,
+LookOut~\cite{pan2025lookout} Project Aria) \textbf{and 3 encoder families}
+(CLIP-L/bigG, SigLIP~2~\cite{tschannen2025siglip2}): 13/14 pass a
+monotone-$r10{\to}r12$ Hit@5 acceptance. Because \psm{} retrieves from
 query-matched H3 cells rather than uniform time slices, it supplies the
 spatial-temporal prefilter frontier MLLMs lack: on two sessions, uniform
 $K{=}8$ sampling yields Hit@5 $=0\%$. On 102.9\,h of metropolitan
