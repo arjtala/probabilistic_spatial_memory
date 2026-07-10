@@ -75,7 +75,7 @@ index whose state is budgeted by the physical \emph{area} explored, not the
 time-decayed ring buffer of HyperLogLog sketches (streaming, test-time
 memory updating) and a reservoir-sampled set of embedding exemplars; a
 \caponek{} knob trades spatial diversity for embedding-similarity precision,
-dialing state size against recall.
+dialing recall against per-query retrieval fan-out.
 
 We evaluate \psm{} as a retrieval substrate for egocentric look-back QA
 (``where did I leave my keys?''). At a bounded deployment point it recovers
