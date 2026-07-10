@@ -476,3 +476,13 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Conclusion footnote: replaced 'URL withheld' with anonymized double-blind link https://anonymous.4open.science/r/probabilistic_spatial_memory-3C17/ ; kept reproduce_paper.sh pointer; build clean (~12pp, 0 undefined); pushed e031803
 - [ ] Author: confirm the 4open.science repo actually mirrors the code incl. scripts/reproduce_paper.sh and renders (it anonymizes a real GitHub repo)
 - [ ] Android on-device POC (post-submission): ANDROID_BENCH.md -> numbers -> §4.3 row
+
+## 2026-07-10 18:22 -- Reviewed d4dd7e8: benchmark compile+run VERIFIED; fixed regime note
+
+- [x] Pulled d4dd7e8 (per_cell_cap arg + peak_VmHWM in benchmark_spatial_memory.c; S22 walkthrough)
+- [x] Code review: edits correct, default-preserving; API usage matches query_similar signature + argv pattern
+- [x] COMPILE+RUN VERIFIED locally: built libh3 (cmake from uber/h3) + fetched PDS submodule (ssh:443, pinned 309dc39); core-only build compiled+linked+ran. per_cell_cap arg, per_cell_cap= print, peak_VmHWM all work; default unchanged. Compile-unverified caveat CLOSED.
+- [x] FINDING: synthetic bench (1024 sparse tiles x 4 exemplars) shows cap=1 FASTER (~1560us) than cap=K (~2106us) -- OPPOSITE §4.3 Nymeria (cap=1 slower via merge-window). Different regimes, both correct.
+- [x] Fixed ANDROID_BENCH.md: removed wrong 'cap=1>cap=K' sanity note; added regime note; reframed §4.3 insert to absolute on-device query us + RSS (not a cap=1/K split). Pushed 0ed0f31.
+- [x] Cleaned up temp deps (submodule dir restored empty, /tmp removed); container run numbers NOT for paper
+- [ ] Author: run on S22 + host (identical synthetic bench) -> send stdouts -> I fill §4.3 wearable-feasibility line (absolute us + RSS)
