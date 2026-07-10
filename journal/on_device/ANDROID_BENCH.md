@@ -70,11 +70,14 @@ note sustained-vs-burst (thermal) if the numbers drift.
 ## Paper integration (I'll do this once you send the numbers)
 Add a short paragraph + one row to §4.3 "Memory, latency, and failure modes":
 
-> On a <phone, SoC> (aarch64, single big core), the engine ingests at
-> <X> µs/frame and answers queries in <Y>/<Z> µs at cap=1/K with <M> MiB peak
-> RSS at 10 cells — confirming the microsecond host-CPU constants (§4.3) hold on
-> wearable-class ARM. This covers the engine core; CLIP encoding and video I/O
-> are excluded (as on host).
+> On a <phone, SoC> (aarch64, single big core), the same synthetic engine
+> benchmark ingests at <X> µs/frame and answers a query in <Y> µs with <M> MiB
+> peak RSS (1024-tile state) — µs-scale on wearable-class ARM, confirming the
+> microsecond host-CPU constants (§4.3) carry to the device. This covers the
+> engine core; CLIP encoding and video I/O are excluded (as on host).
+> (Report the host baseline from the identical synthetic bench for an
+> apples-to-apples host→ARM ratio; the synthetic cap ordering differs from
+> §4.3's Nymeria regime — see the regime note above.)
 
 Send me the raw numbers (or the `time -v` + bench stdout) and I insert the
 verified values — no placeholders ship in the PDF.
@@ -144,8 +147,18 @@ Run each ~10×, drop the first as warmup, report **median + p95**.
 | **Query cap=K** | run #2: `query_similar ... per_cell_cap=10 ... mean_us=<Z>` | µs as-is |
 | **Peak RSS** | `peak_VmHWM:  <M> kB` | MiB = `M/1024` |
 
-Sanity (not a target): cap=1 query > cap=K query (the merge-window-per-unique-
-cell effect, §4.3); ingest in the µs/frame range; RSS a few MiB.
+Sanity (not a target): ingest in the µs/frame range; query µs-scale; RSS a few MiB.
+
+**Regime note (verified by compiling + running this bench, 2026-07-10).** Do NOT
+expect §4.3's cap ordering here. §4.3's Nymeria numbers come from a
+dense/few-cell workload (~7--10 cells x ~113 exemplars), where the per-cell
+merge-window pass dominates and cap=1 is *slower*. This synthetic bench scans
+1024 *sparse* tiles x 4 exemplars each, so cap=K's larger candidate sort
+dominates and **cap=1 is the FASTER setting** (measured ~1560 us cap=1 vs
+~2106 us cap=10 at 20k ops on a container host). Both are correct -- different
+workloads. So: report the on-device *absolute* query us + RSS as the
+wearable-feasibility point; do not map the synthetic cap=1/cap=K split onto
+§4.3's Nymeria cap ordering.
 
 ## Non-root caveats (report these alongside the numbers)
 - **No governor pinning** (root-only). Mitigate: charger in, airplane mode, cool
