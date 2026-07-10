@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include "core/spatial_memory.h"
 
@@ -173,7 +174,8 @@ static void run_query_intervals(const Coord *coords, size_t observe_ops,
 
 static void run_query_similar(const Coord *coords, size_t observe_ops,
                               size_t grid_cells, size_t query_ops,
-                              size_t dim, size_t exemplar_capacity) {
+                              size_t dim, size_t exemplar_capacity,
+                              size_t per_cell_cap) {
   SpatialMemory *sm = SpatialMemory_new(DEFAULT_RESOLUTION,
                                         DEFAULT_CAPACITY,
                                         DEFAULT_PRECISION,
@@ -223,15 +225,15 @@ static void run_query_similar(const Coord *coords, size_t observe_ops,
   double start = monotonic_seconds();
   for (size_t i = 0; i < query_ops; ++i) {
     size_t n = SpatialMemory_query_similar(sm, query, dim, 0.0, 0.0, -1, out,
-                                           TOP, 1);
+                                           TOP, per_cell_cap);
     if (n > 0) hits++;
   }
   double elapsed = monotonic_seconds() - start;
 
   double mean_us = query_ops > 0 ? (elapsed / (double)query_ops) * 1e6 : 0.0;
-  printf("query_similar      ops=%zu  dim=%zu  exemplars=%zu  tiles=%zu  hits=%zu  secs=%.3f  ops/sec=%.0f  mean_us=%.3f\n",
-         query_ops, dim, exemplar_capacity, SpatialMemory_tile_count(sm),
-         hits, elapsed,
+  printf("query_similar      ops=%zu  dim=%zu  exemplars=%zu  per_cell_cap=%zu  tiles=%zu  hits=%zu  secs=%.3f  ops/sec=%.0f  mean_us=%.3f\n",
+         query_ops, dim, exemplar_capacity, per_cell_cap,
+         SpatialMemory_tile_count(sm), hits, elapsed,
          elapsed > 0.0 ? (double)query_ops / elapsed : 0.0, mean_us);
 
   free(out);
@@ -270,10 +272,29 @@ static void run_grid_query(const Coord *coords, size_t observe_ops,
   SpatialMemory_free(sm);
 }
 
+// Peak resident set size at exit (Linux/Android only), for the on-device
+// memory number in ANDROID_BENCH.md. Avoids a hard dependency on GNU
+// `time -v` (not always present in Termux). No-op off Linux.
+static void print_peak_rss(void) {
+#if defined(__linux__)
+  FILE *f = fopen("/proc/self/status", "r");
+  if (!f) return;
+  char line[256];
+  while (fgets(line, sizeof(line), f)) {
+    if (strncmp(line, "VmHWM:", 6) == 0) {
+      printf("peak_%s", line);  // -> "peak_VmHWM:   <N> kB"
+      break;
+    }
+  }
+  fclose(f);
+#endif
+}
+
 int main(int argc, char *argv[]) {
   size_t observe_ops = 200000;
   size_t query_ops = 200000;
   size_t grid_cells = 1024;
+  size_t per_cell_cap = 1;
 
   if (argc > 1 && !parse_size_arg(argv[1], "observe_ops", &observe_ops)) {
     return 1;
@@ -282,6 +303,9 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   if (argc > 3 && !parse_size_arg(argv[3], "query_ops", &query_ops)) {
+    return 1;
+  }
+  if (argc > 4 && !parse_size_arg(argv[4], "per_cell_cap", &per_cell_cap)) {
     return 1;
   }
 
@@ -295,6 +319,7 @@ int main(int argc, char *argv[]) {
   printf("  observe_ops: %zu\n", observe_ops);
   printf("  grid_cells:  %zu\n", grid_cells);
   printf("  query_ops:   %zu\n", query_ops);
+  printf("  per_cell_cap:%zu\n", per_cell_cap);
 
   run_same_cell_observe(observe_ops);
   run_grid_observe(coords, observe_ops, grid_cells);
@@ -302,8 +327,10 @@ int main(int argc, char *argv[]) {
   // Location-trace query latency — representative k_ring=2, top=5.
   run_query_intervals(coords, observe_ops, grid_cells, query_ops, 2, 5);
   // Semantic retrieval latency — modest dim=128, 4 exemplars per tile.
-  run_query_similar(coords, observe_ops, grid_cells, query_ops, 128, 4);
+  run_query_similar(coords, observe_ops, grid_cells, query_ops, 128, 4,
+                    per_cell_cap);
 
+  print_peak_rss();
   free(coords);
   return 0;
 }
