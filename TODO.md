@@ -486,3 +486,15 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Fixed ANDROID_BENCH.md: removed wrong 'cap=1>cap=K' sanity note; added regime note; reframed §4.3 insert to absolute on-device query us + RSS (not a cap=1/K split). Pushed 0ed0f31.
 - [x] Cleaned up temp deps (submodule dir restored empty, /tmp removed); container run numbers NOT for paper
 - [ ] Author: run on S22 + host (identical synthetic bench) -> send stdouts -> I fill §4.3 wearable-feasibility line (absolute us + RSS)
+
+## 2026-07-10 20:43 -- S22 on-device benchmark RUN + MEASURED (Path B, NDK cross-compile)
+
+- [x] Confirmed device: SM-S901B = Galaxy S22 **global (Exynos 2200)**; arm64-v8a; CPU7 part 0xd48 = Cortex-X2 -> taskset 80 correct. No Termux/compiler on phone + no NDK on host -> chose Path B (NDK cross-compile, drive over adb).
+- [x] Installed NDK r29 (brew cask; must run from a real shell -- /opt writes blocked in sandboxed tool shell even un-sandboxed). Toolchain aarch64-linux-android34-clang (clang 21).
+- [x] Cross-compiled libh3 4.5.0 **static** for arm64-v8a (NDK cmake toolchain, android-34); verified elf64-littleaarch64. Then bench_psm: ARM aarch64 PIE, -mcpu=cortex-x2, static libh3, only bionic libc/libm/libdl. Pushed to /data/local/tmp; runs; peak_VmHWM prints.
+- [x] BUG in ANDROID_BENCH.md compile one-liners: **missing vendor include dirs** (-Ivendor/.../{lib,hyperloglog,bloom_filter}); without them hll.c #include "hash.h" fails. Fixed all 4 compile commands (Path A/B + Step 2 + host baseline) + added $VINC definition. Root-caused on host, would've broken the S22 build too.
+- [x] Full run: 200000/1024/200000, taskset 80 (PSR=7 verified on-device), 10 reps/cap, rep1 dropped (n=9). **No thermal throttling** (query_similar flat across reps).
+- [x] **S22 numbers (median):** ingest 0.86 us/frame; query_intervals 104 us; query_similar 1163 us (cap=1) / 1746 us (cap=10); peak RSS 20.2-20.3 MiB. **Host baseline (Apple Silicon):** ingest 0.33 us/frame; query_intervals 30 us; query_similar 366/548 us. **host->ARM ~2.6-3.4x.** cap=1<cap=10 on both (regime note holds).
+- [x] Docs: results saved to journal/on_device/results_s22.md + results_host_baseline.md; ANDROID_BENCH.md placeholder §4.3 block replaced with measured table + ready-to-insert §4.3 line + as-executed reproduction appendix (exact NDK/cmake/adb commands).
+- [ ] Author review: insert the §4.3 wearable-feasibility line (drafted in ANDROID_BENCH.md) + soften the four "on-device timing unmeasured" hedges (§1, §4.3, §6, §7) to "measured on Galaxy S22". Post-submission (camera-ready/poster) -- do NOT block Jul 25.
+- [ ] Raw stdouts in /tmp/{s22_out,host_baseline}_out.txt (not committed; numbers captured in the results md files).
