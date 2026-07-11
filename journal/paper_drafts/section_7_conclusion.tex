@@ -12,7 +12,9 @@
 hex-grid tessellation with per-cell time-decayed HLL sketches, reservoir-sampled
 exemplars, and a \caponek{} knob trading spatial diversity for
 embedding-similarity precision, bounded independently of recording duration
-(\S\ref{sec:method}; on-device latency unmeasured, \S\ref{sec:limitations}).
+(\S\ref{sec:method}; the index runs at sub-2\,ms/query and ${\sim}20$\,MiB on a
+Galaxy S22, the CLIP encoder being the remaining on-device cost,
+\S\ref{sec:limitations}).
 
 \paragraph{What the evidence supports.}
 The bounded $R{=}128$ index tracks brute-force CLIP retrieval monotonically in

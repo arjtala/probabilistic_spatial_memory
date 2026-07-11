@@ -34,10 +34,10 @@ Pilot's~\cite{aria-gen2-pilot} GPS-grounded walks, confirming the bottleneck is
 encoder discrimination, not trajectory quality.
 
 \paragraph{Evaluation scope.}
-\psm's latency (\S\ref{sec:results-memory-latency}) is a host-CPU sanity check
-(a 1024-tile synthetic stress test plus the real 7-cell Nymeria state), not an
-on-device claim; the wearable target is unmeasured, though porting the C engine
-is straightforward. Our baselines also omit a spatial-only heuristic
+\psm's index latency is measured on host \emph{and} on a Galaxy S22 (Exynos~2200)
+engine-core benchmark (\S\ref{sec:results-memory-latency}); the remaining
+on-device gap is the CLIP encoder---the heavy component---still unmeasured on
+wearable silicon. Our baselines also omit a spatial-only heuristic
 (nearest-GPS, random-cell), so the gains show query-guided cell retrieval beats
 uniform temporal coverage at matched budget but do not fully isolate spatial
 indexing from embedding similarity within the selected cells.

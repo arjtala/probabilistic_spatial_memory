@@ -27,8 +27,9 @@ embedding exemplars; a time-decayed ring buffer of HyperLogLog sketches tracking
 unique-event cardinality; and a per-cell capacity bound (\caponek{}) that dials
 strict spatial diversity ($\texttt{cap}{=}1$) to unconstrained top-$K$
 ($\texttt{cap}{=}K$). Memory is bounded per cell, ingestion is streaming, and
-top-$K$ search is sub-millisecond on host CPU (\S\ref{sec:method}; on-device
-timing unmeasured, \S\ref{sec:limitations}).
+top-$K$ search is sub-millisecond on host CPU and low-millisecond on a Galaxy
+S22 (\S\ref{sec:method}, \S\ref{sec:results-memory-latency}; the CLIP encoder,
+not the index, is the remaining on-device bottleneck, \S\ref{sec:limitations}).
 
 \paragraph{Evaluating the retrieval substrate.}
 We evaluate \psm{} as a retrieval substrate on egocentric look-back QA (e.g., ``where did I leave my keys?''). Multimodal LLMs achieve strong single-frame grounding yet remain brittle on temporal grounding over long video~\cite{cheng2024videgothink,chen2025groundedmultihop}, so we compose \psm{} as an upstream spatial \emph{prefilter} to a frontier MLLM (\S\ref{sec:pipeline}): \psm{} guarantees bounded-memory recall, the MLLM supplies localization precision.
