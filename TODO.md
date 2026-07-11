@@ -537,3 +537,13 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Build clean: 0 undefined, 40 refs, leaked notes gone from bbl; pushed eb211da
 - [ ] AUTHOR MUST CONFIRM existence (I cannot verify 2026 papers): [38] SAVEMem (arXiv:2605.07897), [40] HERMES (ACL 2026, Zhang et al.). If these came from auto-complete/search rather than papers you read, verify before submission -- fabricated cites are a credibility risk.
 - [x] Hillsdale6 13.8%/14% cosmetic (prior); anonymized code link present (prior)
+
+## 2026-07-11 18:12 -- FULL author-level verification of all recent refs (integrity)
+
+- [x] User confirmed [38]/[40] exist via links -> but our bib had WRONG authors on both. Verified ALL recent (2024-2026) cited refs against arXiv/DOI/proceedings.
+- [x] FABRICATED author lists FIXED (5): SAVEMem, HERMES, InfiniPot-V (4x Kim->Minsoo Kim/Kyuhong Shim/Jungwook Choi/Simyung Chang), VideoRAG (Cho/Seo/Seo -> Baek Jinheon/Hwang Sung Ju), LookOut (phantom Engelmann removed -> Pan/Harley/Liu/Guibas)
+- [x] TITLE errors FIXED (2): aguerrebere ('Vector Quantization'->'Quantization'); SAVEMem (dropped fake 'SAVEMem:' prefix)
+- [x] VERIFIED CORRECT (no change): MovieChat, MA-LMM, Flash-VStream, LifelongMemory, di2024grounded, SLOPER4D, Plizzari, EgoMask, ESOM, Arora, VidEgoThink, Nymeria, SigLIP2, grounded-multihop + session-verified (EgoVLP, TimeChat, NWM, AM-RADIO, MobileCLIP, Weller)
+- [x] Classics/org untouched (CLIP, HLL, reservoir, Ego4D, DiskANN, SPANN, HDD, Aria, LAION, Gemini, Aria-Gen2)
+- [x] 0 undefined, 40 refs, build clean (local accsupp.sty stub restored); pushed b7dcf97
+- [ ] Author: this was a real integrity save (5/~20 recent refs had hallucinated authors). Bib now verified. Final real-kit build + submit.
