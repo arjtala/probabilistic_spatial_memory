@@ -499,6 +499,14 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [ ] Author review: insert the §4.3 wearable-feasibility line (drafted in ANDROID_BENCH.md) + soften the four "on-device timing unmeasured" hedges (§1, §4.3, §6, §7) to "measured on Galaxy S22". Post-submission (camera-ready/poster) -- do NOT block Jul 25.
 - [ ] Raw stdouts in /tmp/{s22_out,host_baseline}_out.txt (not committed; numbers captured in the results md files).
 
+## 2026-07-10 20:43 -- Added NWM citation to §3 (learned-world-model contrast)
+
+- [x] Verified metadata (arXiv abstract): Bar, Zhou, Tran, Darrell, LeCun, "Navigation World Models", CVPR 2025, arXiv:2412.03572 (facebookresearch/nwm). Matches advisor table.
+- [x] bib: added bar2025nwm @inproceedings (CVPR 2025, arXiv note) after plizzari2025spatial in "Ego streaming memory + grounding".
+- [x] §3 Related Work (section_4_related.tex), egocentric paragraph: added the learned-world-model contrast -- NWM = implicit/learned/unbounded autoregressive generative model; PSM = explicit/non-learned O(area)-bounded index (dual). Sharpens positioning for FAIR/egocentric reviewers.
+- [x] Build VERIFIED: latexmk full build exit 0, bar2025nwm resolved in main.bbl, 0 undefined citations, 38 refs (was 37). Renders "Bar, A., Zhou, G., ...: Navigation world models. In: CVPR (2025), arXiv:2412.03572". Page-neutral in main body.
+- [x] Assessed the other 4 advisor links: AM-RADIO/E-RADIO (2312.06709) marginal (only fits on-device/future-work efficient-encoder swap; NOT added); CALICO + OpenTAD not relevant (no memory/spatial/retrieval overlap). EgoVLP (2206.01670) already cited (lin2022egovlp).
+
 ## 2026-07-11 04:31 -- On-device S22 numbers inserted into paper (reviewers' #1 gap CLOSED)
 
 - [x] Pulled 2d529fa (results_s22.md, results_host_baseline.md, ANDROID_BENCH.md results/drop-in, TODO)

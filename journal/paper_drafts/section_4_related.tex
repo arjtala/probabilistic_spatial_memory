@@ -18,7 +18,12 @@ al.~\cite{chen2025groundedmultihop} extended it to multi-hop chains.
 Spatial cognition is central to cross-time localization~\cite{plizzari2025spatial};
 EgoMask~\cite{liang2025egomask} benchmarks spatiotemporal grounding, and
 ESOM's~\cite{manigrasso2026esom} 4\% online success rate underscores the
-hardness of streaming egocentric retrieval. \psm{} is orthogonal: a
+hardness of streaming egocentric retrieval. A contrasting spatial paradigm is
+the learned world model: Navigation World Models~\cite{bar2025nwm} train an
+implicit autoregressive generative model of egocentric space, predicting future
+observations from past frames and actions. \psm{} is the explicit,
+non-learned dual---an $O(\text{area})$-bounded spatial \emph{index} rather than
+an unbounded learned predictor---and is orthogonal: a
 bounded-memory spatial-temporal substrate any grounding method can rerank
 without retraining---the VideoRAG pattern~\cite{jeong2025videorag}.
 
