@@ -498,3 +498,11 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Docs: results saved to journal/on_device/results_s22.md + results_host_baseline.md; ANDROID_BENCH.md placeholder §4.3 block replaced with measured table + ready-to-insert §4.3 line + as-executed reproduction appendix (exact NDK/cmake/adb commands).
 - [ ] Author review: insert the §4.3 wearable-feasibility line (drafted in ANDROID_BENCH.md) + soften the four "on-device timing unmeasured" hedges (§1, §4.3, §6, §7) to "measured on Galaxy S22". Post-submission (camera-ready/poster) -- do NOT block Jul 25.
 - [ ] Raw stdouts in /tmp/{s22_out,host_baseline}_out.txt (not committed; numbers captured in the results md files).
+
+## 2026-07-11 04:31 -- On-device S22 numbers inserted into paper (reviewers' #1 gap CLOSED)
+
+- [x] Pulled 2d529fa (results_s22.md, results_host_baseline.md, ANDROID_BENCH.md results/drop-in, TODO)
+- [x] §4.3: inserted measured Galaxy S22 (Exynos 2200) line -- 0.86us/frame ingest, 104us location, 1.16/1.75ms semantic (cap=1/K), 20.2MiB RSS, 2.6-3.5x host->ARM; noted synthetic cap=1-faster vs dense Nymeria bench
+- [x] Softened 3 hedges (§1/§6/§7): 'on-device unmeasured' -> 'measured on Galaxy S22'; KEPT honest caveat that the CLIP encoder (heavy component) is still unmeasured on-device (only engine core measured)
+- [x] Numbers verified against committed results_s22.md; body ~12pp (within 14pp); 0 undefined refs; pushed bf4fa10
+- [ ] Author: final real-kit build + OpenReview submission (non-archival + SpatialMem). All strengtheners now in.
