@@ -529,3 +529,11 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Hillsdale6 13.8% vs 14%: cosmetic rounding (4/29), already code-verified; both reviews call it non-blocking. No change.
 - [x] Build clean (0 undefined, body ~12pp <=14pp, 40 refs)
 - [ ] Author: final real-kit build + OpenReview submission (non-archival + SpatialMem), Jul 25. Both reviews: ready to ship.
+
+## 2026-07-11 06:26 -- Reference audit follow-through (40 refs)
+
+- [x] Stripped leaked reading-note 'note' fields (render in splncs04): InfiniPot-V (94% mem), SAVEMem (+10pp OVO-Bench), TGLG (editorial), HERMES (redundant). Entries now standard venue/year.
+- [x] [37] Weller verified REAL: arXiv:2508.21038 (confirmed via search); added arXiv note.
+- [x] Build clean: 0 undefined, 40 refs, leaked notes gone from bbl; pushed eb211da
+- [ ] AUTHOR MUST CONFIRM existence (I cannot verify 2026 papers): [38] SAVEMem (arXiv:2605.07897), [40] HERMES (ACL 2026, Zhang et al.). If these came from auto-complete/search rather than papers you read, verify before submission -- fabricated cites are a credibility risk.
+- [x] Hillsdale6 13.8%/14% cosmetic (prior); anonymized code link present (prior)
