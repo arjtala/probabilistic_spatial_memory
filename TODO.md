@@ -521,3 +521,11 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] §6 "Evaluation scope": where the CLIP encoder is named as the remaining unmeasured on-device component, added the efficient-encoder drop-in -- MobileCLIP (vasu2024mobileclip) / AM-RADIO/E-RADIO (ranzinger2024radio) -- since PSM is encoder-agnostic. Ties the on-device story to a concrete mitigation.
 - [x] bib: added vasu2024mobileclip (CVPR 2024, arXiv:2311.17049) + ranzinger2024radio (CVPR 2024, arXiv:2312.06709); author lists verified vs arXiv.
 - [x] Build VERIFIED: latexmk exit 0, both resolve in main.bbl, 0 undefined citations, 40 refs (was 38). Page-neutral in body.
+
+## 2026-07-11 06:12 -- Two final reviews (both "ship it"); addressed the one flag
+
+- [x] Review flag: 2.6-3.5x on-device ratio was vs host SYNTHETIC bench, but body only showed Nymeria host (456/153us). Fixed §4.3: stated host synthetic figures (0.33us/frame, 30us, 0.37/0.55ms) explicitly, disambiguated from Nymeria. Verified vs results_host_baseline.md. Pushed af6b9b0.
+- [x] Confirmed anonymized code link IS in paper (conclusion footnote, 4open.science) -- both reviews verified it; not missing.
+- [x] Hillsdale6 13.8% vs 14%: cosmetic rounding (4/29), already code-verified; both reviews call it non-blocking. No change.
+- [x] Build clean (0 undefined, body ~12pp <=14pp, 40 refs)
+- [ ] Author: final real-kit build + OpenReview submission (non-archival + SpatialMem), Jul 25. Both reviews: ready to ship.
