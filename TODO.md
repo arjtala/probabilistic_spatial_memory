@@ -514,3 +514,10 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Softened 3 hedges (§1/§6/§7): 'on-device unmeasured' -> 'measured on Galaxy S22'; KEPT honest caveat that the CLIP encoder (heavy component) is still unmeasured on-device (only engine core measured)
 - [x] Numbers verified against committed results_s22.md; body ~12pp (within 14pp); 0 undefined refs; pushed bf4fa10
 - [ ] Author: final real-kit build + OpenReview submission (non-archival + SpatialMem). All strengtheners now in.
+
+## 2026-07-11 04:31 -- Efficient-encoder future-work note (§6) + resolved rebase
+
+- [x] Resolved `git pull` rebase conflict in TODO.md (upstream S22-paper-insert entry vs local NWM entry): kept BOTH, chronological order. .bib/.tex applied clean (NWM independent of §4.3 edits). Rebase continued; branch linear (7900874 on 8b42e06).
+- [x] §6 "Evaluation scope": where the CLIP encoder is named as the remaining unmeasured on-device component, added the efficient-encoder drop-in -- MobileCLIP (vasu2024mobileclip) / AM-RADIO/E-RADIO (ranzinger2024radio) -- since PSM is encoder-agnostic. Ties the on-device story to a concrete mitigation.
+- [x] bib: added vasu2024mobileclip (CVPR 2024, arXiv:2311.17049) + ranzinger2024radio (CVPR 2024, arXiv:2312.06709); author lists verified vs arXiv.
+- [x] Build VERIFIED: latexmk exit 0, both resolve in main.bbl, 0 undefined citations, 40 refs (was 38). Page-neutral in body.
