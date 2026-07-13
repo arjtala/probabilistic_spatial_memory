@@ -625,3 +625,14 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Figure frame swapped to clean f8_psm_viz_crop.png (no pause glyph/toast/HUD); removed stale f8_psm_viz.png. Body verified still exactly 14pp.
 - [ ] CAMERA-READY (cosmetic, NOT blocking submission): source filenames/labels no longer match compiled figure numbers -- f8_psm_viz=Fig2, f7_qualitative=Fig3, f2_psm_vs_mllm=Fig4, hdd_combined=Fig5 (f1=Fig1). Filenames never surface in the PDF (reader sees correct Fig 1-5), so purely a maintainer-clarity refactor. If done, rename files + \label{}s + plot_*.py + reproduce_paper.sh F2/F3/F6 labels + README together, verify against a rebuild.
 - [x] Verified reproduce_paper.sh + README are up to date: script correctly regenerates only the plottable headline figures (F2/F3/F6 = its plot-script names) and does NOT reference F8 (a non-regenerable viz screenshot); conclusion footnote says 'headline figures' -- correctly excludes F8. No overclaim.
+
+## 2026-07-13 17:50 -- Final deep-dive review round (2 more reviews)
+
+- [x] Positioning-source sentence (S2): GNSS outdoors / geo-anchored SLAM-VIO indoors (Aria MPS, LiDAR-SLAM); resolves indoor-keys/GNSS soundness gap + motivation-eval mismatch
+- [x] De-densify S5.7 HDD cardinality sentence (~10-line nested parenthetical -> 3 clean sentences)
+- [x] CRITICAL (novelty): differentiate O(area) from geohashing/quadtree/binning in S4 -- novelty = time-decayed HLL ring (cross-revisit cardinality + temporal envelopes) + reservoir-under-cap + streaming age-out on H3 global ids. Closes the sharpest open rejection lever.
+- [x] MAJOR (rigour): abstract + S1 '13/14' reframed as any-encoder disjunction; 11/14 strongest single encoder
+- [x] S4.4 latency firehose tightened (numbers kept, reversal consolidated); cut redundant S4.2 rerank mention + forward-pointer; trimmed CI sentence -- offsets to hold 14pp
+- [x] Build clean: 0 undefined refs, all figs resolve, body 14pp (proxy); committed 009b216, pushed
+- [ ] Review verdicts: both new reviews = 'Submit'. Residual (camera-ready): run cheap random-cell/nearest-GPS spatial-only control; abstract 84% one-SE caveat; proactive + auxiliary-sensor CfP framing; reimpl. specifics (hash into HLL, k-ring default, normalized cosine); reconcile 219/221/8mo span; fix stale main.tex:30 comment
+- [ ] AUTHOR (unchanged): real ECCV-kit build + confirm <=14pp (still zero buffer); OpenReview upload (Archival, single PDF); verify 4open.science link
