@@ -55,6 +55,19 @@ $n$ frames, \psm{}'s state is $\Theta\!\big(C_n(R d + C\,2^p)\big)=O(\text{area}
 independent of $n$, whereas brute-force embedding storage is $\Theta(n d)$.
 Because $C_n$ is bounded by the physical area covered rather than the recording
 length, \psm{}'s footprint is budgeted by area, not observation count.
+Figure~\ref{fig:f8-psm-viz} shows these per-cell structures over a real
+trajectory: as the wearer moves, each visited cell accrues a bounded summary.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.68\linewidth]{figures/f8_psm_viz_print.png}
+\caption{\psm{} on an egocentric walk (Aria Gen~2
+Pilot~\cite{aria-gen2-pilot}, \texttt{walk\_0}). \textbf{Left:} RGB stream.
+\textbf{Right:} the \psm{} index over the wearer's path---per-cell exemplar
+counts as a 3D hex heatmap. A qualitative illustration on GNSS-positioned
+wearable capture (not used for quantitative evaluation).}
+\label{fig:f8-psm-viz}
+\end{figure}
 
 \subsection{Top-$K$ query with \caponek}
 \label{sec:method-query}
