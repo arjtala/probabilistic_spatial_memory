@@ -617,3 +617,11 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Build clean: 0 undefined refs, all 10 cites resolve; committed 3885ad9, pushed
 - [ ] PAGE BUDGET: body = 14pp on lmodern proxy (AT limit; proxy is pessimistic vs real Times kit). AUTHOR: confirm <=14pp on real ECCV kit; if over, trim candidates = abstract, §4.4 latency prose, §4.3 ablations.
 - [ ] Review 1 verdict: 'strong accept, ship it'. Review 2: 'submission-ready after these fixes' -- now applied.
+
+## 2026-07-13 17:05 -- F8 real-GPS viz figure added (§2) + housekeeping
+
+- [x] Added F8 (psm-viz on Aria Gen2 Pilot walk_0, real GPS) as a qualitative illustration in §2 beside the memory-bound paragraph -> compiles as Fig. 2 (p4). Scoped in caption as NOT part of quantitative eval (walk_0 has no QA labels). Aria Gen2 Pilot is public + already cited (aria-gen2-pilot).
+- [x] Two genuine psm-viz bug fixes found while making the figure (committed f313d71): basemap null-island center-snap (viz_main.c) + frustum course-over-ground heading (gps_trace.c).
+- [x] Figure frame swapped to clean f8_psm_viz_crop.png (no pause glyph/toast/HUD); removed stale f8_psm_viz.png. Body verified still exactly 14pp.
+- [ ] CAMERA-READY (cosmetic, NOT blocking submission): source filenames/labels no longer match compiled figure numbers -- f8_psm_viz=Fig2, f7_qualitative=Fig3, f2_psm_vs_mllm=Fig4, hdd_combined=Fig5 (f1=Fig1). Filenames never surface in the PDF (reader sees correct Fig 1-5), so purely a maintainer-clarity refactor. If done, rename files + \label{}s + plot_*.py + reproduce_paper.sh F2/F3/F6 labels + README together, verify against a rebuild.
+- [x] Verified reproduce_paper.sh + README are up to date: script correctly regenerates only the plottable headline figures (F2/F3/F6 = its plot-script names) and does NOT reference F8 (a non-regenerable viz screenshot); conclusion footnote says 'headline figures' -- correctly excludes F8. No overclaim.
