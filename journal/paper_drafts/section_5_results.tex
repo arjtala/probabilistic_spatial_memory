@@ -1,9 +1,10 @@
 % Section 5 — Results
 % Status: full-depth (14pp Wearable AI target). Body carries Table 1 (headline),
-% Table 2 (multi-corpus verdicts), F2, F7, hdd_combined. Subsections: Setup,
-% Single-session (+Table 1, F7), Memory/latency/failure, Cross-corpus
-% generalization (+Table 2), Why MLLMs need a prefilter (+F2), HDD persistence
-% (+hdd_combined). Supplement keeps ablation prose, F6 crossover, HLL micro-eval.
+% Table 2 (multi-corpus verdicts), Fig 3 (qualitative), Fig 4 (PSM vs MLLM),
+% Fig 5 (HDD). Subsections: Setup,
+% Single-session (+Table 1, Fig 3), Memory/latency/failure, Cross-corpus
+% generalization (+Table 2), Why MLLMs need a prefilter (+Fig 4), HDD persistence
+% (+Fig 5). Supplement keeps ablation prose, memory crossover, HLL micro-eval.
 
 \section{Results}
 \label{sec:results}
@@ -54,7 +55,7 @@ Fig.~\ref{fig:f7-qualitative} shows representative retrievals---\psm{}'s top-5 c
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/f7_qualitative.pdf}
+\includegraphics[width=\linewidth]{figures/fig3_qualitative.pdf}
 \caption{Qualitative look-back retrievals on \texttt{shelby\_arroyo\_act0}.
 Each row is one query: the narration text, GT interval, and \psm{}/Gemini verdict (left), then \psm{}'s top-5 candidates ranked by CLIP cosine (similarity and timestamp per frame). Green/red borders mark whether a candidate falls in the GT interval; the Gemini-selected frame is highlighted.
 Rows~1--2 are hits (row~2 a Gemini Hit@1 rescue over \psm{}'s ranking); row~3 is an honest revisit-heavy miss, where recurring near-identical frames defeat cosine retrieval (\S\ref{sec:limitations}).}
@@ -171,7 +172,7 @@ is designed to close.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/f2_psm_vs_mllm.pdf}
+\includegraphics[width=\linewidth]{figures/fig4_psm_vs_mllm.pdf}
 \caption{Any-of-$K$ coverage at $K{=}8$ uniform frames (red)---a hit if \emph{any} of the 8 frames falls in a GT interval, an upper bound on vanilla Gemini's single-frame pick---vs \psm{} \texttt{clipL@r12} top-5 (blue) on every one of the 14 street-scale sessions.
 \psm{}'s query-guided retrieval reaches every session this uniform-sampling upper bound misses; two sessions sit at $0\%$ because the $K{=}8$ uniform frames never include a GT-interval frame. Gemini's actual single-pick rate is far lower still ($7.1\%$; the $21.4\%$ is a generous any-of-$K$ coverage upper bound, \S\ref{sec:results-vanilla-mllm}).}
 \label{fig:f2-psm-vs-mllm}
@@ -198,7 +199,7 @@ Fig.~\ref{fig:f8-psm-viz}).
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.82\linewidth]{figures/hdd_combined.pdf}
+\includegraphics[width=0.82\linewidth]{figures/fig5_hdd_combined.pdf}
 \caption{HDD multi-session results (132 drives, 102.9\,h).
 \textbf{(A)}~\psm{}'s area-bounded per-cell reservoir vs a dense per-frame
 embedding bank over cumulative driving hours; the gap widens with ingest rate
