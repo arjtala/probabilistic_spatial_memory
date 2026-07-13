@@ -276,13 +276,40 @@ void GpsTrace_upload(GpsTrace *gt, double proj_center_lat, double proj_center_ln
   bool has_heading = gt->has_any_imu && gt->imu_meta[last].has_imu;
 
   if (has_heading) {
-    // Camera frustum: trapezoid showing field of view in heading direction
-    float heading = gt->imu_meta[last].heading_rad;
+    // Camera frustum: trapezoid pointing in the direction of travel.
+    // The IMU heading is gyro dead-reckoned from an arbitrary zero with no
+    // north reference, so it is unmoored from the GPS path (can face
+    // backward). Instead derive the forward direction from course-over-
+    // ground: the normalized vector from a recent earlier trajectory point
+    // to the current one, in the same projected space as the vertices. This
+    // always points along the path and needs no frame alignment.
     float pitch_rad = gt->imu_meta[last].pitch_rad;
-    float fwd_x = sinf(heading);
-    float fwd_y = cosf(heading);
-    float perp_x = cosf(heading);
-    float perp_y = -sinf(heading);
+    float fwd_x, fwd_y;
+    // Look back a few points for a stable heading (skip near-duplicate
+    // samples while the wearer is momentarily still).
+    size_t back = last;
+    float dxc = 0.0f, dyc = 0.0f, dlen = 0.0f;
+    while (back > 0) {
+      size_t prev = back - 1;
+      float pxp = (float)((gt->lngs[prev] - center_lng) * cos_center);
+      float pyp = (float)(gt->lats[prev] - center_lat);
+      dxc = cx - pxp;
+      dyc = cy - pyp;
+      dlen = sqrtf(dxc * dxc + dyc * dyc);
+      if (dlen > 1e-7f) break;
+      back = prev;
+    }
+    if (dlen > 1e-7f) {
+      fwd_x = dxc / dlen;
+      fwd_y = dyc / dlen;
+    } else {
+      // Degenerate (no motion in the whole trace): fall back to IMU heading.
+      float heading = gt->imu_meta[last].heading_rad;
+      fwd_x = sinf(heading);
+      fwd_y = cosf(heading);
+    }
+    float perp_x = -fwd_y;
+    float perp_y = fwd_x;
 
     // pitch_factor: 1.0 horizontal, 0.0 straight down
     float pitch_factor = cosf(pitch_rad);

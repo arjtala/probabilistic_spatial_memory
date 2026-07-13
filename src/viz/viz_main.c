@@ -972,6 +972,18 @@ int main(int argc, char *argv[]) {
     }
 
     glDisable(GL_BLEND);
+    // Basemap tiles, GPS trace, and hexes must all share one projection
+    // origin. The hex renderer self-centers on the ingested data
+    // (hr->center_*); if the follow-driven map_center hasn't converged onto
+    // the data yet (e.g. still near (0,0) before the trace populates), every
+    // layer would be projected around null-island and tiles fetched there.
+    // Snap map_center onto the hex center in that case so the basemap lands
+    // under the heatmap.
+    if (hr->vertex_count > 0 &&
+        fabs(map_center_lat) < 1e-6 && fabs(map_center_lng) < 1e-6) {
+      map_center_lat = hr->center_lat;
+      map_center_lng = hr->center_lng;
+    }
     TileMap_draw(tm, map_center_lat, map_center_lng, hr->zoom,
                  win_w - half_w, win_h,
                  app.budget_state.effective_tile_upload_budget);
