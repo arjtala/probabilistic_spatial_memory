@@ -229,8 +229,10 @@ observations over 219 days} while its 60-slot ring-buffer windowed estimate
 decays between visits and jumps on each revisit---the ``decay while maintaining
 unique-event cardinality across revisits'' behavior of \S\ref{sec:intro} (a
 Nymeria micro-eval validates per-session cardinality accuracy---median $1.0\%$
-relative error across cells, within the $3.2\%$ theoretical bound for $p{=}10$;
-and a Python reimplementation matches the C sketch to $2.4\times10^{-5}$ median
+relative error across cells, within the $3.2\%$ theoretical bound for $p{=}10$,
+accurate enough to answer counting queries such as ``how many distinct people
+did I interact with in the kitchen?'' natively on the substrate; and a Python
+reimplementation matches the C sketch to $2.4\times10^{-5}$ median
 relative error, confirming this is the engine's behavior, not an analysis
 artifact). Is that memory retrievable across sessions? Label-free,
 querying a revisited cell with a drive-A exemplar, different-day drive-B frames
