@@ -602,3 +602,18 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Build clean: 0 undefined refs/citations, no hyperref clash; body ends p13 (proxy, <=14pp); total 16pp = 13pp body + 3pp refs (refs exempt)
 - [x] All numeric results preserved (audited); committed 412b582
 - [ ] AUTHOR: regen main.pdf on real ECCV kit (expect ~12-13pp body); OpenReview upload (ARCHIVAL); single self-contained PDF -> no separate supplement slot needed
+
+## 2026-07-13 10:35 -- Deep-dive review: full fix set (archival exploratory)
+
+- [x] DECISION (author): full R2 fix set (7 items)
+- [x] Related Work +2 paragraphs: explicit spatial memory (ConceptGraphs, VLMaps, CLIP-Fields, Hydra) + VPR/loop-closure (AnyLoc, CosPlace, EigenPlaces, MixVPR, FAB-MAP, DBoW2); positions PSM as device-independent/area-bounded/sensor-light. Closes R2's 2 CRITICAL attacks.
+- [x] 10 new cites verified against arXiv/DBLP via subagent (0 corrections, 0 fabrications)
+- [x] HLL correctness: '3.2% theoretical bound' -> relative standard error 1.04/sqrt(2^10)~3.25% (std error, not bound)
+- [x] Rename brute-force 'oracle' -> 'brute-force CLIP-cosine retrieval'; rescope 13.4% as single-frame cosine ceiling (sliding-window 15% + SigLIP exceed it)
+- [x] HDD 0.853 AUC reframed as byproduct, not VPR; VPR + k-nearest-cell baselines -> future work (results + limitations + related)
+- [x] Abstract: split dense sentence 2 + single-session/seed disclosure + 30-session corroboration
+- [x] Gemini: actual single-pick 7.1% promoted to primary; 21.4% = generous any-of-K coverage upper bound
+- [x] Wilson 95% CI on headline Hit@5 (11.2% [7.5,16.6] vs 13.4% [9.2,19.0]); McNemar NOT computed (per-question vectors not in-repo -> no fabrication)
+- [x] Build clean: 0 undefined refs, all 10 cites resolve; committed 3885ad9, pushed
+- [ ] PAGE BUDGET: body = 14pp on lmodern proxy (AT limit; proxy is pessimistic vs real Times kit). AUTHOR: confirm <=14pp on real ECCV kit; if over, trim candidates = abstract, §4.4 latency prose, §4.3 ablations.
+- [ ] Review 1 verdict: 'strong accept, ship it'. Review 2: 'submission-ready after these fixes' -- now applied.
