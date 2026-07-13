@@ -559,3 +559,11 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] CORRECTION: venue is WEARABLE AI WORKSHOP @ ECCV 2026 (archival OR non-archival). 'Huawei SpatialMem' was OpenSUN3D's sub-track (abandoned venue) -- does NOT apply here. Prior 'non-archival + SpatialMem' notes were a stale carryover error.
 - [ ] Author 30-sec check: F2 legend -- confirm the 'vanilla Gemini K=8' bars plot Gemini's actual pick-rate, not the any-of-K coverage oracle (exemplar_hit_rate_at_5); §4.5 sharply distinguishes them (7.1% pick vs 21.4% oracle).
 - [ ] Committed main.pdf is stale (07-10, 16pp); regenerate from the real kit for the actual upload.
+
+## 2026-07-13 06:11 -- F2 mislabel fixed (Option 1: relabel as any-of-K coverage)
+
+- [x] Confirmed: F2 red bar = exemplar_hit_rate_at_5 = any-of-K coverage oracle (21.4%), was mislabeled 'vanilla Gemini' (contradicting §4.5's oracle 21.4% vs pick 7.1%)
+- [x] Fix (Option 1, relabel): §4.5 + F2 caption now say 'any-of-K coverage' (upper bound on Gemini's single pick); caption cites 7.1% pick vs 21.4% oracle
+- [x] plot_f2_psm_vs_mllm.py: docstring/title/legend relabeled -> so regen bakes correct in-figure label
+- [x] 0 undefined, body p12; pushed faedd7f
+- [ ] MUST regen F2 on cluster: `python scripts/plot_f2_psm_vs_mllm.py --out journal/figures/f2_psm_vs_mllm.svg` (+ svg->pdf). The figure PDF's baked legend still reads 'vanilla MLLM'; caption/text already correct, so regen closes the last gap.
