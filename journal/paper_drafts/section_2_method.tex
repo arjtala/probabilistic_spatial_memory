@@ -27,6 +27,10 @@ hierarchical hexagonal geospatial index. Each tuple maps to its containing cell
 at resolution~$r$ (default~12, ${\sim}9$\,m edges, room scale; swept over
 $r\in\{10,11,12,13\}$ in \S\ref{sec:results-ablations}). H3 cell IDs are
 global---comparable across recordings, sessions, and devices.
+Positions come from whatever pose stream the device already runs---GNSS outdoors
+(HDD's RTK fixes) or geo-anchored on-device SLAM/VIO indoors (Aria MPS,
+LiDAR-SLAM); \psm{} needs only a consistent global frame, so the indoor ``keys''
+setting uses the same localization the device already provides.
 
 \subsection{Time-decayed ring buffer of HyperLogLog sketches}
 \label{sec:method-ring-buffer}

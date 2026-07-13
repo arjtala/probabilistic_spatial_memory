@@ -45,7 +45,8 @@ We evaluate \psm{} as a retrieval substrate on egocentric look-back QA (e.g., ``
     brute-force mIoU (\S\ref{sec:results-main}).
   \item \textbf{Generalization + the MLLM blind spot:} the spatial-axis
     result holds on 13/14 street-scale sessions across 3 sensor stacks
-    and 3 encoders, and \psm{}'s query-guided retrieval supplies the
+    and 3 encoders (any-encoder disjunction; 11/14 for the strongest single
+    encoder), and \psm{}'s query-guided retrieval supplies the
     spatial-temporal prefilter uniform-sampling MLLMs lack---reaching
     every session uniform-sampling Gemini misses (\S\ref{sec:results-vanilla-mllm}).
   \item \textbf{Multi-session persistence (Honda HDD):} on 102.9\,h of

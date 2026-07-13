@@ -45,8 +45,12 @@ DiskANN~\cite{jayaram2019diskann}, SPANN~\cite{chen2021spann}, and
 locally-adaptive vector quantization~\cite{aguerrebere2024lvq} give
 bounded-cost billion-point ANN but assume near-static corpora with no spatial
 axis. \psm{} adds a ``near here'' H3 $k$-ring restriction and streaming
-ring-buffer-aged per-cell state. The contribution is composing these standard
-primitives under \caponek{} with H3's~\cite{brodsky2018h3} stable spatial ids.
+ring-buffer-aged per-cell state. Binning observations into a geohash or quadtree
+grid and capping per bin already yields $O(\text{area})$ state; \psm{}'s
+contribution is not the binning but what each cell carries---a time-decayed
+HyperLogLog ring tracking cross-revisit cardinality and temporal envelopes (which
+static buckets lack), reservoir-under-\caponek{} exemplar semantics, and streaming
+age-out---on H3's~\cite{brodsky2018h3} device-independent global ids.
 
 \paragraph{Explicit spatial memory: maps and scene graphs.}
 A parallel line builds \emph{explicit} spatial memories: open-vocabulary

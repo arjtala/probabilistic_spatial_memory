@@ -45,11 +45,9 @@ $R{=}128$ (top block) is the bounded-memory deployment; $R{=}1024$ isolates rese
 \label{tab:headline}
 \end{table*}
 
-At the deployment point ($R{=}128$, \caponek{}$=K$), \psm{} reaches $84\%$ of brute-force Hit@5 ($11.2\%$ vs $13.4\%$; mIoU $0.063$ vs $0.074$) with session-length-invariant per-cell state; at $R{=}1024$ ($8\times$ the per-cell reservoir) it recovers the \emph{same 25/187} with identical mIoU---a substrate-correctness check whose $2.2$\,pp/$0.011$ gap to $R{=}128$ is the bounded-memory cost. On this single 187-question session the $2.1$\,pp Hit@5 gap sits within one binomial standard error ($95\%$ Wilson CIs $[7.5,16.6]$ and $[9.2,19.0]$ overlap heavily), so we treat the seed-averaged 30-session sweep (\S\ref{sec:results-ablations}) as the aggregate claim and this table as the mechanism-isolating anatomy.
+At the deployment point ($R{=}128$, \caponek{}$=K$), \psm{} reaches $84\%$ of brute-force Hit@5 ($11.2\%$ vs $13.4\%$; mIoU $0.063$ vs $0.074$) with session-length-invariant per-cell state; at $R{=}1024$ ($8\times$ the per-cell reservoir) it recovers the \emph{same 25/187} with identical mIoU---a substrate-correctness check whose $2.2$\,pp/$0.011$ gap to $R{=}128$ is the bounded-memory cost. On this single 187-question session the $2.1$\,pp Hit@5 gap sits within one binomial standard error ($95\%$ Wilson CIs $[7.5,16.6]$ and $[9.2,19.0]$ overlap heavily), so we lean on the seed-averaged 30-session sweep (\S\ref{sec:results-ablations}) for the aggregate claim.
 Strict spatial diversity (\caponek{}$=1$) costs $5.4$\,pp at $R{=}1024$ ($8.0\%$ vs $13.4\%$; $4.3$\,pp at $R{=}128$) because revisits to a cell collapse into one bucket---the intended behavior for place-distinct queries.\footnote{Table~\ref{tab:headline} is a single representative seed; its one non-monotonicity---\caponek{}$=1$ Hit@5 higher at $R{=}128$ ($9.1\%$) than $R{=}1024$ ($8.0\%$)---is within reservoir-sampling noise (max-cosine need not be the ground-truth frame, so a random subsample can incidentally surface a GT-interval exemplar the full set's top-1 misses); the seed-averaged 30-session sweep (\S\ref{sec:results-ablations}) is monotone in $R$ at every \caponek{}.}
 Brute-force itself caps at $13.4\%$: 162/187 narrations are revisit-heavy and visually indistinguishable to CLIP cosine~\cite{weller2025limit}.
-An optional MLLM rerank adds localization precision, not recall---\caponek{}$=1$+rerank reaches exemplar mIoU $0.069$, statistically indistinguishable from brute-force's $0.074$ (\S\ref{sec:results-ablations}).
-The operating-point Pareto, non-spatial retrieval baselines, memory/H3-resolution ablation, and the seed-averaged 30-session sweep are detailed next (\S\ref{sec:results-ablations}).
 
 Fig.~\ref{fig:f7-qualitative} shows representative retrievals---\psm{}'s top-5 candidates with the Gemini-selected frame---spanning two hits (one a Gemini Hit@1 rescue) and an honest revisit-heavy miss.
 
@@ -78,10 +76,10 @@ An MLLM reranker permutes \psm{}'s top-5, so Hit@5 is invariant by construction;
 \label{sec:results-memory-latency}
 
 \psm{}'s per-cell state is session-length-invariant ($R{=}128\times768$-d$\times4$\,B $\approx0.38$\,MiB plus a 60-slot $p{=}10$ HLL ring $\approx0.06$\,MiB), whereas brute-force grows linearly in $N$.
-On the short Nymeria sessions ($N\in[748,1325]$, ${\sim}22$\,min) brute-force is still marginally cheaper---the synthetic crossover falls just beyond this range at $N\approx1500$ frames (${\sim}25$\,min), past which the gap reaches ${\sim}10$--$20\times$ at multi-hour streams---so the bounded-memory payoff is demonstrated on the multi-hour HDD corpus (\S\ref{sec:results-hdd}), where \psm{} is smaller at every ingest rate.
-Retrieval is sub-millisecond either way: brute-force dot-product over the 1133-frame bank is 67\,$\mu$s median, and the paired in-process \psm{} benchmark is 456/153\,$\mu$s at \caponek{}$=1$/$K$ (host-CPU, not wearable-device; \S\ref{sec:limitations}).
-Counterintuitively, \caponek{}$=1$ is the slower setting: its top-$K$ results are $K$ \emph{distinct} cells, so each triggers a separate time-envelope merge-window pass (the query's dominant cost), whereas \caponek{}$=K$'s results often share a cell and reuse a single merge---cosine scoring itself is identical across settings.
-On a Galaxy S22 (Exynos~2200, aarch64, Cortex-X2 prime core), the same synthetic engine benchmark ingests at $0.86\,\mu$s/frame and answers a location query in $104\,\mu$s and a semantic query in $1.16/1.75$\,ms (\caponek{}$=1$/$K$, 1024-tile state) with $20.2$\,MiB peak RSS---a $2.6$--$3.5\times$ slowdown vs.\ the \emph{same} synthetic bench on host ($0.33\,\mu$s/frame, $30\,\mu$s, $0.37/0.55$\,ms; distinct from the Nymeria in-process figures above), confirming the microsecond host-CPU constants carry to wearable-class ARM at sub-2\,ms, tens-of-MiB cost (engine core only; CLIP encoding and video I/O excluded, as on host, \S\ref{sec:limitations}). On this sparse 1024-tile workload \caponek{}$=1$ is \emph{faster} than \caponek{}$=K$---opposite the dense in-process Nymeria bench above---because \caponek{}$=K$'s larger candidate sort, not the per-cell merge-window, dominates.
+On the short Nymeria sessions ($N\in[748,1325]$, ${\sim}22$\,min) brute-force is still marginally cheaper---the synthetic crossover falls at $N\approx1500$ frames, past which the gap reaches ${\sim}10$--$20\times$---so the bounded-memory payoff is demonstrated on the multi-hour HDD corpus (\S\ref{sec:results-hdd}), where \psm{} is smaller at every ingest rate.
+Retrieval is sub-millisecond: brute-force dot-product over the 1133-frame bank is 67\,$\mu$s median; the paired in-process \psm{} benchmark is 456/153\,$\mu$s at \caponek{}$=1$/$K$ (host-CPU).
+On a Galaxy S22 (Exynos~2200, Cortex-X2) the same engine benchmark ingests at $0.86\,\mu$s/frame and answers location/semantic queries in $104\,\mu$s\,/\,$1.16$--$1.75$\,ms (\caponek{}$=1$/$K$) at $20.2$\,MiB RSS---a $2.6$--$3.5\times$ slowdown vs.\ the identical bench on host ($0.33\,\mu$s, $30\,\mu$s, $0.37$--$0.55$\,ms), so the microsecond constants carry to wearable-class ARM at sub-2\,ms, tens-of-MiB cost (engine core only; CLIP encoding and I/O excluded, \S\ref{sec:limitations}).
+The \caponek{} latency ordering flips with density: on the dense Nymeria bench \caponek{}$=1$ is slower (its $K$ distinct cells each force a separate time-envelope merge, the dominant cost), while on the sparse S22 workload \caponek{}$=K$ is slower (its larger candidate sort dominates); cosine scoring is identical across settings.
 Of the 162 shared brute-force/\psm{} misses, most are revisit-heavy narrations with recurring near-identical frames; the 25 groundable questions reference temporally-distinct events, so the shared $13.4\%$ ceiling reflects single-frame CLIP-cosine matching---sliding-window averaging and SigLIP-2 exceed it (\S\ref{sec:results-ablations}, \S\ref{sec:results-multi-corpus})---not method quality (\S\ref{sec:limitations}).
 
 \subsection{Cross-corpus, cross-encoder generalization}
@@ -233,18 +231,17 @@ synthetic crossover at $N\approx1500$ frames, \S\ref{sec:results-memory-latency}
 \paragraph{Persistent, retrievable cross-session memory (Fig.~\ref{fig:hdd-combined}B,C).}
 Feeding a revisited cell's frames chronologically across drives, a single fixed
 $1\,\mathrm{KiB}$ ($p{=}10$) sketch accrues to \textbf{8{,}112 unique
-observations over 219 days} while its 60-slot ring-buffer windowed estimate
+observations over 219 days}, while its 60-slot ring-buffer windowed estimate
 decays between visits and jumps on each revisit---the ``decay while maintaining
-unique-event cardinality across revisits'' behavior of \S\ref{sec:intro} (a
-Nymeria micro-eval validates per-session cardinality accuracy---median $1.0\%$
-relative error across cells, comfortably below HLL's theoretical relative
-standard error of $1.04/\sqrt{2^{10}}\approx3.25\%$ at $p{=}10$ (a standard
-error, not a hard bound), accurate enough to support counting queries such as ``how many distinct people
-did I interact with in the kitchen?'' natively on the substrate---without a
-downstream MLLM recounting frames; and a Python
-reimplementation matches the C sketch to $2.4\times10^{-5}$ median
-relative error, confirming this is the engine's behavior, not an analysis
-artifact). Is that memory retrievable across sessions? Label-free,
+unique-event cardinality across revisits'' behavior of \S\ref{sec:intro}. A
+Nymeria micro-eval validates per-session accuracy: median $1.0\%$ relative error
+across cells, comfortably below HLL's theoretical relative standard error
+($1.04/\sqrt{2^{10}}\approx3.25\%$ at $p{=}10$, a standard error, not a hard
+bound); a Python reimplementation matches the C sketch to $2.4\times10^{-5}$
+median error, confirming this is the engine's behavior, not an analysis artifact.
+This accuracy supports counting queries (``how many distinct people did I interact
+with in the kitchen?'') natively on the substrate, without a downstream MLLM
+recounting frames. Is that memory retrievable across sessions? Label-free,
 querying a revisited cell with a drive-A exemplar, different-day drive-B frames
 outrank other-cell frames at cross-session AUC \textbf{0.853} (5{,}222 cells,
 2{,}000 stratified queries) vs.\ a shuffled-cell null of 0.498 and a same-drive
