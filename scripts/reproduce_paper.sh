@@ -4,7 +4,7 @@
 # Regenerates from the captured JSON/MP4 artifacts that ship in this repo:
 #   - Table 2 H3 acceptance verdicts (13/14 PASS claim across LookOut +
 #     SLOPER4D + Nymeria, three encoders).
-#   - F2 (PSM vs vanilla Gemini-3.1-Pro at K=8) table + PDF/SVG.
+#   - F2 (PSM vs any-of-K coverage at K=8, Gemini-3.1-Pro) table + PDF/SVG.
 #   - F3 (H3 sensitivity, 3 encoders, 14-session mean ±1σ) PDF/SVG.
 #   - F6 (memory + latency vs session length) PDF/SVG.
 #   - Bootstrap 95 % CIs on the four-session Aria detail (mIoU + Hit@5).
@@ -150,7 +150,7 @@ printf '       (for full per-encoder breakdown re-run h3_acceptance.py without r
 printf '\n'
 
 # ----------------------------------------------------------------------
-# Step 3/5 — vanilla MLLM aggregation (F2 table)
+# Step 3/5 — any-of-K coverage aggregation (F2 table)
 # ----------------------------------------------------------------------
 printf '[3/%d] Vanilla MLLM aggregation — F2 table (PSM vs Gemini-3.1-Pro @ K=8)\n' "$TOTAL"
 if [[ ! -d "$REPO/captures/mllm_baseline" ]] || \

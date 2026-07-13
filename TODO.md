@@ -575,3 +575,12 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] plot_f2 legend refined 'Gemini K=8 coverage' -> 'uniform K=8 coverage' (per reviewer, more precise)
 - [x] 0 undefined, 40 refs, body p12; pushed d2e3d1a
 - [ ] STILL PENDING (cluster): regen F2 (python scripts/plot_f2_psm_vs_mllm.py --out journal/figures/f2_psm_vs_mllm.svg + svg->pdf) so the figure PDF's baked legend updates from 'Vanilla Gemini' to 'uniform K=8 coverage'. Text/caption already correct.
+
+## 2026-07-13 09:10 -- F2 figure gap CLOSED locally (no cluster needed) + vanilla-wording sweep
+
+- [x] Root-caused why regen seemed cluster-only: diffed plot_f2 93b5daf..d2e3d1a -- the 2 relabel commits changed ONLY 3 label strings (title, legend label, legend desc) + black reformatting; ZERO geometry/data/coordinate changes. So the committed SVG's bar data == a fresh cluster regen; only labels were stale. Captures needed only to recompute bar heights, which don't change.
+- [x] Patched the 3 baked label strings in journal/figures/f2_psm_vs_mllm.svg to EXACTLY match plot_f2's current output (verified string-for-string): title 'PSM vs any-of-K coverage (K=8 uniform frames)', legend 'uniform K=8 coverage' / 'any-of-K oracle: any frame in GT'. No 'vanilla'/'Gemini 3.1 Pro' left in SVG.
+- [x] Rasterized SVG->PDF via cairosvg 2.9.0 (scratch venv; local rsvg-convert/inkscape absent, miniforge svg2pdf broken). Visually confirmed rendered PNG: correct title+legend, all bar heights/labels intact (PSM 20/33/13/... coverage 3/3/0/...).
+- [x] Full paper rebuild pulls corrected f2_psm_vs_mllm.pdf (main.fls INPUT confirmed); latexmk exit 0, 0 undefined, 40 refs, body p12. F2 figure/caption now self-consistent.
+- [x] Wording sweep: abstract main.tex:91 + intro:50 'vanilla Gemini' -> 'any-of-K coverage'/'uniform-sampling Gemini' (the 0%-coverage claim); reproduce_paper.sh comments (lines 7,153) de-vanilla'd. Only remaining 'vanilla' is the F2 caption's legit CONTRAST ('upper bound on vanilla Gemini's single-frame pick').
+- [ ] Author: on the real ECCV kit, optionally re-run the canonical `python scripts/plot_f2_psm_vs_mllm.py` on the cluster to confirm byte-match (expected identical; local fix is label-only). Not a blocker -- embedded PDF is now correct.
