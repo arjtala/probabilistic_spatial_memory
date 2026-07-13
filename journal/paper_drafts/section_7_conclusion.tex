@@ -11,28 +11,25 @@
 \psm is a streaming bounded-memory index for egocentric look-back QA: an H3
 hex-grid tessellation with per-cell time-decayed HLL sketches, reservoir-sampled
 exemplars, and a \caponek{} knob trading spatial diversity for
-embedding-similarity precision, bounded independently of recording duration
-(\S\ref{sec:method}; the index runs at sub-2\,ms/query and ${\sim}20$\,MiB on a
-Galaxy S22, the CLIP encoder being the remaining on-device cost,
-\S\ref{sec:limitations}).
+embedding-similarity precision, bounded independently of recording duration---
+sub-2\,ms/query and ${\sim}20$\,MiB on a Galaxy S22, the CLIP encoder being the
+remaining on-device cost (\S\ref{sec:method}, \S\ref{sec:limitations}).
 
 \paragraph{What the evidence supports.}
 The bounded $R{=}128$ index tracks brute-force CLIP retrieval monotonically in
 \caponek{} and recovers it exactly once eviction is removed at $R{=}1024$
-(\S\ref{sec:results-main}), and \psm{}'s query-guided retrieval closes the
-temporal-coverage gap frontier MLLMs lack, reaching every street-scale session
-uniform-sampling Gemini misses (\S\ref{sec:results-vanilla-mllm},
-Fig.~\ref{fig:f2-psm-vs-mllm}). On 102.9\,h of driving (HDD,
-\S\ref{sec:results-hdd}) it exercises the multi-session persistence the
-single-pass corpus cannot---area-bounded state, cross-session cardinality
-accrual over months, and label-free place retrieval---the deployment regime
-the design targets.
+(\S\ref{sec:results-main}), and \psm{}'s query-guided retrieval reaches every
+street-scale session uniform-sampling Gemini misses
+(\S\ref{sec:results-vanilla-mllm}, Fig.~\ref{fig:f2-psm-vs-mllm}). On 102.9\,h of
+driving (HDD, \S\ref{sec:results-hdd}) it exercises the multi-session persistence
+the single-pass corpus cannot---area-bounded state, cross-session cardinality
+accrual over months, and label-free place retrieval.
 
 \paragraph{Follow-up directions.}
-Immediate extensions: on-device rerank, counting QA over the HLL cardinalities
-(\S\ref{sec:results-hdd}), and federated memory via HLL union.
-The engine (${\sim}700$ LoC of C) and evaluation harness are released under
-MIT.\footnote{Anonymized code for double-blind review:
-\url{https://anonymous.4open.science/r/probabilistic_spatial_memory-3C17/}. The
-one-shot driver \texttt{scripts/reproduce\_paper.sh} regenerates the headline
-figures and Table~\ref{tab:multi-corpus-h3} verdicts from captured artifacts.}
+On-device rerank, counting QA over the HLL cardinalities (\S\ref{sec:results-hdd}),
+and federated memory via HLL union. The engine (${\sim}700$ LoC of C) and
+evaluation harness are released under
+MIT.\footnote{Anonymized for double-blind review:
+\url{https://anonymous.4open.science/r/probabilistic_spatial_memory-3C17/}
+(\texttt{reproduce\_paper.sh} regenerates the headline figures and
+Table~\ref{tab:multi-corpus-h3}).}
