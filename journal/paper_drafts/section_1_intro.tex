@@ -39,7 +39,7 @@ We evaluate \psm{} as a retrieval substrate on egocentric look-back QA (e.g., ``
   \item \textbf{\psm{} architecture:} a bounded-memory streaming
     spatial-temporal index combining H3 cells, time-decayed HLL ring
     buffers, and reservoir-sampled exemplars (\S\ref{sec:method}).
-  \item \textbf{\caponek{} knob + oracle sanity check:} the bounded
+  \item \textbf{\caponek{} knob + substrate-correctness check:} the bounded
     $R{=}128$ index tracks brute-force CLIP and, with eviction removed
     at $R{=}1024$, recovers it exactly; a Gemini rerank matches
     brute-force mIoU (\S\ref{sec:results-main}).

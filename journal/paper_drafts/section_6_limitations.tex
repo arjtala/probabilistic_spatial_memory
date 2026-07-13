@@ -16,9 +16,12 @@
 \paragraph{Benchmark ceiling and coverage.}
 Both \psm{} and brute-force CLIP plateau at 13.4\% Hit@5 on the headline session
 (\S\ref{sec:results-main}): 162/187 narrations describe repeatedly-entered rooms
-with near-identical frames, so both converge to a frame rarely matching the
-annotator's single chosen interval---benchmark hardness, not method quality (the
-two agree on the 25 uniquely-groundable questions). Future benchmarks should
+with near-identical frames, so single-frame CLIP-cosine retrieval converges to a
+frame rarely matching the annotator's single chosen interval. This is a ceiling
+of single-frame cosine matching, not an absolute benchmark limit---sliding-window
+CLIP ($15.0\%$) and SigLIP-2 rescues clear it (\S\ref{sec:results-ablations},
+\S\ref{sec:results-multi-corpus})---and \psm{} and brute-force agree on the 25
+uniquely-groundable questions. Future benchmarks should
 score against \emph{any} acceptable revisit window. Relatedly, the deepest
 single-session analysis (Table~\ref{tab:headline}) remains one Nymeria session,
 and the 14-session sweep (\S\ref{sec:results-multi-corpus}) uses a heuristic
@@ -52,8 +55,10 @@ HDD ships no look-back QA labels, so the multi-session results
 Hit@5/mIoU number---a deliberate division of labor in which the wearable corpora
 carry retrieval accuracy and HDD carries multi-session persistence. Two caveats:
 the cross-session split (same $r{=}10$ cell vs.\ all others) blends geographic
-proximity with visual identity, so a $k$-nearest-cell hard-negative control is
-the natural next step; and the extracted features carry a ${\sim}3$\,s
+proximity with visual identity, so a $k$-nearest-cell hard-negative control and
+a comparison against purpose-built VPR
+descriptors~\cite{keetha2023anyloc,alibey2023mixvpr} (\S\ref{sec:related}) are
+the natural next steps; and the extracted features carry a ${\sim}3$\,s
 GPS-warmup skew (${\sim}17$\,m median) that we correct at analysis time
 (shifting AUC by only $+0.005$, $0.848{\to}0.853$), with the source-side fix
 verified in simulation but not yet re-run through GPU extraction.
