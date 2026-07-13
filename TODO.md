@@ -591,3 +591,14 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Paper submission-ready: ECCV main-conf format, body p12 (<=14pp), refs unlimited, double-blind (anon authors + 4open.science). PDF identical for either track.
 - [ ] AUTHOR does the upload (I cannot submit to OpenReview): (1) regen main.pdf on real ECCV kit; (2) OpenReview upload, select ARCHIVAL track; (3) attach supplementary if uploaded separately; (4) verify 4open.science link in browser.
 - [ ] IF ACCEPTED (camera-ready): de-anonymize authors + swap 4open.science -> real GitHub; abide by ECCV camera-ready policy.
+
+## 2026-07-13 10:05 -- Appendix absorbed into main body (single <=14pp PDF)
+
+- [x] DECISION (author, Option A): absorb high-value appendix into body + drop redundant F6 figure & HLL table (numbers kept inline)
+- [x] New \S results-ablations: Pareto, sliding-window/uniform baselines, memory/H3 ablation, 30-session monotonicity sweep, optional MLLM rerank
+- [x] HLL micro-eval median error (1.0%, <3.2% p=10 bound) inlined in \S HDD; Table 3 (5 illustrative rows) dropped
+- [x] F6 synthetic-crossover figure dropped; N~1500 + ~10-20x crossover kept inline (HDD real-data crossover carries the argument)
+- [x] Repointed 11 cross-refs; removed \appendix/\input block; supplementary.tex retained in-repo, no longer \input
+- [x] Build clean: 0 undefined refs/citations, no hyperref clash; body ends p13 (proxy, <=14pp); total 16pp = 13pp body + 3pp refs (refs exempt)
+- [x] All numeric results preserved (audited); committed 412b582
+- [ ] AUTHOR: regen main.pdf on real ECCV kit (expect ~12-13pp body); OpenReview upload (ARCHIVAL); single self-contained PDF -> no separate supplement slot needed
