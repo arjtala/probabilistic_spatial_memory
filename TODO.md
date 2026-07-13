@@ -547,3 +547,15 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Classics/org untouched (CLIP, HLL, reservoir, Ego4D, DiskANN, SPANN, HDD, Aria, LAION, Gemini, Aria-Gen2)
 - [x] 0 undefined, 40 refs, build clean (local accsupp.sty stub restored); pushed b7dcf97
 - [ ] Author: this was a real integrity save (5/~20 recent refs had hallucinated authors). Bib now verified. Final real-kit build + submit.
+
+## 2026-07-12 21:47 -- Independent audit: 5 more ref fixes + track correction
+
+- [x] engel2024aria: FABRICATED authors fixed (Kang,Kiran->Somasundaram,Kiran; Gupta,Sach[phantom]->Goesele,Michael). I had wrongly skipped Aria as a 'classic'.
+- [x] pan2025lookout: RESTORED Engelmann,Francis (3rd author in cited ICCV-2025 proceedings; DBLP-confirmed). My 07-11 removal (based on arXiv preprint's 4-author list) was wrong for the cited venue.
+- [x] ren2024timechat: Sun,Xiao->Sun,Xu (arXiv-confirmed)
+- [x] zhang2024flashvstream: was mixing 2024 'Memory-Based' preprint (7 authors) with ICCV-2025 'Efficient' venue -> made consistent as 2024 arXiv preprint (2406.08085)
+- [x] aria-gen2-pilot: year 2024->2025 (arXiv:2510.16134)
+- [x] 0 undefined, 40 refs, build clean; pushed 1ca2b39
+- [x] CORRECTION: venue is WEARABLE AI WORKSHOP @ ECCV 2026 (archival OR non-archival). 'Huawei SpatialMem' was OpenSUN3D's sub-track (abandoned venue) -- does NOT apply here. Prior 'non-archival + SpatialMem' notes were a stale carryover error.
+- [ ] Author 30-sec check: F2 legend -- confirm the 'vanilla Gemini K=8' bars plot Gemini's actual pick-rate, not the any-of-K coverage oracle (exemplar_hit_rate_at_5); §4.5 sharply distinguishes them (7.1% pick vs 21.4% oracle).
+- [ ] Committed main.pdf is stale (07-10, 16pp); regenerate from the real kit for the actual upload.
