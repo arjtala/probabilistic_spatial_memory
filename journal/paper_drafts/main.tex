@@ -80,7 +80,8 @@ dialing recall against per-query retrieval fan-out.
 We evaluate \psm{} as a retrieval substrate for egocentric look-back QA
 (``where did I leave my keys?''). At a bounded deployment point it recovers
 21 of a brute-force CLIP oracle's 25 Hit@5 hits ($84\%$) with
-session-length-invariant per-cell state, and matches it exactly once
+session-length-invariant per-cell state (sub-2\,ms/query, ${\sim}20$\,MiB on a
+Galaxy S22), and matches it exactly once
 reservoir eviction is removed---a substrate-correctness check
 (\S\ref{sec:results-main}). The result generalizes across \textbf{14
 street-scale sessions, 3 sensor stacks, and 3 encoder

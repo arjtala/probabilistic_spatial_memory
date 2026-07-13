@@ -309,7 +309,7 @@ def _render_svg(rows: list[dict]) -> str:
     for i, (color, label, desc) in enumerate(
         [
             (psm_color, "PSM", "clipL @ H3 r12, top-5"),
-            (mllm_color, "Gemini K=8 coverage", "any-of-K oracle: any frame in GT"),
+            (mllm_color, "uniform K=8 coverage", "any-of-K oracle: any frame in GT"),
         ]
     ):
         y = lgy + i * 36
