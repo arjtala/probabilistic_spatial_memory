@@ -110,15 +110,15 @@ structures \and Egocentric video \and Retrieval substrate.}
 
 \input{section_7_conclusion.tex}
 
-% ---- Supplementary material (archival: unlimited; relocated body depth) ----
-% For camera-ready this may be split into a separate supplementary PDF; kept
-% here so the single build shows the body ending before the appendix.
-\appendix
-% Give appendix sections unique hyperref anchors, else the appendix's first
-% \section reuses "section.1" and clashes with §1 (the "destination already
-% used" warning in the build log).
-\renewcommand{\theHsection}{supp.\arabic{section}}
-\input{supplementary.tex}
+% ---- Appendix absorbed into the main body (2026-07-13) ----
+% The former supplementary.tex content is now folded into the body to keep the
+% submission a single self-contained <=14pp PDF (the Wearable AI CfP exempts
+% only references, not appendices): ablations/baselines/30-session sweep + the
+% optional MLLM rerank -> new subsection \S\ref{sec:results-ablations}; the HLL
+% micro-eval median-error number -> inline in \S\ref{sec:results-hdd}; the F6
+% synthetic-crossover figure dropped (N~1500 crossover kept inline in
+% \S\ref{sec:results-memory-latency}; the HDD real-data crossover carries the
+% argument). supplementary.tex is retained in-repo but no longer \input.
 
 % Reproducibility note: the engine + eval harness are released
 % under MIT (URL withheld for double-blind review; available in
