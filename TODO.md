@@ -636,3 +636,10 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Build clean: 0 undefined refs, all figs resolve, body 14pp (proxy); committed 009b216, pushed
 - [ ] Review verdicts: both new reviews = 'Submit'. Residual (camera-ready): run cheap random-cell/nearest-GPS spatial-only control; abstract 84% one-SE caveat; proactive + auxiliary-sensor CfP framing; reimpl. specifics (hash into HLL, k-ring default, normalized cosine); reconcile 219/221/8mo span; fix stale main.tex:30 comment
 - [ ] AUTHOR (unchanged): real ECCV-kit build + confirm <=14pp (still zero buffer); OpenReview upload (Archival, single PDF); verify 4open.science link
+
+## 2026-07-13 22:05 -- §6 spatial-isolation concession reframed
+
+- [x] Replaced bare 'no random-cell/nearest-GPS baseline' concession with reasoned partial-isolation (query-guided > uniform §4.6 + Hit@5 H3-granularity sensitivity §4.5; random-cell control deferred)
+- [x] Rejected analyst-draft's cap=1->cap=K 'spatial-axis signal' claim (scientifically backwards: Hit@5 RISES toward cap=K, showing diversity/precision trade, not spatial routing)
+- [x] Confirmed only ONE spatial-only concession existed (not 3); k-nearest-cell mentions are the distinct VPR/geographic-confound control, kept
+- [x] Length-neutral, body 14pp; committed 9b8755b, pushed
