@@ -141,11 +141,12 @@ On these same 14 sessions we ask whether a frontier MLLM can retrieve
 \emph{without} a spatial prefilter. We run Gemini 3.1 Pro at $K{=}8$
 uniformly-sampled frames per question (Fig.~\ref{fig:f2-psm-vs-mllm}), matching
 \psm{}'s candidate budget to isolate the retrieval substrate. \psm{} matches or
-exceeds the MLLM's Hit@5 on every session (median ${\sim}4\times$) and never
-loses (the sole tie is Hillsdale6 at $13.8\%$, also \psm{}'s weakest
-cross-encoder session); \textbf{two sessions land at vanilla MLLM $=0\%$} because
-the $K{=}8$ uniform frames never include a frame inside the ${\sim}3$\,s GT
-intervals.
+exceeds the MLLM's \emph{any-of-$K$ coverage}---a hit if any of the $K{=}8$
+uniform frames falls in a GT interval, an upper bound on Gemini's single-frame
+pick---on every session (median ${\sim}4\times$) and never loses (the sole tie is
+Hillsdale6 at $13.8\%$, also \psm{}'s weakest cross-encoder session);
+\textbf{two sessions sit at $0\%$} because the $K{=}8$ uniform frames never
+include a frame inside the ${\sim}3$\,s GT intervals.
 The failure is architectural, not a matter of scale. At 100--640\,s session
 durations the uniform-frame gap is 12--80\,s---a ${\sim}4\%$ chance of
 \emph{seeing} the right frame before any discrimination applies---and at $K{=}32$
@@ -159,8 +160,8 @@ is designed to close.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/f2_psm_vs_mllm.pdf}
-\caption{Vanilla Gemini 3.1 Pro at $K{=}8$ uniform frames (red) vs \psm{} \texttt{clipL@r12} top-5 (blue) on every one of the 14 street-scale sessions.
-\psm{}'s query-guided retrieval reaches every session the uniform baseline misses; two sessions land at vanilla MLLM $=0\%$ because the $K{=}8$ uniform frames never include a GT-interval frame.}
+\caption{Any-of-$K$ coverage at $K{=}8$ uniform frames (red)---a hit if \emph{any} of the 8 frames falls in a GT interval, an upper bound on vanilla Gemini's single-frame pick---vs \psm{} \texttt{clipL@r12} top-5 (blue) on every one of the 14 street-scale sessions.
+\psm{}'s query-guided retrieval reaches every session this uniform-sampling upper bound misses; two sessions sit at $0\%$ because the $K{=}8$ uniform frames never include a GT-interval frame. Gemini's actual single-pick rate is lower still ($7.1\%$ vs the $21.4\%$ coverage oracle; \S\ref{sec:results-vanilla-mllm}).}
 \label{fig:f2-psm-vs-mllm}
 \end{figure}
 
