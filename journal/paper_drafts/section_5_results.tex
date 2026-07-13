@@ -193,7 +193,8 @@ corpus yet offers---months of GPS-anchored revisits to the same places---and the
 properties we test (area-bounded state, cross-session cardinality accrual) turn
 on revisit \emph{structure}, not locomotion mode; pedestrian and indoor wearers
 revisit space at finer spatial scale, if anything tightening the
-$O(\text{area})$ argument.
+$O(\text{area})$ argument (Fig.~\ref{fig:f8-psm-viz} shows \psm{} running on
+such a GPS-anchored wearable walk).
 
 \begin{figure}[t]
 \centering
@@ -256,3 +257,20 @@ control (\S\ref{sec:related}, \S\ref{sec:limitations}) are the proper baselines,
 deferred to future work.\footnote{AUC
 (not top-$k$ hit-rate) is the discriminability measure here, as the 357k-frame
 pool is near-duplicate-dominated.}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/f8_psm_viz_print.png}
+\caption{\psm{} running live on a real-GPS egocentric walk (Aria Gen~2
+Pilot~\cite{aria-gen2-pilot}, \texttt{walk\_0}; GNSS-positioned head-worn
+capture). \textbf{Left:} the wearer's egocentric RGB frame. \textbf{Right:} the
+\psm{} spatial index over the same trajectory---per-cell exemplar counts as a 3D
+hex heatmap on the wearer's actual GPS path, with the camera marker oriented
+along the direction of travel. This is a qualitative illustration of the
+substrate on genuinely GPS-anchored wearable capture (complementing the
+SLAM-positioned retrieval corpora of \S\ref{sec:results-main}--%
+\S\ref{sec:results-multi-corpus} and the driving-scale persistence study of
+\S\ref{sec:results-hdd}); \texttt{walk\_0} carries no look-back QA labels and is
+not part of the quantitative evaluation.}
+\label{fig:f8-psm-viz}
+\end{figure}
