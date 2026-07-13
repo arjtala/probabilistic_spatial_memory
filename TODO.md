@@ -584,3 +584,10 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Full paper rebuild pulls corrected f2_psm_vs_mllm.pdf (main.fls INPUT confirmed); latexmk exit 0, 0 undefined, 40 refs, body p12. F2 figure/caption now self-consistent.
 - [x] Wording sweep: abstract main.tex:91 + intro:50 'vanilla Gemini' -> 'any-of-K coverage'/'uniform-sampling Gemini' (the 0%-coverage claim); reproduce_paper.sh comments (lines 7,153) de-vanilla'd. Only remaining 'vanilla' is the F2 caption's legit CONTRAST ('upper bound on vanilla Gemini's single-frame pick').
 - [ ] Author: on the real ECCV kit, optionally re-run the canonical `python scripts/plot_f2_psm_vs_mllm.py` on the cluster to confirm byte-match (expected identical; local fix is label-only). Not a blocker -- embedded PDF is now correct.
+
+## 2026-07-13 09:47 -- Submission: ARCHIVAL track (Wearable AI Workshop, ECCV 2026)
+
+- [x] TRACK DECISION: ARCHIVAL (author chose, over non-archival). Implication acknowledged: appears in ECCV workshop proceedings -> a later ICCV/CVPR extension needs substantial new content (dual-pub policy).
+- [x] Paper submission-ready: ECCV main-conf format, body p12 (<=14pp), refs unlimited, double-blind (anon authors + 4open.science). PDF identical for either track.
+- [ ] AUTHOR does the upload (I cannot submit to OpenReview): (1) regen main.pdf on real ECCV kit; (2) OpenReview upload, select ARCHIVAL track; (3) attach supplementary if uploaded separately; (4) verify 4open.science link in browser.
+- [ ] IF ACCEPTED (camera-ready): de-anonymize authors + swap 4open.science -> real GitHub; abide by ECCV camera-ready policy.
