@@ -567,3 +567,11 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] plot_f2_psm_vs_mllm.py: docstring/title/legend relabeled -> so regen bakes correct in-figure label
 - [x] 0 undefined, body p12; pushed faedd7f
 - [ ] MUST regen F2 on cluster: `python scripts/plot_f2_psm_vs_mllm.py --out journal/figures/f2_psm_vs_mllm.svg` (+ svg->pdf). The figure PDF's baked legend still reads 'vanilla MLLM'; caption/text already correct, so regen closes the last gap.
+
+## 2026-07-13 06:17 -- Abstract S22 clause + F2 legend precision (reviewer re-verify green)
+
+- [x] Reviewer confirmed F2 code-level (any-of-K coverage) -- matches; (a) §4.5/caption/legend relabel was already in faedd7f (reviewer saw pre-faedd7f state)
+- [x] Abstract: added compact '(sub-2 ms/query, ~20 MiB on a Galaxy S22)' parenthetical on the per-cell-state clause -- on-device headline up front, no new sentence
+- [x] plot_f2 legend refined 'Gemini K=8 coverage' -> 'uniform K=8 coverage' (per reviewer, more precise)
+- [x] 0 undefined, 40 refs, body p12; pushed d2e3d1a
+- [ ] STILL PENDING (cluster): regen F2 (python scripts/plot_f2_psm_vs_mllm.py --out journal/figures/f2_psm_vs_mllm.svg + svg->pdf) so the figure PDF's baked legend updates from 'Vanilla Gemini' to 'uniform K=8 coverage'. Text/caption already correct.
