@@ -269,6 +269,11 @@ Readout:
 Decision rule:
 - If PSM achieves ≥50% Acc@5 at <10 ms median query latency while the MLLM baseline is >1 s, this experiment is the operational case for PSM as a memory backbone beneath a reasoning model.
 
+On-device result (2026-07-10, Galaxy S22 / Exynos 2200, Cortex-X2 via `taskset 80`):
+- The core-only `benchmark_spatial_memory` (H3 + HLL + reservoir + cosine top-K, no HDF5/ffmpeg/encoder) was cross-compiled for aarch64 (NDK r29, static libh3 4.5.0) and run over adb at `200000/1024/200000`, 10 reps/cap.
+- Median: ingest **0.86 µs/frame**; location query (`query_intervals`) **104 µs**; semantic query (`query_similar`) **1.16 ms** (cap=1) / **1.75 ms** (cap=K); peak RSS **20.2 MiB** (1024-tile state). A **2.6–3.5× host→ARM** slowdown vs the identical synthetic bench on host.
+- Confirms the microsecond host-CPU constants carry to wearable-class ARM at sub-2 ms / tens-of-MiB. Covers the engine core only; CLIP encoding + video I/O excluded (as on host). Full numbers + method: `journal/on_device/results_s22.md` (+ `results_host_baseline.md`); reproduction guide: `journal/on_device/ANDROID_BENCH.md`. Reported in the paper §4.3.
+
 ### E8. Cross-Session Place-Memory Stability
 
 Question:

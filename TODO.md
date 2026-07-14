@@ -639,7 +639,8 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 
 ## 2026-07-13 22:05 -- §6 spatial-isolation concession reframed
 
-- [x] Replaced bare 'no random-cell/nearest-GPS baseline' concession with reasoned partial-isolation (query-guided > uniform §4.6 + Hit@5 H3-granularity sensitivity §4.5; random-cell control deferred)
+- [x] Replaced bare 'no random-cell/nearest-GPS baseline' concession with reasoned partial-isolation (query-guided > uniform §4.6 + bucket-mIoU H3-granularity sensitivity §4.3; random-cell control deferred)
 - [x] Rejected analyst-draft's cap=1->cap=K 'spatial-axis signal' claim (scientifically backwards: Hit@5 RISES toward cap=K, showing diversity/precision trade, not spatial routing)
 - [x] Confirmed only ONE spatial-only concession existed (not 3); k-nearest-cell mentions are the distinct VPR/geographic-confound control, kept
-- [x] Length-neutral, body 14pp; committed 9b8755b, pushed
+- [x] FOLLOW-UP FIX (9bd655d): the reframe (9b8755b) had cited "Hit@5's H3-granularity sensitivity" as a support signal, but §4.3 states Hit@5 is INsensitive to H3 resolution (±0.5pp); only bucket mIoU tracks it. Corrected "Hit@5" -> "bucket mIoU" and repointed the ref sec:results-multi-corpus -> sec:results-ablations (§4.3). Both cited signals now match the results text.
+- [x] Length-neutral, body 14pp, 0 undefined refs; final state committed 9bd655d (supersedes 9b8755b)
