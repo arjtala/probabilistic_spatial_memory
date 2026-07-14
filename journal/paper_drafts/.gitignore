@@ -1,11 +1,12 @@
 # LaTeX build artifacts (compile-on-demand; the .tex and the rendered
 # figure PDFs are the version-controlled source-of-truth).
-main.aux
-main.bbl
-main.blg
-main.log
-main.out
-main.pdf
-main.fdb_latexmk
+# Covers main.* and any variant build (main_4pp.*, main_8pp.*, etc.).
+main*.aux
+main*.bbl
+main*.blg
+main*.log
+main*.out
+main*.pdf
+main*.fdb_latexmk
 *.fls
 *.brf
