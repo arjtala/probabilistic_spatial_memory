@@ -32,7 +32,7 @@ S22 (\S\ref{sec:method}, \S\ref{sec:results-memory-latency}; the CLIP encoder,
 not the index, is the remaining on-device bottleneck, \S\ref{sec:limitations}).
 
 \paragraph{Evaluating the retrieval substrate.}
-We evaluate \psm{} as a retrieval substrate on egocentric look-back QA (e.g., ``where did I leave my keys?''). Multimodal LLMs achieve strong single-frame grounding yet remain brittle on temporal grounding over long video~\cite{cheng2024videgothink,chen2025groundedmultihop}, so we compose \psm{} as an upstream spatial \emph{prefilter} to a frontier MLLM (\S\ref{sec:pipeline}): \psm{} guarantees bounded-memory recall, the MLLM supplies localization precision.
+We evaluate \psm{} as a retrieval substrate on egocentric look-back QA (e.g., ``where did I last see my bike?'', ``when was I last at this intersection?''). Multimodal LLMs achieve strong single-frame grounding yet remain brittle on temporal grounding over long video~\cite{cheng2024videgothink,chen2025groundedmultihop}, so we compose \psm{} as an upstream spatial \emph{prefilter} to a frontier MLLM (\S\ref{sec:pipeline}): \psm{} guarantees bounded-memory recall, the MLLM supplies localization precision.
 
 \paragraph{Contributions.}
 \begin{itemize}
