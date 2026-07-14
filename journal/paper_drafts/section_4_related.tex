@@ -22,10 +22,10 @@ hardness of streaming egocentric retrieval. A contrasting spatial paradigm is
 the learned world model: Navigation World Models~\cite{bar2025nwm} train an
 implicit autoregressive generative model of egocentric space, predicting future
 observations from past frames and actions. \psm{} is the explicit,
-non-learned dual---an $O(\text{area})$-bounded spatial \emph{index} rather than
-an unbounded learned predictor---and is orthogonal: a
+non-learned dual: an $O(\text{area})$-bounded spatial \emph{index} rather than
+an unbounded learned predictor, and is orthogonal, a
 bounded-memory spatial-temporal substrate any grounding method can rerank
-without retraining---the VideoRAG pattern~\cite{jeong2025videorag}.
+without retraining (the VideoRAG pattern~\cite{jeong2025videorag}).
 
 \paragraph{Memory-augmented video LLMs.}
 MovieChat~\cite{song2024moviechat}, MA-LMM~\cite{he2024malmm},
@@ -34,10 +34,10 @@ LifelongMemory~\cite{wang2024lifelongmemory},
 HERMES~\cite{zhang2026hermes}, InfiniPot-V~\cite{kim2025infinipotv}, and
 SAVEMem~\cite{wu2026savemem} bound memory in \emph{token} space (KV-cache
 compression, dense-to-sparse merging, recurrent state). \psm{} bounds
-\emph{geographic} space (H3 cells) and runs upstream---deciding
+\emph{geographic} space (H3 cells) and runs upstream, deciding
 \emph{which} frames the MLLM sees, not compressing what it sees.
 Time-sensitive video LLMs such as TimeChat~\cite{ren2024timechat} instead target
-temporal grounding within a fixed context, but do not bound memory---orthogonal
+temporal grounding within a fixed context, but do not bound memory, orthogonal
 to \psm{}'s substrate role.
 
 \paragraph{Streaming search and spatial indexing.}
@@ -47,10 +47,10 @@ bounded-cost billion-point ANN but assume near-static corpora with no spatial
 axis. \psm{} adds a ``near here'' H3 $k$-ring restriction and streaming
 ring-buffer-aged per-cell state. Binning observations into a geohash or quadtree
 grid and capping per bin already yields $O(\text{area})$ state; \psm{}'s
-contribution is not the binning but what each cell carries---a time-decayed
+contribution is not the binning but what each cell carries: a time-decayed
 HyperLogLog ring tracking cross-revisit cardinality and temporal envelopes (which
 static buckets lack), reservoir-under-\caponek{} exemplar semantics, and streaming
-age-out---on H3's~\cite{brodsky2018h3} device-independent global ids.
+age-out, all on H3's~\cite{brodsky2018h3} device-independent global ids.
 
 \paragraph{Explicit spatial memory: maps and scene graphs.}
 A parallel line builds \emph{explicit} spatial memories: open-vocabulary
@@ -68,15 +68,15 @@ sit atop, not a competitor.
 
 \paragraph{Visual place recognition and loop closure.}
 Recognizing a revisited place from appearance is the domain of visual place
-recognition (VPR) and loop closure---classical bag-of-words
+recognition (VPR) and loop closure: classical bag-of-words
 (FAB-MAP~\cite{cummins2008fabmap}, DBoW2~\cite{galvezlopez2012dbow2}) and learned
 descriptors (CosPlace~\cite{berton2022cosplace},
 EigenPlaces~\cite{berton2023eigenplaces}, MixVPR~\cite{alibey2023mixvpr},
-AnyLoc~\cite{keetha2023anyloc})---purpose-built for the cross-session same-place
+AnyLoc~\cite{keetha2023anyloc}), purpose-built for the cross-session same-place
 retrieval our HDD analysis (\S\ref{sec:results-hdd}) measures. We report that
 $0.853$ AUC as a byproduct of the bounded index under off-the-shelf CLIP cosine,
 not a VPR contribution: those descriptors and a $k$-nearest-cell control
 (\S\ref{sec:limitations}) are the proper baselines, left to future work. \psm{}
-differs in \emph{role}---it recognizes places to budget memory and route
+differs in \emph{role}: it recognizes places to budget memory and route
 retrieval, keyed on global H3 ids, so VPR descriptors are complementary drop-ins
 for its cell-matching step, not alternatives.

@@ -11,7 +11,7 @@
 \psm is a streaming bounded-memory index for egocentric look-back QA: an H3
 hex-grid tessellation with per-cell time-decayed HLL sketches, reservoir-sampled
 exemplars, and a \caponek{} knob trading spatial diversity for
-embedding-similarity precision, bounded independently of recording duration---
+embedding-similarity precision, bounded independently of recording duration:
 sub-2\,ms/query and ${\sim}20$\,MiB on a Galaxy S22, the CLIP encoder being the
 remaining on-device cost (\S\ref{sec:method}, \S\ref{sec:limitations}).
 
@@ -22,7 +22,7 @@ The bounded $R{=}128$ index tracks brute-force CLIP retrieval monotonically in
 street-scale session uniform-sampling Gemini misses
 (\S\ref{sec:results-vanilla-mllm}, Fig.~\ref{fig:f2-psm-vs-mllm}). On 102.9\,h of
 driving (HDD, \S\ref{sec:results-hdd}) it exercises the multi-session persistence
-the single-pass corpus cannot---area-bounded state, cross-session cardinality
+the single-pass corpus cannot: area-bounded state, cross-session cardinality
 accrual over months, and label-free place retrieval.
 
 \paragraph{Follow-up directions.}

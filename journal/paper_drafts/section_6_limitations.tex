@@ -18,9 +18,9 @@ Both \psm{} and brute-force CLIP plateau at 13.4\% Hit@5 on the headline session
 (\S\ref{sec:results-main}): 162/187 narrations describe repeatedly-entered rooms
 with near-identical frames, so single-frame CLIP-cosine retrieval converges to a
 frame rarely matching the annotator's single chosen interval. This is a ceiling
-of single-frame cosine matching, not an absolute benchmark limit---sliding-window
-CLIP ($15.0\%$) and SigLIP-2 rescues clear it (\S\ref{sec:results-ablations},
-\S\ref{sec:results-multi-corpus})---and \psm{} and brute-force agree on the 25
+of single-frame cosine matching, not an absolute benchmark limit (sliding-window
+CLIP ($15.0\%$) and SigLIP-2 rescues clear it; \S\ref{sec:results-ablations},
+\S\ref{sec:results-multi-corpus}), and \psm{} and brute-force agree on the 25
 uniquely-groundable questions. Future benchmarks should
 score against \emph{any} acceptable revisit window. Relatedly, the deepest
 single-session analysis (Table~\ref{tab:headline}) remains one Nymeria session,
@@ -30,7 +30,7 @@ all 14 are a follow-up.
 
 \paragraph{One honest spatial-axis failure.}
 Of the 14 street-scale sessions, \texttt{BurlingameDT4\_feb5} (242\,m bbox) is
-the only one where all three encoders fail the monotone-\caponek{} lift---a
+the only one where all three encoders fail the monotone-\caponek{} lift: a
 visually homogeneous parking-lot street whose queries collapse onto a few
 indistinguishable cells. The same failure recurs on Aria Gen~2
 Pilot's~\cite{aria-gen2-pilot} GPS-grounded walks, confirming the bottleneck is
@@ -39,12 +39,12 @@ encoder discrimination, not trajectory quality.
 \paragraph{Evaluation scope.}
 \psm's index latency is measured on host \emph{and} on a Galaxy S22 (Exynos~2200)
 engine-core benchmark (\S\ref{sec:results-memory-latency}); the remaining
-on-device gap is the CLIP encoder---the heavy component---still unmeasured on
+on-device gap is the CLIP encoder (the heavy component) still unmeasured on
 wearable silicon. An efficient distilled encoder (MobileCLIP~\cite{vasu2024mobileclip}
 or an AM-RADIO/E-RADIO agglomerative model~\cite{ranzinger2024radio}) is the
 natural drop-in to close that gap, since \psm{} is encoder-agnostic
 (\S\ref{sec:results-multi-corpus}). Our baselines omit a random-cell / nearest-GPS control, so spatial indexing is
-not fully isolated from within-cell embedding similarity---though query-guided
+not fully isolated from within-cell embedding similarity, though query-guided
 retrieval beating uniform sampling (\S\ref{sec:results-vanilla-mllm}) and bucket
 mIoU's H3-granularity sensitivity (\S\ref{sec:results-ablations}), neither from
 similarity alone, partially separate the axes; the control is future work.
@@ -53,7 +53,7 @@ similarity alone, partially separate the axes; the control is future work.
 HDD ships no look-back QA labels, so the multi-session results
 (\S\ref{sec:results-hdd}) are \emph{systems} and \emph{self-supervised}
 (bounded state, cross-session cardinality, label-free place retrieval), not a
-Hit@5/mIoU number---a deliberate division of labor in which the wearable corpora
+Hit@5/mIoU number: a deliberate division of labor in which the wearable corpora
 carry retrieval accuracy and HDD carries multi-session persistence. Two caveats:
 the cross-session split (same $r{=}10$ cell vs.\ all others) blends geographic
 proximity with visual identity, so a $k$-nearest-cell hard-negative control and
