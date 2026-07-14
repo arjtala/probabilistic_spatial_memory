@@ -12,8 +12,8 @@
 \label{sec:method}
 
 \psm{} is a streaming spatial-temporal index that ingests
-$(t, \mathrm{lat}, \mathrm{lng}, \mathbf{e})$ tuples---timestamp,
-geographic position, and a $d$-dimensional CLIP embedding---and
+$(t, \mathrm{lat}, \mathrm{lng}, \mathbf{e})$ tuples: timestamp,
+geographic position, and a $d$-dimensional CLIP embedding. This
 supports bounded-memory top-$K$ similarity search at any time.
 Three layered probabilistic data structures enforce the memory bound.
 
@@ -26,8 +26,8 @@ We tessellate the wearer's trajectory with H3~\cite{brodsky2018h3}, a
 hierarchical hexagonal geospatial index. Each tuple maps to its containing cell
 at resolution~$r$ (default~12, ${\sim}9$\,m edges, room scale; swept over
 $r\in\{10,11,12,13\}$ in \S\ref{sec:results-ablations}). H3 cell IDs are
-global---comparable across recordings, sessions, and devices.
-Positions come from whatever pose stream the device already runs---GNSS outdoors
+global, comparable across recordings, sessions, and devices.
+Positions come from whatever pose stream the device already runs: GNSS outdoors
 (HDD's RTK fixes) or geo-anchored on-device SLAM/VIO indoors (Aria MPS,
 LiDAR-SLAM); \psm{} needs only a consistent global frame, so the indoor ``keys''
 setting uses the same localization the device already provides.
@@ -67,7 +67,7 @@ trajectory: as the wearer moves, each visited cell accrues a bounded summary.
 \includegraphics[width=0.68\linewidth]{figures/fig2_psm_viz_print.png}
 \caption{\psm{} on an egocentric walk (Aria Gen~2
 Pilot~\cite{aria-gen2-pilot}, \texttt{walk\_0}). \textbf{Left:} RGB stream.
-\textbf{Right:} the \psm{} index over the wearer's path---per-cell exemplar
+\textbf{Right:} the \psm{} index over the wearer's path: per-cell exemplar
 counts as a hex overlay. A qualitative illustration on GNSS-positioned
 wearable capture (not used for quantitative evaluation).}
 \label{fig:f8-psm-viz}
@@ -94,7 +94,7 @@ host-CPU constants in \S\ref{sec:results-memory-latency}).
 \texttt{query\_similar} at the configured \caponek{} and $K{=}5$, decode the five
 candidate frames on demand (a device-cache memcpy in deployment, not a video
 seek), and pass them with $q$ in one Gemini~3.1~Pro~\cite{google2026gemini} call
-whose frozen prompt selects the best frame. The split is deliberate---\psm{}
+whose frozen prompt selects the best frame. The split is deliberate, \psm{}
 contributes bounded-memory \emph{recall}, the MLLM \emph{localization precision}
 (\S\ref{sec:results-main}). Encoder choice is a pipeline knob, not an
 architectural commitment: one factory serves CLIP-L, CLIP-bigG, and

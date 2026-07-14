@@ -70,7 +70,7 @@ An agent on wearable glasses must remember its environment without its
 memory growing unboundedly with recording time. We propose
 \textbf{Probabilistic Spatial Memory} (\psm), a streaming spatial-temporal
 index whose state is budgeted by the physical \emph{area} explored, not the
-\emph{length} of the recording---$O(\text{area})$, not $O(\text{time})$.
+\emph{length} of the recording, i.e. $O(\text{area})$, not $O(\text{time})$.
 Concretely, \psm{} partitions the wearer's trajectory into fixed geographic
 cells (an H3 hex grid), so state is capped per place rather than per frame.
 Each cell keeps a reservoir-sampled set of embedding exemplars for retrieval
@@ -78,20 +78,19 @@ and a time-decayed HyperLogLog sketch that counts distinct events across
 revisits; a single knob (\caponek{}) trades spatial coverage for
 embedding-similarity precision.
 
-We evaluate \psm{} as a retrieval substrate for egocentric look-back QA
-(``where did I last see my bike?'', ``when was I last at this
-intersection?''). At a bounded deployment point it recovers
+We evaluate \psm{} as a retrieval substrate for egocentric look-back QA.
+At a bounded deployment point it recovers
 21 of brute-force CLIP-cosine retrieval's 25 Hit@5 hits ($84\%$; single
 session/seed, corroborated by a seed-averaged 30-session sweep) with
 session-length-invariant per-cell state (sub-2\,ms/query, ${\sim}20$\,MiB on a
 Galaxy S22), and matches it exactly once
-reservoir eviction is removed---a substrate-correctness check
+reservoir eviction is removed, thus a substrate-correctness check
 (\S\ref{sec:results-main}). The result generalizes across \textbf{14
 street-scale sessions, 3 sensor stacks, and 3 encoder
 families}~\cite{dai2023sloper4d,pan2025lookout,tschannen2025siglip2} (11/14 for
 the strongest single encoder, 13/14 under an any-encoder disjunction;
 \S\ref{sec:results-multi-corpus}), and \psm{}'s query-matched retrieval
-supplies the spatial-temporal prefilter uniform-sampling MLLMs lack---on two
+supplies the spatial-temporal prefilter uniform-sampling MLLMs lack; on two
 sessions even the any-of-$K$ coverage of $K{=}8$ uniform frames scores Hit@5 $=0\%$ (\S\ref{sec:results-vanilla-mllm}).
 On 102.9\,h of metropolitan driving (Honda HDD~\cite{ramanishka2018hdd})
 \psm{} exercises its target multi-session regime: sublinear state
