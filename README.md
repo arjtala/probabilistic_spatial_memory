@@ -426,7 +426,7 @@ vendor/             # Git submodule
 
 ## Dependencies
 
-- [probabilistic_data_structures](https://github.com/arjtala/probabilistic_data_structures) — HyperLogLog, Bloom filter, hash functions (included as git submodule)
+- [probabilistic_data_structures](https://github.com/mkatindustries/probabilistic_data_structures) — HyperLogLog, Bloom filter, hash functions (included as git submodule)
 - [H3](https://h3geo.org/) — Uber's hexagonal hierarchical spatial index (`brew install h3`)
 - [HDF5](https://www.hdfgroup.org/solutions/hdf5/) — Reading embedding datasets produced by Python extraction pipeline (`brew install hdf5`)
 
