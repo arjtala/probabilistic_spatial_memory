@@ -26,7 +26,7 @@
 #   sbatch scripts/slurm/eval_baselines.sbatch
 #
 # Override defaults via sbatch --export, e.g.:
-#   sbatch --export=ROOT=/checkpoint/dream/arjangt/video_retrieval/aria,ENCODERS=bigG \
+#   sbatch --export=ROOT=$PSM_DATA_ROOT/video_retrieval/aria,ENCODERS=bigG \
 #          scripts/slurm/eval_baselines.sbatch
 #
 # Env knobs (with defaults — these are forwarded to eval_baselines_all.sh):
@@ -67,6 +67,6 @@ echo
 
 # Default ROOT to the cluster data path if not overridden. Falls back to
 # the repo-local default the script already has if neither is set.
-export ROOT="${ROOT:-/checkpoint/dream/arjangt/video_retrieval/aria}"
+export ROOT="${ROOT:-$PSM_DATA_ROOT/video_retrieval/aria}"
 
 bash scripts/eval_baselines_all.sh

@@ -3,7 +3,7 @@
 Batch wrappers for PSM jobs that need cluster resources (GPU extraction,
 parallel CPU sweeps). Each script is parameter-free at the call site:
 all knobs come from `sbatch --export=KEY=VAL`, with sensible defaults
-baked in for the FAIR `/checkpoint/dream/arjangt/video_retrieval/aria`
+baked in for the FAIR `$PSM_DATA_ROOT/video_retrieval/aria`
 layout.
 
 ## One-time setup on a fresh cluster checkout
@@ -68,7 +68,7 @@ login and compute nodes, so once is enough.
   (default `psm`). Override with `--export=CONDA_ENV=myenv`. This is
   the cluster-standard pattern — works in non-interactive batch shells
   without needing conda init.
-- **Data root**: `$ROOT` (default `/checkpoint/dream/arjangt/video_retrieval/aria`).
+- **Data root**: `$ROOT` (default `$PSM_DATA_ROOT/video_retrieval/aria`).
   Override for local runs with `--export=ROOT=$PWD/datasets`.
 - **Account / QoS**: scripts default to `--account=dream`. Partition is
   *inferred from the QoS prefix* on this cluster (cpu_* -> cpu,

@@ -25,16 +25,16 @@
 #   SEEDS        "0 1 2 3 4"
 #   H3_RES_LIST  "8 9 10 11 12"
 #   ENCODERS     "clipL bigG"
-#   SRC_ROOT     /checkpoint/dream/arjangt/SLOPER4D-unzipped
-#   OUT_ROOT     /checkpoint/dream/arjangt/video_retrieval/sloper4d
+#   SRC_ROOT     $PSM_DATA_ROOT/SLOPER4D-unzipped
+#   OUT_ROOT     $PSM_DATA_ROOT/video_retrieval/sloper4d
 
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 SEQ="${SEQ:-seq009_running_002}"
-SRC_ROOT="${SRC_ROOT:-/checkpoint/dream/arjangt/SLOPER4D-unzipped}"
-OUT_ROOT="${OUT_ROOT:-/checkpoint/dream/arjangt/video_retrieval/sloper4d}"
+SRC_ROOT="${SRC_ROOT:-$PSM_DATA_ROOT/SLOPER4D-unzipped}"
+OUT_ROOT="${OUT_ROOT:-$PSM_DATA_ROOT/video_retrieval/sloper4d}"
 N_QUESTIONS="${N_QUESTIONS:-30}"
 MLLM_MODEL="${MLLM_MODEL:-gemini}"
 SEEDS="${SEEDS:-0 1 2 3 4}"

@@ -13,7 +13,7 @@
 #
 # Env knobs:
 #   ROOT        sessions root (default ./datasets, override to
-#               /checkpoint/dream/arjangt/video_retrieval/aria on cluster)
+#               $PSM_DATA_ROOT/video_retrieval/aria on cluster)
 #   SESSIONS    space-separated session ids (default the 3 demo sessions)
 #   ENCODERS    space-separated encoder keys (default "bigG clipL")
 #               each key maps to a (features-basename, checkpoint) pair

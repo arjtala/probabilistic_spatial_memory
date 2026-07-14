@@ -1,5 +1,5 @@
 {
-  "features": "/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic/20230609_s0_angela_harrell_act4_egucf6/clip_l_features.h5",
+  "features": "$PSM_DATA_ROOT/video_retrieval/nymeria_atomic/20230609_s0_angela_harrell_act4_egucf6/clip_l_features.h5",
   "group": "clip",
   "n_frames": 910,
   "dim": 768,

@@ -634,7 +634,7 @@ gives:
   revisitation.
 - **Dates spanning June-July 2023** for environmental diversity.
 
-Sessions live at `/checkpoint/dream/arjangt/video_retrieval/nymeria/<sid>`
+Sessions live at `$PSM_DATA_ROOT/video_retrieval/nymeria/<sid>`
 on the cluster. Each session ships VRS (camera + IMU) plus narration
 JSON, motion JSON, and metadata.
 
@@ -711,8 +711,8 @@ SLOPER4D paper but not in the 6 currently published. If acquired
 via direct request to the authors, they triple the multi-session
 street-scale coverage and we fold them into the same sweep.
 
-Source zips at `/checkpoint/dream/arjangt/SLOPER4D/*.zip` (CC BY-NC-SA 4.0).
-Selectively unzipped to `/checkpoint/dream/arjangt/SLOPER4D-unzipped/`
+Source zips at `$PSM_DATA_ROOT/SLOPER4D/*.zip` (CC BY-NC-SA 4.0).
+Selectively unzipped to `$PSM_DATA_ROOT/SLOPER4D-unzipped/`
 (only `lidar_data/lidar_trajectory.txt` + `rgb_data/*.MP4` per
 sequence — skip the multi-GB LiDAR point clouds that PSM doesn't
 need).

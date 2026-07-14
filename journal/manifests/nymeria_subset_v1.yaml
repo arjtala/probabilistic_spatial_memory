@@ -14,10 +14,10 @@
 # are in v1 of the paper. If we add/drop sessions, edit this file +
 # regenerate extractions; don't silently re-glob.
 #
-# Source listing: `ls /checkpoint/dream/arjangt/video_retrieval/nymeria`
+# Source listing: `ls $PSM_DATA_ROOT/video_retrieval/nymeria`
 # (the full release is ~430 sessions; this is a deliberate subset).
 
-dataset_root: /checkpoint/dream/arjangt/video_retrieval/nymeria
+dataset_root: $PSM_DATA_ROOT/video_retrieval/nymeria
 
 # Selection criteria: every date listed below must have BOTH s0 and s1
 # present, and BOTH act0 and act2 for each wearer slot. Verified by

@@ -14,7 +14,7 @@
 #
 # Array job that runs the Ego-Exo4D extractor over all 696 takes whose
 # atomic_descriptions provide >=1 ego-visible question (see
-# /checkpoint/dream/arjangt/video_retrieval/egoexo4d_atomic/<take_uid>/
+# $PSM_DATA_ROOT/video_retrieval/egoexo4d_atomic/<take_uid>/
 # questions.yaml, produced by scripts/egoexo4d_atomic_to_questions.py).
 #
 # Per task:
@@ -49,7 +49,7 @@
 set -euo pipefail
 
 TAKES_ROOT="${TAKES_ROOT:-/datasets/egoexo4d/v2/takes}"
-OUT_ROOT="${OUT_ROOT:-/checkpoint/dream/arjangt/video_retrieval/egoexo4d_atomic}"
+OUT_ROOT="${OUT_ROOT:-$PSM_DATA_ROOT/video_retrieval/egoexo4d_atomic}"
 MANIFEST="${MANIFEST:-$OUT_ROOT/.take_uids.txt}"
 FPS="${FPS:-1}"
 SEGMENT="${SEGMENT:-1}"

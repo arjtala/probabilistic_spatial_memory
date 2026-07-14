@@ -20,7 +20,7 @@ The runbook below assumes the cluster layout we use:
     │                                       # clock-rebase (see commit e98f88b)
     └── narration/atomic_action.csv         # ground-truth narration windows
 
-/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic/   # WRITEABLE
+$PSM_DATA_ROOT/video_retrieval/nymeria_atomic/   # WRITEABLE
 └── <session_id>/
     ├── clip_l_features.h5                  # CLIP-L feature extraction
     └── questions.yaml                      # auto-derived from atomic_action.csv

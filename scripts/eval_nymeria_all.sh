@@ -29,7 +29,7 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ROOT="${ROOT:-/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic}"
+ROOT="${ROOT:-$PSM_DATA_ROOT/video_retrieval/nymeria_atomic}"
 CAPTURES="${CAPTURES:-$REPO/captures/nymeria}"
 STAGES="${STAGES:-baselines hyperparam latency}"
 SEEDS="${SEEDS:-0}"

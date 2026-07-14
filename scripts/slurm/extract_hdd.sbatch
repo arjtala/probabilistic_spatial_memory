@@ -32,16 +32,16 @@
 #   sbatch --export=ALL,MODEL=siglip2_l  scripts/slurm/extract_hdd.sbatch
 #
 # Env knobs:
-#   ROOT      /checkpoint/dream/arjangt/video_retrieval/hdd/release_2019_07_08
-#   OUT_ROOT  /checkpoint/dream/arjangt/video_retrieval/hdd/features
+#   ROOT      $PSM_DATA_ROOT/video_retrieval/hdd/release_2019_07_08
+#   OUT_ROOT  $PSM_DATA_ROOT/video_retrieval/hdd/features
 #   FPS       1     (raise for the memory-vs-area high-fps operating point)
 #   MODEL     clip_l (default) | clip_bigg | siglip2_l
 #   CONDA_ENV psm
 
 set -euo pipefail
 
-ROOT="${ROOT:-/checkpoint/dream/arjangt/video_retrieval/hdd/release_2019_07_08}"
-OUT_ROOT="${OUT_ROOT:-/checkpoint/dream/arjangt/video_retrieval/hdd/features}"
+ROOT="${ROOT:-$PSM_DATA_ROOT/video_retrieval/hdd/release_2019_07_08}"
+OUT_ROOT="${OUT_ROOT:-$PSM_DATA_ROOT/video_retrieval/hdd/features}"
 FPS="${FPS:-1}"
 MODEL="${MODEL:-clip_l}"
 CONDA_ENV="${CONDA_ENV:-psm}"

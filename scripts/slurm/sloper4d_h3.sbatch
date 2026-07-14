@@ -33,7 +33,7 @@ set -euo pipefail
 
 CONDA_ENV="${CONDA_ENV:-psm}"
 SEQ="${SEQ:-seq009_running_002}"
-OUT_ROOT="${OUT_ROOT:-/checkpoint/dream/arjangt/video_retrieval/sloper4d}"
+OUT_ROOT="${OUT_ROOT:-$PSM_DATA_ROOT/video_retrieval/sloper4d}"
 SEEDS="${SEEDS:-0 1 2 3 4}"
 H3_RES_LIST="${H3_RES_LIST:-8 9 10 11 12}"
 ENCODERS="${ENCODERS:-clipL bigG}"
@@ -59,7 +59,7 @@ if [[ ! -f "$QUESTIONS" ]]; then
   echo "[slurm] ERR: $QUESTIONS does not exist. Caption the sequence first:" >&2
   echo "        GEMINI_API_KEY=... python scripts/sloper4d_generate_questions.py \\" >&2
   echo "          --features $OUT_ROOT/$SEQ/clip_l_features.h5 \\" >&2
-  echo "          --video /checkpoint/dream/arjangt/SLOPER4D-unzipped/$SEQ/rgb_data/$SEQ.MP4 \\" >&2
+  echo "          --video $PSM_DATA_ROOT/SLOPER4D-unzipped/$SEQ/rgb_data/$SEQ.MP4 \\" >&2
   echo "          --out $QUESTIONS --n-questions 20 --model gemini" >&2
   exit 2
 fi

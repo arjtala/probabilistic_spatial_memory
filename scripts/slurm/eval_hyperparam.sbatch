@@ -74,7 +74,7 @@ if [[ ! -x "$REPO/targets/psm" ]]; then
 fi
 
 # Default ROOT to the cluster data path if not overridden.
-export ROOT="${ROOT:-/checkpoint/dream/arjangt/video_retrieval/aria}"
+export ROOT="${ROOT:-$PSM_DATA_ROOT/video_retrieval/aria}"
 
 bash scripts/eval_hyperparam_sweep.sh
 

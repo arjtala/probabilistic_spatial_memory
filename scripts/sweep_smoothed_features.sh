@@ -13,7 +13,7 @@
 set -euo pipefail
 
 TAKE="${TAKE:-20230608_s0_shelby_arroyo_act0_3ciwl8}"
-ROOT="${ROOT:-/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic}"
+ROOT="${ROOT:-$PSM_DATA_ROOT/video_retrieval/nymeria_atomic}"
 CKPT="${CKPT:-laion/CLIP-ViT-L-14-laion2B-s32B-b82K}"
 SRC="$ROOT/$TAKE/clip_l_features.h5"
 Q="$ROOT/$TAKE/questions.yaml"

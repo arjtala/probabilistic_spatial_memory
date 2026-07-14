@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-ROOT="${ROOT:-/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic}"
+ROOT="${ROOT:-$PSM_DATA_ROOT/video_retrieval/nymeria_atomic}"
 
 if [ -z "${LONGCLIP_ROOT:-}" ]; then
   echo "!!! LONGCLIP_ROOT not set. See setup steps in script header."

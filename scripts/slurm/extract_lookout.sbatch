@@ -33,8 +33,8 @@
 #   sbatch --export=ALL,MODEL=clip_bigg       scripts/slurm/extract_lookout.sbatch
 #
 # Env knobs:
-#   ROOT       /checkpoint/dream/arjangt/LookOut-unzipped/aria_navigation_blurred
-#   OUT_ROOT   /checkpoint/dream/arjangt/video_retrieval/lookout
+#   ROOT       $PSM_DATA_ROOT/LookOut-unzipped/aria_navigation_blurred
+#   OUT_ROOT   $PSM_DATA_ROOT/video_retrieval/lookout
 #   FPS        1
 #   MODEL      clip_l (default) | clip_bigg
 #   SEQUENCES  space-separated allowlist; defaults to the 10 top-bbox keepers
@@ -46,8 +46,8 @@
 
 set -euo pipefail
 
-ROOT="${ROOT:-/checkpoint/dream/arjangt/LookOut-unzipped/aria_navigation_blurred}"
-OUT_ROOT="${OUT_ROOT:-/checkpoint/dream/arjangt/video_retrieval/lookout}"
+ROOT="${ROOT:-$PSM_DATA_ROOT/LookOut-unzipped/aria_navigation_blurred}"
+OUT_ROOT="${OUT_ROOT:-$PSM_DATA_ROOT/video_retrieval/lookout}"
 FPS="${FPS:-1}"
 MODEL="${MODEL:-clip_l}"
 CONDA_ENV="${CONDA_ENV:-psm}"
@@ -89,7 +89,7 @@ NAME="${SEQ_ARR[$SLURM_ARRAY_TASK_ID]}"
 # when --export drops the conda-init PATH entries — which happened on
 # the bigG array when the submit used `--export=MODEL=...` instead of
 # `--export=ALL,MODEL=...`.
-CONDA_BASE="${CONDA_BASE:-/home/arjangt/.conda}"
+CONDA_BASE="${CONDA_BASE:-$HOME/.conda}"
 if [[ -f "$CONDA_BASE/etc/profile.d/conda.sh" ]]; then
   source "$CONDA_BASE/etc/profile.d/conda.sh"
 elif [[ -f /opt/conda/etc/profile.d/conda.sh ]]; then

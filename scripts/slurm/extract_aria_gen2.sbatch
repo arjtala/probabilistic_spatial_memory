@@ -31,7 +31,7 @@
 #   sbatch --array=0,1 scripts/slurm/extract_aria_gen2.sbatch
 #
 # Env knobs (with defaults):
-#   ROOT     sessions root (default /checkpoint/dream/arjangt/video_retrieval/aria_gen2_pilot)
+#   ROOT     sessions root (default $PSM_DATA_ROOT/video_retrieval/aria_gen2_pilot)
 #   FPS      sample fps (default 1 — matches v2 reference)
 #   SEGMENT  segment-sec (default 1)
 #   MODEL    one of clip | clip_l | clip_bigg (default clip_l)
@@ -45,7 +45,7 @@
 
 set -euo pipefail
 
-ROOT="${ROOT:-/checkpoint/dream/arjangt/video_retrieval/aria_gen2_pilot}"
+ROOT="${ROOT:-$PSM_DATA_ROOT/video_retrieval/aria_gen2_pilot}"
 FPS="${FPS:-1}"
 SEGMENT="${SEGMENT:-1}"
 MODEL="${MODEL:-clip_l}"

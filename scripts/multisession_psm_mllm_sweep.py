@@ -27,7 +27,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-_DEFAULT_ROOT = Path("/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic")
+_DEFAULT_ROOT = Path("$PSM_DATA_ROOT/video_retrieval/nymeria_atomic")
 _DEFAULT_OUT = Path("captures/multisession_psm_mllm")
 _DEFAULT_SESSIONS = [
     "20230608_s0_shelby_arroyo_act0_3ciwl8",

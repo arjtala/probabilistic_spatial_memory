@@ -1,5 +1,5 @@
 {
-  "features": "/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic/20230612_s1_christina_jones_act0_u2r0z8/clip_l_features.h5",
+  "features": "$PSM_DATA_ROOT/video_retrieval/nymeria_atomic/20230612_s1_christina_jones_act0_u2r0z8/clip_l_features.h5",
   "group": "clip",
   "n_frames": 1042,
   "dim": 768,

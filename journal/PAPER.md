@@ -80,7 +80,7 @@ Item 0 is the load-bearing prerequisite for everything else.
 | # | Experiment | Tracked in | Status | Blocker |
 |---|---|---|---|---|
 | 0a | Aria Gen 2 pipeline: VRS reader + extraction of 12 sessions | EXPERIMENTS.md | **done** (commits `9ee1c9b`..`e7babe3`, verified all 12 with `vrs_gps`/`vrs_slam`) | — |
-| 0b | Nymeria pipeline: reader + atomic_action questions + extraction of 30 sessions | EXPERIMENTS.md | **done** (2026-06-02; SLURM array `7689716` all 30 tasks succeeded, CLIP-L features at `/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic/`, 182 MB) | — |
+| 0b | Nymeria pipeline: reader + atomic_action questions + extraction of 30 sessions | EXPERIMENTS.md | **done** (2026-06-02; SLURM array `7689716` all 30 tasks succeeded, CLIP-L features at `$PSM_DATA_ROOT/video_retrieval/nymeria_atomic/`, 182 MB) | — |
 | 1 | Naive retrieval baselines (no H3) | EXPERIMENTS.md E11 | Aria-internal done (2026-05-26); Nymeria single-session done (2026-06-05, `results_v1.md`); **30-session rerun ready** | — |
 | 2 | PSM hyperparameter sensitivity (incl. H3 res across mobility scales) | EXPERIMENTS.md E12 | Aria-internal done (2026-05-28); Nymeria 4-session + 30-session cap sweep done (2026-06-05, `results_v1.md`); H3 res ablation done | — |
 | 3 | MLLM baselines: Gemini 3.1 Pro + Claude 4.6 Opus (api.llama.com proxy) | EXPERIMENTS.md E10 | **client + harness done** (commit `471e4ab`/`d051757`/`6c10625`/`ed9f2f7`); Nymeria 4-session sweep done (2026-06-04, `results_v1.md`); **full 30-session sweep pending** | API budget |

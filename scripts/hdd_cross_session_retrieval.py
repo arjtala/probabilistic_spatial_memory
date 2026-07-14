@@ -56,7 +56,7 @@ except ImportError:
     print("ERR: h3 not importable (need h3>=4.0).", file=sys.stderr)
     raise
 
-DEFAULT_ROOT = Path("/checkpoint/dream/arjangt/video_retrieval/hdd/features")
+DEFAULT_ROOT = Path("$PSM_DATA_ROOT/video_retrieval/hdd/features")
 DEFAULT_OUT = Path("captures/hdd/cross_session_retrieval.json")
 RESOLUTION = 10          # RTK-noise-robust decision resolution
 HIT_KS = (1, 5, 10)

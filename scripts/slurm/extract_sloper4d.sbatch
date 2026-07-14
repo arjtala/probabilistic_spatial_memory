@@ -19,8 +19,8 @@
 #   sbatch --export=MODEL=clip_bigg scripts/slurm/extract_sloper4d.sbatch  # bigG
 #
 # Env knobs:
-#   ROOT          /checkpoint/dream/arjangt/SLOPER4D-unzipped       (read source)
-#   OUT_ROOT      /checkpoint/dream/arjangt/video_retrieval/sloper4d (write features)
+#   ROOT          $PSM_DATA_ROOT/SLOPER4D-unzipped       (read source)
+#   OUT_ROOT      $PSM_DATA_ROOT/video_retrieval/sloper4d (write features)
 #   FPS           1
 #   MODEL         clip_l (default) | clip_bigg
 #   ORIGIN_LAT    24.4381  (Xiamen University)
@@ -35,8 +35,8 @@
 
 set -euo pipefail
 
-ROOT="${ROOT:-/checkpoint/dream/arjangt/SLOPER4D-unzipped}"
-OUT_ROOT="${OUT_ROOT:-/checkpoint/dream/arjangt/video_retrieval/sloper4d}"
+ROOT="${ROOT:-$PSM_DATA_ROOT/SLOPER4D-unzipped}"
+OUT_ROOT="${OUT_ROOT:-$PSM_DATA_ROOT/video_retrieval/sloper4d}"
 FPS="${FPS:-1}"
 MODEL="${MODEL:-clip_l}"
 ORIGIN_LAT="${ORIGIN_LAT:-24.4381}"

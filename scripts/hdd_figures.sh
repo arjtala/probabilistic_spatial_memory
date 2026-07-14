@@ -20,8 +20,8 @@
 
 set -euo pipefail
 
-RELEASE="${RELEASE:-/checkpoint/dream/arjangt/video_retrieval/hdd/release_2019_07_08}"
-FEATURES="${FEATURES:-/checkpoint/dream/arjangt/video_retrieval/hdd/features}"
+RELEASE="${RELEASE:-$PSM_DATA_ROOT/video_retrieval/hdd/release_2019_07_08}"
+FEATURES="${FEATURES:-$PSM_DATA_ROOT/video_retrieval/hdd/features}"
 PYTHON="${PYTHON:-/opt/conda/bin/python}"
 H5NAME="${H5NAME:-clip_l_features.h5}"
 

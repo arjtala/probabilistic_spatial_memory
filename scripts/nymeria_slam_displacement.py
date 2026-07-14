@@ -27,7 +27,7 @@ import math
 import sys
 from pathlib import Path
 
-DEFAULT_ROOT = Path("/checkpoint/dream/arjangt/video_retrieval/nymeria_partial")
+DEFAULT_ROOT = Path("$PSM_DATA_ROOT/video_retrieval/nymeria_partial")
 
 # Average H3 cell edge lengths in meters from the H3 docs:
 # https://h3geo.org/docs/core-library/restable/#cell-areas

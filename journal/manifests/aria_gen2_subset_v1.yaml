@@ -15,7 +15,7 @@
 #   datasets/AriaGen2PilotDataset_download_urls.json
 # (committed in repo; do not lose). Verified 2026-05-28.
 
-dataset_root: /checkpoint/dream/arjangt/video_retrieval/aria_gen2_pilot
+dataset_root: $PSM_DATA_ROOT/video_retrieval/aria_gen2_pilot
 source_urls_json: datasets/AriaGen2PilotDataset_download_urls.json
 release: v1.0
 

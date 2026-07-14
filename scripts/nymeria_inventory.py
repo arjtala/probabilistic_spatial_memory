@@ -16,7 +16,7 @@ import json
 import sys
 from pathlib import Path
 
-DEFAULT_ROOT = Path("/checkpoint/dream/arjangt/video_retrieval/nymeria_partial")
+DEFAULT_ROOT = Path("$PSM_DATA_ROOT/video_retrieval/nymeria_partial")
 
 
 def main() -> int:

@@ -6,7 +6,7 @@ questions. This protocol produces a small evaluation on *real* look-back queries
 
 ## Why this is cluster-only
 The CLIP features (`clip_l_features.h5`) and session footage live under the
-cluster dataset ROOT (`/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic`),
+cluster dataset ROOT (`$PSM_DATA_ROOT/video_retrieval/nymeria_atomic`),
 not in the paper clone. Authoring genuine (query, ground-truth-interval) pairs
 requires watching the footage, and scoring requires running `targets/psm`. Both
 must happen on the cluster. **No numbers should be written into the paper until

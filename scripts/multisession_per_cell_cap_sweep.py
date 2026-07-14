@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 
-_DEFAULT_ROOT = Path("/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic")
+_DEFAULT_ROOT = Path("$PSM_DATA_ROOT/video_retrieval/nymeria_atomic")
 _DEFAULT_OUT = Path("captures/multisession_pcc_sweep")
 _DEFAULT_MOBILITY = None  # set per-session-dir scan if not provided
 

@@ -22,11 +22,11 @@
 #   sbatch scripts/slurm/extract_clipL_fulham.sbatch
 #
 # Override defaults via sbatch --export, e.g.:
-#   sbatch --export=ROOT=/checkpoint/dream/arjangt/video_retrieval/aria \
+#   sbatch --export=ROOT=$PSM_DATA_ROOT/video_retrieval/aria \
 #          scripts/slurm/extract_clipL_fulham.sbatch
 #
 # Env knobs (with defaults):
-#   ROOT     sessions root (default /checkpoint/dream/arjangt/video_retrieval/aria)
+#   ROOT     sessions root (default $PSM_DATA_ROOT/video_retrieval/aria)
 #   SID      session id (default 1501677363692556 — Fulham)
 #   FPS      sample fps (default 3 — matches existing extractions)
 #   SEGMENT  segment-sec (default 1)
@@ -37,7 +37,7 @@
 
 set -euo pipefail
 
-ROOT="${ROOT:-/checkpoint/dream/arjangt/video_retrieval/aria}"
+ROOT="${ROOT:-$PSM_DATA_ROOT/video_retrieval/aria}"
 SID="${SID:-1501677363692556}"
 FPS="${FPS:-3}"
 SEGMENT="${SEGMENT:-1}"

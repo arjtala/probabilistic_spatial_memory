@@ -24,14 +24,14 @@
 #   SEEDS         "0 1 2 3 4"
 #   H3_RES_LIST   "8 9 10 11 12"
 #   ENCODERS      "clipL"  (add "bigG" once an Aria bigG H5 exists)
-#   OUT_ROOT      /checkpoint/dream/arjangt/video_retrieval/aria_gen2_pilot
+#   OUT_ROOT      $PSM_DATA_ROOT/video_retrieval/aria_gen2_pilot
 
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 SESSION="${SESSION:-walk_0}"
-OUT_ROOT="${OUT_ROOT:-/checkpoint/dream/arjangt/video_retrieval/aria_gen2_pilot}"
+OUT_ROOT="${OUT_ROOT:-$PSM_DATA_ROOT/video_retrieval/aria_gen2_pilot}"
 N_QUESTIONS="${N_QUESTIONS:-30}"
 MLLM_MODEL="${MLLM_MODEL:-gemini}"
 SEEDS="${SEEDS:-0 1 2 3 4}"

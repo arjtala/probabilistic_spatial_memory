@@ -24,7 +24,7 @@
 #   SEEDS         "0 1 2 3 4"
 #   H3_RES_LIST   "8 9 10 11 12"
 #   ENCODERS      "clipL"          (add bigG once an Aria bigG H5 exists)
-#   OUT_ROOT      /checkpoint/dream/arjangt/video_retrieval/aria_gen2_pilot
+#   OUT_ROOT      $PSM_DATA_ROOT/video_retrieval/aria_gen2_pilot
 #   CONDA_ENV     psm
 #
 # Wall time on h200 with warm HF cache: ~5-10 min total.
@@ -33,7 +33,7 @@ set -euo pipefail
 
 CONDA_ENV="${CONDA_ENV:-psm}"
 SESSION="${SESSION:-walk_0}"
-OUT_ROOT="${OUT_ROOT:-/checkpoint/dream/arjangt/video_retrieval/aria_gen2_pilot}"
+OUT_ROOT="${OUT_ROOT:-$PSM_DATA_ROOT/video_retrieval/aria_gen2_pilot}"
 SEEDS="${SEEDS:-0 1 2 3 4}"
 H3_RES_LIST="${H3_RES_LIST:-8 9 10 11 12}"
 ENCODERS="${ENCODERS:-clipL}"

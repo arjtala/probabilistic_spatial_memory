@@ -33,7 +33,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # All Nymeria defaults baked in; override via env if needed.
-export ROOT="${ROOT:-/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic}"
+export ROOT="${ROOT:-$PSM_DATA_ROOT/video_retrieval/nymeria_atomic}"
 export CAPTURES="${CAPTURES:-$REPO/captures/nymeria}"
 export STAGES="${STAGES:-baselines hyperparam latency}"
 export SEEDS="${SEEDS:-0}"

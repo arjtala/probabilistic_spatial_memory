@@ -24,8 +24,8 @@ Usage:
     because CLIP-L embedding is GPU-bound for ~600+ frames per session.
 
     python scripts/extract_lookout_sessions.py \\
-        --root /checkpoint/dream/arjangt/LookOut-unzipped/aria_navigation_blurred \\
-        --out-root /checkpoint/dream/arjangt/video_retrieval/lookout \\
+        --root $PSM_DATA_ROOT/LookOut-unzipped/aria_navigation_blurred \\
+        --out-root $PSM_DATA_ROOT/video_retrieval/lookout \\
         --checkpoint laion/CLIP-ViT-L-14-laion2B-s32B-b82K \\
         --sequences Mainquad_jan10 Sanmateopark_garage_jan11
 """
@@ -210,11 +210,11 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     ap.add_argument(
         "--root", type=Path,
-        default=Path("/checkpoint/dream/arjangt/LookOut-unzipped/aria_navigation_blurred"),
+        default=Path("$PSM_DATA_ROOT/LookOut-unzipped/aria_navigation_blurred"),
     )
     ap.add_argument(
         "--out-root", type=Path,
-        default=Path("/checkpoint/dream/arjangt/video_retrieval/lookout"),
+        default=Path("$PSM_DATA_ROOT/video_retrieval/lookout"),
     )
     ap.add_argument(
         "--encoder", choices=list(_ENCODER_MAP.keys()), default="clipL",

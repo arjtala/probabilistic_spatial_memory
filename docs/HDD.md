@@ -88,7 +88,7 @@ confirmed revisits (do Option A first regardless).
 - [x] **Which option (A / B / C)?** → **Option A** (verify overlap first).
       B-vs-C decided after the revisit measurement (see decision rule below).
 - [x] **HDD access gate?** → Moot. Data is already on the cluster at
-      `/checkpoint/dream/arjangt/video_retrieval/hdd/release_2019_07_08/`
+      `$PSM_DATA_ROOT/video_retrieval/hdd/release_2019_07_08/`
       (21 drive-days, 132 drives with RTK GPS + center camera).
 - [ ] **Archival (8-page) or non-archival (4-page)?** A new HDD result is
       heavier; a 4-page non-archival abstract may not have room and keeps

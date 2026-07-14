@@ -9,7 +9,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-ROOT = Path("/checkpoint/dream/arjangt/video_retrieval/egoexo4d_atomic")
+ROOT = Path("$PSM_DATA_ROOT/video_retrieval/egoexo4d_atomic")
 TAKES = Path("/datasets/egoexo4d/v2/takes")
 MIN_DUR_S = 600.0   # 10 min
 MIN_Q, MAX_Q = 100, 300

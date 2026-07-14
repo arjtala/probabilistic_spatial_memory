@@ -44,7 +44,7 @@ except ImportError:
     raise
 
 DEFAULT_ROOT = Path(
-    "/checkpoint/dream/arjangt/video_retrieval/hdd/release_2019_07_08"
+    "$PSM_DATA_ROOT/video_retrieval/hdd/release_2019_07_08"
 )
 DEFAULT_OUT = Path("captures/hdd/revisit_density.json")
 

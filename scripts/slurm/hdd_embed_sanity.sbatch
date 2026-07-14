@@ -28,15 +28,15 @@
 #   sbatch --export=ALL,DRIVE=201703061033 scripts/slurm/hdd_embed_sanity.sbatch # a specific drive
 #
 # Env knobs:
-#   ROOT   /checkpoint/dream/arjangt/video_retrieval/hdd/release_2019_07_08
+#   ROOT   $PSM_DATA_ROOT/video_retrieval/hdd/release_2019_07_08
 #   MODEL  clip_l (default) | clip_bigg | siglip2_l
 #   DRIVE  (optional) specific drive_id; default = first discovered drive
 #   CONDA_ENV  psm
 
 set -euo pipefail
 
-ROOT="${ROOT:-/checkpoint/dream/arjangt/video_retrieval/hdd/release_2019_07_08}"
-OUT_ROOT="${OUT_ROOT:-/checkpoint/dream/arjangt/video_retrieval/hdd/features}"
+ROOT="${ROOT:-$PSM_DATA_ROOT/video_retrieval/hdd/release_2019_07_08}"
+OUT_ROOT="${OUT_ROOT:-$PSM_DATA_ROOT/video_retrieval/hdd/features}"
 MODEL="${MODEL:-clip_l}"
 CONDA_ENV="${CONDA_ENV:-psm}"
 
@@ -51,7 +51,7 @@ esac
 # conda-init PATH; the conda.sh fallback covers the documented case where env
 # overrides drop it (see extract_lookout.sbatch).
 if ! source activate "$CONDA_ENV" 2>/dev/null; then
-  CONDA_BASE="$(conda info --base 2>/dev/null || echo /home/arjangt/.conda)"
+  CONDA_BASE="$(conda info --base 2>/dev/null || echo $HOME/.conda)"
   source "$CONDA_BASE/etc/profile.d/conda.sh"
   conda activate "$CONDA_ENV"
 fi

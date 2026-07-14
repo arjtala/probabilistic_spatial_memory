@@ -1,5 +1,5 @@
 {
-  "features": "/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic/20230613_s0_virginia_rivera_act0_b6hopn/clip_l_features.h5",
+  "features": "$PSM_DATA_ROOT/video_retrieval/nymeria_atomic/20230613_s0_virginia_rivera_act0_b6hopn/clip_l_features.h5",
   "group": "clip",
   "n_frames": 1122,
   "dim": 768,

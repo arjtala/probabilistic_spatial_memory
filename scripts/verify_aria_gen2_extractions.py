@@ -4,7 +4,7 @@
 Usage:
   python scripts/verify_aria_gen2_extractions.py [ROOT]
 
-ROOT defaults to /checkpoint/dream/arjangt/video_retrieval/aria_gen2_pilot.
+ROOT defaults to $PSM_DATA_ROOT/video_retrieval/aria_gen2_pilot.
 Reports one line per session; missing files or unexpected track_modes
 print loudly so they're easy to grep for.
 
@@ -39,7 +39,7 @@ EXPECTED = {
 
 def main() -> int:
     root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(
-        "/checkpoint/dream/arjangt/video_retrieval/aria_gen2_pilot"
+        "$PSM_DATA_ROOT/video_retrieval/aria_gen2_pilot"
     )
     bad = 0
     for name in sorted(EXPECTED):

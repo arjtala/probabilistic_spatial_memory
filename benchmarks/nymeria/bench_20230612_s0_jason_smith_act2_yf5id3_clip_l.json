@@ -1,5 +1,5 @@
 {
-  "features": "/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic/20230612_s0_jason_smith_act2_yf5id3/clip_l_features.h5",
+  "features": "$PSM_DATA_ROOT/video_retrieval/nymeria_atomic/20230612_s0_jason_smith_act2_yf5id3/clip_l_features.h5",
   "group": "clip",
   "n_frames": 933,
   "dim": 768,

@@ -50,8 +50,8 @@
 
 set -euo pipefail
 
-ROOT="${ROOT:-/checkpoint/dream/arjangt/video_retrieval/nymeria_partial}"
-OUT_ROOT="${OUT_ROOT:-/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic}"
+ROOT="${ROOT:-$PSM_DATA_ROOT/video_retrieval/nymeria_partial}"
+OUT_ROOT="${OUT_ROOT:-$PSM_DATA_ROOT/video_retrieval/nymeria_atomic}"
 MANIFEST="${MANIFEST:-$OUT_ROOT/.session_ids.txt}"
 FPS="${FPS:-1}"
 SEGMENT="${SEGMENT:-1}"

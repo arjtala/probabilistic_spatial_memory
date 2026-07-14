@@ -15,7 +15,7 @@ from pathlib import Path
 
 import h5py
 
-ROOT = Path("/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic")
+ROOT = Path("$PSM_DATA_ROOT/video_retrieval/nymeria_atomic")
 M_PER_DEG = 111_132.0
 BUG_THRESHOLD_M = 0.5
 

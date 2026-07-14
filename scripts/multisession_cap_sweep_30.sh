@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-ROOT="${ROOT:-/checkpoint/dream/arjangt/video_retrieval/nymeria_atomic}"
+ROOT="${ROOT:-$PSM_DATA_ROOT/video_retrieval/nymeria_atomic}"
 CKPT="${CKPT:-laion/CLIP-ViT-L-14-laion2B-s32B-b82K}"
 
 # Auto-discover: any subdir with both clip_l_features.h5 and questions.yaml.

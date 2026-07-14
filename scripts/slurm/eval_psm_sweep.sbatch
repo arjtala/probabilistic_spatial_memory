@@ -63,7 +63,7 @@ cd "${SLURM_SUBMIT_DIR:-$(pwd)}"
 mkdir -p logs
 
 REPO="$(pwd)"
-ROOT="${ROOT:-/checkpoint/dream/arjangt/video_retrieval/aria}"
+ROOT="${ROOT:-$PSM_DATA_ROOT/video_retrieval/aria}"
 CAPTURES="${CAPTURES:-$REPO/captures}"
 ENCODERS="${ENCODERS:-bigG clipL}"
 

@@ -122,16 +122,16 @@ def main() -> int:
     )
     ap.add_argument(
         "--questions-root", type=Path,
-        default=Path("/checkpoint/dream/arjangt/video_retrieval/egoexo4d_atomic"),
+        default=Path("$PSM_DATA_ROOT/video_retrieval/egoexo4d_atomic"),
     )
     ap.add_argument("--threshold-m", type=float, default=10.0)
     ap.add_argument(
         "--out-manifest", type=Path,
-        default=Path("/checkpoint/dream/arjangt/video_retrieval/egoexo4d_mobility.json"),
+        default=Path("$PSM_DATA_ROOT/video_retrieval/egoexo4d_mobility.json"),
     )
     ap.add_argument(
         "--out-take-list", type=Path,
-        default=Path("/checkpoint/dream/arjangt/video_retrieval/egoexo4d_mobile_takes.txt"),
+        default=Path("$PSM_DATA_ROOT/video_retrieval/egoexo4d_mobile_takes.txt"),
     )
     args = ap.parse_args()
 
