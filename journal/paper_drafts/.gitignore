@@ -10,3 +10,6 @@ main*.pdf
 main*.fdb_latexmk
 *.fls
 *.brf
+
+# Personal de-anonymized build (real author name) — NEVER commit.
+main_named.tex
