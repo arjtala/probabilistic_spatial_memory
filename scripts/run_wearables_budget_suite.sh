@@ -58,6 +58,13 @@ fi
 if [[ "${FORCE:-0}" == "1" ]]; then
   extra+=(--force)
 fi
+# Forward extra eval_fixed_budget.py flags (e.g. grid-transform / coordinate-null
+# controls: --translate-east-m, --rotation-deg, --coord-permutation-seed). Word-
+# split intentionally so "--rotation-deg 30" becomes two argv entries.
+if [[ -n "${EXTRA_ARGS:-}" ]]; then
+  # shellcheck disable=SC2206
+  extra+=(${EXTRA_ARGS})
+fi
 
 printf '[suite] root=%s sessions=%d budgets=%s seeds=%s resolutions=%s\n' \
   "$ROOT" "${#sessions[@]}" "$BUDGETS" "$SEEDS" "$H3_RESOLUTIONS"
