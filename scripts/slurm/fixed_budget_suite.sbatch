@@ -1,10 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=psm-fixed-budget
 #SBATCH --account=dream
-#SBATCH --qos=h200_comm_shared
-#SBATCH --gpus=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
+#SBATCH --qos=h200_dev
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:h200:1
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=128G
 #SBATCH --time=04:00:00
 #SBATCH --output=logs/fixed_budget_%j.out
 #SBATCH --error=logs/fixed_budget_%j.err
@@ -44,7 +45,9 @@ export PYTHONUNBUFFERED=1
 export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
 export TRANSFORMERS_OFFLINE="${TRANSFORMERS_OFFLINE:-1}"
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# Under sbatch the script is copied to a spool dir, so BASH_SOURCE does NOT
+# point at the repo. Use the submit dir (sbatch was launched from the repo root).
+REPO="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 cd "$REPO"
 PY="${PY:-python}"
 
@@ -96,6 +99,7 @@ case "$MODE" in
       OUT_DIR="captures/grid_controls/$tag"
       EXTRA_ARGS="$variant" run_corpus lookout "${LOOKOUT[@]}"
       EXTRA_ARGS="$variant" run_corpus sloper4d "${SLOPER4D[@]}"
+      EXTRA_ARGS="$variant" run_corpus nymeria_atomic "${NYMERIA[@]}"
     done
     ;;
   null)
@@ -105,6 +109,7 @@ case "$MODE" in
       OUT_DIR="captures/coordinate_null/p$pseed"
       EXTRA_ARGS="--coord-permutation-seed $pseed" run_corpus lookout "${LOOKOUT[@]}"
       EXTRA_ARGS="--coord-permutation-seed $pseed" run_corpus sloper4d "${SLOPER4D[@]}"
+      EXTRA_ARGS="--coord-permutation-seed $pseed" run_corpus nymeria_atomic "${NYMERIA[@]}"
     done
     ;;
   *) echo "[FATAL] unknown MODE=$MODE" >&2; exit 2 ;;

@@ -73,12 +73,49 @@ Verification: all four edited scripts `py_compile` + pyrefly clean (pre-existing
 `eval_psm_mllm.py:284` provider warning unrelated); 59 extraction tests pass;
 `section_2_method.tex` braces/math balanced (no local LaTeX toolchain to build).
 
-## Remaining (cluster-gated)
+## Fixed-budget controlled study (cluster, DONE) — honest characterization
+
+Ran `eval_fixed_budget.py` over the 14 street-scale sessions, M=128, r12, 5 seeds,
+8 retention policies, matched by bytes + candidate count. Jobs: base 9589389,
+grid 9589393/9589908, null 9589394/9589909 — all COMPLETED (the first smoke
+9588923 FAILED on a spool-path bug, retried once as 9589359 = pass; the scientific
+sweep jobs had **zero failures**).
+
+**Base Hit@5 (seed-avg, 14 sessions):** semantic_kcenter 27.8% > uniform_time 26.0%
+> visit_balanced 24.0% ≈ global_reservoir 23.9% ≈ spatial_balanced 23.9% ≈
+spatial_priority 23.7% > hybrid 22.0% > fifo 14.6%.
+
+**Paired bootstrap (spatial_priority = probe):** vs global_reservoir Hit −0.3%
+[−2.3,2.0] ns; vs semantic_kcenter Hit −4.1% [−6.7,−1.5] (worse); rare-place
++4.4% vs global (ns) but common-place −2.7% (worse).
+
+**Controls:** coordinate-null — rare-place beats broken alignment on all 3 perms
+(+4.7/+8.9/+8.6, all sig) → place-specific, not partition balancing. Grid
+translate/rotate — Hit deltas ≈0 (ns) → not a boundary artifact. n=13 in the first
+control pass because the grid/null sbatch modes omitted the Nymeria session; fixed
+(added nymeria_atomic to control modes, re-ran → n=14).
+
+**Verdict (pre-registered):** does NOT survive the semantic k-center control on
+aggregate → report as honest empirical characterization. Core claim: *under a
+fixed global exemplar budget, spatial allocation changes WHICH places are
+remembered (helps rare/low-exposure places, place-specific per the null), not
+aggregate retrieval; it trades against common places; semantic diversity is best
+overall.* spatial_priority is an experimental probe, not a winning method; keep all
+baselines + controls in the main results; keep k-center's win prominent.
+
+## #3 benchmark at deployment config (DONE, host)
+
+`benchmark_spatial_memory.c` was hard-coded to d=128/R=4/C=12; fixed to the paper's
+deployment point d=768/R=128/C=60 (added a `ring_capacity` param). Host run
+(20k obs, 500 tiles): **RSS ≈ 96 MiB** and **~13 ms per (global/uncentered)
+semantic query** at cap=1 and cap=5 — vs the paper's **20.2 MiB / sub-2 ms**, which
+were the reduced d=128/R=4/C=12 config. (Host, workload-specific; the query path is
+the uncentered global scan of finding #4. Precise on-device deployment figures need
+an S22 rerun at the real config — relabel the 20.2 MiB/sub-2 ms as reduced-config
+until then.)
+
+## Remaining
 - #2 route HDD cardinality + cross-session AUC through the real C engine.
-- #3 rerun `benchmarks/benchmark_spatial_memory.c` at **d=768, R=128, C=60**
-  (currently hard-coded d=128/R=4); S22 if device available, else host + relabel.
-- #6a regenerate SLOPER4D/LookOut questions decoupled from the target frame.
-- Fixed-budget suite + nulls + semantic k-center + grid controls + paired stats +
-  verified genuine QA (the controlled-novelty core; stands only if it survives the
-  semantic and coordinate-null controls).
-- Paper rewrite folding in the honest numbers above (task done post-results).
+- Budget/resolution sensitivity (running) as robustness only.
+- #6a decoupled questions + verified genuine QA (needs annotation).
+- Paper rewrite folding in the honest numbers above.

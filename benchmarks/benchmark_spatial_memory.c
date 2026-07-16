@@ -175,9 +175,10 @@ static void run_query_intervals(const Coord *coords, size_t observe_ops,
 static void run_query_similar(const Coord *coords, size_t observe_ops,
                               size_t grid_cells, size_t query_ops,
                               size_t dim, size_t exemplar_capacity,
+                              size_t ring_capacity,
                               size_t per_cell_cap) {
   SpatialMemory *sm = SpatialMemory_new(DEFAULT_RESOLUTION,
-                                        DEFAULT_CAPACITY,
+                                        ring_capacity,
                                         DEFAULT_PRECISION,
                                         exemplar_capacity,
                                         EXEMPLAR_CODEC_RAW);
@@ -326,9 +327,12 @@ int main(int argc, char *argv[]) {
   run_grid_query(coords, observe_ops, query_ops, grid_cells);
   // Location-trace query latency — representative k_ring=2, top=5.
   run_query_intervals(coords, observe_ops, grid_cells, query_ops, 2, 5);
-  // Semantic retrieval latency — modest dim=128, 4 exemplars per tile.
-  run_query_similar(coords, observe_ops, grid_cells, query_ops, 128, 4,
-                    per_cell_cap);
+  // Semantic retrieval latency at the paper's DEPLOYMENT config: CLIP-L
+  // d=768, reservoir R=128, HLL ring C=60 (was d=128/R=4/C=12, which is not
+  // the operating point the paper's RSS/latency claims describe).
+  run_query_similar(coords, observe_ops, grid_cells, query_ops,
+                    /*dim=*/768, /*exemplar_capacity(R)=*/128,
+                    /*ring_capacity(C)=*/60, per_cell_cap);
 
   print_peak_rss();
   free(coords);
