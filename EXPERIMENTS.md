@@ -1,5 +1,9 @@
 # Experiments
 
+The deadline-focused fixed-global-exemplar study and commands for the
+WearablesAI 2026 submission are in
+[`journal/wearables_novelty_experiments.md`](journal/wearables_novelty_experiments.md).
+
 This file turns the README's open questions into explicit, repeatable experiments using the tooling that already exists in this repo.
 
 A subset of these experiments (E5, E7, E10, E11, E12) is on the critical path for the ECCV 2026 workshop paper plan; see [`journal/PAPER.md`](journal/PAPER.md) for that workstream's status, ordering, and reviewer-anticipation notes.

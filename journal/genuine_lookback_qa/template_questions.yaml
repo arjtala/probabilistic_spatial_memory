@@ -1,21 +1,17 @@
 # Genuine look-back QA — annotation TEMPLATE (schema for scripts/eval_lookback.py)
 #
 # PURPOSE: blunt the "proxy benchmark" reviewer concern by evaluating PSM on a
-# small set of REAL look-back questions ("where did I leave my keys?"), not the
-# Nymeria third-person action narrations.
+# small set of human-authored, video-verified look-back questions ("where did I
+# leave my keys?"), not the Nymeria third-person action narrations.
 #
 # HOW TO USE (on the cluster, where the session footage + clip_l_features.h5 live):
 #   1. Pick 1-3 sessions with rich revisit structure (e.g. shelby_arroyo_act0).
 #   2. Watch the footage and author 15-20 genuine look-back questions below,
-#      filling in REAL ground-truth intervals (seconds from session start).
+#      filling in verified ground-truth intervals (seconds from session start).
 #      DO NOT invent intervals -- each must correspond to footage you verified.
-#   3. Save as <ROOT>/<session>/genuine_questions.yaml and run:
-#        python scripts/eval_lookback.py \
-#          --session <ROOT>/<session> \
-#          --questions <ROOT>/<session>/genuine_questions.yaml \
-#          --psm-binary targets/psm --out eval_genuine_<session>.json
-#   4. Send me eval_genuine_<session>.json (Hit@k + mIoU) and I will write the
-#      §4.x "Genuine look-back QA" paragraph with the real numbers.
+#   3. Have a second annotator independently verify a random 20%, resolve
+#      disagreements against the footage, and freeze the YAML SHA-256.
+#   4. Follow PROTOCOL.md to run seeds 0-4 at the frozen paper configuration.
 #
 # Balance categories toward true look-back cognition (object_recall,
 # location_trace, spatial_awareness) rather than visual_detail_recall alone.
@@ -47,10 +43,11 @@ questions:
     query_k_ring: 1
     intervals: [[TODO_START, TODO_END]]
 
-  # ---- spatial awareness / counting (optional richer scoring) ----
+  # ---- spatial awareness (semantic retrieval) ----
   - id: g04
-    query: "TODO: how many distinct rooms did I enter?"
-    category: counting
-    count: TODO_INT
+    query: "TODO: e.g. the doorway where I entered the kitchen"
+    category: spatial_awareness
+    intervals: [[TODO_START, TODO_END]]
+    notes: "TODO: verify the visible spatial cue and interval"
 
   # ... author ~15-20 total, across categories ...
