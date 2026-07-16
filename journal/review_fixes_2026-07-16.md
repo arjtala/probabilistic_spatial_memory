@@ -114,8 +114,38 @@ the uncentered global scan of finding #4. Precise on-device deployment figures n
 an S22 rerun at the real config — relabel the 20.2 MiB/sub-2 ms as reduced-config
 until then.)
 
+## #2 HDD engine accounting — sanity-drive PoC + DEMOTE corpus claims (per decision)
+
+HDD has NO extracted CLIP features on disk except one sanity drive (201702271017,
+50 frames); corpus-scale cardinality/AUC through the engine would need a 132-drive
+GPU extraction — disproportionate for supplementary, non-wearable evidence under the
+deadline. Decision: sanity-drive implementation check + demote corpus claims.
+
+PoC (sanity drive, r10): with a non-aging window the engine's per-cell HLL `total`
+== true distinct-frame count to **median 0.000%** (max 0.20%); engine (Murmur) vs
+the Python re-impl (BLAKE2b) agree to **median 0.049%** (max 0.05%). The two HLL
+implementations are interchangeable; the earlier 50% per-cell gap was purely the
+retention window (finding #9), not an estimator disagreement. Re-confirms #5:
+cardinality == frame count for continuous embeddings.
+
+Paper actions (per decision): keep the corrected RTK memory-vs-area (#1) as modeled
+logical-state systems evidence; **remove/demote** the corpus-scale cardinality and
+cross-session-AUC panels as PSM-engine results (they used a Python BLAKE2b
+accumulator / dense emb@q, not the engine at scale); state full engine-backed
+multi-session HDD evaluation as future work.
+
+## Sensitivity (robustness, DONE) — budget interaction only
+
+Budget axis (r12): at the tighter **M=64** budget spatial_priority (Hit@5 ~21.3%,
+rare-place ~30%) edges global_reservoir (~18.8%, rare ~21%) — an allocation
+advantage that widens as budget tightens — but still trails uniform_time (~24.2%)
+and semantic_kcenter (~22.9%) on aggregate. Report as a SECONDARY budget
+interaction, not a headline operating point. Resolution axis (M=128): spatial_priority
+r10 ~22.3% vs r12 ~23.6% — no strong interior optimum (H4 not supported).
+
 ## Remaining
-- #2 route HDD cardinality + cross-session AUC through the real C engine.
-- Budget/resolution sensitivity (running) as robustness only.
-- #6a decoupled questions + verified genuine QA (needs annotation).
-- Paper rewrite folding in the honest numbers above.
+- Finish n=14 control retry (grid/null FORCE=1 re-run at current commit).
+- #6a decoupled questions + verified genuine QA (needs annotation) — future work.
+- Paper rewrite: honest-characterization framing, all baselines + controls in main
+  results, k-center win prominent, spatial_priority = experimental Python probe,
+  strata reported together, corrected #1/#3 numbers, #2 demoted.
