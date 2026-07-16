@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 # reproduce_paper.sh — one-shot reproduction of the PSM paper headlines.
 #
-# Regenerates from the captured JSON/MP4 artifacts that ship in this repo:
+# IMPORTANT: the captured artifacts are NOT shipped in this repo (captures/ is
+# .gitignored). This script regenerates figures/tables *from* those artifacts
+# once they are on disk; from a clean checkout it will abort (exit 3) rather
+# than emit empty figures. Regenerate captures/ on the cluster first (see the
+# "Where the captured artifacts came from" section below).
+#
+# When captures/ is present, regenerates from the captured JSON/MP4 artifacts:
 #   - Table 2 H3 acceptance verdicts (13/14 PASS claim across LookOut +
 #     SLOPER4D + Nymeria, three encoders).
 #   - F2 (PSM vs any-of-K coverage at K=8, Gemini-3.1-Pro) table + PDF/SVG.
@@ -89,13 +95,32 @@ printf '       python: %s\n' "$PY"
 "$PY" -c "import numpy, h3, h5py" 2>/dev/null \
   || printf '       [WARN] one of numpy/h3/h5py not importable in this interpreter.\n'
 
-for d in captures captures/mllm_baseline benchmarks; do
+# captures/ is NOT shipped in the repo (it is .gitignored — the JSON/MP4
+# artifacts are regenerated on the cluster; see the header). If it is absent
+# the reproduction cannot do anything, so fail loudly instead of printing a
+# green "done" over an empty run. Count how many of the 14 sessions actually
+# have artifacts so downstream steps can refuse to fabricate a PASS summary.
+missing_core=0
+for d in captures benchmarks; do
   if [[ -d "$REPO/$d" ]]; then
-    printf '       OK     %s\n' "$d"
+    printf '       OK      %s\n' "$d"
   else
-    printf '       MISSING %s (downstream steps may be partial)\n' "$d"
+    printf '       MISSING %s\n' "$d"
+    missing_core=$((missing_core + 1))
   fi
 done
+if [[ ! -d "$REPO/captures/mllm_baseline" ]]; then
+  printf '       MISSING captures/mllm_baseline (F2 step will be skipped)\n'
+fi
+if [[ "$missing_core" -gt 0 ]]; then
+  printf '\n'
+  printf '[FATAL] captures/ or benchmarks/ is absent. This repo does NOT ship the\n' >&2
+  printf '        captured artifacts (they are .gitignored and regenerated on the\n' >&2
+  printf '        cluster — see this script'\''s header for the extraction/eval steps).\n' >&2
+  printf '        Nothing to reproduce from a clean checkout; aborting rather than\n' >&2
+  printf '        emitting empty figures and a hardcoded PASS claim.\n' >&2
+  exit 3
+fi
 printf '\n'
 
 # ----------------------------------------------------------------------
@@ -144,8 +169,20 @@ for entry in "${V1_SESSIONS[@]}"; do
   fi
 done
 printf '\n'
-printf '       Summary: %d PASS / %d FAIL / %d SKIP (paper claim: 13/14 PASS)\n' \
-  "$n_pass" "$n_fail" "$n_skip"
+n_ran=$((n_pass + n_fail))
+if [[ "$n_ran" -eq 0 ]]; then
+  printf '       Summary: 0/%d sessions had artifacts on disk — NOTHING was reproduced.\n' \
+    "${#V1_SESSIONS[@]}" >&2
+  printf '       The paper claim (13/14 PASS) is NOT demonstrated by this run. Regenerate\n' >&2
+  printf '       captures/aria_*_h3 / captures/sloper4d_*_h3 on the cluster first.\n' >&2
+  exit 4
+fi
+printf '       Summary: %d PASS / %d FAIL / %d SKIP  (of %d sessions; paper claim: 13/14 PASS)\n' \
+  "$n_pass" "$n_fail" "$n_skip" "${#V1_SESSIONS[@]}"
+if [[ "$n_skip" -gt 0 ]]; then
+  printf '       [WARN] %d session(s) skipped for missing artifacts — this is a PARTIAL\n' "$n_skip"
+  printf '              reproduction; the 13/14 claim requires all 14 present.\n'
+fi
 printf '       (for full per-encoder breakdown re-run h3_acceptance.py without redirect)\n'
 printf '\n'
 

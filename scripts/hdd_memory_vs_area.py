@@ -17,9 +17,13 @@ The honest memory model. Both systems ingest the SAME frame stream at
     modeled PSM as n_cells * R -- assuming every cell full -- which wrongly
     inflated PSM above the bank at low fps. The min() is the real reservoir.)
 
-bytes = exemplars * dim * bytes_per_dim (+ a small per-cell HLL ring for PSM).
-The bank grows linearly with fps x time; PSM's growth bends down as area
-re-covers. This script reports the ratio and crossover for several fps.
+bytes = exemplars * dim * bytes_per_dim + a per-cell HLL ring for PSM. The ring
+is C sketches x 2^p bytes, charged to EVERY visited cell -- at the paper's C=60,
+p=10 design point that is 60 KiB/cell, which is NOT negligible on a corpus with
+tens of thousands of mostly single-visit cells. This script reports the exemplar
+term and the ring term SEPARATELY (the exemplar term is the part the reservoir
+cap makes sublinear; the ring is a fixed per-cell tax that a global memory budget
+would remove), plus the ratio and crossover for several fps.
 
 Reuses the drive enumeration from hdd_revisit_density.py, but bins ALL RTK
 points (no speed gate: the bank stores frames during stops too), decimated for
@@ -49,7 +53,16 @@ DEFAULT_OUT = Path("captures/hdd/memory_vs_area.json")
 DIM = 768                 # CLIP-L embedding dim
 BYTES_PER_DIM = 4         # float32 raw exemplars
 RESERVOIR = 128           # per-cell reservoir cap (bounded-memory default)
-HLL_BYTES = 2048          # per-cell HLL ring state (small beside a full reservoir)
+# Per-cell HLL ring state = C sketches x 2^p bytes each. The paper's temporal
+# envelope design point is C=60 windows (30 s cadence -> 30 min) at p=10 -> 1 KiB
+# per sketch, so the ring is 60 KiB/cell, NOT a small constant. (An earlier draft
+# hard-coded 2 KiB, which made the ring look negligible beside the reservoir and
+# understated PSM's real footprint by ~58 KiB/cell; on this corpus's 23,298 cells
+# that is ~1.4 GB. The ring is charged to EVERY visited cell, including the many
+# single-visit ones, which is exactly why per-cell allocation is wasteful.)
+HLL_CAPACITY = 60         # C: number of HLL sketches in the ring buffer
+HLL_PRECISION = 10        # p: 2^p registers/bytes per sketch (1 KiB at p=10)
+HLL_BYTES = HLL_CAPACITY * (2 ** HLL_PRECISION)   # 60 KiB/cell at C=60, p=10
 FPS_GRID = (1.0, 5.0, 15.0, 30.0)
 _DECIM_HZ = 5.0           # bin points at ~5 Hz for speed (dwell fraction preserved)
 
@@ -97,9 +110,14 @@ def main() -> int:
     ap.add_argument("root", nargs="?", type=Path, default=DEFAULT_ROOT)
     ap.add_argument("--dim", type=int, default=DIM)
     ap.add_argument("--reservoir", type=int, default=RESERVOIR)
+    ap.add_argument("--hll-capacity", type=int, default=HLL_CAPACITY,
+                    help="C: HLL sketches in the ring (default %(default)s)")
+    ap.add_argument("--hll-precision", type=int, default=HLL_PRECISION,
+                    help="p: 2^p bytes per sketch (default %(default)s)")
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--plot", action="store_true")
     args = ap.parse_args()
+    hll_bytes = args.hll_capacity * (2 ** args.hll_precision)
 
     drives = find_drives(args.root)
     if not drives:
@@ -142,7 +160,7 @@ def main() -> int:
         for f in _CURVE_FPS:
             cf = arr_t * f
             curve_psm[f].append(float((np.minimum(cf, R).sum() * per_ex_bytes
-                                       + arr_t.size * HLL_BYTES) / 1e9))
+                                       + arr_t.size * hll_bytes) / 1e9))
             curve_bank[f].append(float(cf.sum() * per_ex_bytes / 1e9))
 
     # PSM/bank exemplar counts are fps-dependent, so compute per fps below;
@@ -151,20 +169,27 @@ def main() -> int:
     total_cells = len(cell_dwell)
     dwell_arr = np.fromiter(cell_dwell.values(), dtype=np.float64)
 
+    hll_gb = total_cells * hll_bytes / 1e9   # ring state, charged to every cell
     fps_report = {}
     for fps in FPS_GRID:
         cell_frames = dwell_arr * fps
         psm_ex = float(np.minimum(cell_frames, R).sum())
         bank_ex = float(cell_frames.sum())            # == total_secs * fps
-        psm_gb = (psm_ex * per_ex_bytes + total_cells * HLL_BYTES) / 1e9
+        psm_exemplar_gb = psm_ex * per_ex_bytes / 1e9  # exemplars only (HLL as
+                                                       # optional metadata)
+        psm_gb = psm_exemplar_gb + hll_gb              # full per-cell footprint
         bank_gb = bank_ex * per_ex_bytes / 1e9
         fps_report[str(fps)] = {
             "psm_exemplars": psm_ex,
             "bank_exemplars": bank_ex,
+            "psm_exemplar_gb": psm_exemplar_gb,
+            "psm_hll_gb": hll_gb,
             "psm_gb": psm_gb,
             "bank_gb": bank_gb,
             "bank_over_psm": bank_gb / psm_gb if psm_gb else 0.0,
-            "psm_saving_pct": 100 * (1 - psm_ex / bank_ex) if bank_ex else 0.0,
+            "bank_over_psm_exemplar_only": bank_gb / psm_exemplar_gb
+            if psm_exemplar_gb else 0.0,
+            "psm_saving_pct": 100 * (1 - psm_gb / bank_gb) if bank_gb else 0.0,
         }
 
     # ---- report --------------------------------------------------------
@@ -173,22 +198,29 @@ def main() -> int:
     print(f"# model: PSM = sum_cells min(frames_in_cell, R={R}); "
           f"bank = all frames; dim={args.dim}x{BYTES_PER_DIM}B "
           f"({per_ex_bytes} B/exemplar)")
+    print(f"# HLL ring: C={args.hll_capacity} x 2^{args.hll_precision} B = "
+          f"{hll_bytes} B/cell x {total_cells} cells = {hll_gb:.2f} GB "
+          f"(charged to EVERY visited cell, most of them single-visit)")
     print()
-    hdr = f"{'fps':>5s} {'PSM_GB':>8s} {'bank_GB':>8s} {'bank/PSM':>9s} {'PSM saving':>11s}"
+    hdr = (f"{'fps':>5s} {'PSM_ex_GB':>10s} {'+HLL_GB':>8s} {'PSM_GB':>8s} "
+           f"{'bank_GB':>8s} {'bank/PSM':>9s} {'bank/ex-only':>13s}")
     print(hdr); print("-" * len(hdr))
     for fps in FPS_GRID:
         r = fps_report[str(fps)]
-        print(f"{fps:>5.0f} {r['psm_gb']:>8.2f} {r['bank_gb']:>8.2f} "
-              f"{r['bank_over_psm']:>8.1f}x {r['psm_saving_pct']:>10.1f}%")
+        print(f"{fps:>5.0f} {r['psm_exemplar_gb']:>10.2f} {r['psm_hll_gb']:>8.2f} "
+              f"{r['psm_gb']:>8.2f} {r['bank_gb']:>8.2f} "
+              f"{r['bank_over_psm']:>8.1f}x {r['bank_over_psm_exemplar_only']:>12.1f}x")
     half_cells = int(np.interp(0.5 * total_secs / 3600, cum_hours, cum_cells_l))
     print(f"#")
     print(f"# area growth: {half_cells}/{total_cells} distinct cells "
-          f"({100*half_cells/total_cells:.0f}%) seen by the halfway mark. NOTE: "
-          f"on this corpus area keeps growing (the fleet explores new routes "
-          f"over 8 months), so the saving is NOT an area plateau -- it comes "
-          f"from the per-cell reservoir capping redundant frames (dwell + "
-          f"revisits) at R, i.e. PSM memory grows SUBLINEARLY in the frame "
-          f"count while the bank is linear.")
+          f"({100*half_cells/total_cells:.0f}%) seen by the halfway mark. HONEST "
+          f"READING: area keeps growing over the 8 months, so PSM's total state "
+          f"is NOT bounded -- it grows with the cell table. Counting the full "
+          f"C={args.hll_capacity} HLL ring at every cell, PSM can EXCEED the dense "
+          f"bank at low fps (the ring is charged even to single-visit cells). The "
+          f"reservoir cap only makes the EXEMPLAR term sublinear in frame count "
+          f"(bank/ex-only column); the per-cell ring is the cost a global memory "
+          f"budget would remove. Report exemplar and ring bytes separately.")
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps({
@@ -197,7 +229,9 @@ def main() -> int:
         "total_cells_r%d" % DECISION_RES: total_cells,
         "model": {"dim": args.dim, "bytes_per_dim": BYTES_PER_DIM,
                   "reservoir": R, "per_exemplar_bytes": per_ex_bytes,
-                  "hll_bytes_per_cell": HLL_BYTES,
+                  "hll_capacity": args.hll_capacity,
+                  "hll_precision": args.hll_precision,
+                  "hll_bytes_per_cell": hll_bytes,
                   "psm_rule": "sum_cells min(frames_in_cell, R)"},
         "fps": fps_report,
         "cum_hours": cum_hours,
@@ -210,12 +244,12 @@ def main() -> int:
 
     if args.plot:
         _plot(cum_hours, recs, dwell_arr, total_secs, R, per_ex_bytes,
-              total_cells)
+              total_cells, hll_bytes)
     return 0
 
 
 def _plot(cum_hours, recs, dwell_arr, total_secs, R, per_ex_bytes,
-          total_cells) -> None:
+          total_cells, hll_bytes) -> None:
     try:
         import matplotlib
         matplotlib.use("Agg")
@@ -241,29 +275,25 @@ def _plot(cum_hours, recs, dwell_arr, total_secs, R, per_ex_bytes,
         for fps, psm_l, bank_l in ((15.0, psm15, bank15), (30.0, psm30, bank30)):
             cf = arr * fps
             psm_l.append((np.minimum(cf, R).sum() * per_ex_bytes
-                          + len(arr) * 2048) / 1e9)
+                          + len(arr) * hll_bytes) / 1e9)
             bank_l.append(cf.sum() * per_ex_bytes / 1e9)
         bank1.append(cum * 1.0 * per_ex_bytes / 1e9)
 
     fig, ax = plt.subplots(figsize=(7, 4.5))
     ax.plot(hours, bank30, "-", color="C3", label="dense bank @ 30 fps")
-    ax.plot(hours, psm30, "-", color="C0", lw=2.2, label="PSM @ 30 fps (bounded)")
+    ax.plot(hours, psm30, "-", color="C0", lw=2.2,
+            label=f"PSM @ 30 fps (R={R}+HLL ring)")
     ax.plot(hours, bank15, "--", color="C3", alpha=0.7, label="dense bank @ 15 fps")
     ax.plot(hours, psm15, "--", color="C0", lw=2.0, alpha=0.7, label="PSM @ 15 fps")
     ax.set_xlabel("cumulative driving (hours)")
     ax.set_ylabel("embedding memory (GB)")
-    ax.set_title("HDD: PSM area-bounded reservoir vs. dense embedding bank")
+    ax.set_title("HDD: PSM per-cell reservoir+HLL ring vs. dense embedding bank")
     ax.legend(fontsize=8)
     fig.tight_layout()
     fig.savefig(out_dir / "hdd_memory_vs_area.svg")
     fig.savefig(out_dir / "hdd_memory_vs_area.pdf")
     plt.close(fig)
     print("# wrote journal/figures/hdd_memory_vs_area.svg")
-
-
-if __name__ == "__main__":
-    sys.exit(main())
-
 
 
 if __name__ == "__main__":

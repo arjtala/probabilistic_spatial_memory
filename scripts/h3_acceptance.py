@@ -42,23 +42,27 @@ SWEEP_RESOLUTIONS = (8, 9, 10, 11, 12)
 
 
 def evaluate(captures: Path, sequence: str, abs_lift_pp: float,
-             *, strict: bool = False) -> tuple[bool, dict]:
+             *, strict: bool = False,
+             encoder: str | None = None) -> tuple[bool, dict]:
     """Return (overall_pass, report_dict).
 
     A per-encoder pass requires (a) monotone curve over r10..r12 and
     (b) absolute lift r10 → r12 ≥ abs_lift_pp.
 
-    `strict` controls how per-encoder passes combine into the overall
-    verdict:
-      - strict=False (default): overall PASS if **at least one encoder**
-        passes. Models the encoder asymmetry observed on the LookOut
-        sweep: bigG often picks up spatial signal that clipL misses
-        (and vice versa). The spatial-axis claim holds whenever *any*
-        encoder demonstrates monotone discrimination.
+    Overall verdict combines per-encoder passes. `encoder` takes
+    precedence over `strict`:
+      - encoder="clipL" (etc.): overall PASS iff that ONE pre-registered
+        encoder passes. This is the honest, reviewer-recommended mode
+        (finding #6b): fixing the encoder *before* looking at results
+        avoids the post-hoc "any-of-three" selection that inflates the
+        pass count by letting whichever encoder happens to work define
+        success. Report this in the paper.
+      - strict=False (default, LEGACY): overall PASS if **at least one
+        encoder** passes. NOTE: this is post-hoc encoder selection — it
+        reports a session as passing whenever *some* encoder works, which
+        is exactly the confound flagged in review. Kept only for
+        backward-compatible reproduction of the old table; do not headline.
       - strict=True: overall PASS only if **all encoders** pass.
-        Stricter signal that matches the SLOPER4D corroboration
-        framing — only useful when both encoders are known to be
-        capable on a given corpus.
     """
     fname_re = re.compile(
         rf"^h3_res_(?P<label>\d+)_{re.escape(sequence)}_(?P<enc>[A-Za-z][A-Za-z0-9]*)_s(?P<seed>\d+)\.json$"
@@ -115,7 +119,11 @@ def evaluate(captures: Path, sequence: str, abs_lift_pp: float,
             "lift_pp": lift_pp,
             "pass": enc_pass,
         }
-    if strict:
+    if encoder is not None:
+        # Pre-registered single encoder (honest mode, finding #6b): the
+        # verdict is that one encoder's pass flag. Absent data => FAIL.
+        all_pass = bool(enc_pass_flags.get(encoder, False))
+    elif strict:
         # All present encoders must pass; missing data also counts as
         # failure (consistent with the pre-2026-06-19 behavior).
         all_pass = (n_missing_or_empty == 0
@@ -137,24 +145,31 @@ def main() -> int:
                     help="session_id (e.g. seq009_running_002)")
     ap.add_argument("--abs-lift-pp", type=float, default=4.0,
                     help="minimum r10→r12 absolute lift, in percentage points (default 4)")
+    ap.add_argument("--encoder", default=None,
+                    help="pre-register ONE encoder (e.g. clipL) as the verdict "
+                         "basis (finding #6b: avoids post-hoc any-of-N encoder "
+                         "selection). Overrides --strict. Report THIS in the paper.")
     ap.add_argument("--strict", action="store_true",
-                    help="require ALL present encoders to pass (default: at "
-                         "least one encoder must pass). Use --strict for the "
-                         "SLOPER4D-style consensus framing; default is the "
-                         "LookOut-style any-encoder framing that acknowledges "
-                         "real encoder asymmetry across sequences.")
+                    help="LEGACY combine mode: require ALL present encoders to "
+                         "pass. Without --encoder/--strict the default is the "
+                         "any-encoder disjunction, which is post-hoc selection "
+                         "(kept only for old-table reproduction).")
     args = ap.parse_args()
 
     all_pass, report = evaluate(
         args.captures, args.sequence, args.abs_lift_pp,
-        strict=args.strict,
+        strict=args.strict, encoder=args.encoder,
     )
 
     header_cells = "  ".join(f"r{r:>2d} mean" for r in SWEEP_RESOLUTIONS)
     print(f"{'encoder':9s}  {header_cells}  {'mono':6s}  {'lift10→12':9s}  verdict")
     print("-" * (19 + 9 * len(SWEEP_RESOLUTIONS) + 30))
     for enc in report.keys():
+        if enc.startswith("_"):
+            continue
         info = report.get(enc, {})
+        if not isinstance(info, dict):
+            continue
         if "missing" in info:
             print(f"{enc:9s}  MISSING resolutions: {info['missing']}")
             continue
@@ -163,7 +178,12 @@ def main() -> int:
         verdict = "PASS" if info["pass"] else "FAIL"
         print(f"{enc:9s}  {cells}  {mono_s:6s}  {info['lift_pp']:+5.1f}pp   {verdict}")
     print()
-    mode = "all encoders" if args.strict else "at least one encoder"
+    if args.encoder:
+        mode = f"pre-registered encoder {args.encoder}"
+    elif args.strict:
+        mode = "all encoders"
+    else:
+        mode = "at least one encoder (POST-HOC — legacy)"
     if all_pass:
         print(f"ACCEPTANCE: PASS — {mode} shows monotone H3 curve over r10..r12 + ≥{args.abs_lift_pp:.0f}pp lift r10→r12 ({args.sequence})")
         return 0

@@ -362,13 +362,41 @@ def main() -> int:
         bucket_miou = (sum(max((p["bucket_iou"] for p in r["predictions"]), default=0.0)
                            for r in records if r.get("intervals_gt"))
                        / max(1, n_scored))
+
+        # Honest MLLM metric (reviewer finding #8): the *_at_5 numbers above OR
+        # over all K uniform frames, so they measure uniform temporal COVERAGE,
+        # not the MLLM's reasoning — they are an upper bound on what Gemini could
+        # achieve, independent of its actual pick. The chosen-frame metrics below
+        # score only the frame Gemini actually selected (predictions[0], since we
+        # reorder the pick to rank 1). These are what should be compared against
+        # a retrieval method's top-1.
+        def _chosen(r):
+            preds = r.get("predictions") or []
+            return preds[0] if preds else None
+        chosen_hit = sum(1 for r in records
+                         if r.get("intervals_gt") and _chosen(r)
+                         and _chosen(r)["in_gt_idx"] >= 0)
+        exemplar_miou_chosen = (sum((_chosen(r)["exemplar_iou"] if _chosen(r) else 0.0)
+                                    for r in records if r.get("intervals_gt"))
+                                / max(1, n_scored))
+        bucket_miou_chosen = (sum((_chosen(r)["bucket_iou"] if _chosen(r) else 0.0)
+                                  for r in records if r.get("intervals_gt"))
+                              / max(1, n_scored))
         summary = {
             "n_questions": len(records),
             "n_scored": n_scored,
+            # any-of-K COVERAGE UPPER BOUND (not MLLM reasoning; do not compare
+            # to a retrieval top-1 as if it were the MLLM's answer):
             "bucket_miou_at_5": bucket_miou,
             "exemplar_miou_at_5": exemplar_miou,
             "bucket_hit_rate_at_5": bucket_hit / max(1, n_scored),
             "exemplar_hit_rate_at_5": n_hit / max(1, n_scored),
+            "coverage_note": "the *_at_5 fields OR over all K uniform frames "
+                             "(temporal coverage upper bound), NOT Gemini's pick",
+            # Gemini's ACTUAL single-frame decision (the honest headline):
+            "bucket_miou_chosen": bucket_miou_chosen,
+            "exemplar_miou_chosen": exemplar_miou_chosen,
+            "exemplar_hit_rate_chosen": chosen_hit / max(1, n_scored),
         }
         doc = {
             "session_id": session_id,

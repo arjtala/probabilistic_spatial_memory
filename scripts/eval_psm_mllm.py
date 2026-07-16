@@ -721,6 +721,18 @@ def main() -> int:
     exemplar_at_k = float(np.mean([r["exemplar_iou_at_k"] for r in scored])) if scored else 0.0
     bucket_hit_at_k = float(np.mean([r["bucket_hit_at_k"] for r in scored])) if scored else 0.0
     exemplar_hit_at_k = float(np.mean([r["exemplar_hit_at_k"] for r in scored])) if scored else 0.0
+    # NOTE (reviewer finding #7): the @k metrics are a max over the K candidates
+    # and are therefore PERMUTATION-INVARIANT. An MLLM reranker only reorders a
+    # fixed candidate set, so it CANNOT move any @k metric — reporting a mIoU@k
+    # "rerank gain" is invalid. The rank-sensitive effect of reranking lives in
+    # the top-1 metrics below (the MLLM-picked candidate is placed at index 0),
+    # which are the only rerank numbers safe to report.
+    bucket_top1 = float(np.mean([r["bucket_iou_top1"] for r in scored])) if scored else 0.0
+    exemplar_top1 = float(np.mean([r["exemplar_iou_top1"] for r in scored])) if scored else 0.0
+    exemplar_hit_top1 = (float(np.mean([r["exemplar_iou_top1"] >= iou_threshold
+                                        for r in scored])) if scored else 0.0)
+    bucket_hit_top1 = (float(np.mean([r["bucket_iou_top1"] >= iou_threshold
+                                      for r in scored])) if scored else 0.0)
 
     out_doc = {
         "features": str(args.features),
@@ -729,20 +741,28 @@ def main() -> int:
         "mllm": mllm.name,
         "mllm_model_id": mllm.model_id,
         "top": args.top,
+        "exemplar_tolerance": args.exemplar_tolerance,
         "n_questions": len(records),
         "n_scored": len(scored),
         "summary": {
+            # @k metrics: permutation-invariant, NOT valid as a rerank effect.
             "bucket_mIoU_at_k": bucket_at_k,
             "exemplar_mIoU_at_k": exemplar_at_k,
             "bucket_hit_at_k": bucket_hit_at_k,
             "exemplar_hit_at_k": exemplar_hit_at_k,
+            # top-1 metrics: the rank-sensitive rerank effect (report THESE).
+            "bucket_mIoU_top1": bucket_top1,
+            "exemplar_mIoU_top1": exemplar_top1,
+            "bucket_hit_top1": bucket_hit_top1,
+            "exemplar_hit_top1": exemplar_hit_top1,
         },
         "questions_out": records,
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(out_doc, indent=2))
-    print(f"[eval] wrote {args.out} (bucket@k={bucket_at_k:.3f}, "
-          f"exemplar@k={exemplar_at_k:.3f}, hit@k={exemplar_hit_at_k:.3f})",
+    print(f"[eval] wrote {args.out} (exemplar mIoU: top1={exemplar_top1:.3f} "
+          f"[rank-sensitive], @k={exemplar_at_k:.3f} [permutation-invariant], "
+          f"hit@k={exemplar_hit_at_k:.3f}; tol=±{args.exemplar_tolerance}s)",
           file=sys.stderr)
 
     # Clean up partial on success.
