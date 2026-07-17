@@ -104,7 +104,7 @@ def main() -> int:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, (axA, axB) = plt.subplots(1, 2, figsize=(11.0, 4.2),
+    fig, (axA, axB) = plt.subplots(1, 2, figsize=(11.0, 3.6),
                                    gridspec_kw={"width_ratios": [1.35, 1.0]})
 
     # ---- Panel A: Hit@5 vs logical MB ---------------------------------
@@ -124,8 +124,9 @@ def main() -> int:
     # Mark the preregistered operating point M=128 / r12.
     x128 = PRIMARY_BUDGET * LOGICAL_BYTES_PER_EXEMPLAR / 1e6
     axA.axvline(x128, ls="--", color="0.5", lw=1.0, zorder=1)
-    axA.annotate("preregistered\n$M{=}128$, $r{=}12$", xy=(x128, axA.get_ylim()[0]),
-                 xytext=(x128 * 1.04, 10.5), fontsize=8, color="0.35")
+    axA.text(x128 * 1.04, 0.06, "preregistered\n$M{=}128$, $r{=}12$",
+             transform=axA.get_xaxis_transform(), va="bottom", fontsize=8,
+             color="0.35")
     axA.set_xlabel("logical exemplar memory (MB)  [$M\\times$ (768$\\cdot$4$+$8) B]")
     axA.set_ylabel("Hit@5 (\\%)")
     axA.set_title("(A) Retrieval vs. memory budget")
@@ -169,7 +170,7 @@ def main() -> int:
 
     fig.suptitle("Fixed global exemplar budget: spatial allocation shifts which "
                  "places are remembered, not aggregate retrieval", fontsize=10)
-    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     for ext in ("svg", "pdf"):
         fig.savefig(OUT_DIR / f"{args.stem}.{ext}", bbox_inches="tight")

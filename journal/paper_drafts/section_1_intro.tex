@@ -30,6 +30,17 @@ memory-bounded (\S\ref{sec:method}).
 \input{figures/f1_architecture.tex}
 Figure~\ref{fig:f1-architecture} sketches the end-to-end architecture.
 
+\begin{figure}[t!]
+\centering
+\includegraphics[width=0.68\linewidth]{figures/fig2_psm_viz_print.png}
+\caption{\psm{} on an egocentric walk (Aria Gen~2
+Pilot~\cite{aria-gen2-pilot}, \texttt{walk\_0}). \textbf{Left:} RGB stream.
+\textbf{Right:} the \psm{} index over the wearer's path: per-cell exemplar
+counts as a hex overlay. A qualitative illustration on GNSS-positioned
+wearable capture (not used for quantitative evaluation).}
+\label{fig:f8-psm-viz}
+\end{figure}
+
 \paragraph{Probabilistic Spatial Memory.}
 We propose \textbf{\psm{}}, a streaming spatial-temporal index over an H3
 hex-grid tessellation with three per-cell structures: reservoir-sampled
