@@ -1,7 +1,7 @@
 % Section 5 — Results
 % Status: page-budgeted Wearable AI draft. The body retains the fixed-budget
-% table/figure, aggregate cross-encoder sensitivity, engine checks, and the
-% corrected HDD analytical memory figure.
+% table/figure, qualitative retrievals, aggregate cross-encoder sensitivity,
+% engine checks, and the corrected HDD analytical memory figure.
 
 \section{Results}
 \label{sec:results}
@@ -49,8 +49,8 @@ uniformly chosen exemplar from a most-represented cell; once balanced, Algorithm
 replacement runs within that cell. If occupied cells outnumber slots, seed-stable
 random cell priorities avoid a recency cache. The policy cannot recover discarded
 frames and is therefore causal but not equivalent to an offline stratified sample.
-For each question, its target place is the modal canonical H3 cell in the ground-
-truth interval; rare/common are the bottom/top quartiles of that cell's frame
+For each question, its target place is the modal canonical H3 cell in the
+ground-truth interval; rare/common are the bottom/top quartiles of that cell's frame
 exposure within the session. These labels remain fixed in controls. Coordinate
 nulls permute frame-to-coordinate alignment (three seeds); boundary controls
 translate the grid 4.5\,m east/north or rotate its local tangent plane $30^\circ$.
@@ -62,7 +62,7 @@ translate the grid 4.5\,m east/north or rotate its local tangent plane $30^\circ
 Policy ($M{=}128$) & Hit@5 & mIoU@5 & oracle & rare-place Hit & common-place Hit \\
 \midrule
 \texttt{semantic\_kcenter}$^\dagger$ & \textbf{27.8\%} & \textbf{0.206} & 75.9\% & 28.0\% & \textbf{26.0\%} \\
-\texttt{uniform\_time}      & 26.0\% & 0.194 & \textbf{91.8\%} & 30.1\% & 21.8\% \\
+\texttt{uniform\_time}$^\dagger$ & 26.0\% & 0.194 & \textbf{91.8\%} & 30.1\% & 21.8\% \\
 \texttt{global\_reservoir}  & 23.9\% & 0.183 & 78.6\% & 26.7\% & 20.6\% \\
 \texttt{spatial\_priority}  & 23.6\% & 0.183 & 76.7\% & \textbf{31.1\%} & 17.9\% \\
 \texttt{hybrid}             & 22.0\% & 0.168 & 68.1\% & 21.9\% & 20.0\% \\
@@ -72,8 +72,9 @@ Policy ($M{=}128$) & Hit@5 & mIoU@5 & oracle & rare-place Hit & common-place Hit
 \caption{Budget-matched retention on 14 street-scale sessions ($M{=}128$, $r{=}12$,
 5 seeds, CLIP-L), with seeds averaged within session and sessions macro-averaged.
 All policies keep the same number of exemplars and
-return the same number of candidates. $^\dagger$\texttt{semantic\_kcenter} is an
-\emph{offline} diversity diagnostic (uses the full bank), not a streaming policy.
+return the same number of candidates. $^\dagger$ Both \texttt{uniform\_time} and
+\texttt{semantic\_kcenter} are offline diagnostics that require the full session;
+the latter also uses the full embedding bank.
 \texttt{spatial\_priority} is a causal probe with area-growing bookkeeping, not a
 deployed method. Diagnostics \texttt{spatial\_balanced}/\texttt{visit\_balanced}
 (non-causal) omitted for space.}
@@ -110,8 +111,8 @@ comparison.
 averaged within session then macro-averaged).
 \textbf{(A)}~Hit@5 vs.\ logical exemplar memory ($M\times(768{\cdot}4{+}8)$\,B) for
 the four foregrounded policies; the preregistered $M{=}128$, $r{=}12$ operating
-point is marked. A non-spatial semantic-diversity coreset (offline) is strongest;
-the spatial probe only edges the global reservoir at the tightest budget.
+point is marked. The offline uniform-time and semantic-diversity diagnostics lead
+overall; the spatial probe only edges the global reservoir at the tightest budget.
 \textbf{(B)}~At $M{=}128$, $r{=}12$, the spatial probe's Hit@5 shifts by stratum
 relative to the budget-matched global reservoir --- up on rare/low-exposure places,
 down on common places --- with paired session-bootstrap 95\% CIs (sessions
@@ -136,6 +137,22 @@ the full frame bank. Finally, an optional MLLM reranker cannot change any @$k$
 set metric because it only permutes the top five. Its rank-sensitive Hit@1 effect
 is mixed across sessions, so we do not use it by default. These checks diagnose
 the substrate; they are not evidence that the spatial allocation probe wins.
+
+Figure~\ref{fig:f7-qualitative} illustrates two top-5 hits and one honest
+revisit-heavy miss on the same engine-check session.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/fig3_qualitative.pdf}
+\caption{Illustrative look-back retrievals on
+\texttt{shelby\_arroyo\_act0}. Each row shows the query and ground-truth interval
+(left), then \psm{}'s top-5 candidates ranked by CLIP cosine. Green/red borders
+mark whether a candidate is inside the interval; yellow marks Gemini's selection.
+Top: Gemini promotes a \psm{} hit to rank~1. Middle: \psm{} retrieves hits, but
+Gemini selects a miss. Bottom: repeated near-identical views yield a \psm{} miss.
+This panel is qualitative and is not used in aggregate evaluation.}
+\label{fig:f7-qualitative}
+\end{figure}
 
 \subsection{Memory, latency, and failure modes}
 \label{sec:results-memory-latency}
@@ -194,14 +211,25 @@ every session, despite returning fewer frames. This supports only the narrow
 claim that query-aware retrieval beats uniform sampling; it does not show that
 MLLMs require \psm{}.
 
-\subsection{Multi-session persistence at metropolitan scale (Honda HDD)}
+\subsection{Multi-session revisit structure and memory accounting (Honda HDD)}
 \label{sec:results-hdd}
 
 Honda HDD~\cite{ramanishka2018hdd} provides 132 drives (102.9\,h with valid RTK
-GPS) over eight months, including repeated Bay Area streets. It is driving, not
-wearable capture, and has no look-back QA labels; we use its trajectory only to
-characterize multi-session revisit structure and modeled memory, not retrieval
-accuracy (\S\ref{sec:limitations}).
+GPS) over eight months. Because it is driving rather than wearable capture and
+has no look-back QA labels, we use only its trajectory to characterize revisit
+structure and analytical memory, not retrieval accuracy. At H3 $r{=}10$
+(${\sim}66$\,m), 47.0\% of (drive, cell) traversal events occur in cells visited
+on at least two distinct days: 5{,}163 revisited cells with a median revisit span
+of 106 days (maximum 221). Figure~\ref{fig:hdd-combined} models logical state from
+the RTK trajectory. Although the $R{=}128$ exemplar term is capped per cell,
+allocating a $C{=}60$, 60\,KiB HLL ring to each of 23{,}298 visited cells adds
+${\sim}1.4$\,GB, making full \psm{} larger than the dense bank at 1\,fps (2.27
+versus 1.14\,GB). Only 20\% of cells are seen by the temporal midpoint, so state
+continues to grow with explored area; these are modeled bytes, not measured RSS
+or a global memory bound. Corpus-scale CLIP features are unavailable beyond one
+sanity drive, and the earlier cardinality/AUC results used offline substitutes
+rather than the released engine; we therefore withdraw them and make no
+engine-backed HDD retrieval or cardinality claim (\S\ref{sec:limitations}).
 
 \begin{figure}[h]
 \centering
@@ -213,40 +241,3 @@ visited cell at four ingest rates. At 1\,fps, full \psm{} is 2.27\,GB versus
 1.14\,GB for the dense bank; the exemplar-only term is smaller.}
 \label{fig:hdd-combined}
 \end{figure}
-
-\paragraph{Revisit structure and corrected memory model (Fig.~\ref{fig:hdd-combined}).}
-Binning every drive to H3 $r{=}10$ (${\sim}66$\,m), \textbf{47.0\%} of
-(drive, cell) traversal events fall in cells revisited on $\geq2$ distinct days
-(pre-registered bar $\geq30\%$), across 5{,}163 revisited cells spanning a
-\textbf{median of 106 days} (max 221). This is a genuine multi-session revisit
-structure. We use it to model \psm{}'s \emph{logical} per-cell state from the RTK
-trajectory (no embeddings): the \emph{exemplar} term
-$\sum_\text{cells}\min(\text{frames},R)$ is capped at $R$ per cell; the dense
-bank is $1.4$/$2.3$/$4.4$/$7.2\times$ larger at 1/5/15/30\,fps. However,
-charging the full $C{=}60$ HLL ring
-($60\,\mathrm{KiB}$) to \emph{every} visited cell --- most seen once --- adds
-${\sim}1.4$\,GB over 23{,}298 cells, so \psm{}'s \emph{total} state can
-\emph{exceed} the dense bank at 1\,fps ($2.27$ vs $1.14$\,GB); the dense/full-PSM
-ratio is $0.5$/$1.5$/$3.2$/$5.5\times$. We therefore report exemplar and
-ring bytes separately and treat this as \emph{modeled logical state}, not a
-bounded-memory guarantee: total state grows with the cell count, which itself
-grows over the 8 months (only 20\% of cells seen by the halfway mark). This
-per-cell independent allocation --- a full quota to every cell --- is precisely
-what a global budget would avoid.
-
-\paragraph{Engine correctness, and why we demote the corpus cardinality/retrieval claims.}
-The HDD embeddings needed to run per-cell cardinality and cross-session retrieval
-\emph{through the C engine} at corpus scale are not available (only a single
-sanity drive was extracted); an earlier draft's ``$8{,}112$ unique observations''
-accrual and ``$0.853$ cross-session AUC'' were computed by \emph{offline Python
-substitutes} (a BLAKE2b all-time accumulator, and a dense $\mathbf{e}\!\cdot\!\mathbf{q}$
-scan over all frames), not by \psm{}'s reservoir/Murmur-HLL engine. Because those
-numbers do not exercise the released engine at scale and rest on features we cannot
-re-run, \textbf{we withdraw them as PSM-engine results} and defer engine-backed
-multi-session HDD cardinality/retrieval to future work. What we \emph{can} verify
-is an implementation check: on the one available drive the engine's per-cell HLL
-matches the Python re-implementation to a median $0.05\%$ (and both to the true
-distinct count to $0.00\%$ with a non-aging window), and a Nymeria micro-eval puts
-the per-cell median error on one session at $1.0\%$. We also note (\S\ref{sec:method}) that
-for continuous CLIP embeddings this cardinality counts distinct \emph{frames}, not
-distinct events or people, absent an object/event canonicalization stage.
