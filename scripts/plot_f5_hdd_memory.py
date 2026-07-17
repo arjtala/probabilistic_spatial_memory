@@ -89,8 +89,8 @@ def main() -> int:
     if fps_list and fps_list[0] == 1.0 and psm_full[0] > bank[0]:
         ax.annotate(
             f"full PSM {psm_full[0]:.2f} GB $>$ bank {bank[0]:.2f} GB at 1 fps",
-            xy=(x[0] + w, psm_full[0]), xytext=(x[0] - 0.38, 11.4),
-            fontsize=8, ha="left",
+            xy=(x[0] + w, psm_full[0]), xytext=(x[0] + w, 11.4),
+            fontsize=8, ha="center",
             arrowprops=dict(arrowstyle="->", color="black", lw=0.8))
 
     ax.legend(fontsize=8, loc="upper left")
