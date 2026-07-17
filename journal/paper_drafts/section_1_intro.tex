@@ -15,7 +15,17 @@
 For an intelligent agent to hold persistent memory of its environment, its internal state cannot grow unboundedly with time. Standard retrieval-augmented systems embed every observation into a dense vector bank that grows linearly with recording duration, making continuous multi-session memory prohibitively expensive on-device. Long-context modeling of the models themselves~\cite{arora2024linear} does not address the systems bottleneck: how to structure a dynamic spatial representation supporting test-time memory updating without unbounded state explosion?
 
 \paragraph{The memory-centric systems question.}
-Three properties define a viable retrieval substrate for multi-session persistent memory: \emph{memory-budgeted systems}: state must be bounded independently of sequence length, scaling instead by physical area explored; \emph{dynamic spatial representation}: the index must natively support test-time memory evolution, allowing old information to decay while maintaining unique-event cardinality across revisits; and \emph{streaming ingestion}, thus observations must update the memory in-place and online.
+Rather than claim a new memory bound, we ask an empirical allocation question:
+\emph{under a fixed global exemplar budget $M$, how should a streaming agent
+decide which observations to keep, and does allocating that budget across space
+(rather than across time) preserve more of the experiences a later query will
+need?} This isolates \emph{allocation} from encoder quality and from total
+memory: every policy we compare keeps the same number of exemplars and returns
+the same number of candidates, so differences reflect what each policy chooses
+to retain. \psm{} is one point in this space; its per-cell state is bounded and
+grows sublinearly in the frame count, but the number of occupied cells grows
+with area, so \psm{} is budgeted per cell and is \emph{not} globally
+memory-bounded (\S\ref{sec:method}).
 
 \input{figures/f1_architecture.tex}
 Figure~\ref{fig:f1-architecture} sketches the end-to-end architecture.
@@ -23,35 +33,43 @@ Figure~\ref{fig:f1-architecture} sketches the end-to-end architecture.
 \paragraph{Probabilistic Spatial Memory.}
 We propose \textbf{\psm{}}, a streaming spatial-temporal index over an H3
 hex-grid tessellation with three per-cell structures: reservoir-sampled
-embedding exemplars; a time-decayed ring buffer of HyperLogLog sketches tracking
-unique-event cardinality; and a per-cell capacity bound (\caponek{}) that dials
-strict spatial diversity ($\texttt{cap}{=}1$) to unconstrained top-$K$
-($\texttt{cap}{=}K$). Memory is bounded per cell, ingestion is streaming, and
-top-$K$ search is sub-millisecond on host CPU and low-millisecond on a Galaxy
-S22 (\S\ref{sec:method}, \S\ref{sec:results-memory-latency}; the CLIP encoder,
-not the index, is the remaining on-device bottleneck, \S\ref{sec:limitations}).
+embedding exemplars; a time-decayed ring buffer of HyperLogLog sketches giving
+per-cell cardinality and a temporal envelope; and a per-cell capacity bound
+(\caponek{}) that dials strict spatial diversity ($\texttt{cap}{=}1$) to
+unconstrained top-$K$ ($\texttt{cap}{=}K$). Ingestion is streaming and per-cell
+state is bounded; query cost depends on scope (a spatially-centered query scans
+only a k-ring of cells, while an uncentered query scans all retained exemplars).
+We report engine ingest/query cost at the actual CLIP-L deployment
+configuration in \S\ref{sec:results-memory-latency}; the CLIP encoder, not the
+index, is the dominant on-device cost (\S\ref{sec:limitations}).
 
 \paragraph{Evaluating the retrieval substrate.}
-We evaluate \psm{} as a retrieval substrate on egocentric look-back QA (e.g., ``where did I last see my bike?'', ``when was I last at this intersection?''). Multimodal LLMs achieve strong single-frame grounding yet remain brittle on temporal grounding over long video~\cite{cheng2024videgothink,chen2025groundedmultihop}, so we compose \psm{} as an upstream spatial \emph{prefilter} to a frontier MLLM (\S\ref{sec:pipeline}): \psm{} guarantees bounded-memory recall, the MLLM supplies localization precision.
+We evaluate \psm{} as a retrieval substrate on egocentric look-back QA (e.g., ``where did I last see my bike?'', ``when was I last at this intersection?''). Multimodal LLMs achieve strong single-frame grounding yet remain brittle on temporal grounding over long video~\cite{cheng2024videgothink,chen2025groundedmultihop}, so we compose \psm{} as an upstream spatial \emph{prefilter} to a frontier MLLM (\S\ref{sec:pipeline}): \psm{} supplies fixed-budget recall, the MLLM supplies localization precision.
 
 \paragraph{Contributions.}
 \begin{itemize}
-  \item \textbf{\psm{} architecture:} a bounded-memory streaming
-    spatial-temporal index combining H3 cells, time-decayed HLL ring
-    buffers, and reservoir-sampled exemplars (\S\ref{sec:method}).
-  \item \textbf{\caponek{} knob + substrate-correctness check:} the bounded
-    $R{=}128$ index tracks brute-force CLIP and, with eviction removed
-    at $R{=}1024$, recovers it exactly; a Gemini rerank matches
-    brute-force mIoU (\S\ref{sec:results-main}).
-  \item \textbf{Generalization + the MLLM blind spot:} the spatial-axis
-    result holds on 13/14 street-scale sessions across 3 sensor stacks
-    and 3 encoders (any-encoder disjunction; 11/14 for the strongest single
-    encoder), and \psm{}'s query-guided retrieval supplies the
-    spatial-temporal prefilter uniform-sampling MLLMs lack, reaching
-    every session uniform-sampling Gemini misses (\S\ref{sec:results-vanilla-mllm}).
-  \item \textbf{Multi-session persistence (Honda HDD):} on 102.9\,h of
-    metropolitan driving with genuine revisits, \psm{} exercises its
-    target regime: sublinear $O(\text{area})$ state, cross-session HLL
-    cardinality accrual over months, and label-free place retrieval
-    (\S\ref{sec:results-hdd}). Open-source under MIT.
+  \item \textbf{A budget-matched allocation study.} On 14 street-scale
+    egocentric sessions we compare streaming retention policies at an identical
+    global exemplar budget and candidate count (global reservoir, FIFO,
+    temporal stratification, a semantic $k$-center coreset, and a causal
+    spatial-allocation probe), with rare/common-place and old/recent strata
+    reported together (\S\ref{sec:results-main}).
+  \item \textbf{A characterization, not a win.} Spatial allocation changes
+    \emph{which} places are remembered, not aggregate retrieval: it helps
+    rare/low-exposure-place recall in a \emph{place-specific} way (it beats
+    coordinate-permutation nulls on 2/3 seeds and is robust to grid
+    translation/rotation) but trades against common places, and a non-spatial
+    semantic-diversity coreset is best overall. The spatial policy is an
+    experimental probe with area-growing bookkeeping, not a deployed method.
+  \item \textbf{\psm{} substrate + honest systems accounting.} A streaming H3
+    index with per-cell reservoir exemplars and a time-decayed HLL ring
+    (\S\ref{sec:method}); we report the engine's on-device cost at the actual
+    CLIP-L deployment configuration and the corrected per-cell memory model on
+    102.9\,h of driving (Honda HDD) as modeled logical state
+    (\S\ref{sec:results-hdd}).
+  \item \textbf{Correcting the MLLM framing.} A frontier-MLLM comparison shows
+    query-aware retrieval beats uniform frame sampling; it does \emph{not} show
+    that MLLMs require \psm{} (\S\ref{sec:results-vanilla-mllm}). Engine and
+    budget-matched harness (policies, semantic/coordinate-null controls, paired
+    statistics) are open-source under MIT.
 \end{itemize}

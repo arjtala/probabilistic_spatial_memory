@@ -8,28 +8,33 @@
 \section{Conclusion}
 \label{sec:conclusion}
 
-\psm is a streaming bounded-memory index for egocentric look-back QA: an H3
+\psm is a streaming spatial-temporal index for egocentric look-back QA: an H3
 hex-grid tessellation with per-cell time-decayed HLL sketches, reservoir-sampled
 exemplars, and a \caponek{} knob trading spatial diversity for
-embedding-similarity precision, bounded independently of recording duration:
-sub-2\,ms/query and ${\sim}20$\,MiB on a Galaxy S22, the CLIP encoder being the
-remaining on-device cost (\S\ref{sec:method}, \S\ref{sec:limitations}).
+embedding-similarity precision. Its per-cell state is bounded and sublinear in
+frame count, though total state grows with the number of visited cells and is not
+globally memory-bounded (\S\ref{sec:method}).
 
 \paragraph{What the evidence supports.}
-The bounded $R{=}128$ index tracks brute-force CLIP retrieval monotonically in
-\caponek{} and recovers it exactly once eviction is removed at $R{=}1024$
-(\S\ref{sec:results-main}), and \psm{}'s query-guided retrieval reaches every
-street-scale session uniform-sampling Gemini misses
-(\S\ref{sec:results-vanilla-mllm}, Fig.~\ref{fig:f2-psm-vs-mllm}). On 102.9\,h of
-driving (HDD, \S\ref{sec:results-hdd}) it exercises the multi-session persistence
-the single-pass corpus cannot: area-bounded state, cross-session cardinality
-accrual over months, and label-free place retrieval.
+Our main result is a controlled, budget-matched characterization: under an
+identical global exemplar budget, spatial allocation changes \emph{which} places
+are remembered --- it protects rare/low-exposure places in a place-specific way
+(beating coordinate-permutation nulls and robust to grid shifts) --- but does not
+improve aggregate retrieval over budget-matched non-spatial baselines, and a
+semantic-diversity coreset performs best overall (\S\ref{sec:results-main}). We
+present the spatial policy as an experimental probe, not a deployed method. We
+also correct the record on prior framing: query-aware retrieval beats uniform
+frame sampling but does not show MLLMs require \psm{}
+(\S\ref{sec:results-vanilla-mllm}); the S22 deployment figure and the HDD
+corpus-scale cardinality/AUC claims are withdrawn (\S\ref{sec:results-hdd},
+\S\ref{sec:limitations}).
 
 \paragraph{Follow-up directions.}
-On-device rerank, counting QA over the HLL cardinalities (\S\ref{sec:results-hdd}),
-and federated memory via HLL union. The engine (${\sim}700$ LoC of C) and
-evaluation harness are released under
-MIT.\footnote{Anonymized for double-blind review:
+A truly globally-budgeted allocator integrated into the C engine and evaluated
+end-to-end; human-authored, video-verified look-back QA; and engine-backed
+multi-session HDD evaluation once drive-level features are extracted. The engine
+(${\sim}700$ LoC of C) and the budget-matched evaluation harness are released
+under MIT.\footnote{Anonymized for double-blind review:
 \url{https://anonymous.4open.science/r/probabilistic_spatial_memory-3C17/}
 (\texttt{reproduce\_paper.sh} regenerates the headline figures and
 Table~\ref{tab:multi-corpus-h3}).}

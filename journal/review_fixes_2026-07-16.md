@@ -143,8 +143,15 @@ and semantic_kcenter (~22.9%) on aggregate. Report as a SECONDARY budget
 interaction, not a headline operating point. Resolution axis (M=128): spatial_priority
 r10 ~22.3% vs r12 ~23.6% — no strong interior optimum (H4 not supported).
 
+## Final n=14 controls (coordinate-null, rare-place = place-specificity test)
+- perm101: +4.0% [-0.3, 8.6] (ns/marginal); perm202: +8.3% [4.2, 12.7] (sig);
+  perm303: +7.7% [1.5, 13.9] (sig). Directionally consistent +4..+8pp; significant
+  on 2/3 null seeds once room-scale Nymeria-shelby is included (it dilutes perm101).
+- Grid (translate E/N, rotate 30): Hit@5 delta ~0 (ns) -> robust to boundary shift;
+  rare-place +4..4.5% consistent (borderline sig). common-place significantly worse
+  vs null (-4.6/-4.7) -> the rare/common trade is real.
+
 ## Remaining
-- Finish n=14 control retry (grid/null FORCE=1 re-run at current commit).
 - #6a decoupled questions + verified genuine QA (needs annotation) — future work.
 - Paper rewrite: honest-characterization framing, all baselines + controls in main
   results, k-center win prominent, spatial_priority = experimental Python probe,
