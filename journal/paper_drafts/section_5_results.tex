@@ -61,7 +61,8 @@ deployed method. Diagnostics \texttt{spatial\_balanced}/\texttt{visit\_balanced}
 \label{tab:fixed-budget}
 \end{table*}
 
-The result is a characterization, not a win (Table~\ref{tab:fixed-budget}).
+The result is a characterization, not a win (Table~\ref{tab:fixed-budget},
+Fig.~\ref{fig:fixed-budget}).
 \textbf{Spatial allocation changes which places are remembered, not aggregate
 retrieval.} Paired against the budget-matched \texttt{global\_reservoir},
 \texttt{spatial\_priority} is statistically flat on Hit@5 ($-0.3$\,pp, 95\% CI
@@ -82,6 +83,22 @@ but it still trails \texttt{uniform\_time}/\texttt{semantic\_kcenter} overall
 (\S\ref{sec:results-ablations}). We therefore present \texttt{spatial\_priority} as
 an experimental retention probe and report all baselines and controls in the main
 comparison.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/fixed_budget.pdf}
+\caption{Budget-matched retention (14 street-scale sessions, CLIP-L, seeds
+averaged within session then macro-averaged).
+\textbf{(A)}~Hit@5 vs.\ logical exemplar memory ($M\times(768{\cdot}4{+}8)$\,B) for
+the four foregrounded policies; the preregistered $M{=}128$, $r{=}12$ operating
+point is marked. A non-spatial semantic-diversity coreset (offline) is strongest;
+the spatial probe only edges the global reservoir at the tightest budget.
+\textbf{(B)}~At $M{=}128$, $r{=}12$, the spatial probe's Hit@5 shifts by stratum
+relative to the budget-matched global reservoir --- up on rare/low-exposure places,
+down on common places --- with paired session-bootstrap 95\% CIs (sessions
+resampled). Not a Pareto frontier.}
+\label{fig:fixed-budget}
+\end{figure}
 
 \subsection{Single-session operating points}
 \label{sec:results-single}
@@ -273,7 +290,7 @@ revisit structure; the revisit property turns on structure, not locomotion mode
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.82\linewidth]{figures/fig5_hdd_combined.pdf}
+\includegraphics[width=0.72\linewidth]{figures/f5_hdd_memory.pdf}
 % TODO(figure): regenerate fig5 to a single panel (A only); panels B/C are
 % withdrawn as PSM-engine results (offline Python substitutes; see text).
 \caption{HDD memory model (132 drives, 102.9\,h). \psm{}'s modeled per-cell
