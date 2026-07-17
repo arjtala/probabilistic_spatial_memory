@@ -82,15 +82,16 @@ def main() -> int:
     ax.set_xticks(x)
     ax.set_xticklabels([f"{int(f)}" for f in fps_list])
     ax.set_xlabel("ingest rate (fps)")
-    ax.set_ylabel("modeled embedding memory (GB, log scale)")
+    ax.set_ylabel("modeled logical state (GB, log scale)")
     ax.set_title("HDD modeled memory (analytical logical state, not measured RSS)")
 
     # Make the 1-fps crossover explicit: PSM full > dense bank.
     if fps_list and fps_list[0] == 1.0 and psm_full[0] > bank[0]:
+        label = f"full PSM {psm_full[0]:.2f} GB $>$ bank {bank[0]:.2f} GB at 1 fps"
+        ax.text(x[0] - 0.36, 11.4, label, fontsize=8, ha="left")
         ax.annotate(
-            f"full PSM {psm_full[0]:.2f} GB $>$ bank {bank[0]:.2f} GB at 1 fps",
+            "",
             xy=(x[0] + w, psm_full[0]), xytext=(x[0] + w, 11.4),
-            fontsize=8, ha="center",
             arrowprops=dict(arrowstyle="->", color="black", lw=0.8))
 
     ax.legend(fontsize=8, loc="upper left")

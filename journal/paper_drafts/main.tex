@@ -66,17 +66,17 @@ for Wearable Look-Back QA}
 \maketitle
 
 \begin{abstract}
-An agent on wearable glasses must remember its environment under a fixed
-on-device memory budget, yet standard retrieval banks grow linearly with
+An agent on wearable glasses must decide which experiences to retain as it
+streams through the world, yet standard retrieval banks grow linearly with
 recording time. We study a concrete question that this raises but that prior
 work leaves untested: \emph{under a fixed global exemplar budget, when does
 spatial allocation preserve useful experiences better than non-spatial
 streaming memory?} We introduce \textbf{Probabilistic Spatial Memory} (\psm), a
 streaming spatial-temporal index over an H3 hex grid with a per-cell
-reservoir of embedding exemplars and a time-decayed HyperLogLog ring. Its
-``bounded memory'' refers to the per-cell summary: revisits do not accumulate
-every frame, but expansion into new cells grows total state, which is \emph{not}
-bounded independently of recording duration (\S\ref{sec:method}).
+reservoir of embedding exemplars and a time-decayed HyperLogLog ring. The engine
+bounds retained state per spatial cell: revisits do not accumulate every frame,
+but expansion into new cells grows total state, which is \emph{not} bounded
+independently of recording duration (\S\ref{sec:method}).
 
 Separately from the C engine, our main contribution is a controlled,
 \textbf{budget-matched} study in a Python harness on 14 street-scale egocentric
