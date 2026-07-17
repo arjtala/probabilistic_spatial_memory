@@ -1,9 +1,10 @@
 # requirements-paper.txt — minimal pin set for the PSM paper reproduction bundle.
 #
-# Scope: regenerate the headline figures (F2/F3/F6) and Table 2 verdicts from
-# the captured JSON artifacts that ship in this repo, via
-# `bash scripts/reproduce_paper.sh`. NO GPU, NO API keys, NO encoder
-# feature extraction, NO MLLM rerun. Tested against Python 3.12.13.
+# Scope: regenerate the submitted fixed-budget/HDD figures, aggregate tables,
+# and paired statistics from reader-generated JSON captures via
+# `bash scripts/reproduce_paper.sh`. Raw datasets and captures do not ship in
+# this repository. No GPU or API key is needed once captures exist. Tested
+# against Python 3.12.13.
 #
 # Install:
 #   python -m pip install -r requirements-paper.txt
@@ -14,4 +15,5 @@
 
 h3==4.4.1
 h5py==3.16.0
+matplotlib==3.10.9
 numpy==2.4.4

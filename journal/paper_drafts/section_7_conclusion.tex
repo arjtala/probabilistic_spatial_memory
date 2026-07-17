@@ -11,15 +11,16 @@
 \psm is a streaming spatial-temporal index for egocentric look-back QA: an H3
 hex-grid tessellation with per-cell time-decayed HLL sketches, reservoir-sampled
 exemplars, and a \caponek{} knob trading spatial diversity for
-embedding-similarity precision. Its per-cell state is bounded and sublinear in
-frame count, though total state grows with the number of visited cells and is not
-globally memory-bounded (\S\ref{sec:method}).
+embedding-similarity precision. Revisits saturate its bounded per-cell state, but
+total state grows with the number of visited cells and is not globally
+memory-bounded (\S\ref{sec:method}).
 
 \paragraph{What the evidence supports.}
 Our main result is a controlled, budget-matched characterization: under an
 identical global exemplar budget, spatial allocation changes \emph{which} places
-are remembered --- it protects rare/low-exposure places in a place-specific way
-(beating coordinate-permutation nulls and robust to grid shifts) --- but does not
+are remembered. Its rare-place shift versus the global reservoir is directional
+(CI includes zero), while correct alignment beats 2/3 coordinate-permutation
+nulls and is robust to grid shifts. It does not
 improve aggregate retrieval over budget-matched non-spatial baselines, and a
 semantic-diversity coreset performs best overall (\S\ref{sec:results-main}). We
 present the spatial policy as an experimental probe, not a deployed method. We
@@ -36,5 +37,6 @@ multi-session HDD evaluation once drive-level features are extracted. The engine
 (${\sim}700$ LoC of C) and the budget-matched evaluation harness are released
 under MIT.\footnote{Anonymized for double-blind review:
 \url{https://anonymous.4open.science/r/probabilistic_spatial_memory-3C17/}
-(\texttt{reproduce\_paper.sh} regenerates the headline figures and
-Table~\ref{tab:multi-corpus-h3}).}
+(\texttt{reproduce\_paper.sh} regenerates the submitted figures, aggregate
+tables, and paired statistics from reader-generated captures, and fails loudly
+when required licensed data/artifacts are absent).}

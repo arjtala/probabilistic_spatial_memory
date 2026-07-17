@@ -1,26 +1,26 @@
 # Probabilistic Spatial Memory
 
-A bounded-memory, time-decayed spatial memory system built on probabilistic data structures. Models *what has been seen*, *where it was seen*, and *how memory fades over time* — from egocentric video captured on [Project Aria](https://www.projectaria.com/) glasses.
+A per-cell-bounded, time-decayed spatial memory system built on probabilistic data structures. Models *what has been seen*, *where it was seen*, and *how memory fades over time* from egocentric video captured on [Project Aria](https://www.projectaria.com/) glasses.
 
 ## TL;DR
 
-`psm` turns timestamped egocentric video features into a bounded spatial memory: embeddings are hashed into H3 cells, each cell keeps a sliding ring buffer of HyperLogLog sketches, and the visualizer replays the session as synchronized video plus map.
+`psm` turns timestamped egocentric video features into a spatial memory with capped per-cell state: embeddings are hashed into H3 cells, each cell keeps a sliding ring buffer of HyperLogLog sketches, and the visualizer replays the session as synchronized video plus map. Total state grows with the number of occupied cells and is not globally bounded.
 
 In the map view, hexes are colored along an RGB-cube tour (near-black for sparse cells, climbing through red, yellow, green, cyan, blue, magenta, and ending at white for the hottest cell relative to the current scene). Optional 3D extrusion (`E` to toggle) raises a cell's height in proportion to its intensity so dominant memory cells read at a glance. Older memory does not disappear continuously; it decays as time buckets roll over, and cells with history but little current activity fade by becoming more transparent.
 
 ## Why
 
-This project is a systems-oriented model of episodic spatial memory under hard storage limits. The goal is not to predict behavior or reconstruct every past frame, but to maintain a compact representation of:
+This project is a systems-oriented model of episodic spatial memory under storage constraints. The goal is not to predict behavior or reconstruct every past frame, but to maintain a compact representation of:
 
 - what was seen
 - where it was seen
 - how that memory fades over time
 
-The interesting constraint is that memory stays bounded even as session length grows. Instead of storing raw frames or full embeddings indefinitely, the system keeps approximate, mergeable summaries that can still answer useful questions about familiarity, novelty, and revisitation.
+Per-cell memory saturates as a wearer dwells in or revisits the same places. Total memory still grows as new H3 cells are explored, so the engine does not provide a recording-duration-independent global bound. Instead of storing every frame indefinitely, it keeps capped per-cell exemplars and approximate, mergeable summaries.
 
 ## Design goals
 
-- **Bounded memory:** memory use should remain stable as more observations arrive.
+- **Bounded per-cell memory:** revisits should not grow a cell indefinitely; global occupied-cell growth must be reported separately.
 - **Time decay:** recent experience should matter more than old experience without requiring explicit garbage collection of individual events.
 - **Spatial locality:** observations should be attached to geographic regions so queries stay local and map rendering is natural.
 - **Fast aggregation:** summaries should be cheap to merge across time windows for interactive exploration.
@@ -28,29 +28,25 @@ The interesting constraint is that memory stays bounded even as session length g
 
 ## Core idea
 
-Given a stream of observations tied to locations and timestamps, the system maintains compact approximate summaries per geographic region. Each region tracks distinct observations seen over sliding time windows using [HyperLogLog](https://en.wikipedia.org/wiki/HyperLogLog) counters arranged in a ring buffer.
+Given a stream of observations tied to locations and timestamps, the system maintains compact approximate summaries per geographic region. Each region tracks distinct frame-embedding hashes over sliding time windows using [HyperLogLog](https://en.wikipedia.org/wiki/HyperLogLog) counters arranged in a ring buffer.
 
 ```
 (timestamp, lat, lon, observation) -> spatial tile -> ring buffer of HLLs
 ```
 
 This enables queries like:
-- "How many distinct things were seen in this area in the last N intervals?"
+- "How many distinct frame hashes were observed in this area in the last N intervals?"
 - "Is this region becoming more or less novel over time?"
 
-Memory usage is bounded regardless of how many observations are processed.
+Memory usage is bounded per occupied cell, not across continual exploration.
 
 ## What is being counted?
 
-The current implementation hashes frame-level model embeddings into the spatial memory engine, so the primary signal is an approximate count of distinct semantic observations per region and time window.
-
-That is closer to "unique visual or semantic states" than to raw frame count. In practice, the counting layer is generic enough to support several granularities:
-
-- **Frame-level embeddings (current):** count distinct whole-scene observations.
-- **Object-level embeddings:** count distinct objects encountered in space.
-- **Clustered or LSH-stabilized embeddings:** count distinct semantic categories with more robustness to viewpoint or lighting changes.
-
-This separation matters because the storage layer only needs stable hashed tokens; it does not need to know whether those tokens came from whole frames, objects, or semantic clusters.
+The current implementation hashes the raw bytes of frame-level model embeddings.
+Continuous embeddings from near-duplicate frames usually differ, so the HLL signal
+is close to a count of distinct ingested frames, not semantic events, objects, or
+people. An upstream object tracker or event/embedding canonicalizer could change
+the counting unit, but that stage is not implemented here.
 
 ## End-to-end pipeline
 
@@ -75,6 +71,41 @@ A Python extraction pipeline (offline) runs each session through two vision foun
 | [V-JEPA 2](https://arxiv.org/abs/2412.08974) | `jepa` | 1024-d mean-pooled encoder tokens + **spatial prediction error maps** (16x16). Prediction error highlights *surprise* — regions the model fails to predict from context, indicating novelty or unusual content. | Viridis (purple → teal → yellow) |
 
 The CLS embeddings are hashed into the spatial memory engine (HyperLogLog counters per H3 hex cell). The spatial maps are rendered as semi-transparent heatmap overlays on the video.
+
+## Paper datasets and licenses
+
+This repository does not redistribute raw datasets, extracted features, or
+evaluation captures. Download each dataset from its provider, accept the
+provider's current terms, and then run the extraction/evaluation scripts.
+The repository's MIT license applies only to this project's code and does not
+relicense third-party data.
+
+| Dataset | Provider download | License or access terms |
+|---|---|---|
+| Nymeria | [Project Aria](https://www.projectaria.com/datasets/nymeria/) | [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/), as linked by the provider. |
+| SLOPER4D | [Official repository and download](https://github.com/climbingdaily/SLOPER4D) | The official repository states [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/); confirm that the same terms accompany the downloaded archive. |
+| LookOut / Aria Navigation Dataset | [Project page and data link](https://sites.google.com/stanford.edu/lookout) | The project page does not state a standard dataset license. Obtain and use the data only under terms supplied by the authors/provider. |
+| Honda HDD | [Honda Research Institute](https://usa.honda-ri.com/HDD) | Access-gated, non-commercial research use under the provider's HDD agreement; a university email request is required. |
+
+Provider terms can change. The table records the access status checked on
+2026-07-17; the terms shown at download time control.
+
+### Reproducing the paper
+
+After downloading the datasets and generating features/questions, run the H3
+acceptance drivers and the fixed-budget SLURM suite documented in
+[`journal/wearables_novelty_experiments.md`](journal/wearables_novelty_experiments.md).
+Then regenerate the submitted summaries and figures:
+
+```bash
+python -m pip install -r requirements-paper.txt
+bash scripts/reproduce_paper.sh
+```
+
+The driver requires `captures/wearables_fixed_budget/`, the grid/null control
+captures, the 14 H3-resolution capture directories, and
+`captures/hdd/memory_vs_area.json`. It exits with status 3 on a clean checkout
+instead of printing results from missing data.
 
 ## HDF5 feature schema
 

@@ -1,6 +1,6 @@
 """Fixed-budget result figure (2 panels), generated from captured JSON.
 
-Panel A: Hit@5 vs. logical memory (M / logical MiB) for the four streaming/
+Panel A: Hit@5 vs. logical memory (M / logical MB) for the four streaming/
          diagnostic policies the paper foregrounds (global_reservoir,
          uniform_time, semantic_kcenter, spatial_priority). Seeds are averaged
          within a session, then macro-averaged over sessions. The preregistered
@@ -107,7 +107,7 @@ def main() -> int:
     fig, (axA, axB) = plt.subplots(1, 2, figsize=(11.0, 4.2),
                                    gridspec_kw={"width_ratios": [1.35, 1.0]})
 
-    # ---- Panel A: Hit@5 vs logical MiB --------------------------------
+    # ---- Panel A: Hit@5 vs logical MB ---------------------------------
     for method, label, color, marker, lw in PANEL_A:
         budgets = sorted(b for b in data.get(method, {}) if b is not None)
         xs, ys = [], []
@@ -115,7 +115,7 @@ def main() -> int:
             h = macro(data[method][b], "hit_at_k")
             if h is None:
                 continue
-            xs.append(b * LOGICAL_BYTES_PER_EXEMPLAR / 1e6)  # logical MiB
+            xs.append(b * LOGICAL_BYTES_PER_EXEMPLAR / 1e6)  # decimal MB
             ys.append(h * 100)
         if not xs:
             continue
@@ -126,7 +126,7 @@ def main() -> int:
     axA.axvline(x128, ls="--", color="0.5", lw=1.0, zorder=1)
     axA.annotate("preregistered\n$M{=}128$, $r{=}12$", xy=(x128, axA.get_ylim()[0]),
                  xytext=(x128 * 1.04, 10.5), fontsize=8, color="0.35")
-    axA.set_xlabel("logical exemplar memory (MiB)  [$M\\times$ (768$\\cdot$4$+$8) B]")
+    axA.set_xlabel("logical exemplar memory (MB)  [$M\\times$ (768$\\cdot$4$+$8) B]")
     axA.set_ylabel("Hit@5 (\\%)")
     axA.set_title("(A) Retrieval vs. memory budget")
     axA.grid(ls=":", alpha=0.4)

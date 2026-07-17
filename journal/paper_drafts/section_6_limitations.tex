@@ -14,34 +14,26 @@
 \label{sec:limitations}
 
 \paragraph{Benchmark ceiling and coverage.}
-Both \psm{} and brute-force CLIP plateau at 13.4\% Hit@5 on the headline session
-(\S\ref{sec:results-single}): 162/187 narrations describe repeatedly-entered rooms
-with near-identical frames, so single-frame CLIP-cosine retrieval converges to a
-frame rarely matching the annotator's single chosen interval. This is a ceiling
-of single-frame cosine matching, not an absolute benchmark limit (sliding-window
-CLIP ($15.0\%$) and SigLIP-2 rescues clear it; \S\ref{sec:results-ablations},
-\S\ref{sec:results-multi-corpus}), and \psm{} and brute-force agree on the 25
-uniquely-groundable questions. Future benchmarks should
-score against \emph{any} acceptable revisit window. Relatedly, the deepest
-single-session analysis (Table~\ref{tab:headline}) remains one Nymeria session,
-and the 14-session sweep (\S\ref{sec:results-multi-corpus}) uses a heuristic
-monotonicity-plus-lift criterion rather than a formal test; mIoU/counting across
-all 14 are a follow-up.
+On the Nymeria engine-check session, both eviction-free \psm{} and brute-force
+CLIP reach only 13.4\% Hit@5: 162/187 action narrations occur in repeatedly
+entered rooms with near-identical frames. A single annotated interval also
+penalizes valid revisits. More importantly, the 14-session allocation study uses
+third-person action narrations for Nymeria and target-frame-generated questions
+for SLOPER4D/LookOut, not human-authored look-back requests. It therefore tests
+retention under controlled retrieval proxies, not end-to-end wearable QA.
 
 \paragraph{One honest spatial-axis failure.}
-Of the 14 street-scale sessions, \texttt{BurlingameDT4\_feb5} (242\,m bbox) is
-the only one where all three encoders fail the monotone-\caponek{} lift: a
-visually homogeneous parking-lot street whose queries collapse onto a few
-indistinguishable cells. The same failure recurs on Aria Gen~2
-Pilot's~\cite{aria-gen2-pilot} GPS-grounded walks, confirming the bottleneck is
-encoder discrimination, not trajectory quality.
+Of the 14 street-scale sessions, \texttt{BurlingameDT4} is the only one
+where all three encoders fail the resolution-lift criterion: a visually
+homogeneous parking-lot trajectory whose queries collapse onto a few
+indistinguishable cells.
 
 \paragraph{Evaluation scope.}
-\psm's index latency and RSS are reported on host at the actual CLIP-L deployment
+\psm's index latency and RSS are reported on host at the target CLIP-L
 configuration ($d{=}768$, $R{=}128$, $C{=}60$; \S\ref{sec:results-memory-latency});
 a prior Galaxy S22 figure was measured at a reduced ($d{=}128$, $R{=}4$) config and
 is withdrawn as a deployment number, so on-device figures at the true configuration
-remain to be measured. The remaining on-device gap is dominated by the CLIP encoder;
+remain to be measured. The CLIP encoder is expected to dominate on-device cost;
 a distilled encoder (MobileCLIP~\cite{vasu2024mobileclip} or an AM-RADIO/E-RADIO
 agglomerative model~\cite{ranzinger2024radio}) is the natural drop-in since \psm{}
 is encoder-agnostic (\S\ref{sec:results-multi-corpus}). Our fixed-budget study
@@ -59,9 +51,5 @@ as modeled logical state, and \emph{withdraw} the earlier corpus-scale cardinali
 and cross-session-AUC numbers (computed by offline Python substitutes, not the
 engine). Engine-backed multi-session HDD cardinality/retrieval --- with a
 $k$-nearest-cell hard-negative control and purpose-built VPR
-descriptors~\cite{keetha2023anyloc,alibey2023mixvpr} --- is deferred to future
-work, once the drive-level features are extracted. (A residual note from the
-withdrawn analysis: the extracted sanity features carry a ${\sim}3$\,s
-GPS-warmup skew, ${\sim}17$\,m median, corrected at analysis time, with the
-source-side fix
-verified in simulation but not yet re-run through GPU extraction.)
+descriptors~\cite{keetha2023anyloc,alibey2023mixvpr} --- is deferred until the
+drive-level features are extracted.

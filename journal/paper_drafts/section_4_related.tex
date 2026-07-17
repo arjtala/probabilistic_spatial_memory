@@ -21,20 +21,19 @@ ESOM's~\cite{manigrasso2026esom} 4\% online success rate underscores the
 hardness of streaming egocentric retrieval. A contrasting spatial paradigm is
 the learned world model: Navigation World Models~\cite{bar2025nwm} train an
 implicit autoregressive generative model of egocentric space, predicting future
-observations from past frames and actions. \psm{} is the explicit,
-non-learned dual: an $O(\text{area})$-bounded spatial \emph{index} rather than
-an unbounded learned predictor, and is orthogonal, a
-bounded-memory spatial-temporal substrate any grounding method can rerank
+observations from past frames and actions. \psm{} is an explicit, non-learned
+alternative: a per-cell-capped spatial \emph{index} whose total state grows with
+occupied cells, and an upstream substrate that grounding methods can rerank
 without retraining (the VideoRAG pattern~\cite{jeong2025videorag}).
 
 \paragraph{Memory-augmented video LLMs.}
-MovieChat~\cite{song2024moviechat}, MA-LMM~\cite{he2024malmm},
-Flash-VStream~\cite{zhang2024flashvstream},
-LifelongMemory~\cite{wang2024lifelongmemory},
-HERMES~\cite{zhang2026hermes}, InfiniPot-V~\cite{kim2025infinipotv}, and
-SAVEMem~\cite{wu2026savemem} bound memory in \emph{token} space (KV-cache
-compression, dense-to-sparse merging, recurrent state). \psm{} bounds
-\emph{geographic} space (H3 cells) and runs upstream, deciding
+MovieChat and MA-LMM~\cite{song2024moviechat,he2024malmm}, Flash-VStream and
+LifelongMemory~\cite{zhang2024flashvstream,wang2024lifelongmemory}, and recent
+HERMES, InfiniPot-V, and SAVEMem
+~\cite{zhang2026hermes,kim2025infinipotv,wu2026savemem} bound memory in
+\emph{token} space (KV-cache
+compression, dense-to-sparse merging, recurrent state). \psm{} instead organizes
+memory in \emph{geographic} space with per-cell caps and runs upstream, deciding
 \emph{which} frames the MLLM sees, not compressing what it sees.
 Time-sensitive video LLMs such as TimeChat~\cite{ren2024timechat} instead target
 temporal grounding within a fixed context, but do not bound memory, orthogonal
@@ -46,7 +45,7 @@ locally-adaptive vector quantization~\cite{aguerrebere2024lvq} give
 bounded-cost billion-point ANN but assume near-static corpora with no spatial
 axis. \psm{} adds a ``near here'' H3 $k$-ring restriction and streaming
 ring-buffer-aged per-cell state. Binning observations into a geohash or quadtree
-grid and capping per bin already yields $O(\text{area})$ state; \psm{}'s
+grid and capping per bin already yields state proportional to occupied cells; \psm{}'s
 contribution is not the binning but what each cell carries: a time-decayed
 HyperLogLog ring tracking cross-revisit cardinality and temporal envelopes (which
 static buckets lack), reservoir-under-\caponek{} exemplar semantics, and streaming
@@ -60,7 +59,7 @@ CLIP-Fields~\cite{shafiullah2023clipfields}) and online 3D scene graphs
 language-aligned features to reconstructed geometry. These are far richer scene
 representations than \psm{}, but they assume per-scene SLAM/depth and grow with
 scene content. \psm{} trades that richness for three deployment properties they
-do not target: state \emph{provably} bounded by explored area, not scene
+do not target: fixed state per occupied cell rather than growth with scene
 complexity; \emph{device-independent} localization via global H3 ids, with no
 per-scene map to build or share; and a \emph{sensor-light} footprint (a coarse
 pose stream, no dense reconstruction). It is a substrate such a builder could
@@ -72,11 +71,8 @@ recognition (VPR) and loop closure: classical bag-of-words
 (FAB-MAP~\cite{cummins2008fabmap}, DBoW2~\cite{galvezlopez2012dbow2}) and learned
 descriptors (CosPlace~\cite{berton2022cosplace},
 EigenPlaces~\cite{berton2023eigenplaces}, MixVPR~\cite{alibey2023mixvpr},
-AnyLoc~\cite{keetha2023anyloc}), purpose-built for the cross-session same-place
-retrieval our HDD analysis (\S\ref{sec:results-hdd}) measures. We report that
-$0.853$ AUC as a byproduct of the bounded index under off-the-shelf CLIP cosine,
-not a VPR contribution: those descriptors and a $k$-nearest-cell control
-(\S\ref{sec:limitations}) are the proper baselines, left to future work. \psm{}
-differs in \emph{role}: it recognizes places to budget memory and route
-retrieval, keyed on global H3 ids, so VPR descriptors are complementary drop-ins
-for its cell-matching step, not alternatives.
+AnyLoc~\cite{keetha2023anyloc}) are purpose-built for cross-session same-place
+retrieval. Our current HDD result is trajectory-only memory accounting, not a VPR
+evaluation (\S\ref{sec:results-hdd}); engine-backed retrieval with these
+descriptors and a $k$-nearest-cell control remains future work. VPR descriptors
+would be complementary features for \psm{} rather than an alternative index.

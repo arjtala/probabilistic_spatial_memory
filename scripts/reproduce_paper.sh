@@ -7,24 +7,21 @@
 # than emit empty figures. Regenerate captures/ on the cluster first (see the
 # "Where the captured artifacts came from" section below).
 #
-# When captures/ is present, regenerates from the captured JSON/MP4 artifacts:
-#   - Table 2 H3 acceptance verdicts (13/14 PASS claim across LookOut +
-#     SLOPER4D + Nymeria, three encoders).
-#   - F2 (PSM vs any-of-K coverage at K=8, Gemini-3.1-Pro) table + PDF/SVG.
-#   - F3 (H3 sensitivity, 3 encoders, 14-session mean ±1σ) PDF/SVG.
-#   - F6 (memory + latency vs session length) PDF/SVG.
-#   - Bootstrap 95 % CIs on the four-session Aria detail (mIoU + Hit@5).
+# When captures/ is present, regenerates the submitted paper artifacts:
+#   - Aggregate H3 sensitivity verdicts, using pre-registered CLIP-L (9/14).
+#   - Fixed-budget summary, paired session-bootstrap comparisons, and figure.
+#   - Coordinate-permutation and grid-boundary paired control summaries.
+#   - HDD analytical modeled-memory figure from the RTK-derived JSON.
 #
 # What this script DOES NOT do (and cannot, without external resources):
 #   - Encoder feature extraction. The CLIP-L/CLIP-bigG/SigLIP-2L feature
 #     H5s under $PSM_FEATURE_ROOT (default: ./features/) require a
 #     cluster GPU pass (~12 GPU-hours wall for the full 14-session set).
-#   - MLLM baseline rerun. captures/mllm_baseline/*_gemini.json each
-#     embed ~30 Gemini 3.1 Pro completions; regenerating them needs
-#     GEMINI_API_KEY and ~3000 API calls.
 #   - H3-resolution sweep rerun. captures/aria_*_h3/, captures/sloper4d_*_h3/
 #     are the output of `scripts/eval_hyperparam_sweep.sh` after features
-#     and questions are on disk; rerunning is gated on the two items above.
+#     and questions are on disk.
+#   - Fixed-budget sweep rerun. Use scripts/slurm/fixed_budget_suite.sbatch
+#     after downloading and extracting the provider-licensed datasets.
 # Use scripts/aria_acceptance.sh or scripts/sloper4d_acceptance.sh to drive
 # the full pipeline end-to-end when the prerequisites are met.
 #
@@ -33,8 +30,9 @@
 #   - captures/sloper4d_*_h3/     scripts/sloper4d_acceptance.sh (SLOPER4D
 #                                   + Nymeria; the shelby_arroyo session
 #                                   reuses the SLOPER4D harness)
-#   - captures/mllm_baseline/     scripts/eval_mllm_baseline.py --mllm gemini
-#   - benchmarks/nymeria/         scripts/bench_brute_force_clip.py (30 sess.)
+#   - captures/wearables_fixed_budget/  fixed_budget_suite.sbatch MODE=base
+#   - captures/{grid_controls,coordinate_null}/  the same sbatch in grid/null mode
+#   - captures/hdd/memory_vs_area.json  scripts/hdd_memory_vs_area.py
 #
 # Usage:
 #   conda activate psm                      # or any Python 3.12 env with
@@ -77,7 +75,7 @@ if [[ ! -x "$PY" ]]; then
 fi
 
 # Total step count for the [N/M] headers.
-TOTAL=5
+TOTAL=4
 
 printf '╔════════════════════════════════════════════════════════════╗\n'
 printf '║  PSM paper — one-shot reproduction                          ║\n'
@@ -88,45 +86,51 @@ printf '╚═══════════════════════
 printf '\n'
 
 # ----------------------------------------------------------------------
-# Step 1/5 — sanity check (env + captures on disk)
+# Step 1/4 — sanity check (env + captures on disk)
 # ----------------------------------------------------------------------
 printf '[1/%d] Sanity check — interpreter + captures layout\n' "$TOTAL"
 printf '       python: %s\n' "$PY"
-"$PY" -c "import numpy, h3, h5py" 2>/dev/null \
-  || printf '       [WARN] one of numpy/h3/h5py not importable in this interpreter.\n'
+deps_missing=0
+"$PY" -c "import numpy, h3, h5py, matplotlib" 2>/dev/null || {
+  printf '       [WARN] one of numpy/h3/h5py/matplotlib is not importable.\n'
+  deps_missing=1
+}
 
-# captures/ is NOT shipped in the repo (it is .gitignored — the JSON/MP4
-# artifacts are regenerated on the cluster; see the header). If it is absent
-# the reproduction cannot do anything, so fail loudly instead of printing a
-# green "done" over an empty run. Count how many of the 14 sessions actually
-# have artifacts so downstream steps can refuse to fabricate a PASS summary.
+# Captures are not shipped in the repo. Require every artifact family used by
+# the submitted figures/controls so a partial checkout cannot look successful.
 missing_core=0
-for d in captures benchmarks; do
-  if [[ -d "$REPO/$d" ]]; then
-    printf '       OK      %s\n' "$d"
+required_artifacts=(
+  "captures/wearables_fixed_budget"
+  "captures/grid_controls"
+  "captures/coordinate_null"
+  "captures/hdd/memory_vs_area.json"
+)
+for rel in "${required_artifacts[@]}"; do
+  if [[ -e "$REPO/$rel" ]]; then
+    printf '       OK      %s\n' "$rel"
   else
-    printf '       MISSING %s\n' "$d"
+    printf '       MISSING %s\n' "$rel"
     missing_core=$((missing_core + 1))
   fi
 done
-if [[ ! -d "$REPO/captures/mllm_baseline" ]]; then
-  printf '       MISSING captures/mllm_baseline (F2 step will be skipped)\n'
-fi
 if [[ "$missing_core" -gt 0 ]]; then
   printf '\n'
-  printf '[FATAL] captures/ or benchmarks/ is absent. This repo does NOT ship the\n' >&2
-  printf '        captured artifacts (they are .gitignored and regenerated on the\n' >&2
-  printf '        cluster — see this script'\''s header for the extraction/eval steps).\n' >&2
-  printf '        Nothing to reproduce from a clean checkout; aborting rather than\n' >&2
-  printf '        emitting empty figures and a hardcoded PASS claim.\n' >&2
+  printf '[FATAL] Required captures are absent. The repository does not redistribute\n' >&2
+  printf '        provider-licensed datasets or generated captures. Download each\n' >&2
+  printf '        dataset from its provider and run the extraction/evaluation commands\n' >&2
+  printf '        listed in README.md and this script before reproducing paper assets.\n' >&2
   exit 3
+fi
+if [[ "$deps_missing" -ne 0 ]]; then
+  printf '[FATAL] Install requirements-paper.txt in the selected interpreter.\n' >&2
+  exit 2
 fi
 printf '\n'
 
 # ----------------------------------------------------------------------
-# Step 2/5 — H3 acceptance verdicts (reproduces Table 2)
+# Step 2/4 — pre-registered H3 acceptance verdicts
 # ----------------------------------------------------------------------
-# 14 v1 sessions: (sequence_id, captures_dir). Order matches plot_f3.
+# 14 v1 sessions: (sequence_id, captures_dir). Order matches the paper table.
 V1_SESSIONS=(
   "Mainquad_jan10                          captures/aria_Mainquad_jan10_h3"
   "Sanmateopark_garage_jan11               captures/aria_Sanmateopark_garage_jan11_h3"
@@ -144,7 +148,7 @@ V1_SESSIONS=(
   "20230608_s0_shelby_arroyo_act0_3ciwl8   captures/sloper4d_20230608_s0_shelby_arroyo_act0_3ciwl8_h3"
 )
 
-printf '[2/%d] H3 acceptance verdicts — Table 2 reproduction (14 sessions)\n' "$TOTAL"
+printf '[2/%d] H3 acceptance verdicts — pre-registered CLIP-L (14 sessions)\n' "$TOTAL"
 n_pass=0
 n_fail=0
 n_skip=0
@@ -160,7 +164,8 @@ for entry in "${V1_SESSIONS[@]}"; do
   # the loop in both cases — `if !` guards `set -e`.
   if "$PY" "$REPO/scripts/h3_acceptance.py" \
         --captures "$caps_abs" \
-        --sequence "$seq" >/dev/null 2>&1; then
+        --sequence "$seq" \
+        --encoder clipL >/dev/null 2>&1; then
     printf '       PASS    %s\n' "$seq"
     n_pass=$((n_pass + 1))
   else
@@ -173,105 +178,71 @@ n_ran=$((n_pass + n_fail))
 if [[ "$n_ran" -eq 0 ]]; then
   printf '       Summary: 0/%d sessions had artifacts on disk — NOTHING was reproduced.\n' \
     "${#V1_SESSIONS[@]}" >&2
-  printf '       The paper claim (13/14 PASS) is NOT demonstrated by this run. Regenerate\n' >&2
+  printf '       The paper claim (pre-registered CLIP-L: 9/14 PASS) is not demonstrated. Regenerate\n' >&2
   printf '       captures/aria_*_h3 / captures/sloper4d_*_h3 on the cluster first.\n' >&2
   exit 4
 fi
-printf '       Summary: %d PASS / %d FAIL / %d SKIP  (of %d sessions; paper claim: 13/14 PASS)\n' \
+printf '       Summary: %d PASS / %d FAIL / %d SKIP  (of %d sessions; expected: 9/14 PASS)\n' \
   "$n_pass" "$n_fail" "$n_skip" "${#V1_SESSIONS[@]}"
 if [[ "$n_skip" -gt 0 ]]; then
-  printf '       [WARN] %d session(s) skipped for missing artifacts — this is a PARTIAL\n' "$n_skip"
-  printf '              reproduction; the 13/14 claim requires all 14 present.\n'
+  printf '[FATAL] %d session(s) skipped; the 9/14 result requires all 14.\n' "$n_skip" >&2
+  exit 4
 fi
-printf '       (for full per-encoder breakdown re-run h3_acceptance.py without redirect)\n'
+if [[ "$n_pass" -ne 9 || "$n_fail" -ne 5 ]]; then
+  printf '[FATAL] CLIP-L verdict mismatch: observed %d/%d PASS, expected 9/14.\n' \
+    "$n_pass" "$n_ran" >&2
+  exit 5
+fi
+printf '       (for the post-hoc per-encoder breakdown, run h3_acceptance.py without --encoder)\n'
 printf '\n'
 
 # ----------------------------------------------------------------------
-# Step 3/5 — any-of-K coverage aggregation (F2 table)
+# Step 3/4 — fixed-budget table, paired controls, and submitted figure
 # ----------------------------------------------------------------------
-printf '[3/%d] Vanilla MLLM aggregation — F2 table (PSM vs Gemini-3.1-Pro @ K=8)\n' "$TOTAL"
-if [[ ! -d "$REPO/captures/mllm_baseline" ]] || \
-   ! ls "$REPO/captures/mllm_baseline"/*_gemini.json >/dev/null 2>&1; then
-  printf '       SKIP — captures/mllm_baseline/*_gemini.json missing.\n'
-else
-  # plot_f2 prints the apples-to-apples per-session table on stdout
-  # and writes the SVG. Stdout is the F2 reproduction artifact for
-  # reviewers reading the script log.
-  if ! "$PY" "$REPO/scripts/plot_f2_psm_vs_mllm.py"; then
-    printf '       [WARN] plot_f2_psm_vs_mllm.py exited non-zero; continuing.\n'
-  fi
-fi
+printf '[3/%d] Fixed-budget allocation — summary, paired CIs, controls, figure\n' "$TOTAL"
+BASE="$REPO/captures/wearables_fixed_budget"
+GRID="$REPO/captures/grid_controls"
+NULL="$REPO/captures/coordinate_null"
+
+"$PY" "$REPO/scripts/summarize_fixed_budget.py" \
+  "$BASE" --recursive --strict --quiet \
+  --out "$BASE/summary.md"
+"$PY" "$REPO/scripts/compare_fixed_budget.py" \
+  "$BASE" --recursive \
+  --method-a spatial_priority --method-b global_reservoir \
+  --budget 128 --h3-resolution 12 \
+  --out "$BASE/paired_primary.md"
+"$PY" "$REPO/scripts/plot_fixed_budget.py" "$BASE" --recursive
+
+for transform in e4p5 n4p5 rot30; do
+  "$PY" "$REPO/scripts/compare_fixed_budget.py" \
+    "$BASE" "$GRID" --recursive \
+    --method-a spatial_priority --method-b spatial_priority \
+    --transform-a base --transform-b "$transform" \
+    --budget 128 --h3-resolution 12 \
+    --out "$GRID/paired_base_vs_${transform}.md"
+done
+for transform in perm101 perm202 perm303; do
+  "$PY" "$REPO/scripts/compare_fixed_budget.py" \
+    "$BASE" "$NULL" --recursive \
+    --method-a spatial_priority --method-b spatial_priority \
+    --transform-a base --transform-b "$transform" \
+    --budget 128 --h3-resolution 12 \
+    --out "$NULL/paired_base_vs_${transform}.md"
+done
 printf '\n'
 
 # ----------------------------------------------------------------------
-# Step 4/5 — figure regeneration (F2 / F3 / F6 PDFs + SVGs)
+# Step 4/4 — corrected HDD analytical memory figure
 # ----------------------------------------------------------------------
-printf '[4/%d] Figure regeneration — F2 / F3 / F6 SVG + PDF\n' "$TOTAL"
-
-run_plot () {
-  local label="$1"; shift
-  local script="$1"; shift
-  if [[ ! -f "$REPO/scripts/$script" ]]; then
-    printf '       SKIP %s — missing scripts/%s\n' "$label" "$script"
-    return
-  fi
-  if ! "$PY" "$REPO/scripts/$script" "$@"; then
-    printf '       [WARN] %s exited non-zero; continuing.\n' "$label"
-  fi
-}
-
-run_plot "F2" plot_f2_psm_vs_mllm.py
-run_plot "F3" plot_f3_multi_corpus.py
-run_plot "F6" plot_f6_memory_latency.py
-
-# Try to rsvg-convert the SVGs to PDF (the plot scripts only print the
-# command they would run). If rsvg-convert isn't installed, leave the
-# SVG as the canonical artifact.
-if command -v rsvg-convert >/dev/null 2>&1; then
-  for stem in f2_psm_vs_mllm f3_multi_corpus_h3 f6_memory_latency; do
-    svg="$REPO/journal/figures/${stem}.svg"
-    pdf="$REPO/journal/figures/${stem}.pdf"
-    if [[ -f "$svg" ]]; then
-      if rsvg-convert -f pdf -o "$pdf" "$svg" 2>/dev/null; then
-        printf '       PDF    %s\n' "journal/figures/${stem}.pdf"
-      else
-        printf '       [WARN] rsvg-convert failed for %s; SVG is still up-to-date.\n' "$stem"
-      fi
-    fi
-  done
-else
-  printf '       (rsvg-convert not on PATH — SVGs are regenerated; PDFs left untouched.\n'
-  printf '        Install librsvg, or render manually: rsvg-convert -f pdf -o X.pdf X.svg)\n'
-fi
-printf '\n'
-
-# ----------------------------------------------------------------------
-# Step 5/5 — bootstrap CIs on the headline 4-session Aria detail
-# ----------------------------------------------------------------------
-printf '[5/%d] Bootstrap 95%% CIs — 4-session Aria detail (mIoU + Hit@5)\n' "$TOTAL"
-if [[ ! -f "$REPO/scripts/bootstrap_ci.py" ]]; then
-  printf '       SKIP — scripts/bootstrap_ci.py not present.\n'
-else
-  # Headline comparison: clipBigG eval over the four detail sessions
-  # (the file pattern matches the captures already on disk for the
-  # main per_cell_cap=K table).
-  shopt -s nullglob
-  bigg_files=( "$REPO"/captures/eval_*_clipBigG_e128_s*.json )
-  shopt -u nullglob
-  if [[ ${#bigg_files[@]} -eq 0 ]]; then
-    printf '       SKIP — no captures/eval_*_clipBigG_e128_s*.json on disk.\n'
-  else
-    printf '       Aggregating %d eval JSONs (clipBigG, e128, all seeds)…\n' \
-      "${#bigg_files[@]}"
-    if ! "$PY" "$REPO/scripts/bootstrap_ci.py" --aggregate "${bigg_files[@]}"; then
-      printf '       [WARN] bootstrap_ci.py exited non-zero; continuing.\n'
-    fi
-  fi
-fi
+printf '[4/%d] HDD modeled memory — submitted SVG + PDF\n' "$TOTAL"
+"$PY" "$REPO/scripts/plot_f5_hdd_memory.py" \
+  --json "$REPO/captures/hdd/memory_vs_area.json"
 printf '\n'
 
 printf '═════ Done. Generated artifacts:\n'
-printf '       journal/figures/f2_psm_vs_mllm.{svg,pdf}\n'
-printf '       journal/figures/f3_multi_corpus_h3.{svg,pdf}\n'
-printf '       journal/figures/f6_memory_latency.{svg,pdf}\n'
-printf '       (Tables 2/F2 + bootstrap CIs printed above.)\n'
+printf '       captures/wearables_fixed_budget/{summary,paired_primary}.md\n'
+printf '       captures/{grid_controls,coordinate_null}/paired_base_vs_*.md\n'
+printf '       journal/figures/fixed_budget.{svg,pdf}\n'
+printf '       journal/figures/f5_hdd_memory.{svg,pdf}\n'
+printf '       H3 CLIP-L 9/14 verdict printed above.\n'

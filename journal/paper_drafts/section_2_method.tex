@@ -13,9 +13,9 @@
 
 \psm{} is a streaming spatial-temporal index that ingests
 $(t, \mathrm{lat}, \mathrm{lng}, \mathbf{e})$ tuples: timestamp,
-geographic position, and a $d$-dimensional CLIP embedding. This
-supports bounded-memory top-$K$ similarity search at any time.
-Three layered probabilistic data structures enforce the memory bound.
+geographic position, and a $d$-dimensional CLIP embedding. This supports
+top-$K$ similarity search with capped per-cell state at any time. Three
+components define the index.
 
 
 
@@ -25,7 +25,7 @@ Three layered probabilistic data structures enforce the memory bound.
 We tessellate the wearer's trajectory with H3~\cite{brodsky2018h3}, a
 hierarchical hexagonal geospatial index. Each tuple maps to its containing cell
 at resolution~$r$ (default~12, ${\sim}9$\,m edges, room scale; swept over
-$r\in\{10,11,12,13\}$ in \S\ref{sec:results-ablations}). H3 cell IDs are
+$r\in\{8,9,10,11,12\}$ in \S\ref{sec:results-multi-corpus}). H3 cell IDs are
 global, comparable across recordings, sessions, and devices.
 Positions come from whatever pose stream the device already runs: GNSS outdoors
 (HDD's RTK fixes) or geo-anchored on-device SLAM/VIO indoors (Aria MPS,
@@ -67,16 +67,17 @@ trajectory visiting $C_n$ distinct H3 cells over $n$ frames, \psm{}'s state is
 $\Theta\!\big(C_n(R d + C\,2^p)\big)$, whereas brute-force embedding storage is
 $\Theta(n d)$. The \emph{per-cell} summary is bounded ($R$ exemplars plus a
 $C$-slot HLL ring, independent of how long the wearer dwells), so state grows
-\emph{sublinearly} in the frame count $n$: revisited and dwelled cells saturate
-at $R$ rather than accumulating every frame. It is \textbf{not} bounded
-independently of recording duration, however: $C_n$ grows with the physical area
+sublinearly in $n$ \emph{when revisits dominate}: revisited and dwelled cells
+saturate at $R$ rather than accumulating every frame. This is not a worst-case
+bound independent of recording duration: $C_n$ grows with the physical area
 explored, and under continual exploration $C_n=\Theta(n)$, so total state is
 unbounded in the worst case. The HLL ring is charged to \emph{every} visited
 cell, including the many single-visit ones, so on wide-area corpora it can
 dominate the footprint (\S\ref{sec:results-hdd}). We therefore report exemplar
 and ring bytes separately and, in \S\ref{sec:results}, study a \emph{fixed
-global exemplar budget} that allocates a hard byte ceiling across cells rather
-than granting each cell an independent quota. Figure~\ref{fig:f8-psm-viz} shows
+global exemplar budget} that allocates a hard exemplar-payload ceiling across
+cells; per-cell policy bookkeeping is reported separately.
+Figure~\ref{fig:f8-psm-viz} shows
 the per-cell structures over a real trajectory.
 
 \paragraph{Exemplar/window lifetimes.} Exemplars persist for the cell's lifetime
@@ -101,21 +102,19 @@ wearable capture (not used for quantitative evaluation).}
 \subsection{Top-$K$ query with \caponek}
 \label{sec:method-query}
 
-A query takes a vector $\mathbf{q}$ (optionally an $(\mathrm{lat},\mathrm{lng})$
-center with k-ring radius) and aggregates in two phases: (i)~each in-scope cell
-returns its top-$\min(\caponek,|\text{reservoir}|)$ exemplars by
-$\cos(\mathbf{q},\mathbf{e}_i)$; (ii)~the union is sorted and the top-$K$ emitted
-with each cell's bucket window. $\caponek{=}1$ enforces strict spatial diversity
+A query takes a vector $\mathbf{q}$ and, optionally, a geographic center and
+k-ring radius. Each in-scope cell returns at most \caponek{} exemplars ranked by
+cosine similarity; the engine sorts their union and emits the top $K$ with each
+cell's bucket window. $\caponek{=}1$ enforces strict spatial diversity
 (one slot per cell), $\caponek{=}K$ recovers plain top-$K$, and intermediate
-values trade off smoothly (\S\ref{sec:results-main}). Ingest is
+values trade off smoothly (\S\ref{sec:results-engine}). Ingest is
 $O(1)$ amortized. Query cost depends on scope: a \emph{centered} query supplies an
 $(\mathrm{lat},\mathrm{lng})$ center with a k-ring radius, so only the in-scope
 cells are scanned; an \emph{uncentered} (global) query has no spatial prefilter
 and scores every exemplar in every cell, i.e.\ $\Theta$(total retained
-exemplars) per query. The microsecond constants in
-\S\ref{sec:results-memory-latency} are for the centered path; scaling global
-semantic search (e.g.\ via per-cell prototypes that route queries without a full
-scan) is future work.
+exemplars) per query. Our target-configuration host benchmark measures the
+uncentered global-scan path (\S\ref{sec:results-memory-latency}); scaling it via
+per-cell prototypes or another router is future work.
 
 \subsection{PSM as an MLLM prefilter}
 \label{sec:pipeline}
@@ -125,12 +124,11 @@ scan) is future work.
 \texttt{query\_similar} at the configured \caponek{} and $K{=}5$, decode the five
 candidate frames on demand (a device-cache memcpy in deployment, not a video
 seek), and pass them with $q$ in one Gemini~3.1~Pro~\cite{google2026gemini} call
-whose frozen prompt selects the best frame. The split is deliberate, \psm{}
-contributes bounded-memory \emph{recall}, the MLLM \emph{localization precision}
-(\S\ref{sec:results-main}). Encoder choice is a pipeline knob, not an
+whose frozen prompt selects the best frame. The split is deliberate: \psm{}
+retrieves candidates and the MLLM selects one (\S\ref{sec:results-engine}).
+Encoder choice is a pipeline knob, not an
 architectural commitment: one factory serves CLIP-L, CLIP-bigG, and
 SigLIP-2-large~\cite{tschannen2025siglip2}\footnote{Encoder scales: CLIP-L
 430\,M/768\,d, CLIP-bigG 2.5\,B/1280\,d, SigLIP-2-large 660\,M/1024\,d.}; the C
-engine sees only a $D$-dim vector, and cross-encoder generalization
-(\S\ref{sec:results-multi-corpus}) confirms the behavior is not a CLIP-L
-artifact.
+engine sees only a $D$-dim vector. We evaluate resolution sensitivity with all
+three encoders (\S\ref{sec:results-multi-corpus}).

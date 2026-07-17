@@ -1,10 +1,6 @@
 % Supplementary Material
-% Depth relocated from the main body to meet the 8pp body budget (ECCV
-% archival: references excluded, supplementary unlimited). NOTHING is deleted
-% here -- these are the full per-session verdicts, ablation detail, HLL
-% micro-eval, and the optional reranker, moved verbatim from the main text.
-% \input from main.tex after \bibliography, under \appendix, so the labels
-% resolve to appendix numbers and the pages fall outside the body budget.
+% Internal archive only. The Wearable AI submission does not permit appendix
+% pages beyond the body limit, so main.tex deliberately does not input this file.
 
 \section{Supplementary Material}
 \label{sec:supp}
@@ -12,8 +8,8 @@
 \subsection{Additional ablations and retrieval baselines}
 \label{sec:supp-ablations}
 
-Beyond the single-session headline (Table~\ref{tab:headline}, \S\ref{sec:results-main}), four patterns:
-(1)~\emph{Operating-point Pareto}: as \caponek{} sweeps from 1 to $K$, Hit@5 rises and bucket mIoU falls monotonically, and the seed-averaged 30-session sweep (pattern~4) is monotone in $R$ at every \caponek{} ($R{=}1024$ $\geq$ $R{=}128$, e.g.\ $3.26\%$ vs $2.99\%$ at \caponek{}$=1$)---confirming the single-seed non-monotonicity in Table~\ref{tab:headline} is reservoir noise.
+Beyond the engine checks summarized in \S\ref{sec:results-engine}, four patterns:
+(1)~\emph{Operating-point Pareto}: as \caponek{} sweeps from 1 to $K$, Hit@5 rises and bucket mIoU falls monotonically, and the seed-averaged 30-session sweep (pattern~4) is monotone in $R$ at every \caponek{} ($R{=}1024$ $\geq$ $R{=}128$, e.g.\ $3.26\%$ vs $2.99\%$ at \caponek{}$=1$).
 (2)~\emph{Retrieval baselines}: sliding-window CLIP @ $\ell{=}10$\,s exceeds \psm{} \caponek{}$=K$ by $+1.6$\,pp Hit@5 ($15.0\%$ vs $13.4\%$) by averaging out per-frame variance, but requires the full $N$-frame bank; uniform-sample forms the floor at $4.3$--$8.6\%$.
 (3)~\emph{Memory ablation}: tightening the reservoir from 1024 to 128 exemplars costs $2.2$\,pp Hit@5 at \caponek{}$=K$; H3 resolution barely moves Hit@5 (${\pm}0.5$\,pp across $r \in \{10,11,12,13\}$) but moves bucket mIoU monotonically ($0.004 \to 0.019$).
 (4)~\emph{30-session monotonicity}: in the matched $R{=}128$ deployment sweep, mean Hit@5 climbs monotonically from $2.99\%$ at \caponek{}$=1$ through $4.81\%$ and $6.11\%$ to $7.55\%$ at \caponek{}$=K$. The $R{=}1024$ full-reservoir sweep follows the same shape ($3.26\% \to 5.69\% \to 7.08\% \to 8.92\%$) and matches brute-force exactly at the eviction-free endpoint; sliding-window CLIP exceeds both by $+1.0$\,pp. Thus, at \caponek{}$=K$, reservoir eviction costs $1.37$\,pp in the 30-session aggregate.
@@ -26,16 +22,16 @@ while brute-force grows linearly; on these short sessions ($N{\le}1325$,
 ${\sim}22$\,min) brute-force is still marginally cheaper, with the crossover at
 $N\approx1500$ frames (${\sim}25$\,min) under the observed ${\sim}10$-cell
 footprint, past which the gap reaches ${\sim}10$--$20\times$ at multi-hour
-streams. The real-data form of this bound---where \psm{} is smaller at every
-ingest rate---is demonstrated on the 102.9\,h HDD corpus
-(\S\ref{sec:results-hdd}, Fig.~\ref{fig:hdd-combined}A).
+streams under a fixed spatial footprint. HDD shows why that condition matters:
+once the HLL ring is charged to every occupied cell, full \psm{} exceeds the
+dense bank at 1\,fps (\S\ref{sec:results-hdd}, Fig.~\ref{fig:hdd-combined}).
 
 \begin{figure}[h]
 \centering
 \includegraphics[width=\linewidth]{figures/f6_memory_latency.pdf}
 \caption{Memory (MB) vs session length (frames). Brute-force CLIP-L (red): $N \times 768 \times 4$\,B across 30 Nymeria sessions, plus linear fit.
 \psm{} (blue dashed): constant ${\sim}4.3$\,MiB at $R{=}128$, $p{=}10$, ${\sim}10$ H3 cells.
-On the measured corpus ($N{\le}1325$, ${\sim}22$\,min sessions) \psm{} is still slightly more expensive than brute-force; the bounded-memory advantage begins just beyond this range.
+On the measured corpus ($N{\le}1325$, ${\sim}22$\,min sessions) \psm{} is still slightly more expensive than brute-force; the fixed-footprint exemplar-storage crossover lies just beyond this range.
 Crossover at $N \approx 1500$ (${\sim}25$\,min); under the same spatial footprint the gap reaches ${\sim}10$--$20\times$ at multi-hour streams.}
 \label{fig:f6-memory}
 \end{figure}
@@ -43,7 +39,12 @@ Crossover at $N \approx 1500$ (${\sim}25$\,min); under the same spatial footprin
 \subsection{HLL cardinality estimation (Nymeria micro-eval)}
 \label{sec:results-hll}
 
-To validate that \psm{}'s 60\,KiB per-cell state provides accurate cardinality tracking alongside mergeable time windows, we conducted a micro-evaluation on the Nymeria \texttt{shelby\_arroyo\_act0} session. For each cell, we extract the true count of distinct frames ingested and compare it against the HLL estimate from the C engine's ring buffer ($p{=}10$, or $1\,\mathrm{KiB}$ sketches). We report at H3 resolution~10 to ensure cells accumulate enough frames (270--593 here) for a meaningful cardinality check; at the paper's default $r{=}12$, individual cells see fewer frames but the per-sketch error bound holds by construction. Table~\ref{tab:hll-micro} shows the relative error stays well within the ${\sim}3.2\%$ theoretical bound for $p{=}10$ (median $1.0\%$ across all cells), demonstrating that the data structure accurately supports counting queries (``how many distinct people did I interact with in the kitchen?'') natively on the substrate without requiring a downstream MLLM to recount frames.
+To validate frame-level cardinality tracking alongside mergeable time windows,
+we compare each cell's true number of ingested frames with the C engine's HLL
+estimate on Nymeria \texttt{shelby\_arroyo\_act0}. At $r{=}10$, active cells
+contain 270--593 frames. The observed median relative error is 1.0\%, consistent
+with HLL's nominal ${\sim}3.25\%$ relative standard error at $p{=}10$. This is a
+frame-hash check, not evidence that the sketch counts semantic events or people.
 
 \begin{table}[h]
 \centering
@@ -68,8 +69,8 @@ H3 Cell ($r{=}10$) & True distinct frames & HLL estimate ($p{=}10$) & Relative e
 \subsection{PSM $\to$ MLLM rerank}
 \label{sec:results-mllm-rerank}
 
-The reranker permutes \psm{}'s top-5, so Hit@5 is invariant by construction.
-On the headline Nymeria session it adds localization precision, not recall: it lifts exemplar mIoU@5 from $0.074$ to $0.101$ ($+36.5\%$ relative) at \caponek{}$=K$, and \caponek{}$=1$+rerank reaches mIoU $0.069$, statistically indistinguishable from brute-force's $0.074$ (paired bootstrap $\Delta{=}{-}0.005$, 95\% CI $[-0.032,+0.021]$, $n{=}187$).
-On Hit@1 the effect is bimodal: it tripled Hit@1 on \texttt{seq008\_running\_001} ($10\%{\to}30\%$) and helped on \texttt{seq009} ($+3.6$\,pp), but hurt on \texttt{seq003} ($-3.3$\,pp) and Nymeria ($-1.6$\,pp).
-The rerank is a visually-rich-query lever, useful when visual content discriminates beyond \psm{}'s embedding similarity, counterproductive on action-narrations.
-The headline result---\psm{}'s query-guided retrieval reaching sessions that uniform sampling misses---is achievable without any MLLM in the loop; we do not promote the reranker to a default.
+The reranker only permutes \psm{}'s top-5, so Hit@5 and mIoU@5 are invariant by
+construction. The earlier $0.074{\to}0.101$ mIoU@5 claim mixed scoring tolerances
+and is withdrawn. Rank-sensitive Hit@1 is mixed: it rises on
+\texttt{seq008\_running\_001} but falls on \texttt{seq003} and Nymeria. We do not
+promote the reranker to a default.

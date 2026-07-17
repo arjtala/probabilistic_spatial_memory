@@ -27,7 +27,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{microtype}
 \usepackage{graphicx}
-% Figure PDFs (F2/F3/F6/F7) are generated in journal/figures/ by
+% Figure PDFs are generated in journal/figures/ by
 % scripts/plot_f*.py; symlinks in paper_drafts/figures/ point there
 % so \includegraphics{figures/...} resolves without \graphicspath.
 \usepackage{booktabs}
@@ -74,16 +74,16 @@ spatial allocation preserve useful experiences better than non-spatial
 streaming memory?} We introduce \textbf{Probabilistic Spatial Memory} (\psm), a
 streaming spatial-temporal index over an H3 hex grid with a per-cell
 reservoir of embedding exemplars and a time-decayed HyperLogLog ring. Its
-per-cell summary is bounded and its state grows \emph{sublinearly} in the frame
-count; because the number of occupied cells grows with area explored, total
-state is budgeted per cell but is \emph{not} bounded independently of recording
-duration (\S\ref{sec:method}).
+``bounded memory'' refers to the per-cell summary: revisits do not accumulate
+every frame, but expansion into new cells grows total state, which is \emph{not}
+bounded independently of recording duration (\S\ref{sec:method}).
 
-Our main contribution is a controlled, \textbf{budget-matched} study on 14
-street-scale egocentric sessions (3 sensor
-stacks~\cite{dai2023sloper4d,pan2025lookout}, CLIP-L), comparing retention
-policies at an identical global exemplar budget and candidate count: global
-reservoir, FIFO, temporal stratification, a semantic $k$-center coreset, and a
+Separately from the C engine, our main contribution is a controlled,
+\textbf{budget-matched} study in a Python harness on 14 street-scale egocentric
+sessions (3 corpora, 2 capture/localization stack families
+~\cite{dai2023sloper4d,pan2025lookout}, CLIP-L), comparing retention strategies
+at an identical global exemplar budget and candidate count: global
+reservoir, FIFO, uniform-time sampling, a semantic $k$-center coreset, and a
 causal spatial-allocation probe. The finding is a characterization, not a win:
 \textbf{spatial allocation changes \emph{which} places are remembered rather
 than improving aggregate retrieval.} Correct spatial alignment benefits
@@ -91,7 +91,8 @@ rare/low-exposure-place recall relative to coordinate-permutation nulls
 (significant on 2 of 3 null seeds; robust to grid translation/rotation), but
 this trades against common-place recall, and a non-spatial semantic-diversity
 coreset performs best overall (\S\ref{sec:results-main}). The spatial policy is
-an experimental probe with area-growing bookkeeping, not a deployed method. We
+a Python experimental probe with area-growing bookkeeping, not part of the C
+engine or a deployed method. We
 also correct the record on prior framing: a frontier MLLM comparison measures
 query-aware retrieval vs.\ uniform sampling (not that MLLMs require \psm), and
 on multi-hour driving (Honda HDD~\cite{ramanishka2018hdd}) we report the
@@ -115,15 +116,9 @@ Egocentric video \and Retrieval substrate.}
 
 \input{section_7_conclusion.tex}
 
-% ---- Appendix absorbed into the main body (2026-07-13) ----
-% The former supplementary.tex content is now folded into the body to keep the
-% submission a single self-contained <=14pp PDF (the Wearable AI CfP exempts
-% only references, not appendices): ablations/baselines/30-session sweep + the
-% optional MLLM rerank -> new subsection \S\ref{sec:results-ablations}; the HLL
-% micro-eval median-error number -> inline in \S\ref{sec:results-hdd}; the F6
-% synthetic-crossover figure dropped (N~1500 crossover kept inline in
-% \S\ref{sec:results-memory-latency}; the HDD real-data crossover carries the
-% argument). supplementary.tex is retained in-repo but no longer \input.
+% ---- No submitted appendix ----
+% Wearable AI exempts references, not appendices. supplementary.tex is retained
+% as an internal archive but is deliberately not \input into the submission.
 
 % Reproducibility note: the engine + eval harness are released
 % under MIT (URL withheld for double-blind review; available in

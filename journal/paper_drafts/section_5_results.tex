@@ -1,34 +1,39 @@
 % Section 5 — Results
-% Status: full-depth (14pp Wearable AI target). Body carries Table 1 (headline),
-% Table 2 (multi-corpus verdicts), Fig 3 (qualitative), Fig 4 (PSM vs MLLM),
-% Fig 5 (HDD). Subsections: Setup,
-% Single-session (+Table 1, Fig 3), Memory/latency/failure, Cross-corpus
-% generalization (+Table 2), Why MLLMs need a prefilter (+Fig 4), HDD persistence
-% (+Fig 5). Supplement keeps ablation prose, memory crossover, HLL micro-eval.
+% Status: page-budgeted Wearable AI draft. The body retains the fixed-budget
+% table/figure, aggregate cross-encoder sensitivity, engine checks, and the
+% corrected HDD analytical memory figure.
 
 \section{Results}
 \label{sec:results}
 
-We evaluate \psm{} against brute-force CLIP-cosine retrieval and a frontier MLLM on egocentric look-back QA (retrieval baselines, i.e. sliding-window and uniform-sample CLIP, are in \S\ref{sec:results-ablations}).
+We evaluate fixed-budget retention, the released \psm{} engine, and auxiliary
+retrieval baselines for egocentric look-back QA.
 
 \subsection{Setup}
 \label{sec:results-setup}
 
-We evaluate on the Nymeria atomic-action benchmark~\cite{ma2024nymeria}, 30 sessions (${\sim}5{,}600$ narrations) on Project Aria Gen~1 headsets~\cite{engel2024aria}; each narration's $[t_\text{start},t_\text{end}]$ interval is retrieval ground truth, a proxy benchmark, as the narrations are third-person action descriptions, not natural look-back questions (no purpose-built outdoor egocentric look-back QA benchmark exists; \S\ref{sec:conclusion}).
-Primary results use \texttt{shelby\_arroyo\_act0} (187 narrations, 69\,m bbox), encoder CLIP-L~\cite{clip-l-laion,radford2021clip} (768-d, 1\,fps).
-\psm{} uses the \S\ref{sec:method} defaults ($r{=}12$, $R{=}128$); a full-reservoir row at $R{=}1024$ isolates reservoir eviction from the \caponek{} effect, and the baseline is brute-force CLIP-cosine top-5 over the full $N$-frame bank (no spatial structure, no capping).
-We report three top-5 metrics: Hit@5 (any exemplar timestamp in a GT interval), exemplar mIoU@5 (IoU of exemplar $\pm1.5$\,s windows vs.\ GT), and bucket mIoU@5 (IoU of each cell's $[t_\text{min},t_\text{max}]$ envelope vs.\ GT).
+The primary study uses 14 street-scale sessions from three corpora and two
+capture/localization stack families: Nymeria, SLOPER4D, and
+LookOut~\cite{ma2024nymeria,dai2023sloper4d,pan2025lookout}. We use
+CLIP-L~\cite{clip-l-laion,radford2021clip} (768-d, 1\,fps), $K{=}5$, and H3
+$r{=}12$. Hit@5 counts a hit when any returned timestamp lies in the ground-truth
+interval; mIoU@5 scores $\pm1.5$\,s exemplar windows. Nymeria intervals accompany
+third-person action narrations, while SLOPER4D and LookOut questions were
+generated from target frames. Both are retrieval proxies rather than
+human-authored look-back QA (\S\ref{sec:limitations}).
 
 \subsection{Fixed-budget allocation: which places get remembered}
 \label{sec:results-main}
 
-Our primary experiment isolates \emph{memory allocation} from encoder quality and
-from total memory. Every policy receives an identical global exemplar budget
+Our primary experiment isolates \emph{retention allocation} from encoder quality
+and exemplar payload. Every policy receives an identical global exemplar budget
 $M{=}128$ and returns the same number of candidates ($K{=}5$, global cosine, no
-per-cell cap), so differences reflect only \emph{which} frames a policy chooses to
-retain. We compare, on the 14 street-scale sessions (5 seeds, CLIP-L, $r{=}12$):
-streaming \texttt{global\_reservoir} (Algorithm~R over the whole stream),
-\texttt{fifo}, \texttt{hybrid}, \texttt{uniform\_time}, an offline
+per-cell cap), so retrieval differences reflect only \emph{which} frames a policy
+retains. The match covers embedding-plus-timestamp bytes; spatial counters remain
+area-growing bookkeeping, disclosed rather than counted as a global system budget.
+On the 14 sessions (5 seeds, CLIP-L, $r{=}12$), we compare a streaming
+global reservoir (Algorithm~R), FIFO, a half-reservoir/half-recent hybrid,
+offline uniform-time sampling, and an offline
 \texttt{semantic\_kcenter} coreset (farthest-first in cosine space; a
 diversity diagnostic, not a streaming competitor), and \texttt{spatial\_priority},
 a causal exact-$M$ policy that protects under-represented cells. Sessions are the
@@ -36,6 +41,19 @@ unit of analysis (seeds averaged within session, then paired session bootstrap).
 Alongside Hit@5/mIoU@5 we report \emph{oracle retention coverage} (any retained
 timestamp in a GT interval, before ranking) and pre-registered rare/common-place
 strata.
+
+\paragraph{Policy and stratum protocol.}
+Frames arrive in timestamp order. The spatial-priority probe maintains per-cell
+banks summing exactly to $M$: a frame from an under-represented cell evicts a
+uniformly chosen exemplar from a most-represented cell; once balanced, Algorithm~R
+replacement runs within that cell. If occupied cells outnumber slots, seed-stable
+random cell priorities avoid a recency cache. The policy cannot recover discarded
+frames and is therefore causal but not equivalent to an offline stratified sample.
+For each question, its target place is the modal canonical H3 cell in the ground-
+truth interval; rare/common are the bottom/top quartiles of that cell's frame
+exposure within the session. These labels remain fixed in controls. Coordinate
+nulls permute frame-to-coordinate alignment (three seeds); boundary controls
+translate the grid 4.5\,m east/north or rotate its local tangent plane $30^\circ$.
 
 \begin{table*}[t]
 \centering
@@ -52,7 +70,8 @@ Policy ($M{=}128$) & Hit@5 & mIoU@5 & oracle & rare-place Hit & common-place Hit
 \bottomrule
 \end{tabular}
 \caption{Budget-matched retention on 14 street-scale sessions ($M{=}128$, $r{=}12$,
-5 seeds, CLIP-L), seed-averaged. All policies keep the same number of exemplars and
+5 seeds, CLIP-L), with seeds averaged within session and sessions macro-averaged.
+All policies keep the same number of exemplars and
 return the same number of candidates. $^\dagger$\texttt{semantic\_kcenter} is an
 \emph{offline} diversity diagnostic (uses the full bank), not a streaming policy.
 \texttt{spatial\_priority} is a causal probe with area-growing bookkeeping, not a
@@ -80,7 +99,7 @@ visual diversity, not physical space, explains the strongest budget-matched
 retention. At a tighter budget ($M{=}64$) the spatial policy's rare-place and
 aggregate edge over the global reservoir grows (a secondary budget interaction),
 but it still trails \texttt{uniform\_time}/\texttt{semantic\_kcenter} overall
-(\S\ref{sec:results-ablations}). We therefore present \texttt{spatial\_priority} as
+(Fig.~\ref{fig:fixed-budget}A). We therefore present \texttt{spatial\_priority} as
 an experimental retention probe and report all baselines and controls in the main
 comparison.
 
@@ -100,223 +119,115 @@ resampled). Not a Pareto frontier.}
 \label{fig:fixed-budget}
 \end{figure}
 
-\subsection{Single-session operating points}
-\label{sec:results-single}
+\subsection{Engine and retrieval checks}
+\label{sec:results-engine}
 
-Table~\ref{tab:headline} reports the single-session comparison on \texttt{shelby\_arroyo\_act0} (187 narrations).
-
-\begin{table*}[t]
-\centering
-\begin{tabular}{lcccc}
-\toprule
-Method & Reservoir $R$ & Hit@5 & exemplar mIoU@5 & bucket mIoU@5 \\
-\midrule
-Brute-force CLIP-L     & --   & \textbf{13.4\%} (25/187) & 0.074 & 0.074 \\
-PSM, \texttt{cap}=1    & 128  & 9.1\% (17/187)           & 0.048 & 0.019 \\
-PSM, \texttt{cap}=2    & 128  & 9.6\% (18/187)           & 0.050 & 0.014 \\
-PSM, \texttt{cap}=3    & 128  & 10.2\% (19/187)          & 0.057 & 0.014 \\
-PSM, \texttt{cap}=$K$  & 128  & \textbf{11.2\%} (21/187) & 0.063 & 0.013 \\
-\midrule
-PSM, \texttt{cap}=1    & 1024 & 8.0\% (15/187)           & 0.044 & 0.019 \\
-PSM, \texttt{cap}=$K$  & 1024 & \textbf{13.4\%} (25/187) & 0.074 & 0.013 \\
-\bottomrule
-\end{tabular}
-\caption{\psm{} vs brute-force CLIP on \texttt{shelby\_arroyo\_act0} (187 narrations), single representative seed.
-$R{=}128$ (top block) is the bounded-memory deployment; $R{=}1024$ isolates reservoir eviction from the \caponek{} effect, recovering brute-force exactly at \caponek{}$=K$. Optional MLLM rerank: \S\ref{sec:results-ablations}.}
-\label{tab:headline}
-\end{table*}
-
-At the deployment point ($R{=}128$, \caponek{}$=K$), \psm{} reaches $84\%$ of brute-force Hit@5 ($11.2\%$ vs $13.4\%$; mIoU $0.063$ vs $0.074$) with session-length-invariant per-cell state; at $R{=}1024$ ($8\times$ the per-cell reservoir) it recovers the \emph{same 25/187} with identical mIoU, a substrate-correctness check whose $2.2$\,pp/$0.011$ gap to $R{=}128$ is the bounded-memory cost. On this single 187-question session the $2.1$\,pp Hit@5 gap sits within one binomial standard error ($95\%$ Wilson CIs $[7.5,16.6]$ and $[9.2,19.0]$ overlap heavily), so we lean on the seed-averaged 30-session sweep (\S\ref{sec:results-ablations}) for the aggregate claim.
-Strict spatial diversity (\caponek{}$=1$) costs $5.4$\,pp at $R{=}1024$ ($8.0\%$ vs $13.4\%$; $4.3$\,pp at $R{=}128$) because revisits to a cell collapse into one bucket, the intended behavior for place-distinct queries.\footnote{Table~\ref{tab:headline} is a single representative seed; its one non-monotonicity (\caponek{}$=1$ Hit@5 higher at $R{=}128$, $9.1\%$, than $R{=}1024$, $8.0\%$) is within reservoir-sampling noise (max-cosine need not be the ground-truth frame, so a random subsample can incidentally surface a GT-interval exemplar the full set's top-1 misses); the seed-averaged 30-session sweep (\S\ref{sec:results-ablations}) is monotone in $R$ at every \caponek{}.}
-Brute-force itself caps at $13.4\%$: 162/187 narrations are revisit-heavy and visually indistinguishable to CLIP cosine~\cite{weller2025limit}.
-
-Fig.~\ref{fig:f7-qualitative} shows representative retrievals (\psm{}'s top-5 candidates with the Gemini-selected frame) spanning two hits (one a Gemini Hit@1 rescue) and an honest revisit-heavy miss.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/fig3_qualitative.pdf}
-\caption{Qualitative look-back retrievals on \texttt{shelby\_arroyo\_act0}.
-Each row is one query: the narration text, GT interval, and \psm{}/Gemini verdict (left), then \psm{}'s top-5 candidates ranked by CLIP cosine (similarity and timestamp per frame). Green/red borders mark whether a candidate falls in the GT interval; the Gemini-selected frame is highlighted.
-Rows~1--2 are hits (row~2 a Gemini Hit@1 rescue over \psm{}'s ranking); row~3 is an honest revisit-heavy miss, where recurring near-identical frames defeat cosine retrieval (\S\ref{sec:limitations}).}
-\label{fig:f7-qualitative}
-\end{figure}
-
-\subsection{Ablations, retrieval baselines, and reranking}
-\label{sec:results-ablations}
-
-\paragraph{Operating-point Pareto and non-spatial baselines.}
-As \caponek{} sweeps from 1 to $K$, Hit@5 rises and bucket mIoU@5 falls monotonically: the place-diversity/embedding-precision trade the knob is designed to expose. Against non-spatial baselines on the headline session, sliding-window CLIP at $\ell{=}10$\,s edges \psm{} \caponek{}$=K$ by $+1.6$\,pp Hit@5 ($15.0\%$ vs $13.4\%$) by averaging out per-frame variance, but requires the full $N$-frame bank; uniform-sample CLIP forms the floor at $4.3$--$8.6\%$. Tightening the reservoir from $R{=}1024$ to $128$ costs $2.2$\,pp Hit@5 at \caponek{}$=K$, while H3 resolution barely moves Hit@5 (${\pm}0.5$\,pp across $r\in\{10,11,12,13\}$) but moves bucket mIoU monotonically ($0.004\to0.019$).
-
-\paragraph{30-session monotonicity.}
-The single-seed headline (Table~\ref{tab:headline}) generalizes to a seed-averaged sweep over all 30 Nymeria sessions. Mean Hit@5 climbs monotonically in \caponek{} at both reservoirs ($2.99\%\to4.81\%\to6.11\%\to7.55\%$ at $R{=}128$ and $3.26\%\to5.69\%\to7.08\%\to8.92\%$ at $R{=}1024$), with the $R{=}1024$ endpoint matching brute-force exactly and the sweep monotone in $R$ at every \caponek{} (e.g.\ $3.26\%$ vs $2.99\%$ at \caponek{}$=1$). This confirms the lone single-seed non-monotonicity in Table~\ref{tab:headline} is reservoir noise. Reservoir eviction thus costs $1.37$\,pp Hit@5 in the 30-session aggregate at \caponek{}$=K$; sliding-window CLIP exceeds both by $+1.0$\,pp.
-
-\paragraph{Optional MLLM rerank.}
-An MLLM reranker only \emph{reorders} \psm{}'s fixed top-5, so every @$k$ metric
-(Hit@5, mIoU@5) is permutation-invariant and cannot change by construction; an
-earlier draft's ``mIoU@5 $0.074{\to}0.101$'' rerank gain was an artifact of a
-wider scoring tolerance on the rerank run and is withdrawn. The only rank-sensitive
-effect is at the top: reranking moves the MLLM-selected candidate to rank~1, and its
-top-1 IoU is small and mixed across sessions (it helps visually-rich queries,
-e.g.\ Hit@1 $10\%{\to}30\%$ on \texttt{seq008\_running\_001}, but hurts
-action-narration sessions such as \texttt{seq003} $-3.3$\,pp and Nymeria
-$-1.6$\,pp). We therefore report reranking only through top-1 metrics, do not
-promote it to a default, and note \psm{}'s results hold without any MLLM in the loop.
+The fixed-budget policies above run in the released Python evaluation harness;
+\texttt{spatial\_priority} is not integrated into the C engine. We separately
+check the engine on Nymeria. On \texttt{shelby\_arroyo\_act0} (187 intervals),
+the capped engine ($R{=}128$, \caponek{}$=K$) obtains 11.2\% Hit@5 versus 13.4\%
+for the full CLIP-L bank; with eviction disabled ($R{=}1024$), it recovers the
+same 25/187 hits and mIoU, an implementation check. Across all 30 Nymeria
+sessions and five seeds, Hit@5 increases monotonically with \caponek{} at both
+reservoir sizes and the eviction-free endpoint again matches brute force;
+reducing $R$ from 1024 to 128 costs 1.37\,pp at \caponek{}$=K$. A 10\,s
+sliding-window CLIP baseline is 1.0\,pp better than the capped endpoint but keeps
+the full frame bank. Finally, an optional MLLM reranker cannot change any @$k$
+set metric because it only permutes the top five. Its rank-sensitive Hit@1 effect
+is mixed across sessions, so we do not use it by default. These checks diagnose
+the substrate; they are not evidence that the spatial allocation probe wins.
 
 \subsection{Memory, latency, and failure modes}
 \label{sec:results-memory-latency}
 
-\psm{}'s per-cell state is session-length-invariant ($R{=}128\times768$-d$\times4$\,B $\approx0.38$\,MiB plus a 60-slot $p{=}10$ HLL ring $\approx0.06$\,MiB), whereas brute-force grows linearly in $N$.
-On the short Nymeria sessions ($N\in[748,1325]$, ${\sim}22$\,min) brute-force is still cheaper. Whether \psm{} is smaller than a dense bank depends on ingest rate and on how the per-cell HLL ring is charged: counting the full $C{=}60$ ring at every visited cell, \psm{}'s \emph{exemplar} term is sublinear but its total state can \emph{exceed} the dense bank at low fps on wide-area corpora (\S\ref{sec:results-hdd}). We therefore report exemplar and ring bytes separately and treat HDD memory as modeled logical state, not a headline bounded-memory win.
-Retrieval is sub-millisecond: brute-force dot-product over the 1133-frame bank is 67\,$\mu$s median; the paired in-process \psm{} benchmark is 456/153\,$\mu$s at \caponek{}$=1$/$K$ (host-CPU).
-We caution that a previously reported ``${\sim}20$\,MiB, sub-2\,ms'' Galaxy S22
-figure was measured at a reduced benchmark configuration ($d{=}128$, $R{=}4$,
-$C{=}12$), \emph{not} the CLIP-L deployment point; it is withdrawn as a deployment
-number. At the actual deployment configuration ($d{=}768$, $R{=}128$, $C{=}60$) our
-host benchmark (20k observations over 500 cells) uses ${\sim}96$\,MiB RSS and answers
-an \emph{uncentered} semantic query in ${\sim}13$\,ms (the global scan of
-\S\ref{sec:method}; a spatially-centered k-ring query is far cheaper), with the
-per-exemplar state ${\sim}192\times$ larger than the reduced config. On-device
-figures at the true configuration require an S22 rerun and are deferred; the CLIP
-encoder, not the index, remains the dominant on-device cost
-(\S\ref{sec:limitations}).
-The \caponek{} latency ordering flips with density: on the dense Nymeria bench \caponek{}$=1$ is slower (its $K$ distinct cells each force a separate time-envelope merge, the dominant cost), while on a sparse workload \caponek{}$=K$ is slower (its larger candidate sort dominates); cosine scoring is identical across settings.
-Of the 162 shared brute-force/\psm{} misses, most are revisit-heavy narrations with recurring near-identical frames; the 25 groundable questions reference temporally-distinct events, so the shared $13.4\%$ ceiling reflects single-frame CLIP-cosine matching (sliding-window averaging and SigLIP-2 exceed it; \S\ref{sec:results-ablations}, \S\ref{sec:results-multi-corpus}), not method quality (\S\ref{sec:limitations}).
+Each saturated CLIP-L cell costs about 0.38\,MiB for $R{=}128$ exemplars plus
+0.06\,MiB for the $C{=}60$, $p{=}10$ HLL ring. Unlike a dense $N$-frame bank,
+this is independent of dwell time but not of the number of occupied cells; on
+short Nymeria sessions the dense bank is still cheaper, and on wide-area HDD the
+ring can dominate (\S\ref{sec:results-hdd}). At the target CLIP-L
+configuration ($d{=}768$, $R{=}128$, $C{=}60$), a host benchmark with 20k
+observations over 500 cells uses ${\sim}96$\,MiB RSS and answers an uncentered
+global-scan query in ${\sim}13$\,ms; centered k-ring queries scan fewer cells. A
+previously reported Galaxy S22 result used a much smaller configuration
+($d{=}128$, $R{=}4$, $C{=}12$), so we withdraw it as a deployment measurement
+and defer a true-configuration phone rerun (\S\ref{sec:limitations}).
 
-\subsection{Cross-corpus, cross-encoder generalization}
+\subsection{Cross-corpus resolution sensitivity}
 \label{sec:results-multi-corpus}
 
-The spatial-axis result generalizes beyond the headline session. To rule out a
-single-corpus / single-encoder artifact, we replicate it across \textbf{14
-street-scale sessions spanning 3 sensor stacks} (SLOPER4D~\cite{dai2023sloper4d}:
-head-mounted LiDAR + DJI Action2; Nymeria: Project Aria + MPS SLAM;
-LookOut~\cite{pan2025lookout}: Project Aria across 5 Bay Area locations)
-\textbf{and 3 encoder families} (CLIP-L 768-d, CLIP-bigG 1280-d, SigLIP-2-large
-1024-d~\cite{tschannen2025siglip2}). For each (session, encoder) the acceptance
-criterion is Hit@5 non-decreasing across $r\in\{10,11,12\}$ with $\geq4$\,pp lift
-from $r{=}10$ to $r{=}12$ (conservative against binomial noise at 28--30
-questions/session). We pre-register \textbf{CLIP-L} (our primary encoder) as the
-verdict basis to avoid post-hoc encoder selection: \textbf{9/14 sessions pass}
-under CLIP-L (Table~\ref{tab:multi-corpus-h3}). Reporting instead the
-\emph{any-encoder disjunction} (a session passes if \emph{any} of the three
-encoders satisfies the criterion) gives 13/14, but this is an optimistic upper
-bound that selects the successful encoder after the fact; we include it only for
-completeness. Per-encoder, SigLIP-2 passes 11/14, bigG 10/14, CLIP-L 9/14; the
-lone all-encoder failure, \texttt{BurlingameDT4\_feb5}, is a visually-homogeneous
-trajectory (\S\ref{sec:limitations}). We also caution that these SLOPER4D/LookOut
-questions are generated from target frames (\S\ref{sec:limitations}), so this is a
-spatial-resolution sensitivity check, not held-out look-back QA. No existing egocentric benchmark combines
-outdoor spatial trajectories with temporally-grounded text, so we assemble a
-three-corpus scaffold with per-corpus extractors while stopping short of claiming
-a released benchmark.
+As an auxiliary check, we sweep H3 resolution across the same 14 sessions and
+three encoder families: CLIP-L, CLIP-bigG, and
+SigLIP-2-large~\cite{tschannen2025siglip2}. A session passes when Hit@5 is non-decreasing over
+$r\in\{10,11,12\}$ with at least a 4\,pp $r10{\to}r12$ lift. Pre-registered
+CLIP-L passes on 9/14 sessions (Table~\ref{tab:multi-corpus-h3}); the post-hoc
+any-encoder disjunction reaches 13/14 and is only an optimistic upper bound.
+\texttt{BurlingameDT4\_feb5} fails for all encoders. Because SLOPER4D/LookOut
+questions are target-frame-generated, this tests resolution sensitivity, not
+held-out QA or the fixed-budget allocation claim.
 
-\begin{table*}[t]
+\begin{table}[h]
 \centering
-\setlength{\tabcolsep}{4pt}
-\small
-\begin{tabular}{llccccc}
+\begin{tabular}{lc}
 \toprule
-& & \multicolumn{3}{c}{Per-encoder PASS} & & \\
-\cmidrule(lr){3-5}
-Corpus & Session & \texttt{clipL} & \texttt{bigG} & \texttt{siglip2L} & Any-enc & \#PASS \\
+Verdict basis & Sessions passing \\
 \midrule
-LookOut  & \texttt{Mainquad\_jan10}              & \cmark & \xmark & \cmark & \cmark & 2/3 \\
-LookOut  & \texttt{Sanmateopark\_garage\_jan11}  & \xmark & \xmark & \cmark$\dagger$ & \cmark & 1/3 \\
-LookOut  & \texttt{Fostersquare1\_jan16}         & \xmark & \cmark & \cmark & \cmark & 2/3 \\
-LookOut  & \texttt{BurlingameDT5\_feb5}          & \xmark & \cmark & \cmark & \cmark & 2/3 \\
-LookOut  & \texttt{SanmateoDT2\_Jan12}           & \cmark & \cmark & \cmark & \cmark & 3/3 \\
-LookOut  & \texttt{Gates\_to\_mainquad\_jan10}   & \cmark & \cmark & \cmark & \cmark & 3/3 \\
-LookOut  & \texttt{Huang\_Gates\_jan10}          & \cmark & \cmark & \cmark & \cmark & 3/3 \\
-LookOut  & \texttt{BurlingameDT4\_feb5}          & \xmark & \xmark & \xmark & \xmark & 0/3 \\
-LookOut  & \texttt{SSC3\_jan17}                  & \cmark & \cmark & \cmark & \cmark & 3/3 \\
-LookOut  & \texttt{Hillsdale6\_jan14}            & \xmark & \xmark & \cmark$\dagger$ & \cmark & 1/3 \\
-\midrule
-SLOPER4D & \texttt{seq003\_street\_002}          & \cmark & \cmark & \cmark & \cmark & 3/3 \\
-SLOPER4D & \texttt{seq008\_running\_001}         & \cmark & \cmark & \cmark & \cmark & 3/3 \\
-SLOPER4D & \texttt{seq009\_running\_002}         & \cmark & \cmark & \xmark & \cmark & 2/3 \\
-\midrule
-Nymeria  & \texttt{shelby\_arroyo\_act0}         & \cmark & \cmark & \xmark & \cmark & 2/3 \\
-\midrule
-\multicolumn{2}{r}{\textbf{Total PASS}}
-                  & \textbf{9/14} & \textbf{10/14} & \textbf{11/14}
-                  & \textbf{13/14} & --- \\
+CLIP-L (pre-registered) & \textbf{9/14} \\
+CLIP-bigG & 10/14 \\
+SigLIP-2-large & 11/14 \\
+Any encoder (post-hoc) & 13/14 \\
 \bottomrule
 \end{tabular}
-\caption{Acceptance verdicts on the multi-corpus, multi-encoder spatial-axis sweep (5 seeds $\times$ 5 H3 resolutions $\times$ 3 encoders per session).
-\emph{Criterion}: a session passes if an encoder's Hit@5 is non-decreasing across $r{\in}\{10,11,12\}$ with a $\geq4$\,pp $r10{\to}r12$ lift.
-\textbf{Pre-registered CLIP-L is the verdict basis: 9/14 pass.} ``Any-enc'' is the post-hoc disjunction over all three encoders (13/14), an optimistic upper bound reported for completeness; $\dagger$~marks SigLIP rescues where neither CLIP-family encoder passes. \texttt{BurlingameDT4} fails all encoders (visually homogeneous). Questions here are target-frame-generated (\S\ref{sec:limitations}), so this is a resolution-sensitivity check, not held-out QA.}
+\caption{Aggregate resolution-sensitivity verdicts (14 sessions, 5 seeds,
+5 H3 resolutions). The any-encoder row selects the successful encoder after the
+fact and is not the acceptance result.}
 \label{tab:multi-corpus-h3}
-\end{table*}
+\end{table}
 
 \subsection{Query-aware retrieval vs.\ uniform frame sampling}
 \label{sec:results-vanilla-mllm}
 
-On these same 14 sessions we compare query-aware retrieval against a frontier MLLM
-over \emph{uniformly-sampled} frames. We run Gemini 3.1 Pro at $K{=}8$ uniform
-frames per question (Fig.~\ref{fig:f2-psm-vs-mllm}). We are careful about what this
-measures: Gemini's \emph{actual chosen-frame} hit rate is only ${\sim}5\%$ (mean
-over sessions), because with $K{=}8$ uniform frames on 100--640\,s sessions the
-gap to a ${\sim}3$\,s GT interval means the right frame is rarely even in the
-candidate set. An \emph{any-of-$K$ coverage} score (a hit if \emph{any} of the 8
-uniform frames lands in GT, independent of Gemini's pick) is an upper bound of
-${\sim}8\%$ and reflects uniform temporal coverage, not the MLLM's reasoning.
-\psm{}'s query-guided top-5 exceeds both on nearly every session. The honest
-conclusion is narrow: \textbf{query-aware retrieval beats uniform frame sampling};
-this does \emph{not} show that MLLMs require \psm{} (a strong MLLM given the right
-candidates could do well), only that uniform sampling is a poor way to feed one.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/fig4_psm_vs_mllm.pdf}
-\caption{Query-aware \psm{} \texttt{clipL@r12} top-5 (blue) vs.\ $K{=}8$ uniform-frame sampling on the 14 street-scale sessions. Red is any-of-$K$ \emph{coverage} (a hit if \emph{any} of the 8 uniform frames lands in GT) --- an upper bound reflecting temporal coverage, not the MLLM's reasoning; Gemini's \emph{actual} chosen-frame hit rate is lower still (${\sim}5\%$ mean). Query-aware retrieval beats uniform sampling; this does not show MLLMs require \psm{} (\S\ref{sec:results-vanilla-mllm}).}
-\label{fig:f2-psm-vs-mllm}
-\end{figure}
+On the same 14 sessions, Gemini 3.1 Pro chooses a ground-truth frame from eight
+uniform samples only ${\sim}5\%$ of the time. Any-of-eight coverage, independent
+of Gemini's choice, is ${\sim}8\%$ and is an upper bound on what this candidate
+set permits. Query-guided \psm{} top-5 retrieval exceeds that coverage on nearly
+every session, despite returning fewer frames. This supports only the narrow
+claim that query-aware retrieval beats uniform sampling; it does not show that
+MLLMs require \psm{}.
 
 \subsection{Multi-session persistence at metropolitan scale (Honda HDD)}
 \label{sec:results-hdd}
 
-The results so far are single-pass, so they cannot exercise the multi-session
-persistence and revisit-cardinality properties (\S\ref{sec:intro}) that motivate
-a bounded index. We close this gap on the Honda Research Institute Driving
-Dataset (HDD)~\cite{ramanishka2018hdd}: 104\,h of San Francisco Bay Area driving
-with RTK GPS and a front camera (our extraction covers 132 drives, 102.9\,h with
-valid GPS), which over 8 months genuinely re-drives the same streets. HDD ships
-no look-back QA labels, so these results are \emph{systems} and
-\emph{self-supervised}, not retrieval-accuracy (\S\ref{sec:limitations}).
-Driving is not wearable capture, but it supplies what no egocentric look-back
-corpus yet offers (months of GPS-anchored revisits to the same places). We use it
-only to characterize \psm{}'s per-cell memory model against a real multi-session
-revisit structure; the revisit property turns on structure, not locomotion mode
-(cf.\ the GPS-anchored wearable walk in Fig.~\ref{fig:f8-psm-viz}).
+Honda HDD~\cite{ramanishka2018hdd} provides 132 drives (102.9\,h with valid RTK
+GPS) over eight months, including repeated Bay Area streets. It is driving, not
+wearable capture, and has no look-back QA labels; we use its trajectory only to
+characterize multi-session revisit structure and modeled memory, not retrieval
+accuracy (\S\ref{sec:limitations}).
 
-\begin{figure}[t]
+\begin{figure}[h]
 \centering
 \includegraphics[width=0.72\linewidth]{figures/f5_hdd_memory.pdf}
-% TODO(figure): regenerate fig5 to a single panel (A only); panels B/C are
-% withdrawn as PSM-engine results (offline Python substitutes; see text).
-\caption{HDD memory model (132 drives, 102.9\,h). \psm{}'s modeled per-cell
-\emph{logical} state (exemplar term) vs.\ a dense per-frame bank over cumulative
-driving hours, from the RTK trajectory (no embeddings). The exemplar term is
-sublinear in frame count, but charging the full $C{=}60$ HLL ring to every
-visited cell makes \psm{}'s total state exceed the bank at low fps (see text);
-we plot exemplar and ring terms separately. Earlier cardinality/cross-session-AUC
-panels are withdrawn as engine results (offline substitutes;
-\S\ref{sec:results-hdd}).}
+\caption{Analytical HDD memory model from the RTK trajectory (132 drives,
+102.9\,h), not measured RSS. Bars compare a dense CLIP-L frame bank, \psm{}
+exemplars, and full \psm{} logical state including a $C{=}60$ HLL ring per
+visited cell at four ingest rates. At 1\,fps, full \psm{} is 2.27\,GB versus
+1.14\,GB for the dense bank; the exemplar-only term is smaller.}
 \label{fig:hdd-combined}
 \end{figure}
 
-\paragraph{Revisit structure and a corrected memory model (Fig.~\ref{fig:hdd-combined}A).}
+\paragraph{Revisit structure and corrected memory model (Fig.~\ref{fig:hdd-combined}).}
 Binning every drive to H3 $r{=}10$ (${\sim}66$\,m), \textbf{47.0\%} of
 (drive, cell) traversal events fall in cells revisited on $\geq2$ distinct days
 (pre-registered bar $\geq30\%$), across 5{,}163 revisited cells spanning a
 \textbf{median of 106 days} (max 221). This is a genuine multi-session revisit
 structure. We use it to model \psm{}'s \emph{logical} per-cell state from the RTK
-trajectory (no embeddings): the \emph{exemplar} term $\sum_\text{cells}\min(\text{frames},R)$
-grows sublinearly in frame count, $1.4$/$2.3$/$4.4$/$7.2\times$ below a dense bank
-at 1/5/15/30\,fps. However, charging the full $C{=}60$ HLL ring
+trajectory (no embeddings): the \emph{exemplar} term
+$\sum_\text{cells}\min(\text{frames},R)$ is capped at $R$ per cell; the dense
+bank is $1.4$/$2.3$/$4.4$/$7.2\times$ larger at 1/5/15/30\,fps. However,
+charging the full $C{=}60$ HLL ring
 ($60\,\mathrm{KiB}$) to \emph{every} visited cell --- most seen once --- adds
 ${\sim}1.4$\,GB over 23{,}298 cells, so \psm{}'s \emph{total} state can
-\emph{exceed} the dense bank at 1\,fps ($2.27$ vs $1.14$\,GB) and the advantage is
-weaker throughout ($0.5$/$1.5$/$3.2$/$5.5\times$). We therefore report exemplar and
+\emph{exceed} the dense bank at 1\,fps ($2.27$ vs $1.14$\,GB); the dense/full-PSM
+ratio is $0.5$/$1.5$/$3.2$/$5.5\times$. We therefore report exemplar and
 ring bytes separately and treat this as \emph{modeled logical state}, not a
 bounded-memory guarantee: total state grows with the cell count, which itself
 grows over the 8 months (only 20\% of cells seen by the halfway mark). This
@@ -336,6 +247,6 @@ multi-session HDD cardinality/retrieval to future work. What we \emph{can} verif
 is an implementation check: on the one available drive the engine's per-cell HLL
 matches the Python re-implementation to a median $0.05\%$ (and both to the true
 distinct count to $0.00\%$ with a non-aging window), and a Nymeria micro-eval puts
-per-session HLL error at median $1.0\%$. We also note (\S\ref{sec:method}) that
+the per-cell median error on one session at $1.0\%$. We also note (\S\ref{sec:method}) that
 for continuous CLIP embeddings this cardinality counts distinct \emph{frames}, not
 distinct events or people, absent an object/event canonicalization stage.

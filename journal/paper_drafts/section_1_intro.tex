@@ -6,8 +6,8 @@
 %   (2) The architecture: PSM as a spatial-temporal index +
 %       reservoir-sampled exemplars + ring-buffer time decay, with
 %       per_cell_cap as the tuneable place-vs-similarity knob.
-%   (3) The contribution: bounded PSM approaches brute-force while the
-%       full-reservoir row checks the expected cap=K equivalence.
+%   (3) The contribution: characterize fixed-budget retention and report the
+%       released engine's per-cell memory profile honestly.
 
 \section{Introduction}
 \label{sec:intro}
@@ -19,12 +19,12 @@ Rather than claim a new memory bound, we ask an empirical allocation question:
 \emph{under a fixed global exemplar budget $M$, how should a streaming agent
 decide which observations to keep, and does allocating that budget across space
 (rather than across time) preserve more of the experiences a later query will
-need?} This isolates \emph{allocation} from encoder quality and from total
-memory: every policy we compare keeps the same number of exemplars and returns
+need?} This isolates \emph{allocation} from encoder quality and exemplar payload:
+every policy we compare keeps the same number of exemplars and returns
 the same number of candidates, so differences reflect what each policy chooses
-to retain. \psm{} is one point in this space; its per-cell state is bounded and
-grows sublinearly in the frame count, but the number of occupied cells grows
-with area, so \psm{} is budgeted per cell and is \emph{not} globally
+to retain. \psm{} motivates this allocation question; revisits saturate its bounded
+per-cell state, but the number of occupied cells grows with area, so \psm{} is
+budgeted per cell and is \emph{not} globally
 memory-bounded (\S\ref{sec:method}).
 
 \input{figures/f1_architecture.tex}
@@ -34,37 +34,36 @@ Figure~\ref{fig:f1-architecture} sketches the end-to-end architecture.
 We propose \textbf{\psm{}}, a streaming spatial-temporal index over an H3
 hex-grid tessellation with three per-cell structures: reservoir-sampled
 embedding exemplars; a time-decayed ring buffer of HyperLogLog sketches giving
-per-cell cardinality and a temporal envelope; and a per-cell capacity bound
-(\caponek{}) that dials strict spatial diversity ($\texttt{cap}{=}1$) to
+per-cell cardinality and a temporal envelope; and a query-time per-cell selection
+cap (\caponek{}) that dials strict spatial diversity ($\texttt{cap}{=}1$) to
 unconstrained top-$K$ ($\texttt{cap}{=}K$). Ingestion is streaming and per-cell
 state is bounded; query cost depends on scope (a spatially-centered query scans
 only a k-ring of cells, while an uncentered query scans all retained exemplars).
-We report engine ingest/query cost at the actual CLIP-L deployment
-configuration in \S\ref{sec:results-memory-latency}; the CLIP encoder, not the
-index, is the dominant on-device cost (\S\ref{sec:limitations}).
+We report engine ingest/query cost on host at the target CLIP-L configuration
+in \S\ref{sec:results-memory-latency}; true-configuration phone measurements
+remain future work (\S\ref{sec:limitations}).
 
 \paragraph{Evaluating the retrieval substrate.}
-We evaluate \psm{} as a retrieval substrate on egocentric look-back QA (e.g., ``where did I last see my bike?'', ``when was I last at this intersection?''). Multimodal LLMs achieve strong single-frame grounding yet remain brittle on temporal grounding over long video~\cite{cheng2024videgothink,chen2025groundedmultihop}, so we compose \psm{} as an upstream spatial \emph{prefilter} to a frontier MLLM (\S\ref{sec:pipeline}): \psm{} supplies fixed-budget recall, the MLLM supplies localization precision.
+We evaluate \psm{} as a retrieval substrate on egocentric look-back QA (e.g., ``where did I last see my bike?'', ``when was I last at this intersection?''). Multimodal LLMs achieve strong single-frame grounding yet remain brittle on temporal grounding over long video~\cite{cheng2024videgothink,chen2025groundedmultihop}, so we compose \psm{} as an upstream spatial \emph{prefilter} to a frontier MLLM (\S\ref{sec:pipeline}): \psm{} supplies a small candidate set and the MLLM selects among it.
 
 \paragraph{Contributions.}
 \begin{itemize}
   \item \textbf{A budget-matched allocation study.} On 14 street-scale
-    egocentric sessions we compare streaming retention policies at an identical
-    global exemplar budget and candidate count (global reservoir, FIFO,
-    temporal stratification, a semantic $k$-center coreset, and a causal
-    spatial-allocation probe), with rare/common-place and old/recent strata
-    reported together (\S\ref{sec:results-main}).
+    egocentric sessions we compare retention strategies at an identical global
+    exemplar budget and candidate count (causal global reservoir, FIFO, hybrid,
+    and spatial allocation; offline temporal sampling and semantic $k$-center), with
+    a rare/common-place breakdown (\S\ref{sec:results-main}).
   \item \textbf{A characterization, not a win.} Spatial allocation changes
-    \emph{which} places are remembered, not aggregate retrieval: it helps
-    rare/low-exposure-place recall in a \emph{place-specific} way (it beats
-    coordinate-permutation nulls on 2/3 seeds and is robust to grid
-    translation/rotation) but trades against common places, and a non-spatial
-    semantic-diversity coreset is best overall. The spatial policy is an
-    experimental probe with area-growing bookkeeping, not a deployed method.
+    \emph{which} places are remembered, not aggregate retrieval: its rare-place
+    shift versus the global reservoir is directional (CI includes zero), while
+    correct alignment beats coordinate-permutation nulls on 2/3 seeds and is
+    robust to grid transforms. Common-place recall falls, and a non-spatial
+    semantic-diversity coreset is best overall. The spatial policy is a Python
+    experimental probe with area-growing bookkeeping, not part of the C engine.
   \item \textbf{\psm{} substrate + honest systems accounting.} A streaming H3
     index with per-cell reservoir exemplars and a time-decayed HLL ring
-    (\S\ref{sec:method}); we report the engine's on-device cost at the actual
-    CLIP-L deployment configuration and the corrected per-cell memory model on
+    (\S\ref{sec:method}); we report the engine's host cost at the target CLIP-L
+    configuration and the corrected per-cell memory model on
     102.9\,h of driving (Honda HDD) as modeled logical state
     (\S\ref{sec:results-hdd}).
   \item \textbf{Correcting the MLLM framing.} A frontier-MLLM comparison shows
