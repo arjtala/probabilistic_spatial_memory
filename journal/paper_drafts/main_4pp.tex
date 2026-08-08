@@ -1,0 +1,73 @@
+% PSM 4-page extended abstract — OpenSUN3D / SpatialMem (non-archival track).
+% Distinct artifact from the 8pp paper: SpatialMem thesis distilled to
+% method + HDD multi-session persistence. The full four-pillar paper
+% (multi-corpus generalization, vanilla-MLLM baseline, ablations) is held
+% for a full venue; non-archival status keeps dual-submission open.
+%
+% Build: pdflatex main_4pp && bibtex main_4pp && pdflatex main_4pp && pdflatex main_4pp
+% Vendored kit files (eccv.sty, eccvabbrv.sty, llncs.cls, splncs04.bst)
+% are shared with main.tex in this directory.
+
+\documentclass[runningheads]{llncs}
+
+\usepackage[review,year=2026,ID=*****]{eccv}
+\usepackage{eccvabbrv}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[accsupp]{axessibility}
+\usepackage{pifont}
+\usepackage{tikz}
+\usetikzlibrary{positioning, arrows.meta, fit, calc,
+                shapes.geometric, backgrounds}
+\usepackage[pagebackref,breaklinks,colorlinks,citecolor=eccvblue]{hyperref}
+
+\newcommand{\psm}{\textsc{PSM}\xspace}
+\newcommand{\caponek}{\texttt{per\_cell\_cap}\xspace}
+
+\title{Probabilistic Spatial Memory: A Bounded-Memory Substrate
+for Multi-Session Persistent Spatial Memory}
+\titlerunning{Probabilistic Spatial Memory}
+
+\author{Anonymous}
+\authorrunning{Anonymous}
+\institute{Anonymous Institution\\\email{anon@example.com}}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+An agent that remembers its environment across sessions cannot let its
+state grow with time: dense per-observation embedding banks scale
+linearly with recording duration, which is untenable for continuous
+on-device memory. We present \textbf{Probabilistic Spatial Memory}
+(\psm{}), a streaming index that budgets state by \emph{area explored}
+rather than sequence length. \psm{} tessellates trajectories onto an H3
+hex grid and maintains, per cell, a reservoir-sampled embedding sample,
+a time-decayed ring buffer of HyperLogLog sketches, and a
+\caponek{} bound on retrieval fan-out. On a wearable look-back-QA corpus
+the bounded substrate retains 83\% of brute-force CLIP Hit@5, recovering
+it exactly once reservoir eviction is removed---bounding memory costs
+little retrieval accuracy. Scaling to 102.9\,h of metropolitan
+driving (Honda HDD) with genuine multi-session revisits (47\% of
+traversal events over cells re-driven on $\geq2$ days, median 106-day
+gap), \psm{}'s per-cell-capped state stays $1.3$--$7.2\times$ smaller
+than a dense bank as ingest rate rises, a $1\,\mathrm{KiB}$ sketch
+accrues unique-event cardinality across 219 days while decaying between
+visits, and label-free cross-session place recognition reaches
+$0.853$ AUC (vs.\ a $0.498$ shuffled null). The C engine and
+evaluation harness are released under MIT.
+\keywords{Spatial memory \and Multi-session persistence \and
+Bounded-memory systems \and Egocentric video \and Streaming retrieval.}
+\end{abstract}
+
+\input{sec4pp_intro_method.tex}
+\input{sec4pp_hdd.tex}
+\input{sec4pp_validation.tex}
+
+\bibliographystyle{splncs04}
+\bibliography{references}
+
+\end{document}

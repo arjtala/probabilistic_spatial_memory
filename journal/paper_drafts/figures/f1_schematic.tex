@@ -1,0 +1,82 @@
+% F1-compact — PSM schematic for the 4pp abstract (single row, ~1/4 col).
+% Shows the ingest->per-cell-state->query core only; the MLLM-rerank
+% pipeline is deferred to the full paper. Reuses the visual vocabulary of
+% figures/f1_architecture.tex (hex cells, HLL ring, reservoir slots).
+% Requires \usetikzlibrary{positioning,arrows.meta,fit,calc,
+% shapes.geometric,backgrounds} (loaded in main_4pp.tex).
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+    >={Stealth[length=1.4mm,width=1.1mm]},
+    font=\scriptsize,
+    box/.style={draw, rounded corners=1pt, align=center,
+                inner sep=1.5pt, minimum height=4.5mm, fill=white},
+    iobox/.style={box, fill=gray!8},
+    hex/.style={draw, regular polygon, regular polygon sides=6,
+                minimum size=4.4mm, inner sep=0pt, rotate=30, fill=gray!5},
+    hexhi/.style={hex, fill=blue!12, draw=blue!60!black, thick},
+    hllbox/.style={draw, minimum width=1.6mm, minimum height=1.6mm,
+                   inner sep=0pt, fill=orange!25, draw=orange!70!black},
+    hllold/.style={hllbox, fill=orange!8, draw=orange!30},
+    resvslot/.style={draw, minimum width=1.6mm, minimum height=1.6mm,
+                     inner sep=0pt, fill=blue!15, draw=blue!60!black},
+    flow/.style={->, semithick, gray!60!black},
+    smallflow/.style={->, thin, gray!60!black},
+]
+
+% ---- streaming input ----
+\node[iobox] (in) {stream\\$(\mathbf{e},{\rm lat,lng},t)$};
+
+% ---- H3 hex cluster ----
+\coordinate (hexcenter) at ($(in.east) + (11mm, 0mm)$);
+\node[hex]   (h0) at ($(hexcenter) + (-3.8mm, 2.2mm)$) {};
+\node[hex]   (h1) at ($(hexcenter) + ( 0mm,   4.4mm)$) {};
+\node[hex]   (h2) at ($(hexcenter) + ( 3.8mm, 2.2mm)$) {};
+\node[hexhi] (hC) at (hexcenter) {};
+\node[hex]   (h4) at ($(hexcenter) + (-3.8mm,-2.2mm)$) {};
+\node[hex]   (h5) at ($(hexcenter) + ( 0mm,  -4.4mm)$) {};
+\node[hex]   (h6) at ($(hexcenter) + ( 3.8mm,-2.2mm)$) {};
+\node[font=\tiny, below=4.6mm of hC, gray!60!black] {H3 cells};
+
+% ---- per-cell state pop-out ----
+\coordinate (cellAnchor) at ($(hexcenter) + (16mm, 1mm)$);
+% HLL ring (top row) with label ABOVE it
+\node[hllold] (hll1) at ($(cellAnchor) + (-3mm, 3.0mm)$) {};
+\node[hllold] (hll2) at ($(cellAnchor) + (-1mm, 3.0mm)$) {};
+\node[hllbox] (hll3) at ($(cellAnchor) + ( 1mm, 3.0mm)$) {};
+\node[hllbox] (hll4) at ($(cellAnchor) + ( 3mm, 3.0mm)$) {};
+\node[font=\tiny, above=0.4mm of hll2, anchor=south, xshift=1mm]
+     {HLL ring \textit{(decay)}};
+% Reservoir (bottom row) with label BELOW it
+\node[resvslot] (r1) at ($(cellAnchor) + (-3mm, 0.6mm)$) {};
+\node[resvslot] (r2) at ($(cellAnchor) + (-1mm, 0.6mm)$) {};
+\node[resvslot] (r3) at ($(cellAnchor) + ( 1mm, 0.6mm)$) {};
+\node[resvslot] (r4) at ($(cellAnchor) + ( 3mm, 0.6mm)$) {};
+\node[font=\tiny, below=0.4mm of r3, anchor=north, align=center] (rlab)
+     {$R$ exemplars\\\textit{(bounded)}};
+\draw[smallflow, dashed, blue!50!black]
+     (hC.east) -- ($(cellAnchor) + (-4.5mm, 1.8mm)$);
+
+% ---- query ----
+\node[box, right=20mm of cellAnchor, align=center, fill=orange!10,
+      draw=orange!70!black] (topk)
+     {top-$K$ cosine\\{\tiny\caponek}};
+\node[iobox, right=2.5mm of topk] (out)
+     {$(t,{\rm cell})$\\$\times K$};
+
+% ---- flows ----
+\draw[flow] (in.east) -- (hC.west);
+% reservoir -> top-K: exit right from the reservoir row, clear of labels
+\draw[flow, dashed, blue!50!black]
+     ($(r4.east)+(0.8mm,0)$) -- (topk.west);
+\draw[flow] (topk.east) -- (out.west);
+
+\end{tikzpicture}
+\caption{\textbf{\psm{} schematic.} Streaming
+$(\mathbf{e},\mathrm{lat},\mathrm{lng},t)$ tuples are deposited into H3
+cells; each cell keeps a bounded ring of HLL sketches (orange, fading with
+age) and $R$ reservoir-sampled embeddings (blue). A query cosine-searches
+the reservoirs under the \caponek{} gate and returns $K$ cell-tagged
+candidates. State is bounded per cell, independent of recording length.}
+\label{fig:f1-schematic}
+\end{figure}

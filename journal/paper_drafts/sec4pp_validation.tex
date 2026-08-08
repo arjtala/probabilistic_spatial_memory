@@ -1,0 +1,25 @@
+% P4: retrieval-fidelity validation (inline, no table), generalization
+% pointer, limitations (3 sentences), conclusion + MIT.
+
+\section{Retrieval Fidelity and Scope}
+\label{sec:validation}
+
+\paragraph{Retrieval survives the memory bound.}
+Bounding memory is only useful if retrieval survives it. On a wearable
+look-back-QA corpus (Nymeria~\cite{ma2024nymeria} atomic-action
+narrations), \psm{} recovers brute-force CLIP retrieval \emph{exactly} at
+an eviction-free operating point (reservoir capacity exceeding the
+per-cell frame count)---the same 25 of 187 groundable narrations at
+identical mean IoU---and retains 83\% of that Hit@5 at the
+$8\times$-smaller $R{=}128$ deployment point; a single MLLM rerank matches
+brute-force localization within sampling noise. The spatial-axis behavior
+further holds on 13 of 14 street-scale sessions (the lone failure a
+visually-homogeneous parking-lot street) spanning three sensor stacks
+(SLOPER4D~\cite{dai2023sloper4d}, Nymeria, LookOut~\cite{pan2025lookout})
+and three encoders (CLIP-L, CLIP-bigG, SigLIP-2~\cite{tschannen2025siglip2}).
+
+\paragraph{Limitations.}
+HDD carries no QA labels, so its results are self-supervised, not
+retrieval-accuracy; and the cross-session AUC conflates geographic proximity
+with visual identity (a $k$-nearest-cell control would isolate it). Engine and harness are MIT
+licensed.\footnote{Code and evaluation harness: \url{https://anonymous.4open.science/r/probabilistic_spatial_memory-3C17}.}
