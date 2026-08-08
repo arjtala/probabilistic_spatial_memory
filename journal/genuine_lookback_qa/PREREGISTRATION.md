@@ -31,11 +31,13 @@ same place recurs across time. This preregisters the decisive test of whether th
 "Long multi-revisit session" = **≥30 min ingested** AND **cells revisited on ≥2
 temporally-separated passes** (revisit *structure*, not just duration).
 
-Neither route exists yet: PROTOCOL.md's hard gate was never passed (no
-`eval_genuine_*.json`; only `template_questions.yaml`), and the GPS-grounded
-`last_seen` generator is unbuilt (TODO). This annotation is the **weeks-scope cost**,
-and it is required for **any** venue — RcVB's proxy-benchmark objection does not go
-away by moving venues.
+PROTOCOL.md's hard gate has never been passed (no `eval_genuine_*.json`; only
+`template_questions.yaml`). The GPS-grounded `last_seen` generator now exists
+(`scripts/generate_revisit_questions.py`), which makes the *proxy* cohort
+affordable — but it does **not** discharge the annotation requirement. Human
+authoring is still required for **any** venue: RcVB's proxy-benchmark objection
+does not go away by moving venues, and it does not go away by automating the
+proxy. See §3b — the two banks do different jobs and both are preregistered.
 
 ### 3a. IMPORTANT — cohort, not one session
 `compare_fixed_budget.py` computes the CI by **resampling sessions** ("never
@@ -48,6 +50,36 @@ check).
 *(Fallback if only 1–2 long sessions are feasible: add a within-session
 question-bootstrap mode to the harness and preregister that instead — a weaker,
 single-session inference. Flagged, not preferred.)*
+
+### 3b. Two banks, both preregistered — and why construction must be H3-independent
+The test runs on **two question banks**, and the reporting rule in §8 spans both.
+
+| Bank | Source | Job |
+|---|---|---|
+| **Proxy** | `generate_revisit_questions.py`, ≥5-session cohort | Powers the session-bootstrap CI. Makes the cohort affordable. |
+| **Validity** | Hand-authored per PROTOCOL.md, 1–2 sessions | Independent check that a proxy result is not a construction artifact. Answers RcVB. |
+
+**Construction independence (load-bearing).** The proxy generator must select
+places by **metric distance on the raw track**, never by H3 cell identity. The
+first cut of the generator reused the evaluator's `h3_cells` / `group_indices`
+to guarantee no drift; that is the wrong trade. It would make the bank a
+function of the same H3 partition and cell-exposure statistics that (a) define
+the rare/common strata in §5 and (b) *are* the mechanism of `spatial_priority`.
+H1 would then reduce to "does a policy that retains frames from low-exposure H3
+cells score well on questions selected to sit in low-exposure H3 cells?" — which
+can come out positive by construction. It would also blunt §6's coordinate-null:
+the permuted arm scrambles the policy's spatial view while the GT intervals still
+encode true H3-derived structure, so the control no longer isolates
+place-specificity.
+Scoring is unaffected — `eval_fixed_budget.py` still computes cells and strata
+with `h3_cells` exactly as before. Only *construction* is decoupled. Any H3
+figure emitted by the generator is a diagnostic and must never feed selection.
+
+**The validity bank is the reason this still is not sufficient on its own.**
+Even metric-clustered proxy questions are generated from the trajectory, so they
+inherit *some* spatial structure. Human-authored questions are the only ones
+constructed independently of the track, which is why §8 makes them the
+tiebreaker rather than an appendix.
 
 ## 4. Design (frozen)
 - **Policies:** `global_reservoir` (budget-matched baseline), `spatial_priority`
@@ -71,9 +103,28 @@ under translation/rotation to count as place-specific (not partition-balancing o
 H3-boundary artifact).
 
 ## 7. Exact commands (cluster-side; data under `$PSM_DATA_ROOT`)
+
+**Step 0 — build the proxy bank per candidate session, then select the cohort.**
+Keep only sessions reporting `long_multirevisit=true`; assemble ≥5 across ≥2
+substrates. Record each `questions_sha256` before running any policy.
+```bash
+python scripts/generate_revisit_questions.py \
+  --features "$PSM_DATA_ROOT/video_retrieval/<corpus>/<session>/clip_l_features.h5" \
+  --out      "$PSM_DATA_ROOT/video_retrieval/<corpus>/<session>/revisit_questions.yaml" \
+  --metadata-out captures/revisit_meta/<session>.json \
+  --place-radius-m 15 --visit-gap-sec 30 --min-separation-sec 120 \
+  --n-questions 20 --seed 0
+```
+Places are metric clusters on the raw track (§3b); `--h3-resolution` is a
+sidecar diagnostic only and must not be used to select sessions or questions.
+
+**Step 1 — the suite.** Run once per bank: `QUESTIONS_NAME=revisit_questions.yaml`
+for the proxy cohort, and `QUESTIONS_NAME=genuine_questions.yaml` for the
+validity sessions (§8a). Use a distinct `OUT_ROOT` per bank so captures never
+pool.
 ```bash
 ROOT="$PSM_DATA_ROOT/video_retrieval/<corpus>" \
-QUESTIONS_NAME=genuine_questions.yaml \
+QUESTIONS_NAME=revisit_questions.yaml \
 OUT_ROOT=captures/decisive_longrevisit \
 METHODS=global_reservoir,spatial_priority,semantic_kcenter \
 BUDGETS="128 64" SEEDS=0,1,2,3,4 H3_RESOLUTIONS=12 CLIP_DEVICE=cuda \
@@ -104,6 +155,27 @@ SLURM: `scripts/slurm/fixed_budget_suite.sbatch`.
   venue.
 - **No post-hoc operating-point search.** M, r, strata, controls, and this rule are
   frozen; report the M=128 / r=12 point regardless of any other point.
+
+### 8a. Two-bank reporting rule (frozen — deciding this after the run is the exact
+### post-hoc move this document exists to prevent)
+H1 is evaluated on the **proxy cohort** (the CI-bearing test) and **reported
+alongside** the validity bank on every occasion it is stated. The validity bank
+is the **tiebreaker**, not a robustness footnote:
+
+| Proxy cohort | Validity bank | Verdict |
+|---|---|---|
+| H1 holds | effect same direction | **GO.** Positive claim, scoped as in §8. |
+| H1 holds | effect absent / opposite | **NO-GO for the positive claim.** Report as a construction-sensitive proxy effect that does not replicate on human questions. This is a *finding*, not a failed experiment. |
+| H1 fails | either | **NO-GO / null**, per §8. |
+
+The validity bank is small (1–2 sessions, 15–20 questions each), so it will not
+carry its own session-bootstrap CI and **must not be given one**. It is read as
+direction-of-effect plus per-question detail only. Underpowering is not licence
+to discount it when it disagrees — a disagreement is the informative outcome and
+is reported as such.
+
+Both banks' sha256 hashes are recorded in the results table. Neither bank may be
+regenerated, reseeded, or re-authored after any policy has been run against it.
 
 ## 9. Prior
 Author's prior on the null: **> 0.5** even in the long regime. Preregistering the

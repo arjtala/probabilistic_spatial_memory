@@ -18,15 +18,36 @@ Cluster-only: the feature files (``clip_l_features.h5`` with per-frame
 ``$PSM_DATA_ROOT``, not in the paper clone. Run this where the data is.
 
 Design:
-  * A "visit" to an H3 cell is a temporally-separated episode of that cell's
-    frames (``visit_episodes``, gap ``--visit-gap-sec``). A cell is *revisited*
+  * A "place" is a metric cluster of track points (radius ``--place-radius-m``
+    on the raw lat/lng), NOT an H3 cell. See "Why metric, not H3" below — this
+    decoupling is load-bearing for the preregistered test.
+  * A "visit" to a place is a temporally-separated episode of that place's
+    frames (``visit_episodes``, gap ``--visit-gap-sec``). A place is *revisited*
     when it has >= ``--min-visits`` episodes whose start-to-start separation is
     >= ``--min-separation-sec`` (a genuine return, not a long dwell).
-  * For each revisited cell we sample a query timestamp from a *later* visit and
+  * For each revisited place we sample a query timestamp from a *later* visit and
     set the ground-truth interval to an *earlier* visit's span — "when did I last
     see this place before now?". The query carries the earlier visit's mean
     (lat, lng) + a k-ring, so it exercises PSM's spatial substrate (last_seen has
     no text query, by design; retrieval baselines skip it).
+
+Why metric, not H3 (do not "simplify" this back):
+    An earlier cut of this generator built the bank from ``h3_cells`` /
+    ``group_indices`` — the evaluator's own primitives — so that "place" could
+    not drift from how the evaluator scores. That is the wrong trade. It makes
+    the question bank a function of the *same* H3 partition and cell-exposure
+    statistics that (a) define the rare/common outcome strata and (b) are the
+    entire mechanism of the ``spatial_priority`` policy under test. H1 would
+    then reduce to "does a policy that retains frames from low-exposure H3 cells
+    score well on questions selected to sit in low-exposure H3 cells?", which
+    can come out positive by construction. It also blunts the coordinate-null
+    control: the permuted arm scrambles the policy's spatial view while the GT
+    intervals still encode the true H3-derived structure.
+    Selecting places by metric distance on the raw track keeps question
+    construction independent of the evaluation partition. Scoring is unchanged —
+    ``eval_fixed_budget.py`` still computes cells and strata with ``h3_cells``
+    exactly as before — so there is no scoring drift, only construction
+    independence. The H3 numbers in the sidecar are diagnostics, never inputs.
   * Output matches the ``eval_lookback.py`` YAML schema exactly, so
     ``QUESTIONS_NAME=<out>`` in the budget suite picks it up unchanged.
   * Fully deterministic under ``--seed``; we print the output SHA-256 so the bank
@@ -43,7 +64,7 @@ Usage (cluster):
         --features $PSM_DATA_ROOT/.../<session>/clip_l_features.h5 \
         --out      $PSM_DATA_ROOT/.../<session>/revisit_questions.yaml \
         --metadata-out captures/revisit_meta/<session>.json \
-        --h3-resolution 12 --visit-gap-sec 30 --min-separation-sec 120 \
+        --place-radius-m 15 --visit-gap-sec 30 --min-separation-sec 120 \
         --n-questions 20 --seed 0
 """
 from __future__ import annotations
@@ -60,9 +81,69 @@ import yaml
 
 _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "scripts"))
-# Reuse the evaluator's exact cell/visit primitives so "revisit" and the strata
-# are byte-identical to eval_fixed_budget.py's notion of them.
-from eval_fixed_budget import group_indices, h3_cells, visit_episodes  # noqa: E402
+# ``visit_episodes`` is partition-agnostic (it only splits an index array on time
+# gaps), so reusing it keeps episode semantics identical to the evaluator without
+# importing the H3 partition. ``h3_cells`` is imported for SIDECAR DIAGNOSTICS
+# ONLY — it must never feed question selection (see "Why metric, not H3" above).
+from eval_fixed_budget import h3_cells, visit_episodes  # noqa: E402
+
+
+def metric_places(
+    lat: np.ndarray,
+    lng: np.ndarray,
+    *,
+    radius_m: float,
+) -> tuple[dict[int, np.ndarray], np.ndarray]:
+    """Cluster track points into places by metric distance on the raw track.
+
+    Deliberately independent of H3: greedy leader clustering in timestamp order,
+    assigning each frame to the first place whose running centroid is within
+    ``radius_m``, else opening a new place. Deterministic given the track (no
+    RNG, no iteration over unordered containers).
+
+    Returns ``(place_id -> frame indices, per-frame place label)``.
+    """
+    n = int(lat.size)
+    labels = np.full(n, -1, dtype=np.int64)
+    if n == 0:
+        return {}, labels
+
+    # Local equirectangular projection about the track origin: adequate at the
+    # session scales here (<= a few km) and avoids a geodesy dependency.
+    lat0 = float(lat[0])
+    m_per_deg_lat = 110_540.0
+    m_per_deg_lng = 111_320.0 * float(np.cos(np.deg2rad(lat0)))
+    xs = (lng - float(lng[0])) * m_per_deg_lng
+    ys = (lat - lat0) * m_per_deg_lat
+
+    centroids_x: list[float] = []
+    centroids_y: list[float] = []
+    counts: list[int] = []
+    for i in range(n):
+        x, y = float(xs[i]), float(ys[i])
+        assigned = -1
+        best_d2 = radius_m * radius_m
+        for p in range(len(centroids_x)):
+            dx = x - centroids_x[p]
+            dy = y - centroids_y[p]
+            d2 = dx * dx + dy * dy
+            if d2 <= best_d2:
+                best_d2 = d2
+                assigned = p
+        if assigned < 0:
+            centroids_x.append(x)
+            centroids_y.append(y)
+            counts.append(1)
+            assigned = len(centroids_x) - 1
+        else:
+            c = counts[assigned] + 1
+            centroids_x[assigned] += (x - centroids_x[assigned]) / c
+            centroids_y[assigned] += (y - centroids_y[assigned]) / c
+            counts[assigned] = c
+        labels[i] = assigned
+
+    groups = {p: np.flatnonzero(labels == p) for p in range(len(centroids_x))}
+    return groups, labels
 
 
 def load_track(features_h5: Path, group: str):
@@ -96,16 +177,16 @@ def load_track(features_h5: Path, group: str):
     return ts_rel, lat, lng, session_start, n_frames
 
 
-def revisited_cells(
-    groups: dict[str, np.ndarray],
+def revisited_places(
+    groups: dict[int, np.ndarray],
     ts_rel: np.ndarray,
     *,
     visit_gap_sec: float,
     min_visits: int,
     min_separation_sec: float,
-) -> dict[str, list[np.ndarray]]:
-    """cell -> list of episodes, for cells that are *genuinely* revisited."""
-    out: dict[str, list[np.ndarray]] = {}
+) -> dict[int, list[np.ndarray]]:
+    """place -> list of episodes, for places that are *genuinely* revisited."""
+    out: dict[int, list[np.ndarray]] = {}
     for cell, indices in groups.items():
         episodes = visit_episodes(indices, ts_rel, visit_gap_sec)
         if len(episodes) < min_visits:
@@ -123,7 +204,7 @@ def revisited_cells(
 
 
 def build_questions(
-    revisits: dict[str, list[np.ndarray]],
+    revisits: dict[int, list[np.ndarray]],
     ts_rel: np.ndarray,
     lat: np.ndarray,
     lng: np.ndarray,
@@ -133,7 +214,7 @@ def build_questions(
     seed: int,
 ) -> list[dict]:
     rng = np.random.default_rng(seed)
-    # Deterministic cell order: most-revisited first, ties broken by cell id.
+    # Deterministic place order: most-revisited first, ties broken by place id.
     cells = sorted(revisits, key=lambda c: (-len(revisits[c]), c))
     questions: list[dict] = []
     for cell in cells:
@@ -152,8 +233,8 @@ def build_questions(
         query_t = float(ts_rel[later[int(rng.integers(0, later.size))]])
         questions.append(
             {
-                "id": f"rv_{cell}_{later_k}",
-                "query": f"the place I last visited before t={query_t:.1f}s (cell {cell})",
+                "id": f"rv_p{cell}_{later_k}",
+                "query": f"the place I last visited before t={query_t:.1f}s (place {cell})",
                 "category": "location_trace",
                 "query_mode": "last_seen",
                 "query_lat": round(q_lat, 8),
@@ -162,8 +243,9 @@ def build_questions(
                 "query_time_sec": round(query_t, 3),
                 "intervals": [[round(gt_start, 3), round(gt_end, 3)]],
                 "notes": (
-                    f"auto-generated (revisit); cell has {len(episodes)} visits; "
-                    "GPS/SLAM-grounded proxy, not human-authored"
+                    f"auto-generated (revisit); place has {len(episodes)} visits; "
+                    "metric-clustered (H3-independent) GPS/SLAM-grounded proxy, "
+                    "not human-authored"
                 ),
             }
         )
@@ -176,12 +258,30 @@ def main() -> int:
     )
     ap.add_argument("--features", type=Path, required=True)
     ap.add_argument("--group", default="clip")
-    ap.add_argument("--h3-resolution", type=int, default=12)
+    ap.add_argument(
+        "--place-radius-m",
+        type=float,
+        default=15.0,
+        help=(
+            "metric radius defining a 'place' on the raw track. Question "
+            "construction is deliberately H3-independent; see the module "
+            "docstring. Do not set this from an H3 edge length."
+        ),
+    )
+    ap.add_argument(
+        "--h3-resolution",
+        type=int,
+        default=12,
+        help=(
+            "DIAGNOSTIC ONLY — reported in the sidecar for comparison with the "
+            "evaluator. Never used to select places or questions."
+        ),
+    )
     ap.add_argument(
         "--visit-gap-sec",
         type=float,
         default=30.0,
-        help="gap that splits a cell's frames into visits (matches eval default)",
+        help="gap that splits a place's frames into visits (matches eval default)",
     )
     ap.add_argument("--min-visits", type=int, default=2)
     ap.add_argument(
@@ -201,9 +301,9 @@ def main() -> int:
 
     ts_rel, lat, lng, session_start, n_frames = load_track(args.features, args.group)
     duration_sec = float(ts_rel[-1]) if ts_rel.size else 0.0
-    labels = h3_cells(lat, lng, args.h3_resolution)
-    groups = group_indices(labels)
-    revisits = revisited_cells(
+    # Places come from the raw track, NOT from the evaluator's H3 partition.
+    groups, _place_labels = metric_places(lat, lng, radius_m=args.place_radius_m)
+    revisits = revisited_places(
         groups,
         ts_rel,
         visit_gap_sec=args.visit_gap_sec,
@@ -213,9 +313,9 @@ def main() -> int:
 
     if not revisits:
         raise SystemExit(
-            f"{args.features}: no cell has >= {args.min_visits} genuinely-separated "
-            f"visits at r={args.h3_resolution} — this is NOT a long multi-revisit "
-            "session; exclude it from the cohort."
+            f"{args.features}: no place has >= {args.min_visits} genuinely-separated "
+            f"visits at radius {args.place_radius_m} m — this is NOT a long "
+            "multi-revisit session; exclude it from the cohort."
         )
 
     questions = build_questions(
@@ -234,12 +334,18 @@ def main() -> int:
         "iou_threshold": args.iou_threshold,
         "generator": {
             "script": "generate_revisit_questions.py",
-            "h3_resolution": args.h3_resolution,
+            "place_selection": "metric",
+            "place_radius_m": args.place_radius_m,
+            "h3_resolution_diagnostic_only": args.h3_resolution,
             "visit_gap_sec": args.visit_gap_sec,
             "min_visits": args.min_visits,
             "min_separation_sec": args.min_separation_sec,
             "seed": args.seed,
-            "note": "GPS/SLAM-grounded last_seen proxy; NOT human-authored (see PREREGISTRATION.md)",
+            "note": (
+                "GPS/SLAM-grounded last_seen proxy; NOT human-authored. Places "
+                "are metric clusters on the raw track, independent of the H3 "
+                "partition used for scoring/strata (see PREREGISTRATION.md)."
+            ),
         },
         "questions": questions,
     }
@@ -253,7 +359,11 @@ def main() -> int:
     print(f"[revisit-gen] frozen sha256 = {sha}", file=sys.stderr)
 
     # Sidecar: revisit richness for cohort selection + strata sanity.
-    exposures = {c: int(sum(ep.size for ep in eps)) for c, eps in revisits.items()}
+    exposures = {str(c): int(sum(ep.size for ep in eps)) for c, eps in revisits.items()}
+    # DIAGNOSTIC ONLY: how the evaluator's partition sees the same track. Useful
+    # for sanity-checking that metric places are not degenerate w.r.t. scoring,
+    # but never an input to selection.
+    n_h3_cells = int(np.unique(h3_cells(lat, lng, args.h3_resolution)).size)
     meta = {
         "session_id": session_id,
         "features": str(args.features),
@@ -262,10 +372,13 @@ def main() -> int:
         "n_frames": n_frames,
         "duration_sec": round(duration_sec, 1),
         "duration_min": round(duration_sec / 60.0, 1),
-        "n_cells": len(groups),
-        "n_revisited_cells": len(revisits),
+        "place_selection": "metric",
+        "place_radius_m": args.place_radius_m,
+        "n_places": len(groups),
+        "n_revisited_places": len(revisits),
+        "n_h3_cells_diagnostic": n_h3_cells,
         "n_questions": len(questions),
-        "revisit_exposure_by_cell": exposures,
+        "revisit_exposure_by_place": exposures,
         # Cohort gate mirrors the preregistration's "long multi-revisit" definition.
         "long_multirevisit": bool(duration_sec >= 1800.0 and len(revisits) >= 5),
     }
@@ -275,7 +388,8 @@ def main() -> int:
         print(f"[revisit-gen] metadata -> {args.metadata_out}", file=sys.stderr)
     print(
         f"[revisit-gen] {session_id}: {meta['duration_min']} min, "
-        f"{meta['n_revisited_cells']} revisited cells, "
+        f"{meta['n_revisited_places']} revisited places "
+        f"(metric, r={args.place_radius_m} m), "
         f"long_multirevisit={meta['long_multirevisit']}",
         file=sys.stderr,
     )

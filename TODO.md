@@ -664,3 +664,95 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Caveat carried in the docstring: annotation-free but still a retrieval proxy; does NOT answer the human-authored objection -> pair with a small hand-authored validity bank on 1-2 sessions.
 - [ ] CLUSTER (cannot run here; data under $PSM_DATA_ROOT): run generator on candidate long GPS/SLAM sessions -> select >=5 with long_multirevisit=true across >=2 substrates -> run_wearables_budget_suite.sh -> compare_fixed_budget.py per PREREGISTRATION.md go/no-go.
 - [ ] Decide: hand-authored validity bank on 1-2 sessions (PROTOCOL.md) alongside the proxy cohort.
+
+## 2026-08-08 -- WearableAI reviews (ECCV 2026): REJECT, resubmission recommended
+
+Scores 4/5/6; chairs cite "conflates [the question] with an ad-hoc memory
+pipeline not well-anchored to the literature". Full triage:
+[journal/reviews_wearableai_2026.md](journal/reviews_wearableai_2026.md).
+
+- [x] Triage the three reviews; tally cross-reviewer agreement (clarity 3/3;
+      confound 2/3; null-result 2/3)
+- [x] Checked the "submitted PDF diverges from master" concern -- IT DOES NOT.
+      The §5.2 fixed-budget table (23.6/23.9/27.8) and the cap=1/cap=K
+      11.2%/13.4% numbers are two distinct studies coexisting in
+      `section_5_results.tex` (:64-69 and :129). Nothing to reconcile.
+- [x] Root cause identified: the paper argues itself out of a contribution.
+      §5.2 opens "The result is a characterization, not a win"; Table 1 caption
+      calls the contribution "not a deployed method"; §5.2 states k-center is
+      "best overall". Reviewers agreed with the paper's own self-assessment.
+      Honesty was correct; leading with a probe was the error.
+
+### Blocked on direction decision (author)
+- [ ] DIRECTION: full revision -> stronger venue / reframe-and-reuse /
+      light revision -> another workshop / shelve. Light revision assessed as
+      weakest: there is no positive claim left to present more clearly.
+
+### Direction-independent (do regardless, once direction is set)
+- [ ] Move `spatial_priority` from the Python harness
+      (`scripts/eval_fixed_budget.py:224`) into the C engine -- closes RcVB's
+      "headline result is not from the proposed artifact" seam
+- [ ] Run the allocation policies over >=2 memory substrates -- closes yhV1's
+      generalization confound (the chairs' stated reject reason)
+- [ ] HLL: cut it, or make it drive allocation. Cannot ship as paid-for
+      optional metadata (RcVB)
+- [ ] State the task, the metrics, and what the "C engine" is, in §1. Two
+      reviewers could not identify the C engine's role
+- [ ] Answer the reranker-latency objection in text: rerank is per-query, not
+      per-frame, so it is not in the streaming path (2Zao). Writing-only
+- [ ] Fold in on-device numbers from `journal/on_device/results_s22.md`
+      (S22 / Exynos 2200) against `results_host_baseline.md` (RcVB)
+- [ ] Anchor to streaming-selection literature: streaming submodular /
+      sieve-streaming / streaming k-center / coresets (yhV1)
+- [ ] Add GROVE as a baseline (author input; not yet characterized in-repo)
+- [ ] Human-authored look-back questions -- see "Question bank expansion"
+      above. Annotation labor; currently disclosed as proxies at
+      `section_5_results.tex:22`
+- [ ] Density: resubmit with a real page budget or cut a whole results block.
+      Five prior compression cycles caused the density all 3 reviewers hit;
+      another editing pass will not fix it
+
+### Candidate reframe (recommendation, pending direction)
+- [ ] Recast k-center from competitor to *oracle ceiling* (it is offline
+      farthest-first over the full embedding bank, inadmissible when
+      streaming). Question becomes "how close can a streaming bounded-memory
+      policy get to it, and what does a spatial prior buy?" Makes the flat
+      aggregate the point (parity at constant memory) and the +4.4pp/-2.7pp
+      rare/common trade a characterized mechanism. Does NOT by itself close
+      the confound.
+
+## 2026-08-08 -- Construction-independence fix + two-bank rule (revision-prep)
+
+- [x] Tagged `wearableai2026-submission` -> `c20094d` locally (**AUTHOR: push it**;
+      sandbox has no network). Tag is the submission freeze -- do NOT force-reset
+      master to c20094d; the two additive commits on master are wanted.
+- [x] `scripts/generate_revisit_questions.py`: place selection decoupled from the
+      evaluation partition. Was `h3_cells`/`group_indices` (the evaluator's own
+      primitives); now metric leader-clustering on the raw track
+      (`--place-radius-m`, default 15 m). Rationale in the module docstring under
+      "Why metric, not H3 (do not simplify this back)".
+      WHY IT MATTERED: the bank was a function of the same H3 partition and
+      cell-exposure stats that define the rare/common strata AND are the
+      mechanism of `spatial_priority` -- H1 could have come out positive by
+      construction, and the coordinate-null control was blunted.
+      `visit_episodes` is retained (partition-agnostic). `h3_cells` retained for
+      the sidecar diagnostic only.
+- [x] Verified: A->B->A synthetic track yields 2 places, place 0 spans both A
+      visits, deterministic across runs, merges at r=300 m. `py_compile` clean.
+- [x] PREREGISTRATION.md §3b (two banks + construction independence), §7 step 0
+      (generator command + per-bank `QUESTIONS_NAME`/`OUT_ROOT`), §8a (frozen
+      two-bank reporting rule with the validity bank as tiebreaker).
+- [x] Restored the review triage + 2026-08-08 TODO section that were stranded
+      uncommitted on `paper-wearable-14pp`.
+
+### Open
+- [ ] AUTHOR: `git push origin wearableai2026-submission`
+- [ ] AUTHOR (cluster): do long GPS/SLAM-tracked multi-revisit takes exist, or
+      must they be captured? Gates days-vs-weeks on the cohort.
+- [ ] Author the validity bank (1-2 sessions, PROTOCOL.md). Now load-bearing per
+      §8a, not optional.
+- [ ] Branch deletions still awaiting explicit go: `paper-8pp-cut`,
+      `hdd-revisit-density` (0-ahead, safe), `paper-wearable-14pp` (1-ahead),
+      `paper-4pp-abstract` (16-ahead, salvage source -- keep until 12d8b84 verified)
+- [ ] `journal/paper_drafts/main_named.tex` is untracked and looks de-anonymized.
+      Do not commit; decide whether to gitignore it.
