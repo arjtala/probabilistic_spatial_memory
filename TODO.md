@@ -644,3 +644,14 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [x] Confirmed only ONE spatial-only concession existed (not 3); k-nearest-cell mentions are the distinct VPR/geographic-confound control, kept
 - [x] FOLLOW-UP FIX (9bd655d): the reframe (9b8755b) had cited "Hit@5's H3-granularity sensitivity" as a support signal, but §4.3 states Hit@5 is INsensitive to H3 resolution (±0.5pp); only bucket mIoU tracks it. Corrected "Hit@5" -> "bucket mIoU" and repointed the ref sec:results-multi-corpus -> sec:results-ablations (§4.3). Both cited signals now match the results text.
 - [x] Length-neutral, body 14pp, 0 undefined refs; final state committed 9bd655d (supersedes 9b8755b)
+
+## 2026-08-08 17:50 -- Post-reject: consolidate + preregister decisive test
+
+- [x] Reconciled: submitted paper = origin/master "fixed-budget characterization" (semantic_kcenter 27.8% best, spatial_priority 23.6% ~= global_reservoir 23.9%; "a characterization, not a win"); paper-wearable-14pp (my Jul-13 cap-sweep line) was superseded.
+- [x] Tagged c20094d as wearableai2026-submission; ff local master -> origin/master.
+- [x] Created revision-prep off master; salvaged paper-4pp-abstract's 5 unique files (main_4pp + sec4pp_{intro_method,validation,hdd} + f1_schematic) -- raw material for the clarity rewrite. Commit 12d8b84.
+- [x] Branches NOT deleted (paper-8pp-cut/hdd-revisit-density 0-ahead; paper-wearable-14pp 1-ahead; paper-4pp-abstract kept as salvage source). Await explicit go to delete.
+- [x] Wrote journal/genuine_lookback_qa/PREREGISTRATION.md (venue-neutral): H1 = rare-place Hit@5 CI>0 + no aggregate regression + beats perm-nulls + survives translation/rotation, on long multi-revisit sessions; exact run_wearables_budget_suite.sh command; frozen go/no-go rule; no post-hoc operating-point search.
+- [ ] SCOPE CORRECTION (surfaced to user): compare_fixed_budget.py resamples SESSIONS, not questions -> a single long session gives n=1 (no CI). Decisive test needs a COHORT (>=5 long multi-revisit sessions, >=2 substrates), which is more annotation than "one session". Confirm cohort size + which corpus/sessions.
+- [ ] Venue: DEFERRED (venue-neutral). CVPR 2027 CfP not yet posted (404); commit to venue only after the pre-registered result is in.
+- [ ] BLOCKED on cluster-side annotation (PROTOCOL.md gate; genuine or GPS-grounded last_seen generator) -- the weeks-scope prerequisite, required for any venue.
