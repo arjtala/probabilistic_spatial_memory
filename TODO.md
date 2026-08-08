@@ -655,3 +655,12 @@ After the full Nymeria-30 clipL hyperparam sweep returned flat ~2% Hit@5 across 
 - [ ] SCOPE CORRECTION (surfaced to user): compare_fixed_budget.py resamples SESSIONS, not questions -> a single long session gives n=1 (no CI). Decisive test needs a COHORT (>=5 long multi-revisit sessions, >=2 substrates), which is more annotation than "one session". Confirm cohort size + which corpus/sessions.
 - [ ] Venue: DEFERRED (venue-neutral). CVPR 2027 CfP not yet posted (404); commit to venue only after the pre-registered result is in.
 - [ ] BLOCKED on cluster-side annotation (PROTOCOL.md gate; genuine or GPS-grounded last_seen generator) -- the weeks-scope prerequisite, required for any venue.
+
+## 2026-08-08 18:35 -- GPS-grounded revisit question generator built
+
+- [x] Reconciled two-clone divergence: my consolidation was local-only (never pushed). Pushed revision-prep + tag wearableai2026-submission to remote.
+- [x] NOTE: `git push ... revision-prep` mapped to master (upstream tracking) -> remote master advanced c20094d->8423cbb (additive: salvage + prereg + TODO). Then created remote revision-prep explicitly. Submission preserved by tag. Master can be force-reset to c20094d if we want it frozen (not recommended w/ 2 clones).
+- [x] Built scripts/generate_revisit_questions.py: GPS/SLAM-grounded last_seen question generator, reusing eval_fixed_budget's h3_cells/group_indices/visit_episodes so cells/visits/strata are byte-identical to the evaluator. Deterministic under --seed; emits frozen sha256 + a metadata sidecar (duration, #revisited cells, exposure, long_multirevisit gate) for cohort selection. Drops into run_wearables_budget_suite.sh via QUESTIONS_NAME.
+- [x] Caveat carried in the docstring: annotation-free but still a retrieval proxy; does NOT answer the human-authored objection -> pair with a small hand-authored validity bank on 1-2 sessions.
+- [ ] CLUSTER (cannot run here; data under $PSM_DATA_ROOT): run generator on candidate long GPS/SLAM sessions -> select >=5 with long_multirevisit=true across >=2 substrates -> run_wearables_budget_suite.sh -> compare_fixed_budget.py per PREREGISTRATION.md go/no-go.
+- [ ] Decide: hand-authored validity bank on 1-2 sessions (PROTOCOL.md) alongside the proxy cohort.
