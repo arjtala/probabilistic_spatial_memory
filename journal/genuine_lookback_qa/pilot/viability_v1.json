@@ -1,0 +1,105 @@
+{
+  "criteria": {
+    "min_top5_rate": 0.5,
+    "max_median_cosine": 0.8,
+    "top_k": 5,
+    "retrieval": "full unbudgeted bank, CLIP text->frame cosine"
+  },
+  "checkpoint": "laion/CLIP-ViT-L-14-laion2B-s32B-b82K",
+  "pooled_rate": 0.2631578947368421,
+  "pooled_hits": 5,
+  "n_questions": 19,
+  "median_caption_cosine": 0.47724950313568115,
+  "drives_clearing_individually": [
+    "201702271438"
+  ],
+  "gate_passed": false,
+  "banks": [
+    {
+      "bank": "/tmp/pilot/201710061345.yaml",
+      "features": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_10_06_ITS1/201710061345/clip_l_features.h5",
+      "session_id": "201710061345",
+      "prompt_sha256": "f7f745257888f19e0b1e62f467a41c75c17c2fae9c7e9da7bdd81c6423ca9579",
+      "model": "gemini-3-1-pro-preview-genai",
+      "n_questions": 4,
+      "n_frames": 10165,
+      "top5_hits": 0,
+      "top5_rate": 0.0,
+      "median_pairwise_caption_cosine": 0.47724950313568115,
+      "ranks": [
+        6,
+        5899,
+        1611,
+        904
+      ],
+      "queries": [
+        "A mile marker sign reading \"680\" on a post next to the highway off-ramp.",
+        "A large stone monument sign with a digital screen for the Alameda County Fairgrounds.",
+        "A green street name sign reading \"Pine Street\" hanging from the traffic light pole on the right.",
+        "A green street name sign reading \"Dorman Rd\" hanging from the traffic light arm."
+      ]
+    },
+    {
+      "bank": "/tmp/pilot/201704111540.yaml",
+      "features": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_04_11_ITS1/201704111540/clip_l_features.h5",
+      "session_id": "201704111540",
+      "prompt_sha256": "f7f745257888f19e0b1e62f467a41c75c17c2fae9c7e9da7bdd81c6423ca9579",
+      "model": "gemini-3-1-pro-preview-genai",
+      "n_questions": 9,
+      "n_frames": 9414,
+      "top5_hits": 2,
+      "top5_rate": 0.2222222222222222,
+      "median_pairwise_caption_cosine": 0.6095293164253235,
+      "ranks": [
+        28,
+        39,
+        2,
+        22,
+        72,
+        4,
+        681,
+        1544,
+        518
+      ],
+      "queries": [
+        "The building on the left has large letters spelling CHASE.",
+        "The building on the left has a sign reading R&B DISCOUNT STORE.",
+        "The building on the left has a brown awning reading B STREET BOOKS.",
+        "The building on the right has a sign reading PRECOR HOME FITNESS.",
+        "A tall white sign on the left side of the road reads WHEEL WORKS in red letters.",
+        "The building on the right has a sign reading Jeffrey's HAMBURGERS.",
+        "The building on the right has visible text reading ANDREW J. Dispensi.",
+        "The building on the right has a sign reading PEDERSEN & ARNOLD.",
+        "If the frame genuinely contains nothing distinctive, reply exactly: NOTHING DISTINCTIVE\".\n    *   Actually, a \"SPEED LIMIT 35\" sign *does* fit thousands of other moments in"
+      ]
+    },
+    {
+      "bank": "/tmp/pilot/201702271438.yaml",
+      "features": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_02_27_ITS1/201702271438/clip_l_features.h5",
+      "session_id": "201702271438",
+      "prompt_sha256": "f7f745257888f19e0b1e62f467a41c75c17c2fae9c7e9da7bdd81c6423ca9579",
+      "model": "gemini-3-1-pro-preview-genai",
+      "n_questions": 6,
+      "n_frames": 6491,
+      "top5_hits": 3,
+      "top5_rate": 0.5,
+      "median_pairwise_caption_cosine": 0.24418339133262634,
+      "ranks": [
+        1,
+        2,
+        1292,
+        2,
+        118,
+        1371
+      ],
+      "queries": [
+        "A large white building with vertical grooves and a recessed glass facade on the left.",
+        "A very long, multi-story parking structure stretching across the entire background.",
+        "A long, tan institutional building with a distinctive red tile pitched roof visible in the background.",
+        "A white rectangular sign on the right displaying the text 'Stanford MEDICINE'.",
+        "A green street sign displaying the word \"SERRA\" mounted directly above a STOP sign on the right.",
+        "A yellow diamond warning sign reading 'THRU TRAFFIC MERGE LEFT' positioned above a green sign pointing right towards 'STANFORD UNIVERSITY'."
+      ]
+    }
+  ]
+}
