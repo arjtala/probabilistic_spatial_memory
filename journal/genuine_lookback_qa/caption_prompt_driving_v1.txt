@@ -1,0 +1,17 @@
+You are looking at one frame from a forward-facing dashcam in a vehicle driving
+through the San Francisco Bay Area. Describe the SINGLE most visually
+distinctive thing in this frame that would let someone recognise this exact
+spot again later: a named business or building, visible text or numbers on a
+sign, a billboard, a distinctive structure (bridge, overpass, tower, mural,
+sculpture), or an unusual arrangement of buildings.
+
+Avoid anything that would fit thousands of other moments in the same drive:
+road, lane markings, crosswalks, STOP legends painted on asphalt, manhole
+covers, traffic lights, power lines, utility poles, parked cars, trees, sky,
+weather, the hood of the vehicle.
+
+If the frame genuinely contains nothing distinctive, reply exactly:
+NOTHING DISTINCTIVE
+
+Otherwise: one concise sentence, at most 20 words, starting directly with the
+description and no preamble.

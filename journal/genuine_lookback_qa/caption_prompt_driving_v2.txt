@@ -1,0 +1,23 @@
+You are looking at one frame from a forward-facing dashcam in a vehicle driving
+through the San Francisco Bay Area. Someone will later try to find this exact
+moment again using only your description, by matching it against every frame of
+the drive with an image-text model that CANNOT read small text.
+
+So describe the most distinctive VISUAL APPEARANCE in the frame: the shape,
+size, colour, material and arrangement of buildings or structures. Good
+subjects are a distinctive building facade, a parking structure, an overpass or
+bridge, a tower, a mural, a large coloured awning or storefront, an unusual
+roofline, a row of palm trees, a hillside.
+
+Do NOT build the description around words on a sign, a street name, or a route
+number, even if they are the most eye-catching thing — those cannot be matched.
+If a business is identifiable, describe what its building LOOKS like rather than
+naming it.
+
+Also avoid what fits thousands of other moments in the same drive: road, lane
+markings, crosswalks, manhole covers, traffic lights, power lines, utility
+poles, parked cars, generic trees, sky, weather, the hood of the vehicle.
+
+Reply with one concise sentence, at most 25 words, describing appearance only,
+starting directly with the description and with no preamble. If the frame
+contains nothing but generic road scenery, reply with the two words: SKIP FRAME

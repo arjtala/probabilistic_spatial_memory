@@ -1,12 +1,24 @@
 #!/usr/bin/env python3
-"""Generate questions.yaml for a SLOPER4D sequence via MLLM frame captions.
+"""Generate questions.yaml for a tracked session via MLLM frame captions.
 
-Picks N frames evenly spaced along the trajectory, captions each with
-Gemini 3.1 Pro (or Claude 4.6 Opus), and writes them as
+Originally SLOPER4D-only; now also the captioned-`similarity_search` path for
+the HDD long-revisit cohort (PREREGISTRATION.md Amendment B). Picks N frames,
+captions each with Gemini 3.1 Pro (or Claude 4.6 Opus), and writes them as
 ``query_mode: similarity_search`` questions with a small interval
 window. The resulting questions.yaml matches the schema the existing
 eval pipeline already consumes — drop-in compatible with
-eval_lookback.py, the H3-resolution sweep, baselines, everything.
+eval_lookback.py, eval_fixed_budget.py, the H3-resolution sweep, baselines.
+
+Frame selection is either ``--place-selection even`` (legacy: evenly spaced
+along the trajectory) or ``--place-selection metric`` (samples inside revisited
+places, clustered by metric distance on the raw track). Metric mode exists so a
+bank can exercise revisit structure without becoming a function of the H3
+partition that also defines the evaluator's strata — see §3b. It requires an
+explicit ``--gt-visits`` because "which visits count as ground truth" changes
+what the bank measures and must be preregistered rather than defaulted.
+
+For a preregistered bank, pass ``--prompt-file``: the prompt is then a frozen
+artifact whose sha256 is recorded in the output alongside the model id.
 
 Usage:
     python scripts/sloper4d_generate_questions.py \\
@@ -23,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import io
 import subprocess
 import sys
@@ -37,6 +50,10 @@ import yaml
 _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "scripts"))
 from _mllm_client import Mllm, call_mllm  # noqa: E402
+from generate_revisit_questions import (  # noqa: E402
+    metric_places,
+    revisited_places,
+)
 
 
 _CAPTION_PROMPT = (
@@ -57,15 +74,32 @@ _ANTI_EXAMPLE_SUFFIX = (
 )
 
 
+#: Seconds of accurate (post-input) seek to keep in front of the target frame.
+#: Long enough to cross any sane GOP so the decode is frame-accurate, short
+#: enough that we never decode more than this much video per frame.
+_SEEK_REFINE_SEC = 5.0
+
+
 def _decode_frame_at_timestamp(
     mp4_path: Path, ts_sec: float, out_jpg: Path
 ) -> None:
-    """One-shot ffmpeg frame extract. Slow seek (post-input -ss) for
-    accuracy. Output goes to `out_jpg`."""
+    """One-shot ffmpeg frame extract, frame-accurate but not O(video length).
+
+    Hybrid seek: a fast pre-input ``-ss`` to ``ts - _SEEK_REFINE_SEC`` (index
+    seek, keyframe-accurate, constant time) followed by an accurate post-input
+    ``-ss`` over the remaining few seconds. Pure post-input seek is exact but
+    decodes the whole file up to the target — fine for SLOPER4D's few-minute
+    sequences, untenable on HDD's 1-3 h drives (minutes per frame, and 20
+    frames x 60 drives of it). Pure pre-input seek is fast but lands on a
+    keyframe, which can fall outside a +/-1.5 s ground-truth interval.
+    """
+    coarse = max(0.0, ts_sec - _SEEK_REFINE_SEC)
+    fine = ts_sec - coarse
     cmd = [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        "-ss", f"{coarse:.3f}",
         "-i", str(mp4_path),
-        "-ss", f"{ts_sec:.3f}",
+        "-ss", f"{fine:.3f}",
         "-frames:v", "1",
         "-pix_fmt", "yuvj420p",
         "-q:v", "2",
@@ -101,7 +135,38 @@ def main() -> int:
                     help="inject the last K captions as anti-examples to force "
                          "the MLLM toward distinguishing details (default 5; "
                          "set to 0 to disable)")
+    ap.add_argument("--prompt-file", type=Path, default=None,
+                    help="caption prompt to use instead of the built-in "
+                         "SLOPER4D one. Externalising the prompt makes it a "
+                         "frozen, sha256-able artifact; required for any "
+                         "preregistered bank.")
+    ap.add_argument("--place-selection", choices=["even", "metric"], default="even",
+                    help="'even' (default, legacy) spaces caption frames evenly "
+                         "along the session. 'metric' samples inside revisited "
+                         "places clustered by metric distance on the raw track "
+                         "— H3-independent, per PREREGISTRATION.md §3b.")
+    ap.add_argument("--gt-visits", choices=["all", "captioned"], default=None,
+                    help="REQUIRED with --place-selection metric. 'captioned': "
+                         "the GT interval is the captioned visit only (measures "
+                         "episode discrimination; two passes of one corner look "
+                         "alike, so a correct place retrieval can score as a "
+                         "miss). 'all': every visit of that place is a GT "
+                         "interval (measures place recall). No default — this "
+                         "choice changes what is being measured and must be "
+                         "preregistered, not inherited.")
+    ap.add_argument("--place-radius-m", type=float, default=15.0)
+    ap.add_argument("--visit-gap-sec", type=float, default=30.0)
+    ap.add_argument("--min-visits", type=int, default=2)
+    ap.add_argument("--min-separation-sec", type=float, default=120.0)
     args = ap.parse_args()
+
+    if args.place_selection == "metric" and args.gt_visits is None:
+        ap.error("--place-selection metric requires an explicit --gt-visits")
+
+    caption_prompt = (
+        args.prompt_file.read_text().strip() if args.prompt_file else _CAPTION_PROMPT
+    )
+    prompt_sha = hashlib.sha256(caption_prompt.encode()).hexdigest()
 
     # Load timestamps + session_id from the H5.
     with h5py.File(args.features, "r") as h:
@@ -110,6 +175,8 @@ def main() -> int:
             session_id = session_id.decode()
         g = h["clip"]
         timestamps = g["timestamps"][:].astype(np.float64)
+        lat = g["lat"][:].astype(np.float64) if "lat" in g else None
+        lng = g["lng"][:].astype(np.float64) if "lng" in g else None
 
     n_total = len(timestamps)
     if n_total < args.n_questions:
@@ -122,9 +189,74 @@ def main() -> int:
     else:
         n_q = args.n_questions
 
-    # Evenly-spaced indices (no jitter — deterministic picks make
-    # reruns reproducible).
-    idx_picks = np.linspace(0, n_total - 1, n_q, dtype=np.int64)
+    # Frame selection. 'even' is the legacy path. 'metric' targets revisited
+    # places so the bank actually exercises revisit structure, selecting them
+    # by metric distance on the raw track rather than by H3 cell — question
+    # construction must stay independent of the partition used for scoring and
+    # strata (PREREGISTRATION.md §3b).
+    gt_intervals_by_pick: list[list[tuple[float, float]]] | None = None
+    place_of_pick: list[int] = []
+    if args.place_selection == "metric":
+        if lat is None or lng is None:
+            print(f"[caption-qg] {args.features} has no clip/lat,lng — metric "
+                  "place selection needs a position track", file=sys.stderr)
+            return 2
+        groups, _ = metric_places(lat, lng, radius_m=args.place_radius_m)
+        revisits = revisited_places(
+            groups, timestamps,
+            visit_gap_sec=args.visit_gap_sec,
+            min_visits=args.min_visits,
+            min_separation_sec=args.min_separation_sec,
+        )
+        if not revisits:
+            print(f"[caption-qg] {session_id}: no genuinely-separated revisits "
+                  f"at radius {args.place_radius_m} m — not a revisit session",
+                  file=sys.stderr)
+            return 3
+        # Deterministic: richest places first (most visits, then most frames),
+        # tie-broken by place id. No RNG.
+        ranked = sorted(
+            revisits.items(),
+            key=lambda kv: (-len(kv[1]), -sum(ep.size for ep in kv[1]), kv[0]),
+        )
+        picks: list[int] = []
+        gt_intervals_by_pick = []
+        # Richest-first alone concentrates the bank: the most-revisited places
+        # cluster in one congested stretch (a lot, or stop-and-go traffic), so
+        # the first N picks can all land within a couple of minutes of each
+        # other and the bank then samples one location, not the session. Require
+        # each captioned frame to be --min-separation-sec from every earlier
+        # pick; on a driving route that spreads geography too. Reuses the
+        # existing separation parameter rather than adding a knob.
+        for place_id, episodes in ranked:
+            if len(picks) >= n_q:
+                break
+            cand = episodes[-1]
+            cand_t = float(timestamps[int(cand[cand.size // 2])])
+            if any(abs(cand_t - float(timestamps[p])) < args.min_separation_sec
+                   for p in picks):
+                continue
+            # Caption the LAST visit: "when was I last here before now?" reads
+            # forward from a return, so the captioned frame should be the
+            # return, not the first arrival.
+            frame_idx = int(cand[cand.size // 2])
+            picks.append(frame_idx)
+            place_of_pick.append(int(place_id))
+            if args.gt_visits == "all":
+                gt_intervals_by_pick.append([
+                    (float(timestamps[ep[0]]), float(timestamps[ep[-1]]))
+                    for ep in episodes
+                ])
+            else:
+                gt_intervals_by_pick.append([])  # filled with ±window below
+        idx_picks = np.asarray(picks, dtype=np.int64)
+        n_q = idx_picks.size
+        print(f"[caption-qg] {session_id}: {len(revisits)} revisited places, "
+              f"captioning {n_q} (gt-visits={args.gt_visits})", file=sys.stderr)
+    else:
+        # Evenly-spaced indices (no jitter — deterministic picks make
+        # reruns reproducible).
+        idx_picks = np.linspace(0, n_total - 1, n_q, dtype=np.int64)
     # h5_ts: keep H5's original (possibly session-relative) timestamps
     # for the questions.yaml intervals — eval_lookback.py matches them
     # against the same H5 field.
@@ -135,7 +267,7 @@ def main() -> int:
     if len(timestamps) > 0 and timestamps[0] > 5.0:
         offset = float(timestamps[0])
         print(
-            f"[sloper4d-qg] H5 timestamps start at {offset:.1f}s (session-relative); "
+            f"[caption-qg] H5 timestamps start at {offset:.1f}s (session-relative); "
             f"shifting to video-clock for ffmpeg seek only",
             file=sys.stderr,
         )
@@ -144,7 +276,7 @@ def main() -> int:
         video_ts = h5_ts
 
     model = Mllm.GEMINI if args.model == "gemini" else Mllm.CLAUDE
-    print(f"[sloper4d-qg] {session_id}: picking {n_q} frames; using {model.name}", file=sys.stderr)
+    print(f"[caption-qg] {session_id}: picking {n_q} frames; using {model.name}", file=sys.stderr)
 
     questions: list[dict] = []
     # Stream questions to disk after every successful caption so a
@@ -160,11 +292,11 @@ def main() -> int:
             questions = list(existing_q)
             if done_ids:
                 print(
-                    f"[sloper4d-qg] resuming: {len(done_ids)} questions already on disk",
+                    f"[caption-qg] resuming: {len(done_ids)} questions already on disk",
                     file=sys.stderr,
                 )
         except Exception as e:
-            print(f"[sloper4d-qg] WARN: could not parse existing {args.out}: {e}", file=sys.stderr)
+            print(f"[caption-qg] WARN: could not parse existing {args.out}: {e}", file=sys.stderr)
             questions = []
 
     done_ids = {q.get("id") for q in questions if isinstance(q, dict)}
@@ -174,6 +306,23 @@ def main() -> int:
             "session_id": session_id,
             "session_start_unix": 0.0,
             "iou_threshold": float(args.iou_threshold),
+            "generator": {
+                "script": "sloper4d_generate_questions.py",
+                "model": model.model_id,
+                "prompt_file": str(args.prompt_file) if args.prompt_file else None,
+                "prompt_sha256": prompt_sha,
+                "place_selection": args.place_selection,
+                "place_radius_m": (args.place_radius_m
+                                   if args.place_selection == "metric" else None),
+                "visit_gap_sec": (args.visit_gap_sec
+                                  if args.place_selection == "metric" else None),
+                "min_separation_sec": (args.min_separation_sec
+                                       if args.place_selection == "metric" else None),
+                "gt_visits": args.gt_visits,
+                "anti_example_k": args.anti_example_k,
+                "note": ("MLLM-captioned similarity_search proxy; NOT "
+                         "human-authored. Frame selection is H3-independent."),
+            },
             "questions": questions,
         }
         # Atomic write: write to .tmp then rename, so a kill mid-write
@@ -202,9 +351,9 @@ def main() -> int:
             ]
             if recent_captions:
                 anti_block = "\n".join(f"- {c}" for c in recent_captions)
-                prompt = _CAPTION_PROMPT + _ANTI_EXAMPLE_SUFFIX + anti_block
+                prompt = caption_prompt + _ANTI_EXAMPLE_SUFFIX + anti_block
             else:
-                prompt = _CAPTION_PROMPT
+                prompt = caption_prompt
             try:
                 caption = call_mllm(
                     model=model,
@@ -219,18 +368,51 @@ def main() -> int:
             # Intervals are written in the H5 clock so eval_lookback can
             # match them against `clip/timestamps` directly (which uses
             # the H5 clock — same field).
-            t_lo = max(0.0, float(h5_t) - args.interval_half_window_sec)
-            t_hi = float(h5_t) + args.interval_half_window_sec
+            # Declines: the prompt may offer the model an explicit opt-out for
+            # frames with nothing distinctive in them. Also drop captions that
+            # echo prompt text back (observed: a model returning the sentence
+            # describing the opt-out instead of using it) — an echoed
+            # instruction would otherwise be embedded and scored as a query.
+            decline = caption.upper().startswith(("NOTHING DISTINCTIVE", "SKIP FRAME"))
+            echoed = any(
+                fragment in caption.lower()
+                for fragment in ("reply exactly", "reply with the two words",
+                                 "nothing distinctive", "skip frame",
+                                 "one concise sentence")
+            )
+            if decline or echoed:
+                why = "declined — nothing distinctive" if decline else "dropped — echoed prompt"
+                print(f"  q{i+1} (h5_ts={h5_t:.1f}s): {why}", file=sys.stderr)
+                continue
+            if gt_intervals_by_pick is not None and gt_intervals_by_pick[i]:
+                # Pad every visit span by the half-window. A visit episode can
+                # be a single frame, whose raw span is 0 s — and a zero-length
+                # interval scores IoU 0 against anything, so it would be an
+                # automatic miss no matter what the policy retained.
+                half = args.interval_half_window_sec
+                intervals = [
+                    [round(max(0.0, lo - half), 3), round(hi + half, 3)]
+                    for lo, hi in gt_intervals_by_pick[i]
+                ]
+            else:
+                t_lo = max(0.0, float(h5_t) - args.interval_half_window_sec)
+                t_hi = float(h5_t) + args.interval_half_window_sec
+                intervals = [[round(t_lo, 3), round(t_hi, 3)]]
+            note = (f"auto-captioned via {model.name} at h5_ts={h5_t:.3f}s "
+                    f"(video_ts={video_t:.3f}s, frame_idx={int(idx_picks[i])})")
+            if place_of_pick:
+                note += (f"; metric place {place_of_pick[i]} "
+                         f"(r={args.place_radius_m} m), gt_visits={args.gt_visits}")
             questions.append({
                 "id": qid,
                 "query": caption,
-                "intervals": [[round(t_lo, 3), round(t_hi, 3)]],
-                "notes": f"auto-captioned via {model.name} at h5_ts={h5_t:.3f}s (video_ts={video_t:.3f}s, frame_idx={int(idx_picks[i])})",
+                "intervals": intervals,
+                "notes": note,
             })
             _flush()
             print(f"  q{i+1} (h5_ts={h5_t:.1f}s): {caption[:80]}", file=sys.stderr)
 
-    print(f"[sloper4d-qg] wrote {len(questions)} questions to {args.out}", file=sys.stderr)
+    print(f"[caption-qg] wrote {len(questions)} questions to {args.out}", file=sys.stderr)
     return 0
 
 
