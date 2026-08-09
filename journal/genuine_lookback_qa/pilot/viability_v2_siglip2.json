@@ -1,0 +1,133 @@
+{
+  "criteria": {
+    "min_top5_rate": 0.5,
+    "max_median_cosine": 0.8,
+    "top_k": 5,
+    "retrieval": "full unbudgeted bank, CLIP text->frame cosine"
+  },
+  "checkpoint": "google/siglip2-large-patch16-256",
+  "pooled_rate": 0.08823529411764706,
+  "pooled_hits": 3,
+  "n_questions": 34,
+  "median_caption_cosine": 0.5364514589309692,
+  "drives_clearing_individually": [],
+  "gate_passed": false,
+  "banks": [
+    {
+      "bank": "/tmp/pilot_v2/201710061345.yaml",
+      "features": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_10_06_ITS1/201710061345/siglip2_l_features.h5",
+      "session_id": "201710061345",
+      "prompt_sha256": "2f9ca4f83d83c51b4a79708557572ed7716d43350df5e29898d00a96fa67b587",
+      "model": "gemini-3-1-pro-preview-genai",
+      "n_questions": 8,
+      "n_frames": 10165,
+      "top5_hits": 0,
+      "top5_rate": 0.0,
+      "median_pairwise_caption_cosine": 0.5364514589309692,
+      "ranks": [
+        361,
+        566,
+        3821,
+        210,
+        135,
+        397,
+        25,
+        1593
+      ],
+      "queries": [
+        "A multi-story residential building with a light blue and brown facade and gabled roofs stands on the left.",
+        "A wide, dark rectangular sign structure mounted on a thick, light-colored pillar stands among trees on the right side of the intersection.",
+        "A long, light-colored concrete retaining wall with a ribbed texture along its lower half borders the right side, topped by a chain-link fence.",
+        "A light blue, flat-roofed commercial building stands on the right behind a large tree, next to a parked red and white box truck.",
+        "A single-story house featuring a prominent, steeply pitched white gable roof over its front section sits on the left side of the street.",
+        "A light-colored building featuring a distinct bright blue, pyramidal roof section sits on the right side behind a grassy landscaped corner.",
+        "A long, continuous, light-colored solid wall runs along the right side of the road under the deep shade of large, overhanging trees.",
+        "Single-story buildings with prominent reddish-brown gabled roofs sit behind a long, solid, light-colored perimeter wall on the left side of the intersection."
+      ]
+    },
+    {
+      "bank": "/tmp/pilot_v2/201704111540.yaml",
+      "features": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_04_11_ITS1/201704111540/siglip2_l_features.h5",
+      "session_id": "201704111540",
+      "prompt_sha256": "2f9ca4f83d83c51b4a79708557572ed7716d43350df5e29898d00a96fa67b587",
+      "model": "gemini-3-1-pro-preview-genai",
+      "n_questions": 15,
+      "n_frames": 9414,
+      "top5_hits": 1,
+      "top5_rate": 0.06666666666666667,
+      "median_pairwise_caption_cosine": 0.5741445422172546,
+      "ranks": [
+        26,
+        509,
+        107,
+        1509,
+        351,
+        124,
+        18,
+        2,
+        131,
+        354,
+        357,
+        165,
+        350,
+        667,
+        712
+      ],
+      "queries": [
+        "A brown and tan multi-story building with a varied roofline stands next to a structure featuring a large, dark green canopy.",
+        "A one-story beige building on the corner features several distinct dark green awnings shading its windows.",
+        "A beige corner building features prominent decorative arches framing its upper-story windows just beneath a red-tiled roof trim.",
+        "A two-story dark brown building featuring horizontal siding and light-framed rectangular windows occupies the right side of the street corner.",
+        "A small cluster of tall, thin palm trees rises in the distance near the center of the tree-lined residential street.",
+        "A blocky, white multi-story building with a grid of windows sits across the intersection from a tall, dark glass high-rise.",
+        "A grey building on the left features a prominent, bright red, box-like overhang projecting out over the sidewalk.",
+        "A two-story tan building on the right corner is distinguished by a row of striped awnings above its upper windows.",
+        "A light-colored building standing on the right edge features a prominent, sloped, dark green awning extending from its lower facade.",
+        "A two-story building on the right is distinguished by a steep, dark brown mansard roof with small dormer windows.",
+        "A long, light-colored, flat-roofed building on the right features a continuous row of dark garage doors along its street-level facade.",
+        "A tall flagpole displaying an American flag stands in front of a long, single-story brown building with a flat roof on the right side.",
+        "A two-story tan building on the right features a continuous row of dark, vertically divided windows spanning its upper level.",
+        "A light-colored house on the left features a prominent brown shingled roof with a large, forward-facing gable section.",
+        "A two-story house on the right features a white garage door and a front yard landscaped with light gravel and scattered small dark plants."
+      ]
+    },
+    {
+      "bank": "/tmp/pilot_v2/201702271438.yaml",
+      "features": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_02_27_ITS1/201702271438/siglip2_l_features.h5",
+      "session_id": "201702271438",
+      "prompt_sha256": "2f9ca4f83d83c51b4a79708557572ed7716d43350df5e29898d00a96fa67b587",
+      "model": "gemini-3-1-pro-preview-genai",
+      "n_questions": 11,
+      "n_frames": 6491,
+      "top5_hits": 2,
+      "top5_rate": 0.18181818181818182,
+      "median_pairwise_caption_cosine": 0.504177987575531,
+      "ranks": [
+        669,
+        414,
+        1,
+        5,
+        444,
+        8,
+        91,
+        445,
+        26,
+        34,
+        13
+      ],
+      "queries": [
+        "A row of tall, slender palm trees is visible in the distance straight ahead against the clear blue sky.",
+        "A large, light-colored building with flat overhanging rooflines and horizontal bands of dark, recessed windows sits on the left corner.",
+        "A stark white building with vertical ribbing and a massive multi-story glass entrance grid sits on the left opposite a concrete parking structure.",
+        "A long, multi-story structure with distinct horizontal bands stretches entirely across the background behind a row of dark trees.",
+        "Long, tan buildings with pitched red-tiled roofs sit across a wide grassy field on the left side of the road.",
+        "A large, light-colored house with a steep, dark roof and a prominent dormer stands at the far end of the tree-lined street.",
+        "A building with a light, horizontally slatted facade and a flat red roof sits beside a large white freestanding wall on the right.",
+        "A light-colored, multi-story residential building with dark gabled roofs sits partially obscured behind bare trees on the right corner.",
+        "A tall, blocky, light-colored multi-story building with a flat roofline stands prominently in the distance past a dark silhouetted treeline.",
+        "A straight road is prominently lined on both sides by an avenue of tall palm trees.",
+        "A long, silver, multi-level passenger train with a red stripe sits on the left behind a low barrier."
+      ]
+    }
+  ]
+}

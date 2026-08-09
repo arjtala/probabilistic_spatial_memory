@@ -1,0 +1,121 @@
+{
+  "criteria": {
+    "min_top5_rate": 0.5,
+    "max_median_cosine": 0.8,
+    "top_k": 5,
+    "retrieval": "full unbudgeted bank, CLIP text->frame cosine"
+  },
+  "checkpoint": "google/siglip2-large-patch16-256",
+  "pooled_rate": 0.25,
+  "pooled_hits": 7,
+  "n_questions": 28,
+  "median_caption_cosine": 0.533846378326416,
+  "drives_clearing_individually": [],
+  "gate_passed": false,
+  "banks": [
+    {
+      "bank": "/tmp/pilot_v3/201710061345.yaml",
+      "features": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_10_06_ITS1/201710061345/siglip2_l_features.h5",
+      "session_id": "201710061345",
+      "prompt_sha256": "86c99d17009cfc3bff0942cb02154328e11cc197e731939346c1ac5e95cc2bad",
+      "model": "gemini-3-1-pro-preview-genai",
+      "n_questions": 6,
+      "n_frames": 10165,
+      "top5_hits": 0,
+      "top5_rate": 0.0,
+      "median_pairwise_caption_cosine": 0.533846378326416,
+      "ranks": [
+        184,
+        236,
+        149,
+        86,
+        950,
+        552
+      ],
+      "queries": [
+        "A large, light-blue and brown multi-story building complex stands on the left side of a highway.",
+        "A UPS truck sits parked on the right at a large intersection.",
+        "A prominent plume of smoke rises in the distance ahead on a highway flanked by a textured concrete sound wall on the right.",
+        "A light blue, boxy car with a sign in its rear window drives ahead in the right lane.",
+        "An IHOP restaurant with its signature blue roof sits on the right corner of the intersection.",
+        "A single-story building with a reddish-brown tile roof sits on the left corner of a tree-lined intersection."
+      ]
+    },
+    {
+      "bank": "/tmp/pilot_v3/201704111540.yaml",
+      "features": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_04_11_ITS1/201704111540/siglip2_l_features.h5",
+      "session_id": "201704111540",
+      "prompt_sha256": "86c99d17009cfc3bff0942cb02154328e11cc197e731939346c1ac5e95cc2bad",
+      "model": "gemini-3-1-pro-preview-genai",
+      "n_questions": 10,
+      "n_frames": 9414,
+      "top5_hits": 2,
+      "top5_rate": 0.2,
+      "median_pairwise_caption_cosine": 0.5496197938919067,
+      "ranks": [
+        226,
+        287,
+        4,
+        28,
+        18,
+        5,
+        525,
+        167,
+        509,
+        980
+      ],
+      "queries": [
+        "A Chase bank building is located on the left side of the street approaching an intersection.",
+        "A single-story beige commercial building with a dark brown roof and green window awnings sits on the left corner of the intersection.",
+        "A two-story white building featuring ornate arched upper-floor windows and a dark tile roofline occupies the right corner of the intersection.",
+        "A Union Bank branch is located on the ground floor of a multi-story white office building directly across the intersection.",
+        "A Wheel Works tire shop stands on the left side of the street beyond the immediate row of storefronts.",
+        "A two-story tan building with distinctive striped awnings above its second-floor windows occupies the right corner of the intersection.",
+        "A tall, plain beige commercial building with a prominent dark green awning on its corner stands on the right side of the street.",
+        "A low, tan building with a flat, dark overhanging roof and a tall flagpole sits on the right corner of the intersection.",
+        "A flat-front brown commercial building with multi-paned windows stands on the right behind a grey dumpster sitting in the street.",
+        "A light-colored house with a brown shingled roof and a prominent front-facing gable stands on the left side of the street."
+      ]
+    },
+    {
+      "bank": "/tmp/pilot_v3/201702271438.yaml",
+      "features": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_02_27_ITS1/201702271438/siglip2_l_features.h5",
+      "session_id": "201702271438",
+      "prompt_sha256": "86c99d17009cfc3bff0942cb02154328e11cc197e731939346c1ac5e95cc2bad",
+      "model": "gemini-3-1-pro-preview-genai",
+      "n_questions": 12,
+      "n_frames": 6491,
+      "top5_hits": 5,
+      "top5_rate": 0.4166666666666667,
+      "median_pairwise_caption_cosine": 0.447750061750412,
+      "ranks": [
+        937,
+        1,
+        2,
+        316,
+        5,
+        6,
+        1,
+        23,
+        71,
+        19,
+        2,
+        31
+      ],
+      "queries": [
+        "A large, multi-story building with light-colored walls, a dark pitched roof, and rectangular windows stands on the left side of the street.",
+        "A large, stark white building with vertical ribbing and a prominent glass entrance stands on the left side of the road.",
+        "A wide, dark-colored multi-story building with a continuous framework structure along its flat roof spans the background behind several large trees.",
+        "A person is walking across the road in front of a dark, multi-story building with an arched roofline behind trees on the left.",
+        "The vehicle approaches an intersection marked by a stop sign on the right, looking down a street featuring a distinct pink flowering tree ahead.",
+        "A pedestrian wearing a prominent white top and dark pants walks from left to right across the road towards a parked white SUV.",
+        "A yellow taxi drives through an intersection featuring a modern building with a slatted facade and a Stanford Medicine sign on the right.",
+        "A large, light-colored rectangular multi-story building stands out against the twilight sky in the distance, partially framed by dark trees.",
+        "A tall, vintage-style lamp post with two hanging globe lights stands prominently on the left curb under intense sun glare.",
+        "A distinctive row of tall palm trees lines both sides of the road as a white bus drives ahead.",
+        "A dark-clad pedestrian carrying a light-colored shoulder bag walks from right to left across a crosswalk above large painted STOP markings on the road.",
+        "A parked red and white double-decker Caltrain sits behind a low fence on the left side of the street."
+      ]
+    }
+  ]
+}
