@@ -783,3 +783,10 @@ pipeline not well-anchored to the literature". Full triage:
 - [x] Recorded outcome in PREREGISTRATION.md (Amendment B -- Result). Pilot artifacts frozen: journal/genuine_lookback_qa/pilot/viability_v{1,2,3}.json + scripts/caption_viability.py. 60-drive cohort banks untouched/unfrozen.
 - [x] Git bridge: bc6e291 already on remote (pod commits ARE reaching origin); shared working tree. FF'd to bc6e291.
 - [ ] DIRECTION DECISION (escalated): (A) write up the negative + methodological result now [RECOMMENDED -- ready, honest, low-cost; delegate to writer/analyst]; (B) invest weeks in Phase-2 wearable long-form capture to chase a >0.5-prior null; (C) shelve. Engine keeps standalone value regardless.
+
+## 2026-08-09 23:00 -- Decision (A) with SigLIP2 viability gate first; scoping corrected
+
+- [x] SCOPING FIX (my overreach corrected): NOT one convergent negative. Two findings: (1) scoped negative -- 14 short single-visit street-scale sessions, spatial allocation flat, semantic_kcenter wins; (2) long-multi-revisit regime UNTESTED (not refuted), with "not constructible on windshield video" as a separate contribution.
+- [x] Amendment C written (pre-run, diagnostic-only freeze): rerun frozen B4 gate with SigLIP2-large (google/siglip2-large-patch16-256, wired in extract_hdd.sbatch MODEL=siglip2_l) on the 3-6 pilot drives. §4 keeps CLIP-L frozen for the comparison; swap is viability-only, not an operating-point search.
+- [ ] RUN (cluster, user, GPU): h200_dev extraction of SigLIP2 features on 3 pilot drives (~25k frames) -> rerun caption_viability.py gate unchanged. Outcomes: FAIL -> claim hardens to "unmatchable by contrastive image-text retrieval", proceed to writeup A; PASS(>=50%, >=5 drives) -> HDD testable, fork reopens, run H1 with SigLIP2 as comparison encoder.
+- [ ] Writeup (A) delegation HELD until SigLIP2 result. Brief to include: 2 findings (scoped); byproducts = 60-drive long-multi-revisit cohort characterization (first at this scale), coordinate postmortem (silent np.interp clamp -> void docs/HDD.md:264 F-HDD-2/3, don't inherit), viability gate as transferable method. Venue lean: TMLR / negative-results.

@@ -330,3 +330,28 @@ cannot read and CLIP-encodable content is architecture too generic to be unique,
 CLIP-grounded look-back QA bank is not constructible on this corpus — at the retrieval
 ceiling, before any budget.* The two-phase structure collapses to requiring a **wearable
 long-form substrate (Phase 2 capture)**; direction decision escalated 2026-08-09.
+
+## Amendment C — 2026-08-09 (SigLIP2 viability diagnostic, pre-writeup)
+
+Amendment B's new claim — "a CLIP-grounded look-back bank is not constructible on 1-fps
+windshield video" — rests on CLIP-L, whose known weakness is reading sign text (where
+v1's discriminative content lived). Before writing the negative up, rerun the **frozen
+B4 gate** once with **SigLIP2-large** (`google/siglip2-large-patch16-256`, already wired
+in `extract_hdd.sbatch`, `MODEL=siglip2_l`), which reads signage substantially better, on
+the **same 3–6 pilot drives** (one h200_dev extraction of ~25k frames; the 60-drive
+corpus is untouched).
+
+**This is a viability diagnostic, not a reopened operating-point search.** All B4
+parameters are unchanged (≥50% top-5 on the full unbudgeted bank, cosine ≤0.80, same
+frozen prompts, no re-tuning). §4 keeps **CLIP-L frozen for the policy comparison
+itself**; the swap only tests whether *any* contrastive image-text retriever can build an
+answerable bank on this corpus.
+
+**Pre-committed outcomes:**
+- **SigLIP2 also FAILS** → the mechanism generalizes from "CLIP-L can't read signs" to
+  "the discriminative content is unmatchable by contrastive image-text retrieval," and the
+  Amendment-B finding stands **encoder-robust**. Proceed to writeup (A).
+- **SigLIP2 CLEARS** (≥50% on ≥5 drives) → HDD *can* support an encoder-grounded look-back
+  test after all; writing the negative now would be premature. The fork reopens: build the
+  SigLIP2 cohort bank and run H1 (Phase 1), with **SigLIP2 as the comparison encoder** — a
+  necessity-driven, documented deviation from §4's CLIP-L, and the result scoped to it.
