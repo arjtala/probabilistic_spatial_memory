@@ -790,3 +790,11 @@ pipeline not well-anchored to the literature". Full triage:
 - [x] Amendment C written (pre-run, diagnostic-only freeze): rerun frozen B4 gate with SigLIP2-large (google/siglip2-large-patch16-256, wired in extract_hdd.sbatch MODEL=siglip2_l) on the 3-6 pilot drives. §4 keeps CLIP-L frozen for the comparison; swap is viability-only, not an operating-point search.
 - [ ] RUN (cluster, user, GPU): h200_dev extraction of SigLIP2 features on 3 pilot drives (~25k frames) -> rerun caption_viability.py gate unchanged. Outcomes: FAIL -> claim hardens to "unmatchable by contrastive image-text retrieval", proceed to writeup A; PASS(>=50%, >=5 drives) -> HDD testable, fork reopens, run H1 with SigLIP2 as comparison encoder.
 - [ ] Writeup (A) delegation HELD until SigLIP2 result. Brief to include: 2 findings (scoped); byproducts = 60-drive long-multi-revisit cohort characterization (first at this scale), coordinate postmortem (silent np.interp clamp -> void docs/HDD.md:264 F-HDD-2/3, don't inherit), viability gate as transferable method. Venue lean: TMLR / negative-results.
+
+## 2026-08-09 23:37 -- SigLIP2 gate FAIL (encoder-robust); branch (A); delegated writeup
+
+- [x] SigLIP2 viability rerun (matched arm): CLIP-L 19.8% / SigLIP2 14.8% pooled, 0/3 drives clear, degeneracy guard passes. v3=25.0% under BOTH encoders (different subsets) -> not a legibility limit. Claim hardens: discriminative content unmatchable by contrastive image-text retrieval. Amendment C FAIL branch taken.
+- [x] Ordering on record: Amendment C frozen 23:03 UTC, extraction submitted 23:08 -> diagnostic-only framing pre-dates the run.
+- [x] Git: bc6e291 + 70533ea both already on origin (pod pushes landing; local ls-remote fails = visibility only). Local FF'd to 70533ea.
+- [x] Branch (A) confirmed. Wrote WRITER_BRIEF.md + ANALYST_BRIEF.md (two-findings scoping; byproducts; integrity constraints; frozen artifacts).
+- [ ] DELEGATED: writer (two-findings negative paper, TMLR lean) + analyst (fixed-budget table/fig, viability-gate CLIP-L-vs-SigLIP2 fig, 60-drive cohort characterization, coordinate postmortem).
