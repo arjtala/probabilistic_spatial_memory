@@ -25,3 +25,29 @@ number must trace to a committed JSON/manifest. **Do NOT touch the 60-drive coho
 - All figures reproducible from committed artifacts + `scripts/{caption_viability.py,
   eval_fixed_budget.py, compare_fixed_budget.py}`.
 - Follow the dataviz house style; keep metric names identical to the submitted paper.
+
+### Cluster environment (read before the first run — each of these cost a cycle)
+- `PSM_DATA_ROOT` is **unset**; the data root is `/checkpoint/dream/arjangt`. SLURM
+  scripts referencing it fail instantly with `PSM_DATA_ROOT: unbound variable` unless
+  `ROOT`/`OUT_ROOT` are passed via `--export=ALL,...`.
+- Use `/home/arjangt/.conda/envs/psm/bin/python`; the default pod python lacks
+  `yaml`/`h5py`. `ffmpeg`/`ffprobe` are in that env but **not on `PATH`**.
+- `HF_HUB_OFFLINE=1` is mandatory for CLIP-L / SigLIP2 loads (the proxy 403s
+  HuggingFace). Both checkpoints are already cached under `~/.cache/huggingface/hub`.
+- **No GitHub egress from the sandbox pod** (SSH and HTTPS both blocked). Commits land in
+  the shared working tree; pushes come from the login node. A failing `git fetch` means
+  blocked egress, not a missing commit — verify with
+  `git merge-base --is-ancestor <sha> HEAD`, not `ls-remote`.
+- GPU: `--qos=h200_dev` is what actually schedules. The 3-drive SigLIP2 array took ~6 min
+  per task.
+
+### Do not mix encoders (silent-subset hazard)
+`hdd/features/*/*/` now holds **two** feature files per drive:
+- `clip_l_features.h5` — all **132** drives, coordinates corrected at rest, carries the
+  `gps_realign_fix` root attr. **This is the canonical file for everything.**
+- `siglip2_l_features.h5` — only drives **3 / 47 / 131** (`201702271438`,
+  `201704111540`, `201710061345`), extracted solely for the Amendment C viability arm.
+
+Globbing `*_features.h5` will silently mix encoders across an incomplete subset. Match
+`clip_l_features.h5` explicitly, and use the SigLIP2 three only for the Finding-2
+matched-arm figure.
