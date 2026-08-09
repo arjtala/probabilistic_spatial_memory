@@ -756,3 +756,12 @@ pipeline not well-anchored to the literature". Full triage:
       `paper-4pp-abstract` (16-ahead, salvage source -- keep until 12d8b84 verified)
 - [ ] `journal/paper_drafts/main_named.tex` is untracked and looks de-anonymized.
       Do not commit; decide whether to gitignore it.
+
+## 2026-08-09 05:25 -- Prereg Amendment A (HDD-first two-phase) + branch reconciled
+
+- [x] Reconciled clone: local revision-prep was behind (1d238a7, ancestor of remote edd05d2 -- clean FF, nothing lost); adopted origin/revision-prep=edd05d2 (fix/guard/coord-correction/cohort). Archived superseded 1d238a7 as tag archive/h3-generator-superseded.
+- [x] Confirmed pod's fix stack IS on the remote (7480050 clock fix + guard, e78adf8 coord provenance, edd05d2 void-HDD) despite the pod's port-22 push auth error -- port-443 path carried it.
+- [x] Wrote PREREGISTRATION.md Amendment A (2026-08-09): (A1) >=2-substrate cohort unreachable -- only HDD qualifies; (A2) two-phase = Phase 1 HDD existence gate now (60 drives, CI valid n=60>>2), Phase 2 wearable generalization conditional on GO; (A3) null scoped to driving-corridor revisits, not wearable-universal; (A4) validity bank can't run on HDD -> Phase-1 positive can't clear §8a alone (only triggers Phase 2); (A5) coordinate source frozen into bank def (io/hdd.py@7480050); (A6) cohort=60 + excluded 2 stationary + NaN-handling 201710040938; (A7) §6 "sanity drive only" was inaccurate at submission (full corpus 2026-07-05).
+- [x] Does NOT relax H1/§8/§8a -- amendment records corpus-forced sequencing + coordinate freeze only.
+- [ ] READY TO FIRE (cluster): Phase 1 suite on the 60-drive cohort -> compare_fixed_budget.py spatial_priority vs {global_reservoir, semantic_kcenter} -> apply §8 go/no-go. Send me the compare output.
+- [ ] Still open: master freeze decision (leave advanced vs reset to c20094d); Phase-2 wearable substrate (only if Phase 1 GO).

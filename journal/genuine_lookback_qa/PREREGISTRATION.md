@@ -180,3 +180,72 @@ regenerated, reseeded, or re-authored after any policy has been run against it.
 ## 9. Prior
 Author's prior on the null: **> 0.5** even in the long regime. Preregistering the
 rule is what makes both outcomes credible.
+
+## Amendment A — 2026-08-09 (corpus reality: HDD-first two-phase; coordinate freeze)
+
+Records decisions forced by the Step-0 survey. It does **not** relax H1, the §8
+go/no-go rule, or §8a; §1–9 above are unchanged.
+
+**A1. The ≥2-substrate cohort is unreachable from existing extractions.** The
+Step-0 sweep (all 8 CLIP-L corpora, frozen params) found the gate blocked on
+**duration, not revisit structure**: no wearable session clears the ≥30-min clause
+(max minutes — Nymeria 23.5, aria 15.1, LookOut 10.7, SLOPER4D 7.3,
+aria_gen2_pilot 5.7; the lone 42-min EgoExo take has zero separated revisits).
+Only **HDD** qualifies — 60 drives, a single driving/GPS substrate. The §3a
+"≥5 across ≥2 substrates upfront" target cannot be met now; the ≥2-substrate
+requirement moves to Phase 2.
+
+**A2. Two-phase sequencing.**
+- **Phase 1 — HDD existence gate (runs now).** Cohort = the 60-drive
+  `hdd_longrevisit_v1` (manifest `journal/genuine_lookback_qa/hdd_cohort_v1_manifest.json`;
+  1101 questions; gate `duration_sec≥1800 AND n_revisited_places≥5`; generator
+  `e78adf8`; per-session `questions_sha256` + `gps_coords_sha256` frozen). n=60
+  ≫ the `--min-sessions=2` floor, so the paired session-bootstrap CI is valid and
+  well-powered on HDD alone. Phase 1 tests **existence** — does spatial allocation
+  help *at all* in a long-multi-revisit regime — not generalization.
+- **Phase 2 — wearable generalization (conditional).** Runs **only if Phase 1 is
+  GO.** Requires ≥1 long-form wearable substrate (capture/extraction — weeks) for
+  yhV1's confound, plus the §8a human-authored validity bank (native to wearable
+  look-back QA, not to driving). A Phase-1 GO is the *trigger* for that investment;
+  a Phase-1 null needs no Phase 2.
+
+**A3. Null scope (amends §8 wording for Phase 1).** HDD is 1-fps windshield video
+with **road-corridor** revisits. A Phase-1 null is strong — "no benefit even in the
+most revisit-rich data in hand" — but is scoped to **driving-corridor revisits**,
+not wearable-universal. The §8 NO-GO phrase "across substrates" applies only after
+Phase 2; a Phase-1-only null is reported as single-substrate (HDD) and must not
+imply wearable coverage.
+
+**A4. Validity bank in Phase 1.** Human-authored look-back QA is not native to HDD
+driving footage, so the §8a validity-bank tiebreaker cannot be exercised in
+Phase 1. Frozen consequence: a Phase-1 **positive** on the proxy cohort **cannot
+clear §8a on its own** — it only licenses Phase 2 (where the validity bank lives).
+Phase 1's decisive outcomes are therefore (i) **null → hypothesis dead**, or
+(ii) **positive → run Phase 2**; Phase 1 alone never yields a standalone positive
+claim.
+
+**A5. Coordinate source is part of the frozen bank definition.** Banks were
+regenerated on **at-rest-corrected** coordinates after the `astimezone()` clock bug
+(`io/hdd.py`, fixed in `7480050`; originals preserved under
+`provenance/gps_20260705/`, guard `assert_track_coverage` added). Each bank + sidecar
+carries `coord_provenance = io/hdd.py@7480050` and `n_frames_without_coordinate`.
+The pre-fix (skewed) banks and the 94+7 survey YAMLs are **void**; no policy may run
+against skewed-coord banks. Freeze key = (place-radius, visit-gap, min-separation,
+n-questions, seed, **coordinate provenance**).
+
+**A6. Cohort membership + exclusions (frozen selection).** 60/132 drives pass (not
+the 59 first reported off skewed coords; the boundary flip is `201706081335`, exactly
+5 revisited places). Handled explicitly: **2 stationary drives** (RTK bbox extent
+~0 m — genuinely parked, correctly not counted as revisits, distinct from a collapsed
+track) are excluded; **`201710040938`** carries a real 527-s RTK-acquisition lag, its
+uncovered frames written NaN (never fabricated) and barred from anchoring queries/GT.
+These are selection decisions, frozen here.
+
+**A7. §6 factual correction (for any resubmission).** The submitted §6 sentence
+"corpus-scale CLIP features … not available (only a sanity drive was extracted)" was
+**inaccurate at submission**: the full 132-drive corpus was extracted 2026-07-05,
+twelve days before c20094d. HDD is engine-runnable. The withdrawn HDD cardinality/AUC
+numbers stay withdrawn until **rerun through the engine** with the k-nearest-cell +
+VPR controls (the offline-Python-substitute half of the withdrawal stands); correct
+the availability sentence, and keep docs/HDD.md:264 "REAL RESULTS" void pending that
+rerun.
