@@ -171,9 +171,19 @@ def video_start_skew(drive_dir: Path, traj: HDDTrajectory) -> float:
     is naive we assume it shares the video's local timezone (release_2019_07_08
     RTK CSVs write local wall-clock without an offset), so a naive-datetime
     difference is the true skew regardless of PST/PDT. When ``first_iso`` is
-    tz-aware (e.g. a ``...Z`` / ``+00:00`` offset), blindly stripping the
-    tzinfo would leave a UTC wall clock that is skewed from the local video
-    filename by the whole UTC offset; convert to the local wall clock first.
+    tz-aware (e.g. ``2017-02-27T10:17:30-08:00``), its wall-clock fields are
+    ALREADY the capture's local time — the offset only annotates which local
+    zone that is. Dropping the tzinfo therefore yields exactly the local wall
+    clock the video filename is in, and the naive difference is the true skew.
+
+    Do NOT ``astimezone()`` here (see the 2026-08 postmortem in docs/HDD.md).
+    Argless ``astimezone()`` converts to the *host* timezone, which on a UTC
+    cluster node re-expresses a ``-08:00`` fix as UTC and inflates the skew by
+    the whole 7-8 h offset. That fed ``realign_frames`` a ``video_start_unix``
+    hours outside the RTK span, where ``np.interp`` silently clamps every
+    frame to the first fix — collapsing the track to a single coordinate with
+    no error raised. ``assert_track_coverage`` below now makes that loud, but
+    the correct conversion is simply to drop the offset.
     Returns 0.0 if either is unparseable.
     """
     from datetime import datetime
@@ -184,15 +194,63 @@ def video_start_skew(drive_dir: Path, traj: HDDTrajectory) -> float:
         vstart = datetime.strptime(video.name[:19], "%Y-%m-%d-%H-%M-%S")
         gps_first = datetime.fromisoformat(traj.first_iso)
         if gps_first.tzinfo is not None:
-            # Re-express the tz-aware fix as local wall-clock to match the
-            # naive local video filename, then drop tzinfo for subtraction.
-            gps_first = gps_first.astimezone().replace(tzinfo=None)
+            # The wall-clock fields are already capture-local; just drop the
+            # zone annotation so the subtraction matches the naive filename.
+            gps_first = gps_first.replace(tzinfo=None)
         return (gps_first - vstart).total_seconds()
     except (ValueError, TypeError):
         return 0.0
 
 
-def realign_frames(drive_dir: Path, frame_pts: np.ndarray) -> np.ndarray | None:
+#: Max seconds a frame may fall outside the RTK span before we call the
+#: alignment broken. Real drives overhang by a frame or two at each end
+#: (video starts marginally before the first fix / ends after the last);
+#: anything beyond this means the clocks disagree, not that the track is short.
+_MAX_OVERHANG_SEC = 30.0
+
+
+def assert_track_coverage(
+    frame_abs: np.ndarray,
+    xp: np.ndarray,
+    *,
+    drive_id: str = "",
+    max_overhang_sec: float = _MAX_OVERHANG_SEC,
+) -> None:
+    """Fail loudly when interpolation times fall outside the RTK track.
+
+    ``np.interp`` clamps out-of-range queries to the endpoint value instead of
+    erroring, so a clock-alignment bug does not surface as an exception — it
+    surfaces as a track that has silently collapsed onto its first (or last)
+    fix, which then reads downstream as a real, if degenerate, trajectory.
+    That is precisely how the 2026-07 ``astimezone()`` skew bug survived a
+    full 132-drive run. Anything computed from a clamped track is void, so we
+    raise rather than let it propagate.
+    """
+    if frame_abs.size == 0 or xp.size == 0:
+        raise ValueError(f"{drive_id or 'drive'}: empty frame or RTK time axis")
+    lo, hi = float(xp[0]), float(xp[-1])
+    before = float(np.maximum(0.0, lo - frame_abs.min()))
+    after = float(np.maximum(0.0, frame_abs.max() - hi))
+    overhang = max(before, after)
+    if overhang > max_overhang_sec:
+        n_out = int(((frame_abs < lo) | (frame_abs > hi)).sum())
+        raise ValueError(
+            f"{drive_id or 'drive'}: frame times fall {overhang:.1f} s outside "
+            f"the RTK span ({n_out}/{frame_abs.size} frames out of range; "
+            f"{before:.1f} s before / {after:.1f} s after), exceeding the "
+            f"{max_overhang_sec:.0f} s tolerance. np.interp would clamp these "
+            "to an endpoint and silently collapse the track — refusing. This "
+            "is a video/GPS clock-alignment bug (check video_start_skew), not "
+            "a short track."
+        )
+
+
+def realign_frames(
+    drive_dir: Path,
+    frame_pts: np.ndarray,
+    *,
+    on_gap: str = "raise",
+) -> np.ndarray | None:
     """Correct per-frame (lat, lng) from raw RTK GPS on the true video clock.
 
     The 2026-07-05 extraction wrote ``clip/lat,lng`` with a ~3.4 s skew (the
@@ -206,8 +264,22 @@ def realign_frames(drive_dir: Path, frame_pts: np.ndarray) -> np.ndarray | None:
         filtered) raw RTK track at that absolute time.
 
     Returns an (N, 2) array of [lat, lng] aligned to ``frame_pts``, or None if
-    the drive's raw GPS is unreadable. Once a re-extraction with the fixed
-    pipeline lands, ``clip/lat,lng`` are correct and this is unnecessary.
+    the drive's raw GPS is unreadable.
+
+    ``on_gap`` controls what happens when frame times fall outside the RTK
+    span — which is real on a handful of drives whose RTK acquisition lagged
+    the video start by minutes:
+
+    * ``"raise"`` (default) — ``ValueError`` via ``assert_track_coverage``. A
+      clamped track is worse than no track, so callers must opt in to gaps.
+    * ``"nan"`` — interpolate where covered and write NaN elsewhere. Keeps the
+      frame axis aligned with the embeddings while making uncovered frames
+      unmistakable to anything downstream (H3 conversion fails on NaN rather
+      than binning a fabricated coordinate).
+
+    As of the 2026-08 coords-only rewrite the shipped H5s carry corrected
+    ``clip/lat,lng`` at rest, so this is a verification/recompute path rather
+    than a correction every reader must remember to apply.
     """
     try:
         traj = load_rtk_trajectory(drive_dir)
@@ -219,7 +291,16 @@ def realign_frames(drive_dir: Path, frame_pts: np.ndarray) -> np.ndarray | None:
     # np.interp needs strictly increasing xp; timestamps are sorted, drop dups.
     keep = np.concatenate(([True], np.diff(traj.timestamps) > 0))
     xp, la, lo = traj.timestamps[keep], traj.lat[keep], traj.lng[keep]
-    lat = np.interp(frame_abs, xp, la)   # clipped at edges by np.interp
+    if on_gap not in {"raise", "nan"}:
+        raise ValueError(f"on_gap must be 'raise' or 'nan', got {on_gap!r}")
+    # np.interp clamps out-of-range queries instead of raising; check first.
+    if on_gap == "raise":
+        assert_track_coverage(frame_abs, xp, drive_id=drive_dir.name)
+    lat = np.interp(frame_abs, xp, la)
     lng = np.interp(frame_abs, xp, lo)
+    if on_gap == "nan":
+        outside = (frame_abs < xp[0]) | (frame_abs > xp[-1])
+        lat = np.where(outside, np.nan, lat)
+        lng = np.where(outside, np.nan, lng)
     return np.stack([lat, lng], axis=1)
 
