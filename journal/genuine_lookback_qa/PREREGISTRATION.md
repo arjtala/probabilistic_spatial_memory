@@ -249,3 +249,65 @@ numbers stay withdrawn until **rerun through the engine** with the k-nearest-cel
 VPR controls (the offline-Python-substitute half of the withdrawal stands); correct
 the availability sentence, and keep docs/HDD.md:264 "REAL RESULTS" void pending that
 rerun.
+
+## Amendment B — 2026-08-09 (proxy metric: captioned Hit@5, not retention; viability gate)
+
+The GPS-`last_seen` proxy (§3b/§7) cannot score Phase 1: `last_seen` carries no text
+query, so `eval_fixed_budget.py:708` keeps zero of its questions, and H1 is stated in
+**Hit@5** (a text→frame retrieval metric). Any `last_seen` score is circular:
+`oracle_retained` **rewards `spatial_priority`'s own objective** (rare stratum =
+low-exposure cells = exactly what the policy protects → positive by construction, the
+§3b hazard moved into the metric), and a spatial retrieval rule favours the spatial
+policy in scoring. Retention is therefore **demoted to a labelled
+allocation-retention diagnostic, never a headline**.
+
+**B1. Metric stays Hit@5.** Phase 1 proxy = **captioned `similarity_search`** on the
+HDD cohort, retrieved by CLIP text→frame cosine (**non-spatial**, so no policy is
+favoured by construction), scored Hit@5 — continuous with §5 `tab:fixed-budget`; the
+only changed variable is session length/revisit-richness (the preregistered variable).
+
+**B2. Frame selection is H3-independent (§3b).** Caption frames are sampled inside
+**metric-revisited places** (`metric_places`/`revisited_places`), ≥`min-separation-sec`
+apart (`--place-selection metric`); H3 stays a diagnostic, never a selector.
+
+**B3. GT interval = ALL visits of the place (frozen).** A caption of visit B also
+matches near-duplicate visit A; scoring only the captioned visit penalises policies
+that retain *more* frames of the place (more competing near-duplicates) — a
+construction bias running **against** `spatial_priority`, the mirror of the retention
+tautology. GT = union of the place's visit intervals → measures **place recall**
+("where was I last at this place"), which is H1. (Captioned-visit-only measures
+episode discrimination, which on repetitive driving is encoder-limited, not
+policy-limited — not our question.)
+
+**B4. Policy-free viability gate (frozen, pre-run).** Caption viability is tested with
+**no policy**: caption N frames, CLIP-text-embed, retrieve over the **full unbudgeted
+bank**; this is the retrieval *ceiling* (M=128 retention can only degrade it). **Pass
+requires both:** (i) **≥50%** of captions retrieve their GT interval at **top-5** on
+the full bank; (ii) median pairwise caption CLIP-text cosine **≤ 0.80** (guards against
+"every caption says road-with-power-lines"). (i) is decisive and governs; (ii) is a
+secondary degeneracy guard. Failing (i) means no budget or policy can produce a
+measurable `spatial_priority`-vs-`global_reservoir` difference → the corpus cannot
+support B.
+
+**B5. Caption model + prompts frozen by SHA.** Model `gemini-3-1-pro-preview-genai`.
+Prompts are frozen artifacts: `caption_prompt_driving_v1.txt` (distinctiveness, text
+allowed), `v2.txt` (appearance-only, text banned), `v3.txt` (brand-recognition). The
+prompt behind any scored bank is recorded by SHA; **no prompt tuning after a bank is
+scored**.
+
+**B6. Pilot outcome (3 drives, policy-free full-bank ceiling).**
+- v1: top-5 = **26%** (5/19). v2: top-5 = **12%** (4/34). v3: **pending — the last
+  prompt attempt**.
+- Mechanism = a **pincer**: v1's discriminative content is *text*, which CLIP-L cannot
+  read ("Pine Street" sign → rank 1611/10165); v2's CLIP-encodable content is *generic
+  architecture*, non-unique in Bay Area suburbia (tan two-storey building → rank 1006).
+  Specific-but-unreadable, or readable-but-non-unique — prompt engineering moves along
+  the tradeoff, not off it.
+
+**B7. Pre-committed branch (frozen; no fishing).** **v3 is the last prompt (no v4+).**
+If no prompt clears B4 on ≥5 qualifying drives → **B is not viable on HDD**, and the
+decisive test moves to **Phase 2 (wearable capture/extraction)**. This is a reportable
+finding with a mechanism — *"1-fps windshield video is text-discriminative and
+appearance-generic, so CLIP-grounded look-back QA is not constructible on it"* — not a
+failed experiment to bury. `oracle_retained` may accompany only as a labelled
+allocation-retention diagnostic (B-preamble), never as the headline.

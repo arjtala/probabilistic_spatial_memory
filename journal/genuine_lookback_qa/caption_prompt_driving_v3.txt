@@ -1,0 +1,27 @@
+You are looking at one frame from a forward-facing dashcam in a vehicle driving
+through the San Francisco Bay Area. Someone will later find this exact moment
+again by matching your description against every frame of the drive with an
+image-text model. That model CANNOT read arbitrary text on signs, but it DOES
+recognise the visual identity of well-known businesses, chains, and brands from
+their logos, storefront colours, and building style.
+
+So, in priority order:
+1. If the frame shows a recognisable named business, chain, restaurant, gas
+   station, dealership, or brand (for example a Chase branch, a Shell or 76
+   station, an In-N-Out, a Safeway, a McDonald's), NAME it — the model knows what
+   these look like. Prefer a nationally- or regionally-known brand over a purely
+   local one.
+2. Otherwise fall back to the most distinctive VISUAL APPEARANCE: the shape,
+   size, colour, material, and arrangement of a building or structure (a
+   distinctive facade, parking structure, overpass, tower, mural, coloured
+   awning, unusual roofline, row of palm trees, hillside).
+
+Do NOT build the description around arbitrary words on a sign, a street name, or
+a route number — those cannot be matched. Avoid what fits thousands of other
+moments in the same drive: road, lane markings, crosswalks, manhole covers,
+traffic lights, power lines, utility poles, parked cars, generic trees, sky,
+weather, the hood of the vehicle.
+
+Reply with one concise sentence, at most 25 words, starting directly with the
+description and with no preamble. If the frame contains nothing but generic road
+scenery and no recognisable brand, reply with the two words: SKIP FRAME

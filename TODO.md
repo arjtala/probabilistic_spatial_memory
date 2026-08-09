@@ -765,3 +765,13 @@ pipeline not well-anchored to the literature". Full triage:
 - [x] Does NOT relax H1/§8/§8a -- amendment records corpus-forced sequencing + coordinate freeze only.
 - [ ] READY TO FIRE (cluster): Phase 1 suite on the 60-drive cohort -> compare_fixed_budget.py spatial_priority vs {global_reservoir, semantic_kcenter} -> apply §8 go/no-go. Send me the compare output.
 - [ ] Still open: master freeze decision (leave advanced vs reset to c20094d); Phase-2 wearable substrate (only if Phase 1 GO).
+
+## 2026-08-09 18:15 -- Prereg Amendment B (captioned Hit@5 proxy + viability gate)
+
+- [x] Diagnosed: GPS last_seen banks score zero (no text query); H1 is Hit@5. Retention (oracle_retained) is by-construction for spatial_priority (rare stratum = low-exposure cells = the policy's objective) -> DEMOTED to labeled diagnostic, not headline (my tautology argument; user withdrew the retention recommendation).
+- [x] Amendment B written + pushed: metric stays Hit@5; proxy = captioned similarity_search, H3-independent metric-place frame selection; GT = ALL visits of the place (place recall; avoids near-duplicate penalty that runs AGAINST spatial_priority); policy-free viability gate frozen (>=50% captions retrieve GT@top-5 on full unbudgeted bank + median pairwise caption cosine <=0.80); model gemini-3-1-pro-preview-genai + prompts v1/v2/v3 frozen by SHA.
+- [x] Pilot (user, 3 drives, policy-free ceiling): v1 26% (5/19), v2 12% (4/34) -- both fail the 50% bar. Mechanism = pincer: v1 content is text (CLIP-L can't read), v2 content is generic architecture (non-unique). Under M=128 retention this ceiling only degrades -> no headroom for a policy difference.
+- [x] Wrote caption_prompt_driving_v3.txt (brand-recognition: name known chains/brands CLIP recognizes visually, else appearance). Committed.
+- [ ] RUN v3 (cluster, user, has GEMINI_API_KEY): last frozen prompt attempt; pre-committed stop -- if v3 <50% on >=5 drives, B is dead on HDD -> Phase 2 wearable. Expected to fail cohort-wide (suburban arterials dominate; 201710061345 = 0/12 both prompts).
+- [ ] On B-fail: report the finding ("1fps windshield = text-discriminative + appearance-generic -> CLIP-grounded look-back QA not constructible on HDD") + move decisive test to Phase 2 wearable capture.
+- [x] Note: fa78f60 (pilot fixes + v1/v2 prompts) IS on the remote -- pod pushes are landing; git bridge works despite the reported auth errors.
