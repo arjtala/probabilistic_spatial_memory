@@ -311,3 +311,22 @@ finding with a mechanism — *"1-fps windshield video is text-discriminative and
 appearance-generic, so CLIP-grounded look-back QA is not constructible on it"* — not a
 failed experiment to bury. `oracle_retained` may accompany only as a labelled
 allocation-retention diagnostic (B-preamble), never as the headline.
+
+## Amendment B — Result (2026-08-09): gate FAILED; B not viable on HDD
+
+Policy-free viability gate (B4) run on 6 drives across all three frozen prompts
+(harness `scripts/caption_viability.py`; artifacts
+`journal/genuine_lookback_qa/pilot/viability_v{1,2,3}.json`, `bc6e291`):
+v1 **26.3%** (5/19), v2 **11.8%** (4/34), v3 **13.8%** (8/58, **0/6** drives clearing).
+Median caption cosine 0.39–0.48 (< 0.80 ceiling), so captions are diverse — this is
+genuine unretrievability, not a collapsed bank. Bar = 50%. **GATE: FAIL.**
+
+Per B7, B is not viable on HDD and the HDD-first Phase-1 gate is **retired**: H1 is not
+testable on any available corpus through an encoder-grounded path. Brand recognition
+(v3) both rarely triggered (5/58 captions named a brand — suburban arterials have few)
+and failed when it did (0/5 at top-5; median rank 375 vs 126 for appearance captions).
+**Finding:** *on 1-fps windshield video, discriminative content is sign text CLIP-L
+cannot read and CLIP-encodable content is architecture too generic to be unique, so a
+CLIP-grounded look-back QA bank is not constructible on this corpus — at the retrieval
+ceiling, before any budget.* The two-phase structure collapses to requiring a **wearable
+long-form substrate (Phase 2 capture)**; direction decision escalated 2026-08-09.

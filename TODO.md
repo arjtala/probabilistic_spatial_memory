@@ -775,3 +775,11 @@ pipeline not well-anchored to the literature". Full triage:
 - [ ] RUN v3 (cluster, user, has GEMINI_API_KEY): last frozen prompt attempt; pre-committed stop -- if v3 <50% on >=5 drives, B is dead on HDD -> Phase 2 wearable. Expected to fail cohort-wide (suburban arterials dominate; 201710061345 = 0/12 both prompts).
 - [ ] On B-fail: report the finding ("1fps windshield = text-discriminative + appearance-generic -> CLIP-grounded look-back QA not constructible on HDD") + move decisive test to Phase 2 wearable capture.
 - [x] Note: fa78f60 (pilot fixes + v1/v2 prompts) IS on the remote -- pod pushes are landing; git bridge works despite the reported auth errors.
+
+## 2026-08-09 22:45 -- B DEAD on HDD (gate FAIL); two-phase collapses to Phase-2-wearable
+
+- [x] v3 (brand-recognition) FAILED the frozen viability gate: pooled 13.8% (8/58), 0/6 drives clearing; v1 26.3%, v2 11.8% -- all < 50% bar. Degeneracy guard passes (caption cosine 0.39-0.48 < 0.80) -> genuine unretrievability, not a collapsed bank. Brand captions rare (5/58) AND worse when present (0/5, median rank 375 vs 126).
+- [x] Per Amendment B B7 (pre-committed): B not viable on HDD; HDD-first Phase-1 gate retired. Finding: 1fps windshield video is text-discriminative + appearance-generic -> CLIP-grounded look-back QA not constructible on it, at the ceiling before any budget.
+- [x] Recorded outcome in PREREGISTRATION.md (Amendment B -- Result). Pilot artifacts frozen: journal/genuine_lookback_qa/pilot/viability_v{1,2,3}.json + scripts/caption_viability.py. 60-drive cohort banks untouched/unfrozen.
+- [x] Git bridge: bc6e291 already on remote (pod commits ARE reaching origin); shared working tree. FF'd to bc6e291.
+- [ ] DIRECTION DECISION (escalated): (A) write up the negative + methodological result now [RECOMMENDED -- ready, honest, low-cost; delegate to writer/analyst]; (B) invest weeks in Phase-2 wearable long-form capture to chase a >0.5-prior null; (C) shelve. Engine keeps standalone value regardless.
