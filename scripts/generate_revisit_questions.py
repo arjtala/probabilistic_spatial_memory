@@ -108,18 +108,30 @@ def metric_places(
     if n == 0:
         return {}, labels
 
+    # Frames whose coordinate is unknown carry NaN (e.g. HDD drives whose RTK
+    # acquisition lagged the video start; see io/hdd.py ``on_gap="nan"``).
+    # They keep label -1 and join no place, so they can never anchor a query or
+    # a ground-truth interval. Dropping them here rather than upstream keeps
+    # frame indices aligned with the embedding rows the evaluator scores.
+    finite = np.isfinite(lat) & np.isfinite(lng)
+    if not finite.any():
+        return {}, labels
+    origin = int(np.flatnonzero(finite)[0])
+
     # Local equirectangular projection about the track origin: adequate at the
     # session scales here (<= a few km) and avoids a geodesy dependency.
-    lat0 = float(lat[0])
+    lat0 = float(lat[origin])
     m_per_deg_lat = 110_540.0
     m_per_deg_lng = 111_320.0 * float(np.cos(np.deg2rad(lat0)))
-    xs = (lng - float(lng[0])) * m_per_deg_lng
+    xs = (lng - float(lng[origin])) * m_per_deg_lng
     ys = (lat - lat0) * m_per_deg_lat
 
     centroids_x: list[float] = []
     centroids_y: list[float] = []
     counts: list[int] = []
     for i in range(n):
+        if not finite[i]:
+            continue
         x, y = float(xs[i]), float(ys[i])
         assigned = -1
         best_d2 = radius_m * radius_m
@@ -146,11 +158,42 @@ def metric_places(
     return groups, labels
 
 
+#: Coordinate-provenance attrs copied into the frozen bank. Which coordinates a
+#: bank was built from is part of its definition, not incidental metadata: the
+#: HDD corpus shipped skewed coords until the 2026-08 fix, and a bank built on
+#: those is not comparable with one built after it.
+_COORD_PROVENANCE_ATTRS = (
+    "gps_realign_fix",
+    "gps_realign_tool",
+    "gps_realign_skew_sec",
+    "gps_coords_sha256",
+    "gps_uncovered_frames",
+    "created_at_utc",
+    "producer_version",
+    "schema_version",
+)
+
+
+def coord_provenance(features_h5: Path) -> dict:
+    """Read the coordinate-provenance stamp from a feature file's root attrs."""
+    out: dict = {}
+    with h5py.File(features_h5, "r") as f:
+        for k in _COORD_PROVENANCE_ATTRS:
+            if k in f.attrs:
+                v = f.attrs[k]
+                out[k] = v.item() if hasattr(v, "item") else str(v)
+    return out
+
+
 def load_track(features_h5: Path, group: str):
     """Return (ts_rel, lat, lng, session_start, n_frames) from the feature file.
 
     Matches eval_fixed_budget.py's expectations: per-frame ``{group}/timestamps``,
     ``{group}/lat``, ``{group}/lng`` (a GPS or geo-anchored SLAM/VIO track).
+
+    Coordinates may contain NaN for frames with no position fix; those frames
+    are excluded from place clustering by ``metric_places`` but keep their row
+    index so the frame axis still matches the embeddings.
     """
     with h5py.File(features_h5, "r") as f:
         if group not in f:
@@ -172,6 +215,12 @@ def load_track(features_h5: Path, group: str):
         )
     if not (ts.size == lat.size == lng.size == n_frames):
         raise SystemExit("timestamps / lat / lng / embeddings row counts disagree")
+    n_finite = int((np.isfinite(lat) & np.isfinite(lng)).sum())
+    if n_finite < 2:
+        raise SystemExit(
+            f"{features_h5}: only {n_finite} frame(s) have a finite coordinate "
+            "— no usable position track."
+        )
     session_start = float(ts[0]) if ts.size else 0.0
     ts_rel = (ts - session_start).astype(np.float64)
     return ts_rel, lat, lng, session_start, n_frames
@@ -300,6 +349,8 @@ def main() -> int:
     args = ap.parse_args()
 
     ts_rel, lat, lng, session_start, n_frames = load_track(args.features, args.group)
+    provenance = coord_provenance(args.features)
+    n_uncovered = int((~(np.isfinite(lat) & np.isfinite(lng))).sum())
     duration_sec = float(ts_rel[-1]) if ts_rel.size else 0.0
     # Places come from the raw track, NOT from the evaluator's H3 partition.
     groups, _place_labels = metric_places(lat, lng, radius_m=args.place_radius_m)
@@ -341,6 +392,10 @@ def main() -> int:
             "min_visits": args.min_visits,
             "min_separation_sec": args.min_separation_sec,
             "seed": args.seed,
+            # Part of the frozen definition, not a footnote: a bank built on
+            # pre-fix HDD coordinates is a different bank.
+            "coord_provenance": provenance,
+            "n_frames_without_coordinate": n_uncovered,
             "note": (
                 "GPS/SLAM-grounded last_seen proxy; NOT human-authored. Places "
                 "are metric clusters on the raw track, independent of the H3 "
@@ -363,7 +418,11 @@ def main() -> int:
     # DIAGNOSTIC ONLY: how the evaluator's partition sees the same track. Useful
     # for sanity-checking that metric places are not degenerate w.r.t. scoring,
     # but never an input to selection.
-    n_h3_cells = int(np.unique(h3_cells(lat, lng, args.h3_resolution)).size)
+    # Finite-only: h3 raises on NaN, and uncovered frames are not in any place.
+    _fin = np.isfinite(lat) & np.isfinite(lng)
+    n_h3_cells = int(
+        np.unique(h3_cells(lat[_fin], lng[_fin], args.h3_resolution)).size
+    )
     meta = {
         "session_id": session_id,
         "features": str(args.features),
@@ -374,6 +433,8 @@ def main() -> int:
         "duration_min": round(duration_sec / 60.0, 1),
         "place_selection": "metric",
         "place_radius_m": args.place_radius_m,
+        "coord_provenance": provenance,
+        "n_frames_without_coordinate": n_uncovered,
         "n_places": len(groups),
         "n_revisited_places": len(revisits),
         "n_h3_cells_diagnostic": n_h3_cells,
