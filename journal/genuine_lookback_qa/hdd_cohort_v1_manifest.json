@@ -1,0 +1,623 @@
+{
+  "cohort": "hdd_longrevisit_v1",
+  "corpus": "hdd",
+  "gate": "duration_sec >= 1800 AND n_revisited_places >= 5",
+  "generator": "scripts/generate_revisit_questions.py",
+  "generator_commit": "e78adf8",
+  "params": {
+    "place_radius_m": 15.0,
+    "visit_gap_sec": 30.0,
+    "min_visits": 2,
+    "min_separation_sec": 120.0,
+    "n_questions": 20,
+    "seed": 0,
+    "k_ring": 1
+  },
+  "coord_provenance": [
+    "extraction/psm_extraction/io/hdd.py@7480050e6bbbd2f6403c28fc0a330bafbb206a55"
+  ],
+  "n_sessions": 60,
+  "n_questions": 1101,
+  "sessions": [
+    {
+      "session_id": "201702271017",
+      "duration_min": 53.0,
+      "n_revisited_places": 118,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "730edcd2c1126b1b498b66e62c72316077fa7b05d4e24d5ab90707cec2de3f8e",
+      "gps_coords_sha256": "f36af0a38f7e38077dae0349df346c61d9a46342b99bbd9bd10ff2cf7891d655",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_02_27_ITS1/201702271017/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201702271136",
+      "duration_min": 57.5,
+      "n_revisited_places": 183,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "9f1ebb58c40f8e8349267bfcea2dc7f285280fbb617d97694285b84861bd7aa9",
+      "gps_coords_sha256": "6f3e74eed133d772566bb0ce33baccf9a47962228819a5b68a49a24fe7bb43f3",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_02_27_ITS1/201702271136/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201702271438",
+      "duration_min": 108.2,
+      "n_revisited_places": 222,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 3,
+      "questions_sha256": "768b9139378882cb457f6161abfcf697ab6fec12c53cd8b4614eaa0bcb47397c",
+      "gps_coords_sha256": "38349782d0a05aceb7741d0f4d8c9b96fe710768344c88b7a2410b0f85776f24",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_02_27_ITS1/201702271438/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201702271632",
+      "duration_min": 84.0,
+      "n_revisited_places": 239,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "d0d4e7903c0821bdada3a1840e6649c83181e985a840c71d842e2d13ab148930",
+      "gps_coords_sha256": "3ccc79737777455711d9030623e0c209e799e2af3d875aa17bb4d8a1fe9a32cd",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_02_27_ITS1/201702271632/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201702281017",
+      "duration_min": 65.5,
+      "n_revisited_places": 160,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "b33c9345c058766e836e1d51d974546882ae365b4d40c396bc13dcb6fe60eeff",
+      "gps_coords_sha256": "b21616131e7c6a4c106578cdf477dd40c98fad71328620e65ebbb07d1469ab5c",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_02_28_ITS1/201702281017/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201702281511",
+      "duration_min": 69.0,
+      "n_revisited_places": 16,
+      "n_questions": 16,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "fc277356c53213b3ed81e751b283b4950dc632c23fd14e864a5933552b135303",
+      "gps_coords_sha256": "c223b2a1ce297a2c0d296eba28c266b35458b94af80beba83c1c0eb5d73d18b0",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_02_28_ITS1/201702281511/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201703011016",
+      "duration_min": 59.4,
+      "n_revisited_places": 219,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 5,
+      "questions_sha256": "b375a5a7ea503ba92f9bfc7bd014617dffdfa05edc2ac3962a4ca4cab5a24536",
+      "gps_coords_sha256": "018e6864ebdb8343c56527341d0061dfaf511783f19f8d2d104a92f5b2e21523",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_03_01_ITS1/201703011016/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201703081008",
+      "duration_min": 43.6,
+      "n_revisited_places": 112,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "8ab88c64b6d6451a5e1ad68ffbe61bd326dc8dc311234b124a849fa87f19ce42",
+      "gps_coords_sha256": "3792659cb61529f4e0ed93ec32664e0a2b73f7f36aae7a96b272e3a0f8805e38",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_03_08_ITS1/201703081008/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201703081055",
+      "duration_min": 51.0,
+      "n_revisited_places": 167,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "7157c2163eb3eb1146fbdc9fc39ae2500c559b71de8fe448ee01f439418ecb99",
+      "gps_coords_sha256": "a227026f31c21c9b103e342c48e81cd102ffbe799ac61b07487e2597e7e3f4b6",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_03_08_ITS1/201703081055/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201703081152",
+      "duration_min": 49.3,
+      "n_revisited_places": 131,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 3,
+      "questions_sha256": "2e41f9d398fbe742924aadb035989866e91685bdbd8660393baa2fcd24b8a2d2",
+      "gps_coords_sha256": "7999d224120048d98c1c3c9e330709024b6e8ede66b627375c42da2f7002697b",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_03_08_ITS1/201703081152/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201703081437",
+      "duration_min": 31.1,
+      "n_revisited_places": 9,
+      "n_questions": 9,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "0a255234889fad6a559e9d6262310da26099f7f5b76180975ccdb484b01a7716",
+      "gps_coords_sha256": "d5fb2a78c0d7375ad259957d85f347c43e41298f114cb991fb4a906ebb5308c8",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_03_08_ITS1/201703081437/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201704101118",
+      "duration_min": 78.9,
+      "n_revisited_places": 103,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 5,
+      "questions_sha256": "de8a4935a110c54116e60992e0c92cf1087ca09b5d61a145940e94fbb0d65dd6",
+      "gps_coords_sha256": "da743815fc05c1709e011cefc7031c64044cd668efef8d68571ff276057eb25a",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_04_10_ITS1/201704101118/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201704101354",
+      "duration_min": 63.0,
+      "n_revisited_places": 45,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 3,
+      "questions_sha256": "79fb645849204c3361164356ee6e09f91b698eb08450d81e549fc64ba942b903",
+      "gps_coords_sha256": "7fc2207c7e367c56bb22ec4dfdae95ddbd6b000d9666e658d5429a4c2a0a6e38",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_04_10_ITS1/201704101354/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201704101504",
+      "duration_min": 77.2,
+      "n_revisited_places": 143,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 3,
+      "questions_sha256": "e7f20554330a77839a5d99ba546a538f20458cb98ef5a72a62c6e985a63e0198",
+      "gps_coords_sha256": "f0051b1af52b9202cbdf05f338920364b387ba20163a4f40034d111948027176",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_04_10_ITS1/201704101504/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201704101624",
+      "duration_min": 32.1,
+      "n_revisited_places": 6,
+      "n_questions": 6,
+      "n_frames_without_coordinate": 5,
+      "questions_sha256": "de688a82941eb0839e770020edb295c6d1b5a46f89b5100a13a059eeb969a2a5",
+      "gps_coords_sha256": "b7a573b46a7bd62d9f2314697077648e1fe09c025f99750a1b63453c45be9387",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_04_10_ITS1/201704101624/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201704101658",
+      "duration_min": 51.0,
+      "n_revisited_places": 194,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "d21cd9cbd6dabb7712a2a3ace9e09cc1b209b417a8b37d0abb866c2d8c68b74e",
+      "gps_coords_sha256": "81d35fc36ea04930af3e2fc3c654c18441a5d95da65ec5333701ce7d83edb4e9",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_04_10_ITS1/201704101658/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201704111041",
+      "duration_min": 55.9,
+      "n_revisited_places": 151,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "add09ec923b3c71b5fc5488ac679a51a33619e1bddcdd5b52b40b020a9b74020",
+      "gps_coords_sha256": "07533c9bf8f865bc05f4c3b2a23e9ec8c51e8c5cdf60697f65faa045e09da2b6",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_04_11_ITS1/201704111041/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201704111412",
+      "duration_min": 56.4,
+      "n_revisited_places": 28,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "dc2862e66bafe0c6194eb8de843d42608b4bdec7a109737ab0d10144e4de61a4",
+      "gps_coords_sha256": "c946c1f0cac30f4931386cd991df241a8866e7b90d18f62c5c7856d035e840ec",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_04_11_ITS1/201704111412/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201704111540",
+      "duration_min": 156.9,
+      "n_revisited_places": 190,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "b78296dd4cb165f554977e14e5f449fa82df3beac7bd705341503a7dc907a2e3",
+      "gps_coords_sha256": "2d516d396377cb5f25f2d48ba036a41c14c13f0fe957e7abbd3225a30a025fa2",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_04_11_ITS1/201704111540/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201704131537",
+      "duration_min": 56.3,
+      "n_revisited_places": 12,
+      "n_questions": 12,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "2d2f8b1e92a117e72d340c7b7c62588ca827ee70bbed86a0b63b8ceba8742b86",
+      "gps_coords_sha256": "0059b3d76412d16e2387b48550b0e6c19ab9d204247ca04d69eb0e1f24643de2",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_04_13_ITS1/201704131537/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201704141243",
+      "duration_min": 85.2,
+      "n_revisited_places": 27,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "b8c4fbc2f690588be5e6edc09c71d82977ff1e1e90c2d2ca7a2c06c1deed7897",
+      "gps_coords_sha256": "655e1d1ba3160603bef41a43e29ca7f997b19c7ba12557de2c1f0b819dc4941e",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_04_14_ITS1/201704141243/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201704141420",
+      "duration_min": 47.4,
+      "n_revisited_places": 25,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "866b2e062b3498645ea3c627c1978ea922d54097311926f6a193fbe8a79f64b6",
+      "gps_coords_sha256": "134cd3a3a371d9a80c04f83a211f17c167da34a25b60128a05417d19598ae932",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_04_14_ITS1/201704141420/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201704151103",
+      "duration_min": 31.9,
+      "n_revisited_places": 50,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "09fa85eb74a97d8639c0323bcaddda168b08d30fc5cb8a7ae02d8754474e3f95",
+      "gps_coords_sha256": "fe5b7c4de882cc53c360cdf654ec4d1f3426777ccfca7b94333388d94058dbe5",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_04_15_ITS1/201704151103/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201704151140",
+      "duration_min": 38.9,
+      "n_revisited_places": 24,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "06c47caa29792ffb55cfa0be15e140d52f27312a8e0342d9d649de4562ee48d2",
+      "gps_coords_sha256": "8078d8eaa3fc19b7a569b4c11d378dc53f7f0377c9a14f8e525ada6e024c4624",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_04_15_ITS1/201704151140/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201704151347",
+      "duration_min": 65.0,
+      "n_revisited_places": 62,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "82ed541161b42483760b27b3117bcd5bd8248135a7ab69a53d47022c33281b1c",
+      "gps_coords_sha256": "928c1577c6b2b745bd722ef80c38ede08d1b0cc2b744b6030b0fe6d0e2524250",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_04_15_ITS1/201704151347/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201706061140",
+      "duration_min": 70.4,
+      "n_revisited_places": 38,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "2f0b50688b2f78b8008ac8d3bbb11e40251ae35465fc6fcb3dc0f68a04a3beb6",
+      "gps_coords_sha256": "b3df9332a56013fce4a34cdc3081e415cde4cbc95015d299274a33e9a0aadc14",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_06_06_ITS1/201706061140/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201706061536",
+      "duration_min": 67.9,
+      "n_revisited_places": 66,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "9d187658bcdb3caf44501157d6e7b73b2cd4c0af107a15ccf9b4324c74af16a7",
+      "gps_coords_sha256": "ccf31c364484edde8b87467dbbaba0e51a1fc071d369be51cad769fd0d9ec730",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_06_06_ITS1/201706061536/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201706061647",
+      "duration_min": 87.4,
+      "n_revisited_places": 114,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "e48b178fa092f60db4673ea3b59d97e7c1848a3b89caf22368073b98ccfdb4ae",
+      "gps_coords_sha256": "decde66bb32d9b8a366d0167e0a9617aee9af4d8fe2c7bdb52d6a4bee15beb08",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_06_06_ITS1/201706061647/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201706071021",
+      "duration_min": 124.1,
+      "n_revisited_places": 144,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 5,
+      "questions_sha256": "38389ee6a625363643a4d2b226d003d3ada3a3f659dde4568a62e8d9814dcffd",
+      "gps_coords_sha256": "719d05ac7c17878747ced54e2c08931a11abee340c63c0ce0093f611e2ea2b6b",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_06_07_ITS1/201706071021/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201706071319",
+      "duration_min": 86.8,
+      "n_revisited_places": 82,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "c823229ae7b0e97ddee644166d6889795440236dc463dc61948d8b050448b8c9",
+      "gps_coords_sha256": "bb9ebce2eb454bbdb55d0cdd537efbfe0a50b662da1ce8b84c2045fc8744bf3c",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_06_07_ITS1/201706071319/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201706081335",
+      "duration_min": 60.5,
+      "n_revisited_places": 6,
+      "n_questions": 6,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "f726d11c35cb8fd99b154cb2005f993bdf364bdfb3b27cda085740fb31876504",
+      "gps_coords_sha256": "eed62e38bfb986e0248f601748d0e90ee8c285c9b7cea71ed1816ccab1a85d5d",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_06_08_ITS1/201706081335/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201706081445",
+      "duration_min": 100.2,
+      "n_revisited_places": 208,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "8e3d955526ac77fb2809867aeca5fda563006912b3233de46fe8b747886fb866",
+      "gps_coords_sha256": "bfd46740b37a5514eedf257c9382a983550c8da9c2d318eba62697bfc82b5530",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_06_08_ITS1/201706081445/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201706081707",
+      "duration_min": 101.8,
+      "n_revisited_places": 52,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "6148fcd571dd028d4cf9bc2bac71b7e451efbe8961933a16532fc511913c9193",
+      "gps_coords_sha256": "e443b82ff1660e77a9c4db9633b23e8c6502a1466970c325b77fea26d5a05ea1",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_06_08_ITS1/201706081707/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201706140912",
+      "duration_min": 80.0,
+      "n_revisited_places": 5,
+      "n_questions": 5,
+      "n_frames_without_coordinate": 5,
+      "questions_sha256": "9408c277cceccd33da2a083f7db9da7024f128f116f0a39a46b6fd116e43db19",
+      "gps_coords_sha256": "b135c1c8d8e09484976d535161ca7dea47b416321eb364484c3bd7dc71fb5001",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_06_14_ITS1/201706140912/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201706141033",
+      "duration_min": 39.0,
+      "n_revisited_places": 72,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 3,
+      "questions_sha256": "13deb04c35b7cd3a844c3c356e15238a17d10670b1d3aed7fe9e917ccf4e487c",
+      "gps_coords_sha256": "4079f59875c0b1fa1218cd617857a240ba61c65473dedb1fdb0a70d073615b72",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_06_14_ITS1/201706141033/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201706141538",
+      "duration_min": 41.5,
+      "n_revisited_places": 27,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 6,
+      "questions_sha256": "f7739d99997f8b34dfae83905e6e7dea31b40f4ea6f5f9ab87ddc07284ba469d",
+      "gps_coords_sha256": "ef017a5170909a2ed3b0c5d1ea4c0b708a2b2ebeb1936c39209ef245d4e723af",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_06_14_ITS1/201706141538/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201706141819",
+      "duration_min": 53.1,
+      "n_revisited_places": 9,
+      "n_questions": 9,
+      "n_frames_without_coordinate": 5,
+      "questions_sha256": "129df37450fc2fc50b6da7ee4218c74830e94a25820f54a37461bc883e5d4367",
+      "gps_coords_sha256": "288450b71a749264fca756b7661ac2816609f6775773658302ce214945efdaf3",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_06_14_ITS1/201706141819/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201709200946",
+      "duration_min": 40.3,
+      "n_revisited_places": 89,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 5,
+      "questions_sha256": "857123db32430f5c0db6303df4ec5a38179053307b76ff3497266ecb6b07443d",
+      "gps_coords_sha256": "bb2f50adf46bea58d9bab320d5d423a7eb2ba258e314a1a6312d1010ef7d569e",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_09_20_ITS1/201709200946/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201709201027",
+      "duration_min": 80.3,
+      "n_revisited_places": 176,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "35d55e55deba7c3cd9448231f03153edd7a9ed87450165f8dfc973987af3420a",
+      "gps_coords_sha256": "5cba0c63f47f3d31015a46712b3acd43e9b1271209a80023cc10dcab87dcfee5",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_09_20_ITS1/201709201027/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201709201319",
+      "duration_min": 109.5,
+      "n_revisited_places": 213,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 5,
+      "questions_sha256": "d43040facfbf615f3719c6ded5aafefd49c04fd6f3b88f7ddf302369fcc71229",
+      "gps_coords_sha256": "bc650f5deb6523ce50ad626ed108eabea8edaa05b0e8bd95cc8b00fe869867a0",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_09_20_ITS1/201709201319/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201709201530",
+      "duration_min": 32.9,
+      "n_revisited_places": 76,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "e6924b204e9bfc9858945d1cbbe62739c630b29a081b3b905e553e0ccb935264",
+      "gps_coords_sha256": "b0d084cf528fe6efec8c8fb28af346cce80a87340a06839199d12c3e7b6a00c5",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_09_20_ITS1/201709201530/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201709201605",
+      "duration_min": 54.3,
+      "n_revisited_places": 6,
+      "n_questions": 6,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "94e94ffee940751a3de045501589556700a16de3bd52a412791c23390a92c9d7",
+      "gps_coords_sha256": "89a7b598033ff6b655146ea0970ff37221894abd8686dec9fc112ef0b7c30df3",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_09_20_ITS1/201709201605/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201709201700",
+      "duration_min": 73.5,
+      "n_revisited_places": 65,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "8f3a6c88fd7f60b09fb6f91991f3978733d4bb731876625133cf06a64642106b",
+      "gps_coords_sha256": "495db40755442e9e6628513717826c12393831906e2a81c8bfc10282323ccae7",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_09_20_ITS1/201709201700/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201709211047",
+      "duration_min": 111.7,
+      "n_revisited_places": 47,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "9541aa89c3324fe3c62ffb68aa3b69717e3dcb204516a28fab08c51dbc983aa8",
+      "gps_coords_sha256": "c3236b9c2662fc89d3869181c50928d7c37f774d9a4393b9e3c33d274c3366f2",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_09_21_ITS1/201709211047/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201709211317",
+      "duration_min": 84.1,
+      "n_revisited_places": 31,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "3c82a193484a833840d9baac9bb4beb027768539649f43a01abbbda35578d317",
+      "gps_coords_sha256": "c589a3703ae9beb36440b123a363bf28cbc9c3a805780f583da6cf7e7bd7bd49",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_09_21_ITS1/201709211317/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201709211444",
+      "duration_min": 49.9,
+      "n_revisited_places": 26,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "85f08747f2f34e7db84be32c6bd989fe52400453b9419d884442e10d3e631ead",
+      "gps_coords_sha256": "a79c74877c662751b8c881d6ad751bd604a590d89969a3404b8ec194b63d89ad",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_09_21_ITS1/201709211444/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201709211547",
+      "duration_min": 135.7,
+      "n_revisited_places": 32,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "5e8351a0c3b438b36b2400c49ab01f89affabd00733eb7803721147059175e01",
+      "gps_coords_sha256": "920f6d2959ef6c248e863a60f245124102272ae2fa265159a9a68d741611f9b9",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_09_21_ITS1/201709211547/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201709221037",
+      "duration_min": 74.9,
+      "n_revisited_places": 42,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "71c6a93c61452b7c2b454904b055ee1dc292aab7bb0459ace0856511833f01e3",
+      "gps_coords_sha256": "905f8e38cecb7ddc523f0e0fe5f85f69bece289a7bd7a7efd9bebd8fc573174a",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_09_22_ITS1/201709221037/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201709221238",
+      "duration_min": 33.3,
+      "n_revisited_places": 55,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 5,
+      "questions_sha256": "c11b9dad5f6b440cb9bb44741bac10f63fa172ac69373f0d6a4a8878be887604",
+      "gps_coords_sha256": "087533c7b2b9e37739d7b5d3cf849289dbcd2c4e6279ac487896f1ba6c8f10fa",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_09_22_ITS1/201709221238/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201709221435",
+      "duration_min": 51.6,
+      "n_revisited_places": 68,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "f9632af5dd618bcb47a50585ad0e3d8b6348e5318e07328206440f01ac405ad0",
+      "gps_coords_sha256": "5ae57b44395a76707cf640ffcff44539149e6f96e39e719300093ff07b636fde",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_09_22_ITS1/201709221435/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201709221527",
+      "duration_min": 127.0,
+      "n_revisited_places": 112,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "84a70c57583ff952e96b3e97def38d44a350b90aaead5725ede6427dd4736a76",
+      "gps_coords_sha256": "8b4bfa9cad1f9693a3f5d82bfaa7ebe901b5d1c38fbaa7312e485f481a99684d",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_09_22_ITS1/201709221527/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201710031247",
+      "duration_min": 104.6,
+      "n_revisited_places": 56,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "ba739ef96ddda40289fad0ad6c3becb2e116771dccd40fe7e86debf1034f1244",
+      "gps_coords_sha256": "fc381f1c5092783708ac964dfe22c503b70a13fb17cfac2ce5a0bee212d385e0",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_10_03_ITS1/201710031247/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201710031458",
+      "duration_min": 101.7,
+      "n_revisited_places": 70,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "a58fcd45f916cb4f9d1109f80d16680083657dc6dc180ed0a1a586061151e346",
+      "gps_coords_sha256": "35551271df9822fa215f98c6b6dd9c58df9289f40a2e05bb991b05eff37a7e96",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_10_03_ITS1/201710031458/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201710040938",
+      "duration_min": 81.2,
+      "n_revisited_places": 39,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 528,
+      "questions_sha256": "96d4bfd8e1708ec4e33526793ce11285bcf537bfc357899a8ae5526c26d7f490",
+      "gps_coords_sha256": "50c9a775f912dbbfd3cb01ad1a24608f61fc934e2145cb251336e9638a6e989d",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_10_04_ITS1/201710040938/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201710041102",
+      "duration_min": 61.6,
+      "n_revisited_places": 72,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "5e873cd4767a68ab9f673228527cd6330e48e19e8530318678fcfdd570bed800",
+      "gps_coords_sha256": "c9a51bc275b5dd9ac32e08cdcd065af8880508ec72331b163af88fd89e3f6d82",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_10_04_ITS1/201710041102/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201710041351",
+      "duration_min": 36.2,
+      "n_revisited_places": 38,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 5,
+      "questions_sha256": "8a9f34d04ad4b3cc9c2a6d9ac6b4d119e0728d1ab89439c58a52d67838cf7444",
+      "gps_coords_sha256": "42a6d2f506fadbe661ac0b6052e98cca5941299ceff15ed01d827142a9af036d",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_10_04_ITS1/201710041351/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201710041448",
+      "duration_min": 111.2,
+      "n_revisited_places": 12,
+      "n_questions": 12,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "811c5a3bb94370181dfbe25630595d3d40afdc66ade8014cb871b2a96e2fe111",
+      "gps_coords_sha256": "ff380bd987da0ca5775f9bccc2953a696a65d6196e647b9ba104c368abb3a781",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_10_04_ITS1/201710041448/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201710061114",
+      "duration_min": 62.6,
+      "n_revisited_places": 158,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "f79d67e01df54e8d86b4b26b5765132a5c218ef8855a09d24ef8dc3c17a591ed",
+      "gps_coords_sha256": "231a5a7b8ac95a10f8b5edaaaa4f2e19bb002c69894d216d8544330e68221aa9",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_10_06_ITS1/201710061114/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201710061311",
+      "duration_min": 32.4,
+      "n_revisited_places": 39,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 4,
+      "questions_sha256": "92c717d1a212e24e6304c2a27f90953e2ca891105e2dd3112580324df7a8d772",
+      "gps_coords_sha256": "a1a63ef2cf0a422c1c70cb55ae405637e2ca3253fce22de8ac946c69e0493c84",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_10_06_ITS1/201710061311/revisit_questions.yaml"
+    },
+    {
+      "session_id": "201710061345",
+      "duration_min": 169.4,
+      "n_revisited_places": 75,
+      "n_questions": 20,
+      "n_frames_without_coordinate": 5,
+      "questions_sha256": "c294c24ad1beb4454cf802c804fb412f07c3073c60a1bf99ccee9046dfd0b3c2",
+      "gps_coords_sha256": "ab886b3d070c22238735242004398b73cfbc40a96a45418c044cb4b0ea3f96aa",
+      "questions_file": "/checkpoint/dream/arjangt/video_retrieval/hdd/features/2017_10_06_ITS1/201710061345/revisit_questions.yaml"
+    }
+  ]
+}

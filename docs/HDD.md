@@ -261,7 +261,30 @@ accuracy number, or (b) the drafted B figures read thin without one.
   coarse-geography with visual place identity (→ add a k-NN-cell hard-negative
   control if it's ever written up) and is a per-query (not per-cell) mean.
 
-### ✅ REAL RESULTS — full 132-drive corpus (2026-07-05, GPS-realigned)
+### ⚠️ VOID PENDING RERUN — full 132-drive corpus (2026-07-05, "GPS-realigned")
+
+> **Every `--realign-gps` number below is void (marked 2026-08-09).** The
+> realign path was broken: `video_start_skew` called argless `astimezone()`,
+> which converts to the *host* timezone, so on a UTC cluster node a
+> capture-local `-08:00`/`-07:00` RTK fix was re-expressed as UTC and the skew
+> came out as **25,203 / 28,803 s instead of ~3 s — on all 132 drives**.
+> `realign_frames` then placed `video_start_unix` 7–8 h before the RTK span,
+> where `np.interp` **clamps** out-of-range queries to the endpoint instead of
+> raising. Every realigned track therefore collapsed onto its first fix
+> (`n_places` 5701 → 1, revisited places → 0) with no error emitted.
+>
+> The "skew verified negligible" bullet below is *not* reassurance — a genuinely
+> collapsed coordinate track cannot leave a cell-based AUC nearly unchanged, so
+> either the realign arm did not apply in that run or F-HDD-3 is far less
+> coordinate-sensitive than the framing implies. Both possibilities invalidate
+> the bullet as evidence. F-HDD-1 and the revisit-density metric read raw GPS
+> directly and are **unaffected**; F-HDD-2/3 need rerunning.
+>
+> Fixed in `7480050`: drop the tzinfo (the wall-clock fields are already
+> capture-local), plus `assert_track_coverage()` so an out-of-span interpolation
+> raises instead of clamping. Coordinates are now corrected **at rest** in the
+> H5s by `scripts/fix_hdd_h5_coords.py` — see "Coordinate correction at rest"
+> below — so `--realign-gps` is a verification path, not a required flag.
 
 Extraction array finished (132/132 drives); `scripts/hdd_figures.sh` produced all three.
 F-HDD-2/3 use `--realign-gps` (per-frame coords recomputed from raw RTK on the true
@@ -289,6 +312,39 @@ video clock — corrects the H5 skew + outliers, see the ⚠️ note above). JSO
   evidence it was immaterial. Outlier filter (Finding 2) removed ~1.8 % spurious
   singleton r10 cells from F-HDD-1 (23,736 → 23,298); the saving table is
   unchanged. Realign machinery in `io/hdd.py:realign_frames`.
+
+### Coordinate correction at rest (2026-08-09)
+
+`scripts/fix_hdd_h5_coords.py` recomputes `clip/lat,lng` in place from the raw
+RTK track. Coords only — the GPS bug never touched the embeddings, so this is a
+CPU-minutes pass, not a re-extraction. Read-time realignment was rejected: a
+flag someone forgets silently corrupts the exact scoring partition the
+fixed-budget study turns on.
+
+| | |
+|---|---|
+| corrected | **130 / 132** drives |
+| excluded | 2 stationary drives (`201703080946`, `201710031436`) — RTK bbox extent 0.1 m / 0.0 m; the vehicle never moved, so a single-coordinate track is the truth, not a collapse |
+| skew applied | 2.55–4.22 s on 129 drives; **527 s** on `201710040938` (RTK acquisition genuinely lagged the video by ~9 min) |
+| displacement vs the 2026-07-05 coords | median over drives **17.5 m**; per-drive medians reach 942 m and p95 reaches ~52 km on long 2017-06-08 drives, where the correction also removes teleport fixes the extraction reader binned without an outlier guard |
+| frames with no fix | 1,064 total (median 4/drive, end overhang; 528 on `201710040938`) written as **NaN**, never fabricated |
+
+Provenance: originals preserved at `provenance/gps_20260705/{lat,lng}` (audit
+only), root attrs carry `gps_realign_fix` (commit), `gps_realign_skew_sec`,
+`gps_uncovered_frames`, and a `gps_coords_sha256` per file; manifest at
+`captures/hdd/coords_fix_manifest.json`. Re-running the script is idempotent
+(`--force` to redo).
+
+The correction is **not** cosmetic on every drive: the per-drive medians well
+above the ~3 s skew scale are consistent with the documented Bug-2 sample-rate
+drift (frame times mapped on the GPS span rather than the video duration), which
+accumulates over a drive, compounded by outlier removal. Anything computed from
+the pre-fix coordinates on those drives should be treated as void, not shifted.
+
+**Gate impact: none material.** The long-multi-revisit cohort is **60 drives**
+(≥30 min and ≥5 revisited places at r=15 m) on corrected coordinates, versus 59
+on the pre-fix coordinates — one boundary flip (`201706081335`, exactly 5
+revisited places). Frozen banks + shas: `captures/revisit_meta/hdd_cohort_v1_manifest.json`.
 - **Perf (F-HDD-3):** the full-corpus run needed int-code cell ids, vectorized
   (searchsorted) tie-corrected AUC (a per-element Python rank loop over 370k negs
   × thousands of calls was hanging), O(n) hit@k, and a stratified
